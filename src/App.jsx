@@ -1,14 +1,36 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useLayoutEffect } from "react";
 import "./App.css";
 import headshots from "./assets/congress_chairs.png";
 
-function sendHeight() {
-  var height = document.body.scrollHeight;
-  window.parent.postMessage({ height: height }, "*");
-}
+/**
+ * Utility function to send the current document height to the parent window (WordPress site).
+ * IMPORTANT: Replace 'https://yourwordpresssite.com' with the actual domain of your WordPress site for security.
+ */
+const broadcastHeightToParent = () => {
+  // If not inside an iframe, exit.
+  if (window.parent === window) return;
 
-window.addEventListener("load", sendHeight);
-window.addEventListener("resize", sendHeight);
+  // Get the full height of the document content
+  const height = Math.max(
+    document.body.scrollHeight,
+    document.documentElement.scrollHeight,
+    document.body.offsetHeight,
+    document.documentElement.offsetHeight,
+    document.body.clientHeight,
+    document.documentElement.clientHeight
+  );
+
+  // Send the height value to the parent window
+  // *** SECURITY NOTE: REPLACE THE '*' WITH YOUR ACTUAL WORDPRESS DOMAIN ***
+  const parentOrigin = "*";
+
+  window.parent.postMessage(
+    {
+      height: height,
+    },
+    parentOrigin
+  );
+};
 
 // NAVIGATION COMPONENT
 const Navigation = ({ activeTab, onTabClick }) => {
@@ -1308,10 +1330,31 @@ export default function App() {
     }
   };
 
+  /**
+   * 1. Send height on initial mount (after all content has rendered)
+   */
+  useEffect(() => {
+    broadcastHeightToParent();
+
+    // Also broadcast on window resize in case responsive changes content size
+    window.addEventListener("resize", broadcastHeightToParent);
+    return () => window.removeEventListener("resize", broadcastHeightToParent);
+  }, []);
+
+  /**
+   * 2. Send height every time the activeTab changes
+   * useLayoutEffect runs synchronously after all DOM mutations. This is
+   * critical to get the height *after* the new tab content is rendered.
+   */
+  useLayoutEffect(() => {
+    broadcastHeightToParent();
+  }, [activeTab]);
+
   return (
-    <main className="bg-white rounded-lg shadow-md">
+    <div className="bg-white rounded-lg shadow-md">
       <Navigation activeTab={activeTab} onTabClick={setActiveTab} />
       <div className="p-6 md:p-8">{renderTabContent()}</div>
-    </main>
+      <Footer />
+    </div>
   );
 }
