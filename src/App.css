@@ -1,0 +1,31 @@
+body {
+  font-family: "Inter", sans-serif;
+  /* Colors inspired by the poster */
+  --color-primary: #1a3a6c; /* Dark Blue */
+  --color-secondary: #f3b72c; /* Gold */
+  --color-accent: #e9ecef; /* Light Gray */
+}
+.tab-button.active {
+  /* New styles based on image */
+  border-top: 4px solid #60a5fa; /* light blue border */
+  color: white;
+  font-weight: 600;
+}
+.tab-button {
+  /* New styles for spacing and color */
+  border-top: 4px solid transparent;
+  color: #d1d5db; /* text-gray-300 */
+  transition: all 0.2s ease-in-out;
+}
+.tab-button:hover {
+  color: white;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.schedule-tab.active {
+  background-color: var(--color-primary);
+  color: white;
+}
+.schedule-tab {
+  background-color: var(--color-accent);
+  color: var(--color-primary);
+}
