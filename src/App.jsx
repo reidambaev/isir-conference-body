@@ -2,6 +2,14 @@ import React, { useState } from "react";
 import "./App.css";
 import headshots from "./assets/congress_chairs.png";
 
+function sendHeight() {
+  var height = document.body.scrollHeight;
+  window.parent.postMessage({ height: height }, "*");
+}
+
+window.addEventListener("load", sendHeight);
+window.addEventListener("resize", sendHeight);
+
 // NAVIGATION COMPONENT
 const Navigation = ({ activeTab, onTabClick }) => {
   const tabs = [
@@ -1301,12 +1309,9 @@ export default function App() {
   };
 
   return (
-    <div className="bg-gray-100 p-30">
-      <main className="bg-white rounded-lg shadow-md">
-        <Navigation activeTab={activeTab} onTabClick={setActiveTab} />
-        <div className="p-6 md:p-8">{renderTabContent()}</div>
-      </main>
-      <Footer />
-    </div>
+    <main className="bg-white rounded-lg shadow-md">
+      <Navigation activeTab={activeTab} onTabClick={setActiveTab} />
+      <div className="p-6 md:p-8">{renderTabContent()}</div>
+    </main>
   );
 }
