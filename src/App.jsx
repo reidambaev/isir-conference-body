@@ -1,36 +1,13 @@
-import React, { useState, useEffect, useLayoutEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import headshots from "./assets/congress_chairs.png";
 
-/**
- * Utility function to send the current document height to the parent window (WordPress site).
- * IMPORTANT: Replace 'https://yourwordpresssite.com' with the actual domain of your WordPress site for security.
- */
-const broadcastHeightToParent = () => {
-  // If not inside an iframe, exit.
-  if (window.parent === window) return;
-
-  // Get the full height of the document content
-  const height = Math.max(
-    document.body.scrollHeight,
-    document.documentElement.scrollHeight,
-    document.body.offsetHeight,
-    document.documentElement.offsetHeight,
-    document.body.clientHeight,
-    document.documentElement.clientHeight
-  );
-
-  // Send the height value to the parent window
-  // *** SECURITY NOTE: REPLACE THE '*' WITH YOUR ACTUAL WORDPRESS DOMAIN ***
-  const parentOrigin = "*";
-
-  window.parent.postMessage(
-    {
-      height: height,
-    },
-    parentOrigin
-  );
-};
+// ======================================================================
+// NOTE ON HEIGHT BROADCASTING:
+// The original utility function has been REMOVED and the logic is now
+// integrated into the App component using a ResizeObserver.
+// This ensures height is sent on expansion AND on shrinkage.
+// ======================================================================
 
 // NAVIGATION COMPONENT
 const Navigation = ({ activeTab, onTabClick }) => {
@@ -1308,6 +1285,11 @@ const Footer = () => (
 // MAIN APP COMPONENT
 export default function App() {
   const [activeTab, setActiveTab] = useState("about");
+  // 1. Create a ref to attach to the main container
+  const appRef = useRef(null);
+
+  // *** IMPORTANT: REPLACE THE '*' WITH YOUR ACTUAL WORDPRESS DOMAIN ***
+  const parentOrigin = "*";
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -1331,27 +1313,46 @@ export default function App() {
   };
 
   /**
-   * 1. Send height on initial mount (after all content has rendered)
+   * 2. Use a single useEffect hook to handle all height adjustments
+   * via a ResizeObserver on the main container element (appRef).
+   * This fires on initial load, element size changes (shrink/expand),
+   * and window resize.
    */
   useEffect(() => {
-    broadcastHeightToParent();
+    // Function to calculate and send the height
+    const broadcastHeight = () => {
+      // Exit if not inside an iframe or ref not ready
+      if (window.parent === window || !appRef.current) return;
 
-    // Also broadcast on window resize in case responsive changes content size
-    window.addEventListener("resize", broadcastHeightToParent);
-    return () => window.removeEventListener("resize", broadcastHeightToParent);
-  }, []);
+      // Get the full scroll height of the observed element
+      const height = appRef.current.scrollHeight;
 
-  /**
-   * 2. Send height every time the activeTab changes
-   * useLayoutEffect runs synchronously after all DOM mutations. This is
-   * critical to get the height *after* the new tab content is rendered.
-   */
-  useLayoutEffect(() => {
-    broadcastHeightToParent();
-  }, [activeTab]);
+      window.parent.postMessage({ height: height }, parentOrigin);
+      // Optional: console.log("Iframe sending height:", height); for debugging
+    };
+
+    // 3. Setup the ResizeObserver
+    const observer = new ResizeObserver(broadcastHeight);
+
+    // 4. Start observing the main application container
+    if (appRef.current) {
+      observer.observe(appRef.current);
+    }
+
+    // Also explicitly broadcast the height whenever the tab changes
+    // to ensure the instant update is registered (ResizeObserver might have a slight delay)
+    broadcastHeight();
+
+    // 5. Cleanup function
+    return () => {
+      observer.disconnect();
+      // No need for a separate window.resize listener now, as ResizeObserver handles that too.
+    };
+  }, [activeTab]); // Rerun setup when the tab changes to ensure instant update
 
   return (
-    <div className="bg-white rounded-lg shadow-md">
+    // 6. Attach the ref to the outermost container
+    <div ref={appRef} className="bg-white rounded-lg shadow-md">
       <Navigation activeTab={activeTab} onTabClick={setActiveTab} />
       <div className="p-6 md:p-8">{renderTabContent()}</div>
       <Footer />
