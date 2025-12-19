@@ -30,7 +30,7 @@ const Navigation = ({ activeTab, onTabClick }) => {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            className={`tab-button text-base font-medium px-4 py-3 ${
+            className={`tab-button text-xl font-medium px-8 py-6 ${
               activeTab === tab.id ? "active" : ""
             }`}
             onClick={() => onTabClick(tab.id)}
@@ -72,14 +72,13 @@ const AboutTab = () => (
           Location
         </h4>
         <p className="text-gray-700 mb-4">
-          The congress will be held at the{" "}
-          <strong className="font-medium">
-            BEXCO (Busan Exhibition and Convention Center)
-          </strong>
-          , a world-class venue in the heart of Busan. The recommended
-          conference hotel is the{" "}
-          <strong className="font-medium">Grand Josun, Busan</strong>, offering
-          special rates for attendees.
+          The 16th International Society for Immunology of Reproduction (ISIR)
+          Congress will be held at{" "}
+          <strong className="font-medium">The Westin Josun Busan</strong>, one
+          of Korea's premier seafront conference hotels. Overlooking Haeundae
+          Beach and located adjacent to Dongbaek Island, the venue provides an
+          ideal environment that blends scientific professionalism with
+          outstanding natural beauty.
         </p>
 
         <h4
@@ -90,13 +89,22 @@ const AboutTab = () => (
         </h4>
         <ul className="list-disc list-inside text-gray-700 space-y-2">
           <li>
-            <strong>Abstract Submission Deadline:</strong> March 15, 2026
+            <strong>Abstract Submission:</strong> April 30, 2026
           </li>
           <li>
-            <strong>Early Bird Registration Closes:</strong> June 1, 2026
+            <strong>Notification of Acceptance:</strong> May 20, 2026
           </li>
           <li>
-            <strong>Hotel Reservation Deadline:</strong> August 10, 2026
+            <strong>Early Bird Registration:</strong> July 10, 2026
+          </li>
+          <li>
+            <strong>Registration:</strong> August 30, 2026
+          </li>
+          <li>
+            <strong>Hotel Discount:</strong> July 10, 2026
+          </li>
+          <li>
+            <strong>Hotel Block Release:</strong> August 10, 2026
           </li>
         </ul>
       </div>
@@ -106,29 +114,22 @@ const AboutTab = () => (
           className="text-lg font-semibold text-blue-800 mb-3"
           style={{ color: "var(--color-primary)" }}
         >
-          Local Organizers
+          Rep. Cooperation Directors
         </h4>
-        <ul className="text-gray-700 space-y-1 mb-4">
-          <li>Kyung-Joo Hwang</li>
-          <li>Jae Kwan Lee</li>
-          <li>Ja Young Kwon</li>
-          <li>Haeng Seok Song</li>
-          <li>Joon Cheol Park</li>
+        <ul className="text-gray-700 space-y-2 mb-6">
+          <li>Hyejin Cho</li>
+          <li>Kuksun Han</li>
+          <li>Nayoung Kim</li>
+          <li>Aera Han</li>
         </ul>
-        <h4
-          className="text-lg font-semibold text-blue-800 mb-3"
-          style={{ color: "var(--color-primary)" }}
-        >
-          Rep. Cooperation Director
-        </h4>
-        <p className="text-gray-700 mb-4">Hyejin Cho</p>
+
         <h4
           className="text-lg font-semibold text-blue-800 mb-3"
           style={{ color: "var(--color-primary)" }}
         >
           Supported By
         </h4>
-        <ul className="text-gray-700 space-y-1 text-sm">
+        <ul className="text-gray-700 space-y-2">
           <li>Korean Society for Reproductive Medicine</li>
           <li>Korean Society for Reproductive Immunology</li>
           <li>Korean Society of Gynecologic Oncology</li>
@@ -167,180 +168,201 @@ const CommitteeTab = () => (
     </h4>
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-6">
       <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Joanee Kwak-Kim</p>
-        <p className="text-sm text-gray-600">
-          Rosalind Franklin University of Medicine and Science, USA
-        </p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
         <p className="font-semibold text-gray-800">Nardhy Gomez-Lopez</p>
-        <p className="text-sm text-gray-600">
-          Washington University School of Medicine, USA
-        </p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">David Sharkey</p>
-        <p className="text-sm text-gray-600">
-          University of Adelaide, Australia
-        </p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Cherie Ocampo-Cervantes</p>
-        <p className="text-sm text-gray-600">
-          University of the Philippines College of Medicine - Philippine General
-          Hospital, Philippines
-        </p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Renate van der Molen</p>
-        <p className="text-sm text-gray-600">
-          Radboud University Medical Center, The Netherlands
-        </p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Khaliun Dashdeleg</p>
-        <p className="text-sm text-gray-600">
-          Rosalind Franklin University Health Clinics, USA
-        </p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Petra Arck</p>
-        <p className="text-sm text-gray-600">
-          University Medical Center Hamburg, Germany
-        </p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Svetlana Dambaeva</p>
-        <p className="text-sm text-gray-600">
-          Rosalind Franklin University of Medicine and Science, USA
-        </p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Maja Weber</p>
-        <p className="text-sm text-gray-600">
-          Reprognostics GbR Gaiser-Kuon-Toth, Germany
-        </p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Karin Cerna</p>
-        <p className="text-sm text-gray-600">GENNET, Czech Republic</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Vikki Abrahams</p>
-        <p className="text-sm text-gray-600">Yale University, USA</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Takeshi Nagamatsu</p>
-        <p className="text-sm text-gray-600">
-          International University of Health and Welfare, Japan
-        </p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Johanna Carmina Tagle</p>
-        <p className="text-sm text-gray-600">
-          De La Salle University Medical Center, Philippines
-        </p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Karol Anne Camonayan-Flor</p>
-        <p className="text-sm text-gray-600">
-          Baguio General Hospital and Medical Center, Philippines
-        </p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Jelmer Prins</p>
-        <p className="text-sm text-gray-600">
-          University Medical Center Groningen, The Netherlands
-        </p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">John Schjenken</p>
-        <p className="text-sm text-gray-600">
-          University of Newcastle, Australia, Australia
-        </p>
+        <p className="text-sm text-gray-600">USA</p>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg">
         <p className="font-semibold text-gray-800">Sylvie Girard</p>
-        <p className="text-sm text-gray-600">Mayo Clinic, USA</p>
+        <p className="text-sm text-gray-600">USA</p>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Ayano Yamaya</p>
-        <p className="text-sm text-gray-600">
-          SORA no MORI Clinic KURUME, Japan
-        </p>
+        <p className="font-semibold text-gray-800">Petra Arck</p>
+        <p className="text-sm text-gray-600">Germany</p>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Soren Hayrabedyan</p>
-        <p className="text-sm text-gray-600">
-          Institute of Biology and Immunology of Reproduction, Bulgarian Academy
-          of Sciences, Bulgaria
-        </p>
+        <p className="font-semibold text-gray-800">David Sharkey</p>
+        <p className="text-sm text-gray-600">Australia</p>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">
-          Krassimira Todorova-Hayrabedyan
-        </p>
-        <p className="text-sm text-gray-600">
-          Institute of Biology and Immunology of Reproduction, Bulgarian Academy
-          of Sciences, Bulgaria
-        </p>
+        <p className="font-semibold text-gray-800">Atsushi Fukui</p>
+        <p className="text-sm text-gray-600">Japan</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Sarah Robertson</p>
+        <p className="text-sm text-gray-600">Australia</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Satish K Gupta</p>
+        <p className="text-sm text-gray-600">India</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Udo Markert</p>
+        <p className="text-sm text-gray-600">Germany</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Sandra Blois</p>
+        <p className="text-sm text-gray-600">Germany</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Marie Pierre Piccinni</p>
+        <p className="text-sm text-gray-600">Italy</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Akitoshi Nakashima</p>
+        <p className="text-sm text-gray-600">Japan</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Shigeru Saito</p>
+        <p className="text-sm text-gray-600">Japan</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Aihua Liao</p>
+        <p className="text-sm text-gray-600">China</p>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg">
         <p className="font-semibold text-gray-800">Nathalie Ledee</p>
-        <p className="text-sm text-gray-600">
-          Maternité Pierre Rouques Les Bluets, France
-        </p>
+        <p className="text-sm text-gray-600">France</p>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Sandra M. Blois</p>
-        <p className="text-sm text-gray-600">
-          Universitätsklinikum Hamburg-Eppendorf, Germany
-        </p>
+        <p className="font-semibold text-gray-800">Chandrakant Tayade</p>
+        <p className="text-sm text-gray-600">Canada</p>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Jenina Maree Tuozo</p>
-        <p className="text-sm text-gray-600">
-          South Imus Specialist Hospital ; City of Imus Doctors Hospital,
-          Philippines
-        </p>
+        <p className="font-semibold text-gray-800">Jelmer Prins</p>
+        <p className="text-sm text-gray-600">Netherlands</p>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">
-          Frances Lorraine Silvestre
-        </p>
-        <p className="text-sm text-gray-600">
-          St. Luke's Medical Center, Philippines
-        </p>
+        <p className="font-semibold text-gray-800">Nandor Gabor Than</p>
+        <p className="text-sm text-gray-600">Hungary</p>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Mariana Garcia</p>
-        <p className="text-sm text-gray-600">
-          Universitätsklinikum Hamburg-Eppendorf, Germany
-        </p>
+        <p className="font-semibold text-gray-800">Gendie Lash</p>
+        <p className="text-sm text-gray-600">China</p>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Jacqueline Rodolfo</p>
-        <p className="text-sm text-gray-600">
-          Medical Center Manila, Philippines
-        </p>
+        <p className="font-semibold text-gray-800">Aleksandar Stanic-Kostic</p>
+        <p className="text-sm text-gray-600">USA</p>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Maria Rowena Valerio</p>
-        <p className="text-sm text-gray-600">
-          Philippine Society of Reproductive Immunologists, Philippines
-        </p>
+        <p className="font-semibold text-gray-800">Tamara Tilburgs</p>
+        <p className="text-sm text-gray-600">USA</p>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Kenichiro Motomura</p>
-        <p className="text-sm text-gray-600">
-          National Center for Child Health and Development, Japan
-        </p>
+        <p className="font-semibold text-gray-800">Lorena Amaral</p>
+        <p className="text-sm text-gray-600">USA</p>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Antonina Gospodinova</p>
-        <p className="text-sm text-gray-600">
-          Institute of Biology and Immunology of Reproduction, Bulgaria
-        </p>
+        <p className="font-semibold text-gray-800">Thanh Luu</p>
+        <p className="text-sm text-gray-600">USA</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Joon Cheol Park</p>
+        <p className="text-sm text-gray-600">Korea</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Haiming Wei</p>
+        <p className="text-sm text-gray-600">China</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Meirong Du</p>
+        <p className="text-sm text-gray-600">China</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Liang Hui Diao</p>
+        <p className="text-sm text-gray-600">China</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Da-Jin Li</p>
+        <p className="text-sm text-gray-600">China</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Marcelo Cavalcante</p>
+        <p className="text-sm text-gray-600">Brazil</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Conor Harrity</p>
+        <p className="text-sm text-gray-600">Ireland</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Deepak Modi</p>
+        <p className="text-sm text-gray-600">India</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Mohan Raut</p>
+        <p className="text-sm text-gray-600">India</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Mugdha Raut</p>
+        <p className="text-sm text-gray-600">India</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Michael Eikmans</p>
+        <p className="text-sm text-gray-600">Netherlands</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Brice Gaudilliere</p>
+        <p className="text-sm text-gray-600">USA</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Wael Saab</p>
+        <p className="text-sm text-gray-600">UK</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Lujain Alsubki</p>
+        <p className="text-sm text-gray-600">Saudi Arabia</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Stella Goulopoulou</p>
+        <p className="text-sm text-gray-600">USA</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Gus Dekker</p>
+        <p className="text-sm text-gray-600">Australia</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Sandra Davidge</p>
+        <p className="text-sm text-gray-600">Canada</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Phil Bennett</p>
+        <p className="text-sm text-gray-600">UK</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Larry Chamley</p>
+        <p className="text-sm text-gray-600">New Zealand</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Cherie Ocampo-Cervantes</p>
+        <p className="text-sm text-gray-600">Philippines</p>
+      </div>
+    </div>
+
+    <h4
+      className="text-xl font-semibold text-blue-800 mt-8 mb-4"
+      style={{ color: "var(--color-primary)" }}
+    >
+      Local Scientific Committee Members
+    </h4>
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-6">
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Kyung-Joo Hwang</p>
+        <p className="text-sm text-gray-600">Korea</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Jae Kwan Lee</p>
+        <p className="text-sm text-gray-600">Korea</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Ja Young Kwon</p>
+        <p className="text-sm text-gray-600">Korea</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Haeng Seok Song</p>
+        <p className="text-sm text-gray-600">Korea</p>
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <p className="font-semibold text-gray-800">Joon Cheol Park</p>
+        <p className="text-sm text-gray-600">Korea</p>
       </div>
     </div>
   </div>
@@ -693,10 +715,10 @@ const RegistrationTab = () => (
                     Category
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Early Bird (by June 1)
+                    Early Bird (by July 10)
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Standard (after June 1)
+                    Standard (after July 10)
                   </th>
                 </tr>
               </thead>
@@ -747,7 +769,7 @@ const RegistrationTab = () => (
           </h4>
           <p className="text-gray-700">
             The presenting author of an accepted abstract must register for the
-            congress by the early bird deadline (June 1, 2026). Failure to
+            congress by the early bird deadline (July 10, 2026). Failure to
             register will result in the abstract being withdrawn from the
             program and publication.
           </p>
@@ -877,34 +899,39 @@ const CircleCheckIcon = ({ className }) => (
 
 const deadlines = [
   {
-    date: "Sept 1",
+    date: "Jan 15",
     title: "Registration & Abstract Submissions Open",
     desc: "The portal for both congress registration and abstract submission will be available.",
   },
   {
-    date: "Mar 15",
+    date: "Apr 30",
     title: "Abstract Submission Deadline",
     desc: "Final day to submit abstracts for consideration.",
   },
   {
-    date: "May 15",
+    date: "May 20",
     title: "Notification of Acceptance",
     desc: "Authors will be notified of their abstract status.",
   },
   {
-    date: "Jun 1",
+    date: "Jul 10",
     title: "Early Bird Registration Closes",
     desc: "Register by this date to secure the discounted rate. Presenting authors must be registered.",
   },
   {
-    date: "Jul 1",
-    title: "Last Day to Withdraw an Abstract",
-    desc: "Final day to withdraw an abstract from publication in the congress proceedings.",
+    date: "Jul 10",
+    title: "Hotel Discount Deadline",
+    desc: "Last day to book hotel rooms at the early discounted rate.",
   },
   {
     date: "Aug 10",
-    title: "Housing Reservation Deadline",
-    desc: "Book your hotel reservations early! Rooms at the special congress rate are limited and will sell out.",
+    title: "Hotel Block Release Date",
+    desc: "After this date, rooms may not be available at the group rate.",
+  },
+  {
+    date: "Aug 30",
+    title: "Registration Deadline",
+    desc: "Final day for advance registration. On-site registration available September 10-13.",
   },
 ];
 
@@ -915,24 +942,13 @@ const DeadlinesTab = () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  let eventYear = today.getFullYear();
-  let lastMonth = -1; // Use -1 to correctly handle the first month
+  // 2. Set the conference year to 2026
+  let eventYear = 2026;
 
-  // 2. Process deadlines to add full dates and past/future status
+  // 3. Process deadlines to add full dates and past/future status
   const processedDeadlines = deadlines.map((item) => {
-    // Create a date object (e.g., 'Dec 1' -> Dec 1, [CurrentYear])
-    const deadlineDate = new Date(item.date);
-    const month = deadlineDate.getMonth();
-
-    // 3. Handle year rollover
-    // If this month (e.g., 2) is less than last month (e.g., 11),
-    // it means we've crossed into the next year.
-    if (month < lastMonth) {
-      eventYear++;
-    }
-
-    deadlineDate.setFullYear(eventYear);
-    lastMonth = month;
+    // Create a date object (e.g., 'Jan 15' -> Jan 15, 2026)
+    const deadlineDate = new Date(item.date + ", " + eventYear);
 
     // 4. Check if the deadline is in the past
     const isPast = deadlineDate < today;
@@ -1041,10 +1057,12 @@ const TravelTab = () => (
           Hotel Reservations
         </h4>
         <p className="text-gray-700">
-          We have secured a block of rooms at a discounted rate at the{" "}
-          <strong className="font-medium">Grand Josun, Busan</strong>. Rates are
-          available on a first-come, first-served basis and must be booked by
-          August 10, 2026. Book early, as rooms will sell out!
+          The congress will be held at{" "}
+          <strong className="font-medium">The Westin Josun Busan</strong>,
+          overlooking Haeundae Beach. We have secured a block of rooms at a
+          discounted rate. Rates are available on a first-come, first-served
+          basis and must be booked by August 10, 2026. Book early, as rooms will
+          sell out!
         </p>
         <a
           href="#"
@@ -1079,9 +1097,11 @@ const TravelTab = () => (
           2.5 - 3 hours).
         </p>
         <p className="text-gray-700">
-          <strong className="font-medium">From PUS to BEXCO:</strong> Taxis and
-          airport limousine buses are readily available. The journey to the
-          BEXCO/Haeundae area takes approximately 45-60 minutes.
+          <strong className="font-medium">
+            From PUS to The Westin Josun Busan:
+          </strong>{" "}
+          Taxis and airport limousine buses are readily available. The journey
+          to the Haeundae area takes approximately 45-60 minutes.
         </p>
       </div>
       <div>
@@ -1128,8 +1148,7 @@ const TravelTab = () => (
               Haeundae Beach
             </h5>
             <p className="text-sm text-gray-600">
-              Enjoy the stunning coastline, just steps from the convention
-              center.
+              Enjoy the stunning coastline, just steps from the hotel.
             </p>
           </div>
         </div>

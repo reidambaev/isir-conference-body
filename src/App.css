@@ -1,5 +1,6 @@
 body {
   font-family: "Inter", sans-serif;
+  font-size: 1.125rem; /* 18px - slightly larger base font */
   /* Colors inspired by the poster */
   --color-primary: #1a3a6c; /* Dark Blue */
   --color-secondary: #f3b72c; /* Gold */
