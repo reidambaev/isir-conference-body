@@ -14,10 +14,10 @@ const Navigation = ({ activeTab, onTabClick }) => {
   const tabs = [
     { id: "about", label: "About" },
     { id: "committee", label: "Program Committee" },
-    { id: "schedule", label: "Schedule" },
-    { id: "registration", label: "Registration" },
+    // { id: "schedule", label: "Schedule" },
+    // { id: "registration", label: "Registration" },
     { id: "deadlines", label: "Deadlines" },
-    { id: "travel", label: "Travel" },
+    // { id: "travel", label: "Travel" },
     { id: "sponsors", label: "Sponsors/Exhibits" },
   ];
 
@@ -64,7 +64,7 @@ const AboutTab = () => (
     </p>
 
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <div className="md:col-span-2">
+      <div className="md:col-span-3">
         <h4
           className="text-xl font-semibold text-blue-800 mb-3"
           style={{ color: "var(--color-primary)" }}
@@ -80,31 +80,31 @@ const AboutTab = () => (
           ideal environment that blends scientific professionalism with
           outstanding natural beauty.
         </p>
+      </div>
 
+      <div className="md:col-span-2">
         <h4
-          className="text-xl font-semibold text-blue-800 mt-6 mb-3"
+          className="text-xl font-semibold text-blue-800 mb-3"
           style={{ color: "var(--color-primary)" }}
         >
-          Important Deadlines
+          Important Dates
         </h4>
         <ul className="list-disc list-inside text-gray-700 space-y-2">
           <li>
-            <strong>Abstract Submission:</strong> April 30, 2026
+            <strong>Abstract Submission Opens:</strong> February 1, 2026
           </li>
           <li>
-            <strong>Notification of Acceptance:</strong> May 20, 2026
+            <strong>Early Bird Registration Opens:</strong> February 1, 2026
+          </li>
+          <li className="list-none">&nbsp;</li>
+          <li>
+            <strong>Abstract Submission Deadline:</strong> April 30, 2026
           </li>
           <li>
-            <strong>Early Bird Registration:</strong> July 10, 2026
+            <strong>Early Bird Registration Deadline:</strong> July 10, 2026
           </li>
           <li>
-            <strong>Registration:</strong> August 30, 2026
-          </li>
-          <li>
-            <strong>Hotel Discount:</strong> July 10, 2026
-          </li>
-          <li>
-            <strong>Hotel Block Release:</strong> August 10, 2026
+            <strong>Online Registration Deadline:</strong> August 30, 2026
           </li>
         </ul>
       </div>
@@ -116,24 +116,11 @@ const AboutTab = () => (
         >
           Rep. Cooperation Directors
         </h4>
-        <ul className="text-gray-700 space-y-2 mb-6">
+        <ul className="text-gray-700 space-y-2">
           <li>Hyejin Cho</li>
           <li>Kuksun Han</li>
           <li>Nayoung Kim</li>
           <li>Aera Han</li>
-        </ul>
-
-        <h4
-          className="text-lg font-semibold text-blue-800 mb-3"
-          style={{ color: "var(--color-primary)" }}
-        >
-          Supported By
-        </h4>
-        <ul className="text-gray-700 space-y-2">
-          <li>Korean Society for Reproductive Medicine</li>
-          <li>Korean Society for Reproductive Immunology</li>
-          <li>Korean Society of Gynecologic Oncology</li>
-          <li>Korean Society of Ultrasound in Obstetrics and Gynecology</li>
         </ul>
       </div>
     </div>
@@ -166,174 +153,49 @@ const CommitteeTab = () => (
     >
       Scientific Committee Members
     </h4>
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-6">
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Nardhy Gomez-Lopez</p>
-        <p className="text-sm text-gray-600">USA</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Sylvie Girard</p>
-        <p className="text-sm text-gray-600">USA</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Petra Arck</p>
-        <p className="text-sm text-gray-600">Germany</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">David Sharkey</p>
-        <p className="text-sm text-gray-600">Australia</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Atsushi Fukui</p>
-        <p className="text-sm text-gray-600">Japan</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Sarah Robertson</p>
-        <p className="text-sm text-gray-600">Australia</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Satish K Gupta</p>
-        <p className="text-sm text-gray-600">India</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Udo Markert</p>
-        <p className="text-sm text-gray-600">Germany</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Sandra Blois</p>
-        <p className="text-sm text-gray-600">Germany</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Marie Pierre Piccinni</p>
-        <p className="text-sm text-gray-600">Italy</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Akitoshi Nakashima</p>
-        <p className="text-sm text-gray-600">Japan</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Shigeru Saito</p>
-        <p className="text-sm text-gray-600">Japan</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Aihua Liao</p>
-        <p className="text-sm text-gray-600">China</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Nathalie Ledee</p>
-        <p className="text-sm text-gray-600">France</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Chandrakant Tayade</p>
-        <p className="text-sm text-gray-600">Canada</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Jelmer Prins</p>
-        <p className="text-sm text-gray-600">Netherlands</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Nandor Gabor Than</p>
-        <p className="text-sm text-gray-600">Hungary</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Gendie Lash</p>
-        <p className="text-sm text-gray-600">China</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Aleksandar Stanic-Kostic</p>
-        <p className="text-sm text-gray-600">USA</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Tamara Tilburgs</p>
-        <p className="text-sm text-gray-600">USA</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Lorena Amaral</p>
-        <p className="text-sm text-gray-600">USA</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Thanh Luu</p>
-        <p className="text-sm text-gray-600">USA</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Joon Cheol Park</p>
-        <p className="text-sm text-gray-600">Korea</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Haiming Wei</p>
-        <p className="text-sm text-gray-600">China</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Meirong Du</p>
-        <p className="text-sm text-gray-600">China</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Liang Hui Diao</p>
-        <p className="text-sm text-gray-600">China</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Da-Jin Li</p>
-        <p className="text-sm text-gray-600">China</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Marcelo Cavalcante</p>
-        <p className="text-sm text-gray-600">Brazil</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Conor Harrity</p>
-        <p className="text-sm text-gray-600">Ireland</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Deepak Modi</p>
-        <p className="text-sm text-gray-600">India</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Mohan Raut</p>
-        <p className="text-sm text-gray-600">India</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Mugdha Raut</p>
-        <p className="text-sm text-gray-600">India</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Michael Eikmans</p>
-        <p className="text-sm text-gray-600">Netherlands</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Brice Gaudilliere</p>
-        <p className="text-sm text-gray-600">USA</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Wael Saab</p>
-        <p className="text-sm text-gray-600">UK</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Lujain Alsubki</p>
-        <p className="text-sm text-gray-600">Saudi Arabia</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Stella Goulopoulou</p>
-        <p className="text-sm text-gray-600">USA</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Gus Dekker</p>
-        <p className="text-sm text-gray-600">Australia</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Sandra Davidge</p>
-        <p className="text-sm text-gray-600">Canada</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Phil Bennett</p>
-        <p className="text-sm text-gray-600">UK</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Larry Chamley</p>
-        <p className="text-sm text-gray-600">New Zealand</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Cherie Ocampo-Cervantes</p>
-        <p className="text-sm text-gray-600">Philippines</p>
+    <div className="bg-gray-50 p-6 rounded-lg">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 text-gray-700">
+        <p>Nardhy Gomez-Lopez (USA)</p>
+        <p>Sylvie Girard (USA)</p>
+        <p>Petra Arck (Germany)</p>
+        <p>David Sharkey (Australia)</p>
+        <p>Atsushi Fukui (Japan)</p>
+        <p>Sarah Robertson (Australia)</p>
+        <p>Satish K Gupta (India)</p>
+        <p>Udo Markert (Germany)</p>
+        <p>Sandra Blois (Germany)</p>
+        <p>Marie Pierre Piccinni (Italy)</p>
+        <p>Akitoshi Nakashima (Japan)</p>
+        <p>Shigeru Saito (Japan)</p>
+        <p>Aihua Liao (China)</p>
+        <p>Nathalie Ledee (France)</p>
+        <p>Chandrakant Tayade (Canada)</p>
+        <p>Jelmer Prins (Netherlands)</p>
+        <p>Nandor Gabor Than (Hungary)</p>
+        <p>Gendie Lash (China)</p>
+        <p>Aleksandar Stanic-Kostic (USA)</p>
+        <p>Tamara Tilburgs (USA)</p>
+        <p>Lorena Amaral (USA)</p>
+        <p>Thanh Luu (USA)</p>
+        <p>Haiming Wei (China)</p>
+        <p>Meirong Du (China)</p>
+        <p>Liang Hui Diao (China)</p>
+        <p>Da-Jin Li (China)</p>
+        <p>Marcelo Cavalcante (Brazil)</p>
+        <p>Conor Harrity (Ireland)</p>
+        <p>Deepak Modi (India)</p>
+        <p>Mohan Raut (India)</p>
+        <p>Mugdha Raut (India)</p>
+        <p>Michael Eikmans (Netherlands)</p>
+        <p>Brice Gaudilliere (USA)</p>
+        <p>Wael Saab (UK)</p>
+        <p>Lujain Alsubki (Saudi Arabia)</p>
+        <p>Stella Goulopoulou (USA)</p>
+        <p>Gus Dekker (Australia)</p>
+        <p>Sandra Davidge (Canada)</p>
+        <p>Phil Bennett (UK)</p>
+        <p>Larry Chamley (New Zealand)</p>
+        <p>Cherie Ocampo-Cervantes (Philippines)</p>
       </div>
     </div>
 
@@ -343,26 +205,13 @@ const CommitteeTab = () => (
     >
       Local Scientific Committee Members
     </h4>
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-6">
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Kyung-Joo Hwang</p>
-        <p className="text-sm text-gray-600">Korea</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Jae Kwan Lee</p>
-        <p className="text-sm text-gray-600">Korea</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Ja Young Kwon</p>
-        <p className="text-sm text-gray-600">Korea</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Haeng Seok Song</p>
-        <p className="text-sm text-gray-600">Korea</p>
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <p className="font-semibold text-gray-800">Joon Cheol Park</p>
-        <p className="text-sm text-gray-600">Korea</p>
+    <div className="bg-gray-50 p-6 rounded-lg">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 text-gray-700">
+        <p>Kyung-Joo Hwang (Korea)</p>
+        <p>Jae Kwan Lee (Korea)</p>
+        <p>Ja Young Kwon (Korea)</p>
+        <p>Haeng Seok Song (Korea)</p>
+        <p>Joon Cheol Park (Korea)</p>
       </div>
     </div>
   </div>
@@ -727,29 +576,36 @@ const RegistrationTab = () => (
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">
                     ISIR Member
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">$650</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">$750</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">$350</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">$450</td>
                 </tr>
                 <tr>
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">
                     Non-Member
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">$800</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">$900</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">$650</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">$750</td>
                 </tr>
                 <tr>
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                    Trainee / Student
+                    Trainee / Student Member
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">$400</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">$500</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">$150</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">$200</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                    Trainee / Student Non-Member
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700">$250</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">$300</td>
                 </tr>
                 <tr>
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">
                     Accompanying Person
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700">$250</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">$250</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">$350</td>
                 </tr>
               </tbody>
             </table>
@@ -786,7 +642,7 @@ const RegistrationTab = () => (
           </h4>
           <p className="text-gray-700 mb-3">
             Registration and abstract submission are handled through the same
-            portal. Portals open December 1, 2025.
+            portal. Portals open February 1, 2026.
           </p>
           <a
             href="#"
@@ -796,7 +652,7 @@ const RegistrationTab = () => (
               color: "var(--color-primary)",
             }}
           >
-            Register Now (Opens Dec 1)
+            Register Now (Opens Feb 1)
           </a>
           <a
             href="#"
@@ -806,7 +662,7 @@ const RegistrationTab = () => (
               color: "var(--color-primary)",
             }}
           >
-            Submit Abstract (Opens Dec 1)
+            Submit Abstract (Opens Feb 1)
           </a>
         </div>
 
@@ -899,7 +755,7 @@ const CircleCheckIcon = ({ className }) => (
 
 const deadlines = [
   {
-    date: "Jan 15",
+    date: "Feb 1",
     title: "Registration & Abstract Submissions Open",
     desc: "The portal for both congress registration and abstract submission will be available.",
   },
@@ -1209,84 +1065,18 @@ const SponsorsTab = () => (
       className="text-xl font-semibold text-blue-800 mb-4"
       style={{ color: "var(--color-primary)" }}
     >
-      Platinum Sponsors
+      Supported By
     </h4>
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-      <div className="flex items-center justify-center p-6 bg-gray-100 rounded-lg h-32">
-        <img
-          src="https://placehold.co/150x50/1a3a6c/f3b72c?text=Pharma+Inc."
-          alt="Sponsor Logo"
-          className="opacity-75"
-        />
-      </div>
-      <div className="flex items-center justify-center p-6 bg-gray-100 rounded-lg h-32">
-        <img
-          src="https://placehold.co/150x50/1a3a6c/f3b72c?text=BioTech+Global"
-          alt="Sponsor Logo"
-          className="opacity-75"
-        />
-      </div>
-    </div>
+    <ul className="list-disc list-inside text-gray-700 space-y-2 mb-8">
+      <li>Korean Society for Reproductive Medicine</li>
+      <li>Korean Society for Reproductive Immunology</li>
+      <li>Korean Society of Gynecologic Oncology</li>
+      <li>Korean Society of Ultrasound in Obstetrics and Gynecology</li>
+    </ul>
 
-    <h4
-      className="text-xl font-semibold text-blue-800 mb-4"
-      style={{ color: "var(--color-primary)" }}
-    >
-      Gold Sponsors
-    </h4>
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-      <div className="flex items-center justify-center p-6 bg-gray-100 rounded-lg h-32">
-        <img
-          src="https://placehold.co/140x40/666/eee?text=Repro+Solutions"
-          alt="Sponsor Logo"
-          className="opacity-75"
-        />
-      </div>
-      <div className="flex items-center justify-center p-6 bg-gray-100 rounded-lg h-32">
-        <img
-          src="https://placehold.co/140x40/666/eee?text=ImmuneHealth"
-          alt="Sponsor Logo"
-          className="opacity-75"
-        />
-      </div>
-      <div className="flex items-center justify-center p-6 bg-gray-100 rounded-lg h-32">
-        <img
-          src="https://placehold.co/140x40/666/eee?text=MedLab+Co."
-          alt="Sponsor Logo"
-          className="opacity-75"
-        />
-      </div>
-    </div>
-
-    <h4
-      className="text-xl font-semibold text-blue-800 mb-4"
-      style={{ color: "var(--color-primary)" }}
-    >
-      Silver Sponsors
-    </h4>
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
-      <div className="flex items-center justify-center p-4 bg-gray-100 rounded-lg h-24">
-        <img
-          src="https://placehold.co/120x30/999/eee?text=Genetics+Ltd"
-          alt="Sponsor Logo"
-          className="opacity-75"
-        />
-      </div>
-      <div className="flex items-center justify-center p-4 bg-gray-100 rounded-lg h-24">
-        <img
-          src="https://placehold.co/120x30/999/eee?text=Innova+Diagnostics"
-          alt="Sponsor Logo"
-          className="opacity-75"
-        />
-      </div>
-      <div className="flex items-center justify-center p-4 bg-gray-100 rounded-lg h-24">
-        <img
-          src="https://placehold.co/120x30/999/eee?text=Korea+Pharma"
-          alt="Sponsor Logo"
-          className="opacity-75"
-        />
-      </div>
-    </div>
+    <p className="text-gray-600 italic mt-8">
+      Sponsorship opportunities are available. Please contact us for more information.
+    </p>
   </div>
 );
 
