@@ -1075,7 +1075,8 @@ const SponsorsTab = () => (
     </ul>
 
     <p className="text-gray-600 italic mt-8">
-      Sponsorship opportunities are available. Please contact us for more information.
+      Sponsorship opportunities are available. Please contact us for more
+      information.
     </p>
   </div>
 );
