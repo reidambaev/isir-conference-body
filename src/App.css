@@ -15,7 +15,7 @@ body {
 }
 .tab-button.active::before,
 .tab-button.active::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 20%;
   height: 60%;
@@ -38,7 +38,7 @@ body {
 }
 .tab-button::before,
 .tab-button::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 20%;
   height: 60%;
