@@ -11,16 +11,66 @@ body {
   border-top: 4px solid #60a5fa; /* light blue border */
   color: white;
   font-weight: 600;
+  position: relative;
+}
+.tab-button.active::before,
+.tab-button.active::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  height: 60%;
+  width: 1px;
+  background-color: rgba(255, 255, 255, 0.2);
+  transition: all 0.2s ease-in-out;
+}
+.tab-button.active::before {
+  left: 0;
+}
+.tab-button.active::after {
+  right: 0;
 }
 .tab-button {
   /* New styles for spacing and color */
   border-top: 4px solid transparent;
   color: #d1d5db; /* text-gray-300 */
   transition: all 0.2s ease-in-out;
+  position: relative;
+}
+.tab-button::before,
+.tab-button::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  height: 60%;
+  width: 1px;
+  background-color: rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease-in-out;
+}
+.tab-button::before {
+  left: 0;
+}
+.tab-button::after {
+  right: 0;
 }
 .tab-button:hover {
   color: white;
   background-color: rgba(255, 255, 255, 0.1);
+}
+.tab-button:hover::before,
+.tab-button:hover::after {
+  background-color: rgba(255, 255, 255, 0.2);
+  top: 0;
+  height: 100%;
+}
+.tab-button:hover + .tab-button::before {
+  background-color: rgba(255, 255, 255, 0.2);
+  top: 0;
+  height: 100%;
+}
+.tab-button:has(+ .tab-button:hover)::after {
+  background-color: rgba(255, 255, 255, 0.2);
+  top: 0;
+  height: 100%;
 }
 .schedule-tab.active {
   background-color: var(--color-primary);

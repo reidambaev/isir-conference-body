@@ -15,7 +15,7 @@ const Navigation = ({ activeTab, onTabClick }) => {
     { id: "about", label: "About" },
     { id: "committee", label: "Program Committee" },
     // { id: "schedule", label: "Schedule" },
-    { id: "registration", label: "Registration" },
+    // { id: "registration", label: "Registration" },
     { id: "deadlines", label: "Deadlines" },
     // { id: "travel", label: "Travel" },
     { id: "sponsors", label: "Sponsors/Exhibits" },
@@ -645,7 +645,7 @@ const RegistrationTab = () => (
             portal. Portals open February 1, 2026.
           </p>
           <a
-            href="#"
+            href="https://theisir.org/membership-account/membership-levels/"
             className="px-4 py-2 font-medium rounded-md hover:bg-yellow-600"
             style={{
               backgroundColor: "var(--color-secondary)",
@@ -694,8 +694,8 @@ const RegistrationTab = () => (
             Oral Presentations
           </h5>
           <p className="text-gray-700 mb-2">
-            Selected authors will be invited for a 12-minute oral presentation
-            followed by a 3-minute Q&A.
+            Selected authors will be invited for a 9-minute oral presentation
+            followed by a 2-minute Q&A.
           </p>
           <h5 className="text-lg font-medium text-gray-800 mb-1">
             Poster Presentations
@@ -768,11 +768,6 @@ const deadlines = [
     date: "Jul 10",
     title: "Hotel Discount Deadline",
     desc: "Last day to book hotel rooms at the early discounted rate.",
-  },
-  {
-    date: "Aug 10",
-    title: "Hotel Block Release Date",
-    desc: "After this date, rooms may not be available at the group rate.",
   },
   {
     date: "Aug 30",
@@ -1062,6 +1057,7 @@ const SponsorsTab = () => (
       <li>Korean Society for Reproductive Immunology</li>
       <li>Korean Society of Gynecologic Oncology</li>
       <li>Korean Society of Ultrasound in Obstetrics and Gynecology</li>
+      <li>Korean College of Obstetrics and Gynecology</li>
     </ul>
 
     <p className="text-gray-600 italic mt-8">
