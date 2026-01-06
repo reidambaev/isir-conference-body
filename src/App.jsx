@@ -15,7 +15,7 @@ const Navigation = ({ activeTab, onTabClick }) => {
     { id: "about", label: "About" },
     { id: "committee", label: "Program Committee" },
     // { id: "schedule", label: "Schedule" },
-    // { id: "registration", label: "Registration" },
+    { id: "registration", label: "Registration" },
     { id: "deadlines", label: "Deadlines" },
     // { id: "travel", label: "Travel" },
     { id: "sponsors", label: "Sponsors/Exhibits" },
@@ -646,23 +646,13 @@ const RegistrationTab = () => (
           </p>
           <a
             href="#"
-            className="px-4 py-2 font-medium rounded-md hover:bg-yellow-600 mr-2"
-            style={{
-              backgroundColor: "var(--color-secondary)",
-              color: "var(--color-primary)",
-            }}
-          >
-            Register Now (Opens Feb 1)
-          </a>
-          <a
-            href="#"
             className="px-4 py-2 font-medium rounded-md hover:bg-yellow-600"
             style={{
               backgroundColor: "var(--color-secondary)",
               color: "var(--color-primary)",
             }}
           >
-            Submit Abstract (Opens Feb 1)
+            Create an Account to Register & Submit Abstracts
           </a>
         </div>
 
