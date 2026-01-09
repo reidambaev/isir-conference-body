@@ -15,7 +15,7 @@ const Navigation = ({ activeTab, onTabClick }) => {
     { id: "about", label: "About" },
     { id: "committee", label: "Program Committee" },
     // { id: "schedule", label: "Schedule" },
-    // { id: "registration", label: "Registration" },
+    { id: "registration", label: "Registration" },
     { id: "deadlines", label: "Deadlines" },
     // { id: "travel", label: "Travel" },
     { id: "sponsors", label: "Sponsors/Exhibits" },
@@ -630,31 +630,6 @@ const RegistrationTab = () => (
             program and publication.
           </p>
         </div>
-      </div>
-
-      <div className="space-y-6">
-        <div>
-          <h4
-            className="text-xl font-semibold text-blue-800 mb-2"
-            style={{ color: "var(--color-primary)" }}
-          >
-            Register Now
-          </h4>
-          <p className="text-gray-700 mb-3">
-            Registration and abstract submission are handled through the same
-            portal. Portals open February 1, 2026.
-          </p>
-          <a
-            href="https://theisir.org/membership-account/membership-levels/"
-            className="px-4 py-2 font-medium rounded-md hover:bg-yellow-600"
-            style={{
-              backgroundColor: "var(--color-secondary)",
-              color: "var(--color-primary)",
-            }}
-          >
-            Create an Account to Register & Submit Abstracts
-          </a>
-        </div>
 
         <div>
           <h4
@@ -681,6 +656,103 @@ const RegistrationTab = () => (
               <strong>Keywords:</strong> 3-5 keywords.
             </li>
           </ul>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <div>
+          <h4
+            className="text-xl font-semibold text-blue-800 mb-2"
+            style={{ color: "var(--color-primary)" }}
+          >
+            Steps To Register
+          </h4>
+          <div className="bg-gray-50 p-6 rounded-lg space-y-4">
+            <div className="flex items-start">
+              <div
+                className="flex-shrink-0 w-8 h-8 bg-blue-900 text-white rounded-full flex items-center justify-center font-bold mr-3"
+                style={{ backgroundColor: "var(--color-primary)" }}
+              >
+                1
+              </div>
+              <div>
+                <h5 className="font-semibold text-gray-900 mb-1">
+                  Create an Account
+                </h5>
+                <p className="text-gray-700 text-sm mb-2">
+                  Choose either ISIR Member or Non-Member account. Members
+                  receive discounted registration rates.
+                </p>
+                <a
+                  href="https://theisir.org/membership-account/membership-levels/"
+                  className="inline-block px-4 py-2 text-sm font-medium rounded-md hover:bg-yellow-600"
+                  style={{
+                    backgroundColor: "var(--color-secondary)",
+                    color: "var(--color-primary)",
+                  }}
+                >
+                  Create Account
+                </a>
+              </div>
+            </div>
+
+            <div className="flex items-start">
+              <div
+                className="flex-shrink-0 w-8 h-8 bg-blue-900 text-white rounded-full flex items-center justify-center font-bold mr-3"
+                style={{ backgroundColor: "var(--color-primary)" }}
+              >
+                2
+              </div>
+              <div>
+                <h5 className="font-semibold text-gray-900 mb-1">
+                  Register for the Event
+                </h5>
+                <p className="text-gray-700 text-sm mb-2">
+                  Complete your congress registration and select your
+                  registration category. Early bird rates available until July
+                  10, 2026.
+                </p>
+                <a
+                  href="#"
+                  className="inline-block px-4 py-2 text-sm font-medium rounded-md hover:bg-yellow-600"
+                  style={{
+                    backgroundColor: "var(--color-secondary)",
+                    color: "var(--color-primary)",
+                  }}
+                >
+                  Register Now (Opens Feb 1)
+                </a>
+              </div>
+            </div>
+
+            <div className="flex items-start">
+              <div
+                className="flex-shrink-0 w-8 h-8 bg-blue-900 text-white rounded-full flex items-center justify-center font-bold mr-3"
+                style={{ backgroundColor: "var(--color-primary)" }}
+              >
+                3
+              </div>
+              <div>
+                <h5 className="font-semibold text-gray-900 mb-1">
+                  Submit an Abstract (Optional)
+                </h5>
+                <p className="text-gray-700 text-sm mb-2">
+                  If you wish to present your research, submit an abstract by
+                  April 30, 2026. Not required for attendance.
+                </p>
+                <a
+                  href="#"
+                  className="inline-block px-4 py-2 text-sm font-medium rounded-md hover:bg-yellow-600"
+                  style={{
+                    backgroundColor: "var(--color-secondary)",
+                    color: "var(--color-primary)",
+                  }}
+                >
+                  Submit Abstract (Opens Feb 1)
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div>
