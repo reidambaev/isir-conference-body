@@ -4184,15 +4184,29 @@ const SponsorsTab = () => (
     {/* Row 1: Logos 1, 2, 3 */}
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
       {[
-        { name: "Korean Society for Reproductive Medicine", logo: logo1, size: 'w-48 h-16' },
-        { name: "Korean Society for Reproductive Immunology", logo: logo2, size: 'w-28 h-28' },
-        { name: "Korean Society of Gynecologic Oncology", logo: logo3, size: 'w-48 h-16' },
+        {
+          name: "Korean Society for Reproductive Medicine",
+          logo: logo1,
+          size: "w-48 h-16",
+        },
+        {
+          name: "Korean Society for Reproductive Immunology",
+          logo: logo2,
+          size: "w-28 h-28",
+        },
+        {
+          name: "Korean Society of Gynecologic Oncology",
+          logo: logo3,
+          size: "w-48 h-16",
+        },
       ].map((org, index) => (
         <div
           key={index}
           className="flex items-center p-4 bg-gray-50 rounded-xl border border-gray-200 hover:shadow-md transition-shadow"
         >
-          <div className={`${org.size} rounded-lg flex items-center justify-center mr-4 flex-shrink-0 bg-white border border-gray-100 p-1 overflow-hidden`}>
+          <div
+            className={`${org.size} rounded-lg flex items-center justify-center mr-4 flex-shrink-0 bg-white border border-gray-100 p-1 overflow-hidden`}
+          >
             <img
               src={org.logo}
               alt={org.name}
@@ -4206,14 +4220,24 @@ const SponsorsTab = () => (
     {/* Row 2: Logos 4, 5 */}
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
       {[
-        { name: "Korean Society of Ultrasound in Obstetrics and Gynecology", logo: logo4, size: 'w-64 h-24' },
-        { name: "Korean College of Obstetrics and Gynecology", logo: logo5, size: 'w-64 h-24' },
+        {
+          name: "Korean Society of Ultrasound in Obstetrics and Gynecology",
+          logo: logo4,
+          size: "w-64 h-24",
+        },
+        {
+          name: "Korean College of Obstetrics and Gynecology",
+          logo: logo5,
+          size: "w-64 h-24",
+        },
       ].map((org, index) => (
         <div
           key={index}
           className="flex items-center p-4 bg-gray-50 rounded-xl border border-gray-200 hover:shadow-md transition-shadow"
         >
-          <div className={`${org.size} rounded-lg flex items-center justify-center mr-4 flex-shrink-0 bg-white border border-gray-100 p-1 overflow-hidden`}>
+          <div
+            className={`${org.size} rounded-lg flex items-center justify-center mr-4 flex-shrink-0 bg-white border border-gray-100 p-1 overflow-hidden`}
+          >
             <img
               src={org.logo}
               alt={org.name}
