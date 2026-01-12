@@ -2,13 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import headshots from "./assets/congress_chairs.png";
 import logo from "./assets/logo.png";
-
-// ======================================================================
-// NOTE ON HEIGHT BROADCASTING:
-// The original utility function has been REMOVED and the logic is now
-// integrated into the App component using a ResizeObserver.
-// This ensures height is sent on expansion AND on shrinkage.
-// ======================================================================
+import logo1 from "./assets/logo1.png";
+import logo2 from "./assets/logo2.png";
+import logo3 from "./assets/logo3.png";
+import logo4 from "./assets/logo4.png";
+import logo5 from "./assets/logo5.png";
 
 // HEADER COMPONENT - Standalone branding header
 const Header = () => (
@@ -114,28 +112,28 @@ const HeroSection = () => (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
         <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
           <img
-            src="https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=400&q=80"
+            src="src/assets/busan_skyline.jpg"
             alt="Busan Skyline"
             className="w-full h-full object-cover"
           />
         </div>
         <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
           <img
-            src="https://images.unsplash.com/photo-1596345606939-b8c21a69ee25?w=400&q=80"
+            src="src/assets/beach.jpg"
             alt="Haeundae Beach"
             className="w-full h-full object-cover"
           />
         </div>
         <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
           <img
-            src="https://images.unsplash.com/photo-1517154421773-0529f29ea451?w=400&q=80"
+            src="src/assets/temple.jpg"
             alt="Korean Temple"
             className="w-full h-full object-cover"
           />
         </div>
         <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
           <img
-            src="https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04?w=400&q=80"
+            src="src/assets/conference.jpg"
             alt="Conference Center"
             className="w-full h-full object-cover"
           />
@@ -317,7 +315,7 @@ const AboutTab = () => (
         <div className="bg-gray-100 rounded-xl overflow-hidden shadow-md mb-4">
           <div className="aspect-video relative">
             <img
-              src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80"
+              src="src/assets/map.png"
               alt="Busan City Map View"
               className="w-full h-full object-cover"
             />
@@ -4183,37 +4181,46 @@ const SponsorsTab = () => (
     >
       Supported By
     </h4>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+    {/* Row 1: Logos 1, 2, 3 */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
       {[
-        "Korean Society for Reproductive Medicine",
-        "Korean Society for Reproductive Immunology",
-        "Korean Society of Gynecologic Oncology",
-        "Korean Society of Ultrasound in Obstetrics and Gynecology",
-        "Korean College of Obstetrics and Gynecology",
+        { name: "Korean Society for Reproductive Medicine", logo: logo1, size: 'w-48 h-16' },
+        { name: "Korean Society for Reproductive Immunology", logo: logo2, size: 'w-28 h-28' },
+        { name: "Korean Society of Gynecologic Oncology", logo: logo3, size: 'w-48 h-16' },
       ].map((org, index) => (
         <div
           key={index}
           className="flex items-center p-4 bg-gray-50 rounded-xl border border-gray-200 hover:shadow-md transition-shadow"
         >
-          <div
-            className="w-12 h-12 rounded-lg flex items-center justify-center mr-4 flex-shrink-0"
-            style={{ backgroundColor: "var(--color-primary)" }}
-          >
-            <svg
-              className="w-6 h-6 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-              />
-            </svg>
+          <div className={`${org.size} rounded-lg flex items-center justify-center mr-4 flex-shrink-0 bg-white border border-gray-100 p-1 overflow-hidden`}>
+            <img
+              src={org.logo}
+              alt={org.name}
+              className="w-full h-full object-contain"
+            />
           </div>
-          <span className="text-gray-700 font-medium">{org}</span>
+          <span className="text-gray-700 font-medium">{org.name}</span>
+        </div>
+      ))}
+    </div>
+    {/* Row 2: Logos 4, 5 */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+      {[
+        { name: "Korean Society of Ultrasound in Obstetrics and Gynecology", logo: logo4, size: 'w-64 h-24' },
+        { name: "Korean College of Obstetrics and Gynecology", logo: logo5, size: 'w-64 h-24' },
+      ].map((org, index) => (
+        <div
+          key={index}
+          className="flex items-center p-4 bg-gray-50 rounded-xl border border-gray-200 hover:shadow-md transition-shadow"
+        >
+          <div className={`${org.size} rounded-lg flex items-center justify-center mr-4 flex-shrink-0 bg-white border border-gray-100 p-1 overflow-hidden`}>
+            <img
+              src={org.logo}
+              alt={org.name}
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <span className="text-gray-700 font-medium">{org.name}</span>
         </div>
       ))}
     </div>
