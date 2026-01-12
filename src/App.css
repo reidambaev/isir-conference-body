@@ -5,6 +5,17 @@ body {
   --color-primary: #1a3a6c; /* Dark Blue */
   --color-secondary: #f3b72c; /* Gold */
   --color-accent: #e9ecef; /* Light Gray */
+  overflow-x: hidden; /* Prevent horizontal scroll */
+}
+
+/* Ensure root elements don't overflow */
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+#root {
+  overflow-x: hidden;
 }
 
 /* Header Gradient */
@@ -16,11 +27,6 @@ body {
 .hero-section {
   background: linear-gradient(135deg, #1a3a6c 0%, #0f2847 100%);
   min-height: 400px;
-}
-
-/* Smooth scroll for anchor links */
-html {
-  scroll-behavior: smooth;
 }
 
 /* Custom scrollbar */

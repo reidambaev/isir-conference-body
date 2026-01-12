@@ -7,6 +7,10 @@ import logo2 from "./assets/logo2.png";
 import logo3 from "./assets/logo3.png";
 import logo4 from "./assets/logo4.png";
 import logo5 from "./assets/logo5.png";
+import busanSkyline from "./assets/busan_skyline.jpg";
+import beach from "./assets/beach.jpg";
+import temple from "./assets/temple.jpg";
+import conference from "./assets/conference.jpg";
 
 // HEADER COMPONENT - Standalone branding header
 const Header = () => (
@@ -64,7 +68,7 @@ const Header = () => (
 );
 
 // HERO SECTION - Visual banner with conference theme
-const HeroSection = () => {
+const HeroSection = ({ onRegisterClick }) => {
   const scrollToNav = () => {
     const navElement = document.getElementById("navigation");
     if (navElement) {
@@ -87,7 +91,7 @@ const HeroSection = () => {
       ></div>
       <div className="items-center relative max-w-7xl mx-auto px-4 py-10 sm:px-6 lg:px-8 text-center flex-1 flex flex-col justify-center">
         <span
-          className="w-60 inline-block px-4 py-1 mb-4 text-sm font-semibold rounded-full"
+          className="inline-block px-4 py-1 mb-4 text-sm font-semibold rounded-full whitespace-nowrap"
           style={{
             backgroundColor: "var(--color-secondary)",
             color: "var(--color-primary)",
@@ -104,44 +108,44 @@ const HeroSection = () => {
         </p>
 
         <div className="flex flex-wrap justify-center gap-4 mb-12">
-          <a
-            href="#registration"
-            className="px-8 py-1 text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+          <button
+            onClick={onRegisterClick}
+            className="px-8 py-2 text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer"
             style={{
               backgroundColor: "var(--color-secondary)",
               color: "var(--color-primary)",
             }}
           >
             Register Now
-          </a>
+          </button>
         </div>
 
         {/* Photo Gallery Preview */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-8 p-0 m-0">
           <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
             <img
-              src="src/assets/busan_skyline.jpg"
+              src={busanSkyline}
               alt="Busan Skyline"
               className="w-full h-full object-cover"
             />
           </div>
           <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
             <img
-              src="src/assets/beach.jpg"
+              src={beach}
               alt="Haeundae Beach"
               className="w-full h-full object-cover"
             />
           </div>
           <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
             <img
-              src="src/assets/temple.jpg"
+              src={temple}
               alt="Korean Temple"
               className="w-full h-full object-cover"
             />
           </div>
           <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
             <img
-              src="src/assets/conference.jpg"
+              src={conference}
               alt="Conference Center"
               className="w-full h-full object-cover"
             />
@@ -923,7 +927,6 @@ const ScheduleTab = () => {
     borderCollapse: "separate",
     borderSpacing: "0",
     width: "100%",
-    minWidth: "700px",
     borderRadius: "12px",
     overflow: "hidden",
     boxShadow:
@@ -4221,17 +4224,17 @@ const SponsorsTab = () => (
         {
           name: "Korean Society for Reproductive Medicine",
           logo: logo1,
-          size: "w-48 h-16",
+          size: "w-20 md:w-32 lg:w-48 h-12 md:h-14 lg:h-16",
         },
         {
           name: "Korean Society for Reproductive Immunology",
           logo: logo2,
-          size: "w-28 h-28",
+          size: "w-16 md:w-20 lg:w-28 h-16 md:h-20 lg:h-28",
         },
         {
           name: "Korean Society of Gynecologic Oncology",
           logo: logo3,
-          size: "w-48 h-16",
+          size: "w-20 md:w-32 lg:w-48 h-12 md:h-14 lg:h-16",
         },
       ].map((org, index) => (
         <div
@@ -4257,12 +4260,12 @@ const SponsorsTab = () => (
         {
           name: "Korean Society of Ultrasound in Obstetrics and Gynecology",
           logo: logo4,
-          size: "w-64 h-24",
+          size: "w-24 md:w-40 lg:w-64 h-16 md:h-20 lg:h-24",
         },
         {
           name: "Korean College of Obstetrics and Gynecology",
           logo: logo5,
-          size: "w-64 h-24",
+          size: "w-24 md:w-40 lg:w-64 h-16 md:h-20 lg:h-24",
         },
       ].map((org, index) => (
         <div
@@ -4663,13 +4666,23 @@ export default function App() {
     // 6. Attach the ref to the outermost container
     <div ref={appRef} className="min-h-screen bg-gray-50">
       {/* Full viewport hero container */}
-      <div className="h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col">
         {/* Standalone Header */}
         <Header />
 
         {/* Hero Section with Photos - takes remaining space */}
         <div className="flex-1 flex flex-col">
-          <HeroSection />
+          <HeroSection
+            onRegisterClick={() => {
+              setActiveTab("registration");
+              setTimeout(() => {
+                const navElement = document.getElementById("navigation");
+                if (navElement) {
+                  navElement.scrollIntoView({ behavior: "smooth" });
+                }
+              }, 100);
+            }}
+          />
           {/* Stats Bar */}
           <StatsBar />
         </div>
