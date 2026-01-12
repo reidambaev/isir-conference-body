@@ -1306,7 +1306,9 @@ const StepIndicator = ({ currentStep, totalSteps = 5 }) => {
 
 // API Configuration for ISIR Member Verification
 const ISIR_API_CONFIG = {
-  endpoint: import.meta.env.VITE_ISIR_API_ENDPOINT || "https://theisir.org/wp-json/isir/v1/check-member",
+  endpoint:
+    import.meta.env.VITE_ISIR_API_ENDPOINT ||
+    "https://theisir.org/wp-json/isir/v1/check-member",
   apiKey: import.meta.env.VITE_ISIR_API_KEY || "",
 };
 
@@ -1423,7 +1425,8 @@ const RegistrationForm = ({ onClose }) => {
           );
         } else if (!data.data.has_membership) {
           setVerificationError(
-            data.message || "No active ISIR membership found. Please renew your membership at theisir.org to access member pricing."
+            data.message ||
+              "No active ISIR membership found. Please renew your membership at theisir.org to access member pricing."
           );
         } else {
           setVerificationError(
