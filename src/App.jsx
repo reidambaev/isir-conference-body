@@ -64,90 +64,123 @@ const Header = () => (
 );
 
 // HERO SECTION - Visual banner with conference theme
-const HeroSection = () => (
-  <section className="hero-section relative overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-r from-blue-900/85 to-blue-800/75"></div>
-    <div
-      className="absolute inset-0"
-      style={{
-        backgroundImage:
-          "url('https://cache.marriott.com/content/dam/marriott-renditions/PUSWI/puswi-view-detail-2081-hor-clsc.jpg?output-quality=70&interpolation=progressive-bilinear&downsize=1336px:*')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        opacity: 0.25,
-      }}
-    ></div>
-    <div className="relative max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8 text-center">
-      <span
-        className="inline-block px-4 py-1 mb-4 text-sm font-semibold rounded-full"
-        style={{
-          backgroundColor: "var(--color-secondary)",
-          color: "var(--color-primary)",
-        }}
-      >
-        16th ISIR World Congress
-      </span>
-      <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 leading-tight">
-        Global Dialogue on
-        <br className="hidden md:block" /> Women's Health
-      </h2>
-      <p className="text-lg text-blue-200 mb-8 max-w-2xl mx-auto">
-        Join leading researchers and clinicians from around the world
-      </p>
+const HeroSection = () => {
+  const scrollToNav = () => {
+    const navElement = document.getElementById("navigation");
+    if (navElement) {
+      navElement.scrollIntoView({ behavior: "smooth" });
+    }
+  };
 
-      <div className="flex flex-wrap justify-center gap-4 mb-12">
-        <a
-          href="#registration"
-          className="px-8 py-3 text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+  return (
+    <section className="hero-section relative overflow-hidden flex flex-col">
+      <div className="absolute inset-0 bg-gradient-to-r from-blue-900/85 to-blue-800/75"></div>
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage:
+            "url('https://cache.marriott.com/content/dam/marriott-renditions/PUSWI/puswi-view-detail-2081-hor-clsc.jpg?output-quality=70&interpolation=progressive-bilinear&downsize=1336px:*')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          opacity: 0.25,
+        }}
+      ></div>
+      <div className="items-center relative max-w-7xl mx-auto px-4 py-10 sm:px-6 lg:px-8 text-center flex-1 flex flex-col justify-center">
+        <span
+          className="w-60 inline-block px-4 py-1 mb-4 text-sm font-semibold rounded-full"
           style={{
             backgroundColor: "var(--color-secondary)",
             color: "var(--color-primary)",
           }}
         >
-          Register Now
-        </a>
-      </div>
+          16th ISIR World Congress
+        </span>
+        <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 leading-tight">
+          Global Dialogue on
+          <br className="hidden md:block" /> Women's Health
+        </h2>
+        <p className="text-lg text-blue-200 mb-8 max-w-2xl mx-auto">
+          Join leading researchers and clinicians from around the world
+        </p>
 
-      {/* Photo Gallery Preview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-        <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
-          <img
-            src="src/assets/busan_skyline.jpg"
-            alt="Busan Skyline"
-            className="w-full h-full object-cover"
-          />
+        <div className="flex flex-wrap justify-center gap-4 mb-12">
+          <a
+            href="#registration"
+            className="px-8 py-1 text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            style={{
+              backgroundColor: "var(--color-secondary)",
+              color: "var(--color-primary)",
+            }}
+          >
+            Register Now
+          </a>
         </div>
-        <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
-          <img
-            src="src/assets/beach.jpg"
-            alt="Haeundae Beach"
-            className="w-full h-full object-cover"
-          />
+
+        {/* Photo Gallery Preview */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-8 p-0 m-0">
+          <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
+            <img
+              src="src/assets/busan_skyline.jpg"
+              alt="Busan Skyline"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
+            <img
+              src="src/assets/beach.jpg"
+              alt="Haeundae Beach"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
+            <img
+              src="src/assets/temple.jpg"
+              alt="Korean Temple"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
+            <img
+              src="src/assets/conference.jpg"
+              alt="Conference Center"
+              className="w-full h-full object-cover"
+            />
+          </div>
         </div>
-        <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
-          <img
-            src="src/assets/temple.jpg"
-            alt="Korean Temple"
-            className="w-full h-full object-cover"
-          />
-        </div>
-        <div className="aspect-video rounded-lg overflow-hidden shadow-lg transform hover:scale-105 transition-transform duration-300">
-          <img
-            src="src/assets/conference.jpg"
-            alt="Conference Center"
-            className="w-full h-full object-cover"
-          />
+
+        {/* Learn More Button */}
+        <div className="mt-auto pt-8">
+          <button
+            onClick={scrollToNav}
+            className="inline-flex flex-col items-center text-white hover:text-yellow-300 transition-colors duration-300 group"
+            aria-label="Learn more"
+          >
+            <span className="text-sm font-semibold mb-2">Learn More</span>
+            <svg
+              className="w-6 h-6 animate-bounce"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 14l-7 7m0 0l-7-7m7 7V3"
+              />
+            </svg>
+          </button>
         </div>
       </div>
-    </div>
-  </section>
-);
+    </section>
+  );
+};
 
 // QUICK STATS BAR
 const StatsBar = () => (
-  <div className="bg-gray-50 border-y border-gray-200">
-    <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+  <div className="bg-gray-50 border-y border-gray-200 flex-shrink-0">
+    <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
         <div>
           <div
             className="text-3xl font-bold"
@@ -203,6 +236,7 @@ const Navigation = ({ activeTab, onTabClick }) => {
 
   return (
     <nav
+      id="navigation"
       style={{ backgroundColor: "var(--color-primary)" }}
       className="sticky top-0 z-50 shadow-lg"
     >
@@ -4628,20 +4662,24 @@ export default function App() {
   return (
     // 6. Attach the ref to the outermost container
     <div ref={appRef} className="min-h-screen bg-gray-50">
-      {/* Standalone Header */}
-      <Header />
+      {/* Full viewport hero container */}
+      <div className="h-screen flex flex-col">
+        {/* Standalone Header */}
+        <Header />
 
-      {/* Hero Section with Photos */}
-      <HeroSection />
-
-      {/* Stats Bar */}
-      <StatsBar />
+        {/* Hero Section with Photos - takes remaining space */}
+        <div className="flex-1 flex flex-col">
+          <HeroSection />
+          {/* Stats Bar */}
+          <StatsBar />
+        </div>
+      </div>
 
       {/* Navigation */}
       <Navigation activeTab={activeTab} onTabClick={setActiveTab} />
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
           {renderTabContent()}
         </div>
