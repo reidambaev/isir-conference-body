@@ -1304,11 +1304,19 @@ const StepIndicator = ({ currentStep, totalSteps = 5 }) => {
   );
 };
 
+// API Configuration for ISIR Member Verification
+const ISIR_API_CONFIG = {
+  endpoint: import.meta.env.VITE_ISIR_API_ENDPOINT || "https://theisir.org/wp-json/isir/v1/check-member",
+  apiKey: import.meta.env.VITE_ISIR_API_KEY || "",
+};
+
 // REGISTRATION FORM COMPONENT - Multi-step registration process
 const RegistrationForm = ({ onClose }) => {
   const [step, setStep] = useState(1);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [verificationError, setVerificationError] = useState(null);
+  const [membershipData, setMembershipData] = useState(null);
 
   // Auto-detect early bird period (before July 10, 2026)
   const earlyBirdDeadline = new Date("2026-07-10");
@@ -1374,18 +1382,63 @@ const RegistrationForm = ({ onClose }) => {
     }
   };
 
-  const handleVerify = (e) => {
+  const handleVerify = async (e) => {
     e.preventDefault();
-    if (!formData.firstName || !formData.lastName || !formData.email) {
-      alert("Please enter Name and Email to verify.");
+    if (!formData.email) {
+      alert("Please enter your email to verify.");
       return;
     }
 
     setIsVerifying(true);
-    setTimeout(() => {
+    setVerificationError(null);
+
+    try {
+      const response = await fetch(ISIR_API_CONFIG.endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-ISIR-API-Key": ISIR_API_CONFIG.apiKey,
+        },
+        body: JSON.stringify({
+          email: formData.email,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Verification failed");
+      }
+
+      setMembershipData(data.data);
+
+      if (data.is_member) {
+        // Member verified - proceed to ticket selection
+        setStep(2);
+      } else {
+        // Not a member - show appropriate message
+        if (!data.data.email_registered) {
+          setVerificationError(
+            "No account found with this email address. Please check your email or register at theisir.org first."
+          );
+        } else if (!data.data.has_membership) {
+          setVerificationError(
+            data.message || "No active ISIR membership found. Please renew your membership at theisir.org to access member pricing."
+          );
+        } else {
+          setVerificationError(
+            "Verification failed. Please contact support@theisir.org for assistance."
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Verification error:", error);
+      setVerificationError(
+        "Unable to verify membership. Please try again or contact support@theisir.org"
+      );
+    } finally {
       setIsVerifying(false);
-      setStep(2);
-    }, 1000);
+    }
   };
 
   const handleTicketSelection = (e) => {
@@ -1624,6 +1677,41 @@ const RegistrationForm = ({ onClose }) => {
                   required
                 />
               </div>
+
+              {/* Verification Error Message */}
+              {verificationError && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                  <div className="flex items-start">
+                    <svg
+                      className="w-5 h-5 text-red-500 mt-0.5 mr-3 flex-shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <div>
+                      <p className="text-red-700 font-medium text-sm">
+                        {verificationError}
+                      </p>
+                      <a
+                        href="https://theisir.org/membership/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-red-600 underline text-sm mt-2 inline-block hover:text-red-800"
+                      >
+                        Join or renew ISIR membership →
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={isVerifying}
