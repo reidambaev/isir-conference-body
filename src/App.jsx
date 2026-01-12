@@ -1463,14 +1463,44 @@ const RegistrationForm = ({ onClose }) => {
     setStep(4);
   };
 
-  const handlePayment = (e) => {
+  const handlePayment = async (e) => {
     e.preventDefault();
     setIsProcessingPayment(true);
-    setTimeout(() => {
-      setIsProcessingPayment(false);
-      console.log("Payment Successful:", formData);
+
+    try {
+      // Save registration to D1 database
+      const response = await fetch("/api/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...formData,
+          membershipLevel: membershipData?.membership_level || null,
+          membershipStatus: membershipData?.membership_status || null,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Failed to save registration");
+      }
+
+      console.log("Registration saved:", result);
+      setFormData((prev) => ({
+        ...prev,
+        registrationId: result.registrationId,
+      }));
       setStep(5);
-    }, 2000);
+    } catch (error) {
+      console.error("Payment/Registration error:", error);
+      alert(
+        "There was an error processing your registration. Please try again or contact support@theisir.org"
+      );
+    } finally {
+      setIsProcessingPayment(false);
+    }
   };
 
   const fillExampleData = () => {
