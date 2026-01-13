@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import headshots from "./assets/congress_chairs.png";
+import logo1 from "./assets/logo1.png";
+import logo2 from "./assets/logo2.png";
+import logo3 from "./assets/logo3.png";
+import logo4 from "./assets/logo4.png";
+import logo5 from "./assets/logo5.png";
 
 // ======================================================================
 // NOTE ON HEIGHT BROADCASTING:
@@ -1051,13 +1056,46 @@ const SponsorsTab = () => (
     >
       Supported By
     </h4>
-    <ul className="list-disc list-inside text-gray-700 space-y-2 mb-8">
-      <li>Korean Society for Reproductive Medicine</li>
-      <li>Korean Society for Reproductive Immunology</li>
-      <li>Korean Society of Gynecologic Oncology</li>
-      <li>Korean Society of Ultrasound in Obstetrics and Gynecology</li>
-      <li>Korean College of Obstetrics and Gynecology</li>
-    </ul>
+    <div className="space-y-4 mb-8">
+      <div className="flex items-center p-4 bg-gray-50 rounded-lg">
+        <img
+          src={logo1}
+          alt="Korean Society for Reproductive Medicine"
+          className="h-16 w-auto mr-4"
+        />
+      </div>
+      <div className="flex items-center p-4 bg-gray-50 rounded-lg">
+        <img
+          src={logo2}
+          alt="Korean Society for Reproductive Immunology"
+          className="h-16 w-auto mr-4"
+        />
+        <span className="text-gray-700 font-medium">
+          Korean Society for Reproductive Immunology
+        </span>
+      </div>
+      <div className="flex items-center p-4 bg-gray-50 rounded-lg">
+        <img
+          src={logo3}
+          alt="Korean Society of Gynecologic Oncology"
+          className="h-16 w-auto mr-4"
+        />
+      </div>
+      <div className="flex items-center p-4 bg-gray-50 rounded-lg">
+        <img
+          src={logo4}
+          alt="Korean Society of Ultrasound in Obstetrics and Gynecology"
+          className="h-16 w-auto mr-4"
+        />
+      </div>
+      <div className="flex items-center p-4 bg-gray-50 rounded-lg">
+        <img
+          src={logo5}
+          alt="Korean College of Obstetrics and Gynecology"
+          className="h-16 w-auto mr-4"
+        />
+      </div>
+    </div>
 
     <p className="text-gray-600 italic mt-8">
       Sponsorship opportunities are available. Please contact us for more
