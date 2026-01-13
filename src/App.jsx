@@ -63,8 +63,8 @@ const AboutTab = () => (
       partners to share the latest advancements in our field.
     </p>
 
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <div className="md:col-span-3">
+    <div className="space-y-8">
+      <div>
         <h4
           className="text-xl font-semibold text-blue-800 mb-3"
           style={{ color: "var(--color-primary)" }}
@@ -82,21 +82,20 @@ const AboutTab = () => (
         </p>
       </div>
 
-      <div className="md:col-span-2">
+      <div>
         <h4
           className="text-xl font-semibold text-blue-800 mb-3"
           style={{ color: "var(--color-primary)" }}
         >
           Important Dates
         </h4>
-        <ul className="list-disc list-inside text-gray-700 space-y-2">
+        <ul className="list-disc list-inside text-gray-700 space-y-2 grid grid-cols-1 md:grid-cols-2 gap-x-8">
           <li>
             <strong>Abstract Submission Opens:</strong> February 1, 2026
           </li>
           <li>
             <strong>Early Bird Registration Opens:</strong> February 1, 2026
           </li>
-          <li className="list-none">&nbsp;</li>
           <li>
             <strong>Abstract Submission Deadline:</strong> April 30, 2026
           </li>
@@ -106,21 +105,6 @@ const AboutTab = () => (
           <li>
             <strong>Online Registration Deadline:</strong> August 30, 2026
           </li>
-        </ul>
-      </div>
-
-      <div className="bg-gray-50 p-6 rounded-lg">
-        <h4
-          className="text-lg font-semibold text-blue-800 mb-3"
-          style={{ color: "var(--color-primary)" }}
-        >
-          Rep. Cooperation Directors
-        </h4>
-        <ul className="text-gray-700 space-y-2">
-          <li>Hyejin Cho</li>
-          <li>Kuksun Han</li>
-          <li>Nayoung Kim</li>
-          <li>Aera Han</li>
         </ul>
       </div>
     </div>
@@ -212,6 +196,21 @@ const CommitteeTab = () => (
         <p>Ja Young Kwon (Korea)</p>
         <p>Haeng Seok Song (Korea)</p>
         <p>Joon Cheol Park (Korea)</p>
+      </div>
+    </div>
+
+    <h4
+      className="text-xl font-semibold text-blue-800 mt-8 mb-4"
+      style={{ color: "var(--color-primary)" }}
+    >
+      Rep. Cooperation Directors
+    </h4>
+    <div className="bg-gray-50 p-6 rounded-lg">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 text-gray-700">
+        <p>Hyejin Cho</p>
+        <p>Kuksun Han</p>
+        <p>Nayoung Kim</p>
+        <p>Aera Han</p>
       </div>
     </div>
   </div>
