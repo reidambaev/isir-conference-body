@@ -10,7 +10,14 @@ import logo5 from "./assets/logo5.png";
 import busanSkyline from "./assets/busan_skyline.jpg";
 import beach from "./assets/beach.jpg";
 import temple from "./assets/temple.jpg";
+import map from "./assets/map.png";
 import conference from "./assets/conference.jpg";
+import temple2 from "./assets/temple2.jpg";
+import village from "./assets/village.jpg";
+import beach2 from "./assets/beach2.jpg";
+import market from "./assets/market.jpg";
+import beach3 from "./assets/beach3.jpg";
+import food from "./assets/food.jpg";
 
 // HEADER COMPONENT - Standalone branding header
 const Header = () => (
@@ -231,6 +238,7 @@ const Navigation = ({ activeTab, onTabClick }) => {
   const tabs = [
     { id: "about", label: "About" },
     { id: "committee", label: "Program Committee" },
+    { id: "speakers", label: "Speakers" },
     { id: "schedule", label: "Schedule" },
     { id: "registration", label: "Registration" },
     { id: "deadlines", label: "Deadlines" },
@@ -353,7 +361,7 @@ const AboutTab = () => (
         <div className="bg-gray-100 rounded-xl overflow-hidden shadow-md mb-4">
           <div className="aspect-video relative">
             <img
-              src="src/assets/map.png"
+              src={map}
               alt="Busan City Map View"
               className="w-full h-full object-cover"
             />
@@ -424,61 +432,6 @@ const AboutTab = () => (
             </li>
           </ul>
         </div>
-
-        <div className="bg-gray-50 p-6 rounded-xl">
-          <h4
-            className="text-lg font-semibold text-blue-800 mb-3"
-            style={{ color: "var(--color-primary)" }}
-          >
-            Rep. Cooperation Directors
-          </h4>
-          <ul className="text-gray-700 space-y-2">
-            <li className="flex items-center">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: "var(--color-primary)" }}
-                >
-                  HC
-                </span>
-              </div>
-              Hyejin Cho
-            </li>
-            <li className="flex items-center">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: "var(--color-primary)" }}
-                >
-                  KH
-                </span>
-              </div>
-              Kuksun Han
-            </li>
-            <li className="flex items-center">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: "var(--color-primary)" }}
-                >
-                  NK
-                </span>
-              </div>
-              Nayoung Kim
-            </li>
-            <li className="flex items-center">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: "var(--color-primary)" }}
-                >
-                  AH
-                </span>
-              </div>
-              Aera Han
-            </li>
-          </ul>
-        </div>
       </div>
     </div>
 
@@ -514,7 +467,7 @@ const AboutTab = () => (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="group relative aspect-square rounded-xl overflow-hidden shadow-lg">
           <img
-            src="https://images.unsplash.com/photo-1596345606939-b8c21a69ee25?w=400&q=80"
+            src={beach2}
             alt="Haeundae Beach"
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
@@ -524,7 +477,7 @@ const AboutTab = () => (
         </div>
         <div className="group relative aspect-square rounded-xl overflow-hidden shadow-lg">
           <img
-            src="https://images.unsplash.com/photo-1578637387939-43c525550085?w=400&q=80"
+            src={village}
             alt="Gamcheon Culture Village"
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
@@ -534,7 +487,7 @@ const AboutTab = () => (
         </div>
         <div className="group relative aspect-square rounded-xl overflow-hidden shadow-lg">
           <img
-            src="https://images.unsplash.com/photo-1517154421773-0529f29ea451?w=400&q=80"
+            src={temple2}
             alt="Traditional Korean Temple"
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
@@ -544,7 +497,7 @@ const AboutTab = () => (
         </div>
         <div className="group relative aspect-square rounded-xl overflow-hidden shadow-lg">
           <img
-            src="https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&q=80"
+            src={market}
             alt="Fresh Seafood Market"
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
@@ -596,7 +549,7 @@ const CommitteeTab = () => (
       Scientific Committee Members
     </h4>
     <div className="bg-gray-50 p-6 rounded-lg">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 text-gray-700 text-sm">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 text-gray-700 text-sm justify-center">
         <p>Nardhy Gomez-Lopez (USA)</p>
         <p>Sylvie Girard (USA)</p>
         <p>Petra Arck (Germany)</p>
@@ -648,7 +601,7 @@ const CommitteeTab = () => (
       Local Scientific Committee Members
     </h4>
     <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-xl border border-blue-100">
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-2 text-gray-700 text-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-2 text-gray-700 text-sm justify-center">
         <p className="py-1">Kyung-Joo Hwang (Korea)</p>
         <p className="py-1">Jae Kwan Lee (Korea)</p>
         <p className="py-1">Ja Young Kwon (Korea)</p>
@@ -657,8 +610,63 @@ const CommitteeTab = () => (
       </div>
     </div>
 
+    <h4
+      className="text-xl font-semibold text-blue-800 mt-8 mb-4"
+      style={{ color: "var(--color-primary)" }}
+    >
+      Representative Cooperation Directors
+    </h4>
+    <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-xl border border-blue-100">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 text-gray-700 text-sm">
+        <div className="flex items-center py-1 justify-center">
+          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3 flex-shrink-0">
+            <span
+              className="text-xs font-semibold"
+              style={{ color: "var(--color-primary)" }}
+            >
+              HC
+            </span>
+          </div>
+          <span>Hyejin Cho</span>
+        </div>
+        <div className="flex items-center py-1 justify-center">
+          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3 flex-shrink-0">
+            <span
+              className="text-xs font-semibold"
+              style={{ color: "var(--color-primary)" }}
+            >
+              KH
+            </span>
+          </div>
+          <span>Kuksun Han</span>
+        </div>
+        <div className="flex items-center py-1 justify-center">
+          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3 flex-shrink-0">
+            <span
+              className="text-xs font-semibold"
+              style={{ color: "var(--color-primary)" }}
+            >
+              NK
+            </span>
+          </div>
+          <span>Nayoung Kim</span>
+        </div>
+        <div className="flex items-center py-1 justify-center">
+          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3 flex-shrink-0">
+            <span
+              className="text-xs font-semibold"
+              style={{ color: "var(--color-primary)" }}
+            >
+              AH
+            </span>
+          </div>
+          <span>Aera Han</span>
+        </div>
+      </div>
+    </div>
+
     {/* Past Congress Photos */}
-    <div className="mt-10">
+    {/* <div className="mt-10">
       <h4
         className="text-xl font-semibold text-blue-800 mb-4"
         style={{ color: "var(--color-primary)" }}
@@ -695,9 +703,346 @@ const CommitteeTab = () => (
           />
         </div>
       </div>
-    </div>
+    </div> */}
   </div>
 );
+
+// SPEAKERS TAB COMPONENT
+const SpeakersTab = () => {
+  // Keynote speakers data
+  const keynoteSpeakers = [
+    {
+      name: "To Be Announced",
+      title: "Keynote Speaker",
+      affiliation: "Details coming soon",
+      topic: "Opening Keynote",
+      image: null,
+    },
+    {
+      name: "To Be Announced",
+      title: "Keynote Speaker",
+      affiliation: "Details coming soon",
+      topic: "Plenary Session",
+      image: null,
+    },
+  ];
+
+  // Invited speakers data (placeholder)
+  const invitedSpeakers = [
+    { name: "Speaker TBA", affiliation: "Institution TBA", session: "Session 1" },
+    { name: "Speaker TBA", affiliation: "Institution TBA", session: "Session 2" },
+    { name: "Speaker TBA", affiliation: "Institution TBA", session: "Session 3" },
+    { name: "Speaker TBA", affiliation: "Institution TBA", session: "Session 4" },
+    { name: "Speaker TBA", affiliation: "Institution TBA", session: "Session 5" },
+    { name: "Speaker TBA", affiliation: "Institution TBA", session: "Session 6" },
+  ];
+
+  return (
+    <div role="tabpanel">
+      {/* Header Section */}
+      <div className="mb-8">
+        <div className="flex items-center mb-4">
+          <div
+            className="w-12 h-12 rounded-xl flex items-center justify-center mr-4"
+            style={{ backgroundColor: "var(--color-primary)" }}
+          >
+            <svg
+              className="w-6 h-6 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+              />
+            </svg>
+          </div>
+          <div>
+            <h3
+              className="text-2xl font-bold"
+              style={{ color: "var(--color-primary)" }}
+            >
+              Speakers & Faculty
+            </h3>
+            <p className="text-gray-600">
+              Distinguished experts in reproductive immunology
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Coming Soon Banner */}
+      <div className="mb-10 p-6 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200">
+        <div className="flex flex-col md:flex-row items-center justify-between">
+          <div className="flex items-center mb-4 md:mb-0">
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center mr-4"
+              style={{ backgroundColor: "var(--color-primary)" }}
+            >
+              <svg
+                className="w-7 h-7 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+            <div>
+              <h4
+                className="text-xl font-bold"
+                style={{ color: "var(--color-primary)" }}
+              >
+                Speaker Lineup Coming Soon
+              </h4>
+              <p className="text-gray-700">
+                Our scientific committee is finalizing the speaker program. Check back for updates!
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Keynote Speakers Section */}
+      <div className="mb-10">
+        <h4
+          className="text-xl font-semibold mb-6 flex items-center"
+          style={{ color: "var(--color-primary)" }}
+        >
+          <svg
+            className="w-6 h-6 mr-2"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+            />
+          </svg>
+          Keynote Speakers
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {keynoteSpeakers.map((speaker, index) => (
+            <div
+              key={index}
+              className="bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow"
+            >
+              <div className="flex items-start">
+                <div
+                  className="w-20 h-20 rounded-full flex items-center justify-center mr-4 flex-shrink-0"
+                  style={{ backgroundColor: "var(--color-secondary)" }}
+                >
+                  <svg
+                    className="w-10 h-10"
+                    style={{ color: "var(--color-primary)" }}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <span
+                    className="inline-block px-3 py-1 text-xs font-semibold rounded-full mb-2"
+                    style={{
+                      backgroundColor: "var(--color-secondary)",
+                      color: "var(--color-primary)",
+                    }}
+                  >
+                    {speaker.topic}
+                  </span>
+                  <h5
+                    className="text-lg font-bold"
+                    style={{ color: "var(--color-primary)" }}
+                  >
+                    {speaker.name}
+                  </h5>
+                  <p className="text-gray-600 text-sm">{speaker.title}</p>
+                  <p className="text-gray-500 text-sm">{speaker.affiliation}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Invited Speakers Section */}
+      <div className="mb-10">
+        <h4
+          className="text-xl font-semibold mb-6 flex items-center"
+          style={{ color: "var(--color-primary)" }}
+        >
+          <svg
+            className="w-6 h-6 mr-2"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+            />
+          </svg>
+          Invited Speakers
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {invitedSpeakers.map((speaker, index) => (
+            <div
+              key={index}
+              className="bg-gray-50 rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-center">
+                <div
+                  className="w-12 h-12 rounded-full flex items-center justify-center mr-3 flex-shrink-0"
+                  style={{ backgroundColor: "var(--color-primary)", opacity: 0.1 }}
+                >
+                  <svg
+                    className="w-6 h-6"
+                    style={{ color: "var(--color-primary)" }}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h5 className="font-semibold text-gray-800">{speaker.name}</h5>
+                  <p className="text-gray-500 text-sm">{speaker.affiliation}</p>
+                  <p className="text-xs text-gray-400 mt-1">{speaker.session}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Session Topics Preview */}
+      <div className="mb-10">
+        <h4
+          className="text-xl font-semibold mb-6 flex items-center"
+          style={{ color: "var(--color-primary)" }}
+        >
+          <svg
+            className="w-6 h-6 mr-2"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+            />
+          </svg>
+          Scientific Topics
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[
+            "Maternal-Fetal Immune Tolerance",
+            "Reproductive Autoimmunity",
+            "Immunology of Implantation",
+            "Recurrent Pregnancy Loss",
+            "Immunotherapy in Reproduction",
+            "Microbiome & Reproductive Health",
+            "Endometriosis & Immune Dysfunction",
+            "Male Reproductive Immunology",
+          ].map((topic, index) => (
+            <div
+              key={index}
+              className="flex items-center p-4 bg-gradient-to-r from-blue-50 to-white rounded-xl border border-blue-100"
+            >
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center mr-3 flex-shrink-0"
+                style={{ backgroundColor: "var(--color-primary)" }}
+              >
+                <span className="text-white text-sm font-bold">{index + 1}</span>
+              </div>
+              <span className="font-medium text-gray-800">{topic}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Call for Abstracts */}
+      <div className="bg-gradient-to-r from-blue-900 to-blue-800 rounded-2xl p-8 text-center shadow-xl">
+        <h4 className="text-2xl font-bold text-white mb-3">
+          Share Your Research
+        </h4>
+        <p className="text-blue-200 mb-6 max-w-2xl mx-auto">
+          Submit your abstract and join our distinguished speakers at ISIR 2026. Abstract submission opens February 1, 2026.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <button
+            className="inline-flex items-center justify-center px-8 py-3 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+            style={{
+              backgroundColor: "var(--color-secondary)",
+              color: "var(--color-primary)",
+            }}
+          >
+            <svg
+              className="w-5 h-5 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+            Submit Abstract
+          </button>
+          <button
+            className="inline-flex items-center justify-center px-8 py-3 font-semibold rounded-xl border-2 border-white text-white hover:bg-white/10 transition-all duration-300"
+          >
+            <svg
+              className="w-5 h-5 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            Abstract Guidelines
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // SCHEDULE TAB COMPONENT (UPDATED)
 const ScheduleTab = () => {
@@ -3514,6 +3859,110 @@ const RegistrationTab = () => {
         </div>
       </div>
 
+      {/* FAQ Section */}
+      <div className="mt-10 mb-10">
+        <div className="flex items-center mb-6">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center mr-3"
+            style={{ backgroundColor: "var(--color-primary)" }}
+          >
+            <svg
+              className="w-5 h-5 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <h4
+            className="text-xl font-bold"
+            style={{ color: "var(--color-primary)" }}
+          >
+            Frequently Asked Questions
+          </h4>
+        </div>
+        
+        <div className="space-y-4">
+          <details className="group bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition-colors">
+              <span className="font-medium text-gray-800">What is included in the registration fee?</span>
+              <svg className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="px-4 pb-4 text-gray-600">
+              <p>Your registration includes access to all scientific sessions, poster presentations, exhibition hall, welcome reception, coffee breaks, and lunch on all congress days. The gala dinner is an optional add-on that can be purchased during registration.</p>
+            </div>
+          </details>
+          
+          <details className="group bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition-colors">
+              <span className="font-medium text-gray-800">Can I get a refund if I cancel my registration?</span>
+              <svg className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="px-4 pb-4 text-gray-600">
+              <p>Cancellations received before July 10, 2026 are eligible for a full refund minus a $50 administrative fee. Cancellations between July 11 and August 15, 2026 will receive a 50% refund. No refunds will be issued after August 15, 2026. All cancellation requests must be submitted in writing to info@isir2026.org.</p>
+            </div>
+          </details>
+          
+          <details className="group bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition-colors">
+              <span className="font-medium text-gray-800">Do I need to be an ISIR member to register?</span>
+              <svg className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="px-4 pb-4 text-gray-600">
+              <p>No, membership is not required to attend. However, ISIR members receive a significant discount on registration fees. If you're not already a member, you can join ISIR at <a href="https://theisir.org" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">theisir.org</a> before registering to take advantage of member pricing.</p>
+            </div>
+          </details>
+          
+          <details className="group bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition-colors">
+              <span className="font-medium text-gray-800">How do I submit an abstract?</span>
+              <svg className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="px-4 pb-4 text-gray-600">
+              <p>Abstract submission opens on February 1, 2026, and closes on April 30, 2026. You can submit your abstract through our online submission system. Note that you do not need to be registered to submit an abstract, but the presenting author must complete registration by the early bird deadline (July 10, 2026) for the abstract to be included in the program.</p>
+            </div>
+          </details>
+          
+          <details className="group bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition-colors">
+              <span className="font-medium text-gray-800">Can I transfer my registration to someone else?</span>
+              <svg className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="px-4 pb-4 text-gray-600">
+              <p>Yes, registration transfers are permitted until August 30, 2026. Please email info@isir2026.org with the original registrant's information and the new attendee's details. A $25 transfer fee applies.</p>
+            </div>
+          </details>
+          
+          <details className="group bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition-colors">
+              <span className="font-medium text-gray-800">Will there be on-site registration available?</span>
+              <svg className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="px-4 pb-4 text-gray-600">
+              <p>Yes, on-site registration will be available during the congress (September 10-13, 2026) at the on-site rate. However, we strongly encourage advance registration to secure your spot and avoid potential delays at the registration desk.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+
       {/* Call to Action - Register Now */}
       <div className="mt-10 bg-gradient-to-r from-blue-900 to-blue-800 rounded-2xl p-8 text-center shadow-xl">
         <h4 className="text-2xl font-bold text-white mb-3">
@@ -3946,7 +4395,9 @@ const TravelTab = () => (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="aspect-video rounded-xl overflow-hidden shadow-lg">
           <img
-            src="https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80"
+            src={
+              "https://cache.marriott.com/content/dam/marriott-renditions/PUSWI/puswi-exterior-3080-hor-clsc.jpg?output-quality=70&interpolation=progressive-bilinear&downsize=1336px:*"
+            }
             alt="The Westin Josun Busan"
             className="w-full h-full object-cover"
           />
@@ -4155,7 +4606,7 @@ const TravelTab = () => (
         <div className="group bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow">
           <div className="aspect-video overflow-hidden">
             <img
-              src="https://images.unsplash.com/photo-1596345606939-b8c21a69ee25?w=400&q=80"
+              src={beach}
               alt="Haeundae Beach"
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
             />
@@ -4176,7 +4627,7 @@ const TravelTab = () => (
         <div className="group bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow">
           <div className="aspect-video overflow-hidden">
             <img
-              src="https://images.unsplash.com/photo-1578637387939-43c525550085?w=400&q=80"
+              src={village}
               alt="Gamcheon Culture Village"
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
             />
@@ -4197,7 +4648,7 @@ const TravelTab = () => (
         <div className="group bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow">
           <div className="aspect-video overflow-hidden">
             <img
-              src="https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&q=80"
+              src={market}
               alt="Jagalchi Market"
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
             />
@@ -4221,7 +4672,7 @@ const TravelTab = () => (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
         <div className="group relative aspect-square rounded-xl overflow-hidden shadow-lg">
           <img
-            src="https://images.unsplash.com/photo-1517154421773-0529f29ea451?w=300&q=80"
+            src={temple2}
             alt="Haedong Yonggungsa Temple"
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
@@ -4245,7 +4696,7 @@ const TravelTab = () => (
         </div>
         <div className="group relative aspect-square rounded-xl overflow-hidden shadow-lg">
           <img
-            src="https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=300&q=80"
+            src={beach3}
             alt="Gwangalli Beach"
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
@@ -4257,7 +4708,7 @@ const TravelTab = () => (
         </div>
         <div className="group relative aspect-square rounded-xl overflow-hidden shadow-lg">
           <img
-            src="https://images.unsplash.com/photo-1590736969955-71cc94901144?w=300&q=80"
+            src={food}
             alt="Korean Cuisine"
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
@@ -4371,7 +4822,7 @@ const SponsorsTab = () => (
               className="w-full h-full object-contain"
             />
           </div>
-          <span className="text-gray-700 font-medium">{org.name}</span>
+          <span className="text-gray-700 font-medium text-sm">{org.name}</span>
         </div>
       ))}
     </div>
@@ -4402,7 +4853,7 @@ const SponsorsTab = () => (
               className="w-full h-full object-contain"
             />
           </div>
-          <span className="text-gray-700 font-medium">{org.name}</span>
+          <span className="text-gray-700 font-medium text-sm">{org.name}</span>
         </div>
       ))}
     </div>
@@ -4531,48 +4982,75 @@ const Footer = () => (
           </p>
         </div>
 
-        {/* Quick Links */}
+        {/* Resources */}
         <div>
-          <h4 className="font-bold text-lg mb-4">Quick Links</h4>
-          <ul className="space-y-2 text-gray-400">
-            <li>
-              <a href="#about" className="hover:text-white transition-colors">
-                About the Congress
-              </a>
-            </li>
-            <li>
-              <a
-                href="#registration"
-                className="hover:text-white transition-colors"
+          <h4 className="font-bold text-lg mb-4">Resources</h4>
+          <ul className="space-y-3 text-gray-400 text-sm">
+            <li className="flex items-start">
+              <svg
+                className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0 text-blue-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                Registration
-              </a>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                />
+              </svg>
+              <div>
+                <a
+                  href="https://theisir.org"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-white hover:text-blue-400 transition-colors"
+                >
+                  ISIR Official Website
+                </a>
+                <p className="text-xs mt-0.5">Learn more about our society</p>
+              </div>
             </li>
-            <li>
-              <a
-                href="#schedule"
-                className="hover:text-white transition-colors"
+            <li className="flex items-start">
+              <svg
+                className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0 text-blue-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                Schedule
-              </a>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              <div>
+                <p className="font-medium text-white">Abstract Guidelines</p>
+                <p className="text-xs mt-0.5">
+                  Submission requirements & formatting
+                </p>
+              </div>
             </li>
-            <li>
-              <a
-                href="#deadlines"
-                className="hover:text-white transition-colors"
+            <li className="flex items-start">
+              <svg
+                className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0 text-blue-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                Important Dates
-              </a>
-            </li>
-            <li>
-              <a
-                href="https://theisir.org"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-white transition-colors"
-              >
-                ISIR Main Website
-              </a>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div>
+                <p className="font-medium text-white">FAQ</p>
+                <p className="text-xs mt-0.5">Frequently asked questions</p>
+              </div>
             </li>
           </ul>
         </div>
@@ -4635,57 +5113,87 @@ const Footer = () => (
           </ul>
         </div>
 
-        {/* Social & Newsletter */}
+        {/* Important Information */}
         <div>
-          <h4 className="font-bold text-lg mb-4">Stay Connected</h4>
-          <p className="text-gray-400 text-sm mb-4">
-            Follow us for the latest updates and announcements about ISIR 2026.
-          </p>
-          <div className="flex space-x-4 mb-6">
-            <a
-              href="#"
-              className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z" />
-              </svg>
-            </a>
-            <a
-              href="#"
-              className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-800 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
-              </svg>
-            </a>
-            <a
-              href="#"
-              className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-pink-600 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-              </svg>
-            </a>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-4">
-            <p className="text-sm text-gray-400 mb-2">Subscribe for updates:</p>
-            <div className="flex">
-              <input
-                type="email"
-                placeholder="Your email"
-                className="flex-1 px-3 py-2 bg-gray-700 rounded-l-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                className="px-4 py-2 rounded-r-lg font-medium text-sm"
-                style={{
-                  backgroundColor: "var(--color-secondary)",
-                  color: "var(--color-primary)",
-                }}
+          <h4 className="font-bold text-lg mb-4">Important Information</h4>
+          <ul className="space-y-3 text-gray-400 text-sm">
+            <li className="flex items-start">
+              <svg
+                className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0 text-blue-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                Subscribe
-              </button>
-            </div>
-          </div>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+              <div>
+                <p className="font-medium text-white">Congress Dates</p>
+                <p>September 10-13, 2026</p>
+              </div>
+            </li>
+            <li className="flex items-start">
+              <svg
+                className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0 text-blue-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div>
+                <p className="font-medium text-white">Early Bird Deadline</p>
+                <p>July 10, 2026</p>
+              </div>
+            </li>
+            <li className="flex items-start">
+              <svg
+                className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0 text-blue-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              <div>
+                <p className="font-medium text-white">Abstract Deadline</p>
+                <p>April 30, 2026</p>
+              </div>
+            </li>
+            <li className="flex items-start">
+              <svg
+                className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0 text-blue-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div>
+                <p className="font-medium text-white">Location</p>
+                <p>Busan, South Korea</p>
+              </div>
+            </li>
+          </ul>
         </div>
       </div>
     </div>
@@ -4730,6 +5238,8 @@ export default function App() {
         return <AboutTab />;
       case "committee":
         return <CommitteeTab />;
+      case "speakers":
+        return <SpeakersTab />;
       case "schedule":
         return <ScheduleTab />;
       case "registration":

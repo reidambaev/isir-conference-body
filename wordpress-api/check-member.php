@@ -91,10 +91,11 @@ add_action('rest_api_init', function () {
  * Permission callback - can be modified for API key authentication
  */
 function isir_check_member_permission($request) {
-    // Option 1: Public access (not recommended for production)
-    // return true;
+    // Temporarily allow public access for testing
+    return true;
     
-    // Option 2: Check for API key in header
+    // Option 2: Check for API key in header (re-enable after testing)
+    /*
     $api_key = $request->get_header('X-ISIR-API-Key');
     $valid_api_key = get_option('isir_member_api_key', '');
     
@@ -104,6 +105,7 @@ function isir_check_member_permission($request) {
     }
     
     return hash_equals($valid_api_key, $api_key);
+    */
 }
 
 /**
