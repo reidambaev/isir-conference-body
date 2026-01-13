@@ -729,12 +729,36 @@ const SpeakersTab = () => {
 
   // Invited speakers data (placeholder)
   const invitedSpeakers = [
-    { name: "Speaker TBA", affiliation: "Institution TBA", session: "Session 1" },
-    { name: "Speaker TBA", affiliation: "Institution TBA", session: "Session 2" },
-    { name: "Speaker TBA", affiliation: "Institution TBA", session: "Session 3" },
-    { name: "Speaker TBA", affiliation: "Institution TBA", session: "Session 4" },
-    { name: "Speaker TBA", affiliation: "Institution TBA", session: "Session 5" },
-    { name: "Speaker TBA", affiliation: "Institution TBA", session: "Session 6" },
+    {
+      name: "Speaker TBA",
+      affiliation: "Institution TBA",
+      session: "Session 1",
+    },
+    {
+      name: "Speaker TBA",
+      affiliation: "Institution TBA",
+      session: "Session 2",
+    },
+    {
+      name: "Speaker TBA",
+      affiliation: "Institution TBA",
+      session: "Session 3",
+    },
+    {
+      name: "Speaker TBA",
+      affiliation: "Institution TBA",
+      session: "Session 4",
+    },
+    {
+      name: "Speaker TBA",
+      affiliation: "Institution TBA",
+      session: "Session 5",
+    },
+    {
+      name: "Speaker TBA",
+      affiliation: "Institution TBA",
+      session: "Session 6",
+    },
   ];
 
   return (
@@ -804,7 +828,8 @@ const SpeakersTab = () => {
                 Speaker Lineup Coming Soon
               </h4>
               <p className="text-gray-700">
-                Our scientific committee is finalizing the speaker program. Check back for updates!
+                Our scientific committee is finalizing the speaker program.
+                Check back for updates!
               </p>
             </div>
           </div>
@@ -913,7 +938,10 @@ const SpeakersTab = () => {
               <div className="flex items-center">
                 <div
                   className="w-12 h-12 rounded-full flex items-center justify-center mr-3 flex-shrink-0"
-                  style={{ backgroundColor: "var(--color-primary)", opacity: 0.1 }}
+                  style={{
+                    backgroundColor: "var(--color-primary)",
+                    opacity: 0.1,
+                  }}
                 >
                   <svg
                     className="w-6 h-6"
@@ -931,9 +959,13 @@ const SpeakersTab = () => {
                   </svg>
                 </div>
                 <div>
-                  <h5 className="font-semibold text-gray-800">{speaker.name}</h5>
+                  <h5 className="font-semibold text-gray-800">
+                    {speaker.name}
+                  </h5>
                   <p className="text-gray-500 text-sm">{speaker.affiliation}</p>
-                  <p className="text-xs text-gray-400 mt-1">{speaker.session}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {speaker.session}
+                  </p>
                 </div>
               </div>
             </div>
@@ -981,7 +1013,9 @@ const SpeakersTab = () => {
                 className="w-8 h-8 rounded-full flex items-center justify-center mr-3 flex-shrink-0"
                 style={{ backgroundColor: "var(--color-primary)" }}
               >
-                <span className="text-white text-sm font-bold">{index + 1}</span>
+                <span className="text-white text-sm font-bold">
+                  {index + 1}
+                </span>
               </div>
               <span className="font-medium text-gray-800">{topic}</span>
             </div>
@@ -995,7 +1029,8 @@ const SpeakersTab = () => {
           Share Your Research
         </h4>
         <p className="text-blue-200 mb-6 max-w-2xl mx-auto">
-          Submit your abstract and join our distinguished speakers at ISIR 2026. Abstract submission opens February 1, 2026.
+          Submit your abstract and join our distinguished speakers at ISIR 2026.
+          Abstract submission opens February 1, 2026.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button
@@ -1020,9 +1055,7 @@ const SpeakersTab = () => {
             </svg>
             Submit Abstract
           </button>
-          <button
-            className="inline-flex items-center justify-center px-8 py-3 font-semibold rounded-xl border-2 border-white text-white hover:bg-white/10 transition-all duration-300"
-          >
+          <button className="inline-flex items-center justify-center px-8 py-3 font-semibold rounded-xl border-2 border-white text-white hover:bg-white/10 transition-all duration-300">
             <svg
               className="w-5 h-5 mr-2"
               fill="none"
@@ -3887,77 +3920,191 @@ const RegistrationTab = () => {
             Frequently Asked Questions
           </h4>
         </div>
-        
+
         <div className="space-y-4">
           <details className="group bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
             <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition-colors">
-              <span className="font-medium text-gray-800">What is included in the registration fee?</span>
-              <svg className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <span className="font-medium text-gray-800">
+                What is included in the registration fee?
+              </span>
+              <svg
+                className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </summary>
             <div className="px-4 pb-4 text-gray-600">
-              <p>Your registration includes access to all scientific sessions, poster presentations, exhibition hall, welcome reception, coffee breaks, and lunch on all congress days. The gala dinner is an optional add-on that can be purchased during registration.</p>
+              <p>
+                Your registration includes access to all scientific sessions,
+                poster presentations, exhibition hall, welcome reception, coffee
+                breaks, and lunch on all congress days. The gala dinner is an
+                optional add-on that can be purchased during registration.
+              </p>
             </div>
           </details>
-          
+
           <details className="group bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
             <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition-colors">
-              <span className="font-medium text-gray-800">Can I get a refund if I cancel my registration?</span>
-              <svg className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <span className="font-medium text-gray-800">
+                Can I get a refund if I cancel my registration?
+              </span>
+              <svg
+                className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </summary>
             <div className="px-4 pb-4 text-gray-600">
-              <p>Cancellations received before July 10, 2026 are eligible for a full refund minus a $50 administrative fee. Cancellations between July 11 and August 15, 2026 will receive a 50% refund. No refunds will be issued after August 15, 2026. All cancellation requests must be submitted in writing to info@isir2026.org.</p>
+              <p>
+                Cancellations received before July 10, 2026 are eligible for a
+                full refund minus a $50 administrative fee. Cancellations
+                between July 11 and August 15, 2026 will receive a 50% refund.
+                No refunds will be issued after August 15, 2026. All
+                cancellation requests must be submitted in writing to
+                info@isir2026.org.
+              </p>
             </div>
           </details>
-          
+
           <details className="group bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
             <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition-colors">
-              <span className="font-medium text-gray-800">Do I need to be an ISIR member to register?</span>
-              <svg className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <span className="font-medium text-gray-800">
+                Do I need to be an ISIR member to register?
+              </span>
+              <svg
+                className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </summary>
             <div className="px-4 pb-4 text-gray-600">
-              <p>No, membership is not required to attend. However, ISIR members receive a significant discount on registration fees. If you're not already a member, you can join ISIR at <a href="https://theisir.org" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">theisir.org</a> before registering to take advantage of member pricing.</p>
+              <p>
+                No, membership is not required to attend. However, ISIR members
+                receive a significant discount on registration fees. If you're
+                not already a member, you can join ISIR at{" "}
+                <a
+                  href="https://theisir.org"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  theisir.org
+                </a>{" "}
+                before registering to take advantage of member pricing.
+              </p>
             </div>
           </details>
-          
+
           <details className="group bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
             <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition-colors">
-              <span className="font-medium text-gray-800">How do I submit an abstract?</span>
-              <svg className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <span className="font-medium text-gray-800">
+                How do I submit an abstract?
+              </span>
+              <svg
+                className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </summary>
             <div className="px-4 pb-4 text-gray-600">
-              <p>Abstract submission opens on February 1, 2026, and closes on April 30, 2026. You can submit your abstract through our online submission system. Note that you do not need to be registered to submit an abstract, but the presenting author must complete registration by the early bird deadline (July 10, 2026) for the abstract to be included in the program.</p>
+              <p>
+                Abstract submission opens on February 1, 2026, and closes on
+                April 30, 2026. You can submit your abstract through our online
+                submission system. Note that you do not need to be registered to
+                submit an abstract, but the presenting author must complete
+                registration by the early bird deadline (July 10, 2026) for the
+                abstract to be included in the program.
+              </p>
             </div>
           </details>
-          
+
           <details className="group bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
             <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition-colors">
-              <span className="font-medium text-gray-800">Can I transfer my registration to someone else?</span>
-              <svg className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <span className="font-medium text-gray-800">
+                Can I transfer my registration to someone else?
+              </span>
+              <svg
+                className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </summary>
             <div className="px-4 pb-4 text-gray-600">
-              <p>Yes, registration transfers are permitted until August 30, 2026. Please email info@isir2026.org with the original registrant's information and the new attendee's details. A $25 transfer fee applies.</p>
+              <p>
+                Yes, registration transfers are permitted until August 30, 2026.
+                Please email info@isir2026.org with the original registrant's
+                information and the new attendee's details. A $25 transfer fee
+                applies.
+              </p>
             </div>
           </details>
-          
+
           <details className="group bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
             <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition-colors">
-              <span className="font-medium text-gray-800">Will there be on-site registration available?</span>
-              <svg className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <span className="font-medium text-gray-800">
+                Will there be on-site registration available?
+              </span>
+              <svg
+                className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </summary>
             <div className="px-4 pb-4 text-gray-600">
-              <p>Yes, on-site registration will be available during the congress (September 10-13, 2026) at the on-site rate. However, we strongly encourage advance registration to secure your spot and avoid potential delays at the registration desk.</p>
+              <p>
+                Yes, on-site registration will be available during the congress
+                (September 10-13, 2026) at the on-site rate. However, we
+                strongly encourage advance registration to secure your spot and
+                avoid potential delays at the registration desk.
+              </p>
             </div>
           </details>
         </div>
