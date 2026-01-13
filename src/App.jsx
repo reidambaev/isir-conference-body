@@ -1079,282 +1079,459 @@ const SpeakersTab = () => {
 
 // SCHEDULE TAB COMPONENT (UPDATED)
 const ScheduleTab = () => {
+  const [hoveredDay, setHoveredDay] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
   const scheduleRef = useRef(null);
 
   const handleDownloadPNG = async () => {
     if (!scheduleRef.current) return;
-
+    setIsExporting(true);
     try {
-      // Dynamically import html2canvas
       const html2canvas = (await import("html2canvas")).default;
-
       const canvas = await html2canvas(scheduleRef.current, {
-        backgroundColor: "#ffffff",
-        scale: 2, // Higher resolution
+        backgroundColor: "#f8fafc",
+        scale: 2,
         useCORS: true,
-        logging: false,
       });
-
       const link = document.createElement("a");
-      link.download = "ISIR2026-Schedule.png";
+      link.download = "ISIR-2026-Schedule.png";
       link.href = canvas.toDataURL("image/png");
       link.click();
     } catch (error) {
       console.error("Failed to generate PNG:", error);
-      alert("Failed to download PNG. Please try again.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
-  // 1. Define the Master Time Slots (Rows) and their duration
-  // I am using the most specific time slot available to define the row.
-  const timeSlots = [
-    { time: "7:30 am - 8:30 am", className: "h-16" },
-    { time: "8:00 am - 9:30 am", className: "h-20" }, // Plenary Sessions start at 8:00
-    { time: "10:00 am - 12:00 pm", className: "h-24" },
-    { time: "12:00 pm - 1:15 pm", className: "h-16" },
-    { time: "1:15 pm - 3:15 pm", className: "h-24" },
-    { time: "3:15 pm - 3:45 pm", className: "h-12" },
-    { time: "3:45 pm - 5:45 pm", className: "h-24" },
-    { time: "5:45 pm - 6:30 pm", className: "h-16" },
-    { time: "6:30 pm +", className: "h-16" }, // For evening social events
-    // Note: Some events will appear in a cell that starts *before* their defined time (e.g., 8:00 AM event in the 7:30 AM row)
-    // This is necessary because of the rigid row structure.
-  ];
-
-  // 2. Define the Day Columns (Matching your conference dates/days)
+  // Define the Day Columns
   const days = [
-    { key: "day0", label: "THU Sept 10" },
-    { key: "day1", label: "FRI Sept 11" },
-    { key: "day2", label: "SAT Sept 12" },
-    { key: "day3", label: "SUN Sept 13" },
-    { key: "day4", label: "MON Sept 14" }, // Departure day
+    { key: "day0", label: "THU", date: "Sept 10" },
+    { key: "day1", label: "FRI", date: "Sept 11" },
+    { key: "day2", label: "SAT", date: "Sept 12" },
+    { key: "day3", label: "SUN", date: "Sept 13" },
+    { key: "day4", label: "MON", date: "Sept 14" },
   ];
 
-  // 3. The Schedule Data, reorganized to match the new image structure
-  // Each item's position corresponds to the timeSlots array index (row index)
-  const scheduleDataBySlot = [
-    // Row 0: 7:30 am - 8:30 am
+  // Schedule Events - Flat array format for grid layout
+  const scheduleEvents = [
+    // Thursday Sept 10
     {
-      day0: null,
-      day1: {
-        event: "Breakfast",
-        style: { backgroundColor: "#e9f5ff", borderLeft: "3px solid #60a5fa" },
-      },
-      day2: {
-        event: "Breakfast",
-        style: { backgroundColor: "#e9f5ff", borderLeft: "3px solid #60a5fa" },
-      },
-      day3: {
-        event: "Breakfast",
-        style: { backgroundColor: "#e9f5ff", borderLeft: "3px solid #60a5fa" },
-      },
-      day4: {
-        event: "Departures",
-        style: { backgroundColor: "#fef3c7", color: "var(--color-primary)" },
-      },
+      id: 1,
+      day: "day0",
+      time: "5:45 PM",
+      end: "6:30 PM",
+      title: "Plenary Session I: Coulam Award Lecture",
+      type: "plenary",
+      location: "Main Ballroom",
+      description:
+        "Opening keynote session featuring the prestigious Coulam Award lecture.",
     },
-    // Row 1: 8:00 am - 9:30 am
     {
-      day0: null,
-      day1: {
-        event: "Plenary Session II: Herr Award Lecture",
-        style: {
-          backgroundColor: "#f1f5f9",
-          borderLeft: "3px solid var(--color-primary)",
-        },
-      },
-      day2: {
-        event: "Plenary Session III: AJRI Award Lecture",
-        style: {
-          backgroundColor: "#f1f5f9",
-          borderLeft: "3px solid var(--color-primary)",
-        },
-      },
-      day3: {
-        event: "Plenary Session IV: Gusdon Award Talks",
-        style: {
-          backgroundColor: "#f1f5f9",
-          borderLeft: "3px solid var(--color-primary)",
-        },
-      },
-      day4: null,
+      id: 2,
+      day: "day0",
+      time: "6:30 PM",
+      end: "8:30 PM",
+      title: "Welcome Reception",
+      type: "social",
+      location: "Grand Foyer",
+      description:
+        "Join us for an evening of networking and refreshments as we kick off the congress.",
     },
-    // Row 2: 10:00 am - 12:00 pm
+
+    // Friday Sept 11
     {
-      day0: null,
-      day1: {
-        event: "Breakouts",
-        style: { backgroundColor: "#fff7ed", borderLeft: "3px solid #f3b72c" },
-      },
-      day2: {
-        event: "Breakouts",
-        style: { backgroundColor: "#fff7ed", borderLeft: "3px solid #f3b72c" },
-      },
-      day3: {
-        event: "Breakouts 11 & 12",
-        style: { backgroundColor: "#fff7ed", borderLeft: "3px solid #f3b72c" },
-      },
-      day4: null,
+      id: 3,
+      day: "day1",
+      time: "7:30 AM",
+      end: "8:30 AM",
+      title: "Breakfast",
+      type: "meal",
+      location: "Dining Hall",
+      description: "Continental breakfast for all attendees.",
     },
-    // Row 3: 12:00 pm - 1:15 pm
     {
-      day0: null,
-      day1: {
-        event: "Lunch Session",
-        style: { backgroundColor: "#f0fdfa", borderLeft: "3px solid #14b8a6" },
-      },
-      day2: {
-        event: "ASRI Bus. Meeting & Lunch",
-        style: { backgroundColor: "#f0fdfa", borderLeft: "3px solid #14b8a6" },
-      },
-      day3: {
-        event: "Lunch Session",
-        style: { backgroundColor: "#f0fdfa", borderLeft: "3px solid #14b8a6" },
-      },
-      day4: null,
+      id: 4,
+      day: "day1",
+      time: "8:00 AM",
+      end: "9:30 AM",
+      title: "Plenary Session II: Herr Award Lecture",
+      type: "plenary",
+      location: "Main Ballroom",
+      description: "Distinguished lecture honoring the Herr Award recipient.",
     },
-    // Row 4: 1:15 pm - 3:15 pm
     {
-      day0: null,
-      day1: {
-        event: "Breakouts",
-        style: { backgroundColor: "#fff7ed", borderLeft: "3px solid #f3b72c" },
-      },
-      day2: {
-        event: "Breakouts",
-        style: { backgroundColor: "#fff7ed", borderLeft: "3px solid #f3b72c" },
-      },
-      day3: {
-        event: "Breakouts",
-        style: { backgroundColor: "#fff7ed", borderLeft: "3px solid #f3b72c" },
-      },
-      day4: null,
+      id: 5,
+      day: "day1",
+      time: "10:00 AM",
+      end: "12:00 PM",
+      title: "Breakout Sessions 1-4",
+      type: "breakout",
+      location: "Conference Rooms A-D",
+      description:
+        "Parallel sessions covering key topics in reproductive immunology.",
     },
-    // Row 5: 3:15 pm - 3:45 pm
     {
-      day0: null,
-      day1: {
-        event: "Break",
-        style: { backgroundColor: "#e9ecef", color: "#6c757d" },
-      },
-      day2: {
-        event: "Break",
-        style: { backgroundColor: "#e9ecef", color: "#6c757d" },
-      },
-      day3: {
-        event: "Break",
-        style: { backgroundColor: "#e9ecef", color: "#6c757d" },
-      },
-      day4: null,
+      id: 6,
+      day: "day1",
+      time: "12:00 PM",
+      end: "1:15 PM",
+      title: "Lunch Session",
+      type: "social",
+      location: "Dining Hall",
+      description: "Networking lunch with colleagues.",
     },
-    // Row 6: 3:45 pm - 5:45 pm
     {
-      day0: null,
-      day1: {
-        event: "Poster Session I & Judging",
-        style: { backgroundColor: "#f0fdfa", borderLeft: "3px solid #14b8a6" },
-      },
-      day2: {
-        event: "Breakouts",
-        style: { backgroundColor: "#fff7ed", borderLeft: "3px solid #f3b72c" },
-      },
-      day3: {
-        event: "Poster Session II",
-        style: { backgroundColor: "#f0fdfa", borderLeft: "3px solid #14b8a6" },
-      },
-      day4: null,
+      id: 7,
+      day: "day1",
+      time: "1:15 PM",
+      end: "3:15 PM",
+      title: "Breakout Sessions 5-8",
+      type: "breakout",
+      location: "Conference Rooms A-D",
+      description: "Afternoon parallel sessions.",
     },
-    // Row 7: 5:45 pm - 6:30 pm
     {
-      day0: {
-        event: "Plenary Session I: Coulam Award Lecture",
-        style: {
-          backgroundColor: "#f1f5f9",
-          borderLeft: "3px solid var(--color-primary)",
-        },
-      },
-      day1: null,
-      day2: null,
-      day3: null,
-      day4: null,
+      id: 8,
+      day: "day1",
+      time: "3:15 PM",
+      end: "3:45 PM",
+      title: "Coffee Break",
+      type: "break",
+      location: "Grand Foyer",
+      description: "Refreshment and networking break.",
     },
-    // Row 8: 6:30 pm +
     {
-      day0: {
-        event: "Welcome Reception",
-        style: { backgroundColor: "#e9f5ff", color: "var(--color-primary)" },
-      },
-      day1: {
-        event: "Trainee Event",
-        style: { backgroundColor: "#e9f5ff", color: "var(--color-primary)" },
-      },
-      day2: {
-        event: "AJRI Editorial Board Meeting",
-        style: { backgroundColor: "#e9f5ff", color: "var(--color-primary)" },
-      },
-      day3: {
-        event: "Awards Dinner & Dancing",
-        style: { backgroundColor: "#e9f5ff", color: "var(--color-primary)" },
-      },
-      day4: null,
+      id: 9,
+      day: "day1",
+      time: "3:45 PM",
+      end: "5:45 PM",
+      title: "Poster Session I & Judging",
+      type: "social",
+      location: "Exhibit Hall",
+      description: "Interactive poster presentations with award judging.",
+    },
+    {
+      id: 10,
+      day: "day1",
+      time: "6:30 PM",
+      end: "9:00 PM",
+      title: "Trainee Event",
+      type: "social",
+      location: "Harbor Room",
+      description:
+        "Special networking event for students and early career researchers.",
+    },
+
+    // Saturday Sept 12
+    {
+      id: 11,
+      day: "day2",
+      time: "7:30 AM",
+      end: "8:30 AM",
+      title: "Breakfast",
+      type: "meal",
+      location: "Dining Hall",
+      description: "Continental breakfast for all attendees.",
+    },
+    {
+      id: 12,
+      day: "day2",
+      time: "8:00 AM",
+      end: "9:30 AM",
+      title: "Plenary Session III: AJRI Award Lecture",
+      type: "plenary",
+      location: "Main Ballroom",
+      description:
+        "Featuring the American Journal of Reproductive Immunology Award lecture.",
+    },
+    {
+      id: 13,
+      day: "day2",
+      time: "10:00 AM",
+      end: "12:00 PM",
+      title: "Breakout Sessions 9-10",
+      type: "breakout",
+      location: "Conference Rooms A-D",
+      description: "Morning parallel sessions.",
+    },
+    {
+      id: 14,
+      day: "day2",
+      time: "12:00 PM",
+      end: "1:15 PM",
+      title: "ASRI Business Meeting & Lunch",
+      type: "social",
+      location: "Boardroom",
+      description:
+        "American Society for Reproductive Immunology annual meeting.",
+    },
+    {
+      id: 15,
+      day: "day2",
+      time: "1:15 PM",
+      end: "3:15 PM",
+      title: "Breakout Sessions",
+      type: "breakout",
+      location: "Conference Rooms A-D",
+      description: "Afternoon parallel sessions.",
+    },
+    {
+      id: 16,
+      day: "day2",
+      time: "3:15 PM",
+      end: "3:45 PM",
+      title: "Coffee Break",
+      type: "break",
+      location: "Grand Foyer",
+      description: "Refreshment and networking break.",
+    },
+    {
+      id: 17,
+      day: "day2",
+      time: "3:45 PM",
+      end: "5:45 PM",
+      title: "Breakout Sessions",
+      type: "breakout",
+      location: "Conference Rooms A-D",
+      description: "Late afternoon parallel sessions.",
+    },
+    {
+      id: 18,
+      day: "day2",
+      time: "6:30 PM",
+      end: "9:00 PM",
+      title: "AJRI Editorial Board Meeting",
+      type: "social",
+      location: "Executive Suite",
+      description: "Journal editorial board annual meeting and dinner.",
+    },
+
+    // Sunday Sept 13
+    {
+      id: 19,
+      day: "day3",
+      time: "7:30 AM",
+      end: "8:30 AM",
+      title: "Breakfast",
+      type: "meal",
+      location: "Dining Hall",
+      description: "Continental breakfast for all attendees.",
+    },
+    {
+      id: 20,
+      day: "day3",
+      time: "8:00 AM",
+      end: "9:30 AM",
+      title: "Plenary Session IV: Gusdon Award Talks",
+      type: "plenary",
+      location: "Main Ballroom",
+      description: "Presentations by Gusdon Award recipients.",
+    },
+    {
+      id: 21,
+      day: "day3",
+      time: "10:00 AM",
+      end: "12:00 PM",
+      title: "Breakout Sessions 11 & 12",
+      type: "breakout",
+      location: "Conference Rooms A-D",
+      description: "Final morning parallel sessions.",
+    },
+    {
+      id: 22,
+      day: "day3",
+      time: "12:00 PM",
+      end: "1:15 PM",
+      title: "Lunch Session",
+      type: "social",
+      location: "Dining Hall",
+      description: "Final networking lunch.",
+    },
+    {
+      id: 23,
+      day: "day3",
+      time: "1:15 PM",
+      end: "3:15 PM",
+      title: "Closing Breakout Sessions",
+      type: "breakout",
+      location: "Conference Rooms A-D",
+      description: "Final afternoon parallel sessions.",
+    },
+    {
+      id: 24,
+      day: "day3",
+      time: "3:15 PM",
+      end: "3:45 PM",
+      title: "Coffee Break",
+      type: "break",
+      location: "Grand Foyer",
+      description: "Final refreshment break.",
+    },
+    {
+      id: 25,
+      day: "day3",
+      time: "3:45 PM",
+      end: "5:45 PM",
+      title: "Poster Session II",
+      type: "social",
+      location: "Exhibit Hall",
+      description: "Final interactive poster presentations.",
+    },
+    {
+      id: 26,
+      day: "day3",
+      time: "6:30 PM",
+      end: "11:00 PM",
+      title: "Awards Dinner & Dancing",
+      type: "social",
+      location: "Grand Ballroom",
+      description: "Gala dinner with awards ceremony and entertainment.",
+    },
+
+    // Monday Sept 14
+    {
+      id: 27,
+      day: "day4",
+      time: "7:30 AM",
+      end: "12:00 PM",
+      title: "Departures",
+      type: "departure",
+      location: "Hotel Lobby",
+      description:
+        "Safe travels! We look forward to seeing you at the next congress.",
     },
   ];
 
-  // 4. Custom Styles (More compact and visually appealing to match the image)
-  const tableStyles = {
-    borderCollapse: "separate",
-    borderSpacing: "0",
-    width: "100%",
-    borderRadius: "12px",
-    overflow: "hidden",
-    boxShadow:
-      "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
-    fontSize: "14px",
-  };
-  const thStyles = {
-    padding: "12px 8px",
-    textAlign: "center",
-    backgroundColor: "#1a3a6c",
-    fontWeight: "700",
-    color: "white",
-    width: "calc(100% / 6)",
-    borderBottom: "2px solid #f3b72c",
-  };
-  const timeThStyles = {
-    ...thStyles,
-    textAlign: "left",
-    padding: "12px 14px",
-    fontWeight: "600",
-    backgroundColor: "#0f2847",
-    width: "110px",
-    verticalAlign: "top",
-    lineHeight: "1.3",
-    fontSize: "13px",
-  };
-  const tdStyles = {
-    border: "1px solid #e5e7eb",
-    padding: "0",
-    verticalAlign: "middle",
-    textAlign: "center",
-  };
-  const eventBoxStyles = {
-    height: "100%",
-    width: "100%",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: "8px 4px",
-    fontWeight: "500",
-    lineHeight: "1.3",
-    transition: "all 0.2s ease",
+  // Event type styling helper
+  const getTypeStyles = (type) => {
+    switch (type) {
+      case "plenary":
+        return "bg-blue-50 border-blue-200 text-blue-900";
+      case "breakout":
+        return "bg-amber-50 border-amber-200 text-amber-900";
+      case "social":
+        return "bg-emerald-50 border-emerald-200 text-emerald-900";
+      case "meal":
+        return "bg-slate-50 border-slate-200 text-slate-700";
+      case "break":
+        return "bg-gray-50 border-gray-200 text-gray-700";
+      case "departure":
+        return "bg-purple-50 border-purple-200 text-purple-900";
+      default:
+        return "bg-slate-50 border-slate-200 text-slate-700";
+    }
   };
 
   return (
     <div role="tabpanel">
+      {/* Event Detail Modal */}
+      {selectedEvent && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
+          onClick={() => setSelectedEvent(null)}
+        >
+          <div
+            className="bg-white rounded-3xl w-full max-w-lg shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-8">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getTypeStyles(
+                      selectedEvent.type
+                    )}`}
+                  >
+                    {selectedEvent.type}
+                  </span>
+                  <h2 className="text-2xl font-bold text-slate-900 mt-2">
+                    {selectedEvent.title}
+                  </h2>
+                </div>
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                >
+                  <svg
+                    className="w-5 h-5 text-slate-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4 mb-8">
+                <div className="flex items-center text-slate-600">
+                  <svg
+                    className="w-5 h-5 mr-3 text-slate-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <span className="font-medium">
+                    {selectedEvent.time} — {selectedEvent.end}
+                  </span>
+                </div>
+                <div className="flex items-center text-slate-600">
+                  <svg
+                    className="w-5 h-5 mr-3 text-slate-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                  <span className="font-medium">{selectedEvent.location}</span>
+                </div>
+                <div className="pt-4 border-t border-slate-100">
+                  <p className="text-slate-600 leading-relaxed text-sm">
+                    {selectedEvent.description}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedEvent(null)}
+                className="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header Section */}
-      <div className="mb-8">
-        <div className="flex items-center mb-4">
+      <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
+        <div className="flex items-center">
           <div
             className="w-12 h-12 rounded-xl flex items-center justify-center mr-4"
             style={{ backgroundColor: "var(--color-primary)" }}
@@ -1375,162 +1552,164 @@ const ScheduleTab = () => {
           </div>
           <div>
             <h3
-              className="text-2xl font-bold"
+              className="text-3xl font-bold tracking-tight"
               style={{ color: "var(--color-primary)" }}
             >
-              Full Congress Schedule
+              Congress Schedule
             </h3>
-            <p className="text-gray-600">
+            <p className="text-slate-500 font-medium">
               September 10-14, 2026 • The Westin Josun Busan
             </p>
           </div>
         </div>
-      </div>
 
-      {/* Schedule Container for PNG Export */}
-      <div ref={scheduleRef} className="bg-white p-4 rounded-xl">
-        {/* Legend */}
-        <div className="flex flex-wrap gap-4 p-4 bg-gray-50 rounded-xl mb-4">
-          <div className="flex items-center">
-            <div
-              className="w-4 h-4 rounded mr-2"
-              style={{
-                backgroundColor: "#f1f5f9",
-                borderLeft: "3px solid var(--color-primary)",
-              }}
-            ></div>
-            <span className="text-sm text-gray-600">Plenary Sessions</span>
-          </div>
-          <div className="flex items-center">
-            <div
-              className="w-4 h-4 rounded mr-2"
-              style={{
-                backgroundColor: "#fff7ed",
-                borderLeft: "3px solid #f3b72c",
-              }}
-            ></div>
-            <span className="text-sm text-gray-600">Breakout Sessions</span>
-          </div>
-          <div className="flex items-center">
-            <div
-              className="w-4 h-4 rounded mr-2"
-              style={{
-                backgroundColor: "#f0fdfa",
-                borderLeft: "3px solid #14b8a6",
-              }}
-            ></div>
-            <span className="text-sm text-gray-600">Networking & Posters</span>
-          </div>
-          <div className="flex items-center">
-            <div
-              className="w-4 h-4 rounded mr-2"
-              style={{ backgroundColor: "#e9f5ff" }}
-            ></div>
-            <span className="text-sm text-gray-600">Social Events</span>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto rounded-xl">
-          <table style={tableStyles}>
-            <thead>
-              <tr>
-                <th style={timeThStyles}>TIME</th>
-                {days.map((day) => (
-                  <th key={day.key} style={thStyles}>
-                    {day.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {timeSlots.map((slot, rowIndex) => (
-                <tr key={slot.time} className="hover:bg-gray-50/50">
-                  {/* Time Column */}
-                  <th
-                    style={{
-                      ...timeThStyles,
-                      height: slot.className.split("-")[1] + "px",
-                      background: "#f8fafc",
-                      color: "var(--color-primary)",
-                      borderRight: "2px solid #e5e7eb",
-                    }}
-                  >
-                    {slot.time
-                      .replace("+", "")
-                      .split(" - ")
-                      .map((t, i) => (
-                        <div key={i}>{t}</div>
-                      ))}
-                  </th>
-
-                  {/* Day Columns */}
-                  {days.map((day) => {
-                    const event = scheduleDataBySlot[rowIndex][day.key];
-                    const combinedStyle = event
-                      ? { ...eventBoxStyles, ...event.style }
-                      : eventBoxStyles;
-
-                    // Use Tailwind utility classes for height, defined in the timeSlots array
-                    return (
-                      <td
-                        key={day.key}
-                        style={{
-                          ...tdStyles,
-                          height: slot.className.split("-")[1] + "px",
-                        }}
-                      >
-                        {event ? (
-                          <div
-                            style={combinedStyle}
-                            className="hover:scale-[1.02] cursor-default"
-                          >
-                            {event.event}
-                          </div>
-                        ) : (
-                          <div
-                            style={{
-                              ...combinedStyle,
-                              backgroundColor: "#fafafa",
-                            }}
-                          >
-                            {/* Empty Cell */}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Download Button */}
-      <div className="mt-6 flex justify-center">
         <button
           onClick={handleDownloadPNG}
-          className="inline-flex items-center px-6 py-3 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer"
-          style={{
-            backgroundColor: "var(--color-secondary)",
-            color: "var(--color-primary)",
-          }}
+          disabled={isExporting}
+          className="flex items-center bg-white border border-slate-200 px-5 py-2.5 rounded-xl font-bold text-sm text-slate-700 hover:bg-slate-50 transition-all shadow-sm disabled:opacity-50"
         >
-          <svg
-            className="w-5 h-5 mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-            />
-          </svg>
-          Download Schedule (PNG)
+          {isExporting ? (
+            <>
+              <svg
+                className="w-4 h-4 mr-2 animate-spin"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              Exporting...
+            </>
+          ) : (
+            <>
+              <svg
+                className="w-4 h-4 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              Download PNG
+            </>
+          )}
         </button>
+      </header>
+
+      {/* Modern Grid Schedule View */}
+      <div
+        ref={scheduleRef}
+        className="grid grid-cols-1 md:grid-cols-5 gap-4 items-stretch"
+      >
+        {days.map((day) => {
+          const isHovered = hoveredDay === day.key;
+          const events = scheduleEvents.filter((e) => e.day === day.key);
+
+          return (
+            <div
+              key={day.key}
+              onMouseEnter={() => setHoveredDay(day.key)}
+              onMouseLeave={() => setHoveredDay(null)}
+              className={`
+                flex flex-col bg-white border rounded-2xl transition-all duration-300
+                ${
+                  isHovered
+                    ? "border-blue-400 shadow-lg ring-1 ring-blue-100"
+                    : "border-slate-200 shadow-sm"
+                }
+              `}
+            >
+              {/* Day Header */}
+              <div
+                className={`p-4 border-b rounded-t-2xl transition-colors duration-300 ${
+                  isHovered ? "bg-blue-50/50" : "bg-slate-50"
+                }`}
+              >
+                <h4
+                  className={`font-bold text-sm transition-colors ${
+                    isHovered ? "text-blue-700" : "text-slate-900"
+                  }`}
+                >
+                  {day.label}
+                </h4>
+                <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
+                  {day.date}
+                </p>
+              </div>
+
+              {/* Event List with Dynamic Gap */}
+              <div
+                className={`p-3 flex-1 flex flex-col transition-all duration-500 ease-out ${
+                  isHovered ? "gap-6" : "gap-3"
+                }`}
+              >
+                {events.length > 0 ? (
+                  events.map((event) => (
+                    <div
+                      key={event.id}
+                      onClick={() => setSelectedEvent(event)}
+                      className={`
+                        p-4 rounded-xl border-l-4 cursor-pointer transition-all duration-300
+                        ${getTypeStyles(event.type)}
+                        ${
+                          isHovered
+                            ? "opacity-100 scale-[1.02]"
+                            : "opacity-90 scale-100"
+                        }
+                        hover:shadow-md hover:brightness-[0.98] active:scale-[0.98]
+                      `}
+                    >
+                      <div className="text-[10px] font-bold opacity-60 mb-1">
+                        {event.time}
+                      </div>
+                      <h5 className="font-bold text-xs leading-snug mb-2">
+                        {event.title}
+                      </h5>
+                      <div className="flex items-center text-[9px] font-bold opacity-50 uppercase tracking-tighter">
+                        <svg
+                          className="w-2.5 h-2.5 mr-1"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                        </svg>
+                        {event.location}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="h-32 flex items-center justify-center">
+                    <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                      No Events
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
