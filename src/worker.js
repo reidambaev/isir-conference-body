@@ -369,6 +369,37 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         .run();
     }
 
+    // Insert affiliations
+    let affiliationsData =
+      typeof data.affiliations === "string"
+        ? JSON.parse(data.affiliations)
+        : data.affiliations;
+
+    if (Array.isArray(affiliationsData)) {
+      for (let i = 0; i < affiliationsData.length; i++) {
+        const aff = affiliationsData[i];
+        const affId = `AFF-${submissionId}-${i}`;
+
+        await env.ISIR_DB.prepare(
+          `INSERT INTO affiliations (
+            id, abstract_id, author_name, department, institution,
+            city, country, position
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+          .bind(
+            affId,
+            submissionId,
+            aff.authorName?.trim() || null,
+            aff.department?.trim() || null,
+            aff.institution?.trim() || null,
+            aff.city?.trim() || null,
+            aff.country?.trim() || null,
+            i
+          )
+          .run();
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
