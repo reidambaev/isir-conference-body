@@ -216,7 +216,6 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
       "keywords",
       "abstract",
       "presentationPreference",
-      "conflictOfInterest",
     ];
 
     for (const field of requiredFields) {
@@ -277,15 +276,6 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
       );
     }
 
-    // Validate conflict of interest
-    const validConflict = ["yes", "no"];
-    if (!validConflict.includes(data.conflictOfInterest)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid conflict of interest value" }),
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
     // Check submission window
     const submissionDeadline = new Date("2026-04-30").getTime();
     const submissionOpens = new Date("2026-01-15").getTime();
@@ -332,8 +322,8 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
     await env.ISIR_DB.prepare(
       `INSERT INTO abstractions (
         id, submission_date, title, category, keywords, abstract,
-        word_count, presentation_preference, conflict_of_interest,
-        conflict_details, presenter_name, presenter_email, status, created_at
+        word_count, presentation_preference, presenter_role,
+        presenter_name, presenter_email, affiliations, status, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
@@ -345,10 +335,10 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         data.abstract.trim(),
         wordCount,
         data.presentationPreference,
-        data.conflictOfInterest,
-        data.conflictOfInterest === "yes" ? data.conflictDetails?.trim() : null,
+        data.presenterRole || null,
         data.presenterName.trim(),
         data.presenterEmail.trim(),
+        data.affiliations || null,
         "submitted",
         submissionDate
       )

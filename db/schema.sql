@@ -59,15 +59,6 @@ CREATE TABLE
         updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)
     );
 
--- Index for common queries
-CREATE INDEX IF NOT EXISTS idx_registrations_email ON registrations (email);
-
-CREATE INDEX IF NOT EXISTS idx_registrations_date ON registrations (registration_date);
-
-CREATE INDEX IF NOT EXISTS idx_registrations_payment_status ON registrations (payment_status);
-
-CREATE INDEX IF NOT EXISTS idx_registrations_ticket_type ON registrations (ticket_type);
-
 -- Accompanying Persons table (optional - for detailed accompanying person info)
 CREATE TABLE
     IF NOT EXISTS accompanying_persons (
@@ -94,12 +85,6 @@ CREATE TABLE
         updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)
     );
 
-CREATE INDEX IF NOT EXISTS idx_visa_requests_email ON visa_requests (email);
-
-CREATE INDEX IF NOT EXISTS idx_visa_requests_status ON visa_requests (status);
-
-CREATE INDEX IF NOT EXISTS idx_visa_requests_date ON visa_requests (created_at);
-
 -- Abstract Submissions table
 CREATE TABLE
     IF NOT EXISTS abstractions (
@@ -111,10 +96,10 @@ CREATE TABLE
         abstract TEXT NOT NULL,
         word_count INTEGER NOT NULL,
         presentation_preference TEXT NOT NULL,
-        conflict_of_interest TEXT NOT NULL,
-        conflict_details TEXT,
+        presenter_role TEXT,
         presenter_name TEXT NOT NULL,
         presenter_email TEXT NOT NULL,
+        affiliations TEXT,
         status TEXT DEFAULT 'submitted',
         reviewer_notes TEXT,
         acceptance_status TEXT DEFAULT 'pending',
@@ -172,3 +157,18 @@ CREATE INDEX IF NOT EXISTS idx_abstractions_status ON abstractions (acceptance_s
 CREATE INDEX IF NOT EXISTS idx_abstractions_category ON abstractions (category);
 
 CREATE INDEX IF NOT EXISTS idx_abstractions_date ON abstractions (submission_date);
+
+-- Index for common queries
+CREATE INDEX IF NOT EXISTS idx_registrations_email ON registrations (email);
+
+CREATE INDEX IF NOT EXISTS idx_registrations_date ON registrations (registration_date);
+
+CREATE INDEX IF NOT EXISTS idx_registrations_payment_status ON registrations (payment_status);
+
+CREATE INDEX IF NOT EXISTS idx_registrations_ticket_type ON registrations (ticket_type);
+
+CREATE INDEX IF NOT EXISTS idx_visa_requests_email ON visa_requests (email);
+
+CREATE INDEX IF NOT EXISTS idx_visa_requests_status ON visa_requests (status);
+
+CREATE INDEX IF NOT EXISTS idx_visa_requests_date ON visa_requests (created_at);
