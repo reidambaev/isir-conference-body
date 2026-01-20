@@ -166,8 +166,10 @@ const SubmissionTab = () => {
         },
       ],
       category: "Immune Regulation in Reproduction",
-      keywords: "maternal tolerance, regulatory T cells, immune adaptation, pregnancy immunology, fetal-maternal interface",
-      abstract: "Objectives: To investigate the role of regulatory T cells (Tregs) in establishing maternal immune tolerance during early pregnancy and identify key molecular mechanisms involved in immune adaptation at the maternal-fetal interface. Methods: We conducted a prospective study of 120 pregnant women in their first trimester, analyzing peripheral blood and decidual tissue samples. Flow cytometry was used to characterize Treg populations, while RNA sequencing identified differentially expressed genes. Results: Treg populations showed significant expansion (2.3-fold increase, p<0.001) during early pregnancy compared to non-pregnant controls. We identified upregulation of FOXP3, IL-10, and TGF-β pathways, along with novel markers associated with enhanced suppressive function. Women who later experienced pregnancy complications showed reduced Treg expansion and altered gene expression patterns. Conclusions: Our findings demonstrate that successful pregnancy establishment requires robust Treg expansion and specific molecular adaptations. These insights may inform future therapeutic strategies for preventing pregnancy complications related to immune dysregulation.",
+      keywords:
+        "maternal tolerance, regulatory T cells, immune adaptation, pregnancy immunology, fetal-maternal interface",
+      abstract:
+        "Objectives: To investigate the role of regulatory T cells (Tregs) in establishing maternal immune tolerance during early pregnancy and identify key molecular mechanisms involved in immune adaptation at the maternal-fetal interface. Methods: We conducted a prospective study of 120 pregnant women in their first trimester, analyzing peripheral blood and decidual tissue samples. Flow cytometry was used to characterize Treg populations, while RNA sequencing identified differentially expressed genes. Results: Treg populations showed significant expansion (2.3-fold increase, p<0.001) during early pregnancy compared to non-pregnant controls. We identified upregulation of FOXP3, IL-10, and TGF-β pathways, along with novel markers associated with enhanced suppressive function. Women who later experienced pregnancy complications showed reduced Treg expansion and altered gene expression patterns. Conclusions: Our findings demonstrate that successful pregnancy establishment requires robust Treg expansion and specific molecular adaptations. These insights may inform future therapeutic strategies for preventing pregnancy complications related to immune dysregulation.",
       presentationPreference: "oral",
     });
     setAbstractType("");
@@ -609,7 +611,8 @@ const SubmissionTab = () => {
             </p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
               <p className="text-xs text-blue-800">
-                <strong>Note:</strong> All correspondence regarding this abstract will be sent to the presenting author's email address.
+                <strong>Note:</strong> All correspondence regarding this
+                abstract will be sent to the presenting author's email address.
               </p>
             </div>
 
@@ -1160,7 +1163,7 @@ const SubmissionTab = () => {
             >
               Fill Example Data
             </button>
-            
+
             <button
               type="submit"
               disabled={loading}
