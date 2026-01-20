@@ -289,3 +289,35 @@ input:focus-visible {
   outline: 2px solid var(--color-secondary);
   outline-offset: 2px;
 }
+
+/* Custom styles for react-phone-number-input */
+.phone-input-custom .PhoneInputInput {
+  border: none;
+  outline: none;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  width: 100%;
+  background: transparent;
+}
+
+.phone-input-custom .PhoneInputInput:focus {
+  outline: none;
+}
+
+.phone-input-custom {
+  padding: 0.5rem;
+}
+
+.phone-input-custom .PhoneInputCountry {
+  margin-right: 0.5rem;
+}
+
+.phone-input-custom .PhoneInputCountrySelect {
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+}
+
+.phone-input-custom .PhoneInputCountrySelect:focus {
+  outline: none;
+}

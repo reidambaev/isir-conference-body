@@ -16,6 +16,7 @@ CREATE TABLE
         credentials TEXT,
         badge_name TEXT,
         pronouns TEXT,
+        department TEXT,
         -- Address
         address1 TEXT,
         address2 TEXT,
@@ -30,6 +31,7 @@ CREATE TABLE
         -- Ticket Information
         ticket_type TEXT NOT NULL,
         accompanying_count INTEGER DEFAULT 0,
+        gala_dinner INTEGER DEFAULT 0,
         ticket_price INTEGER NOT NULL,
         total_price INTEGER NOT NULL,
         is_early_bird INTEGER DEFAULT 0,
@@ -78,3 +80,95 @@ CREATE TABLE
     );
 
 CREATE INDEX IF NOT EXISTS idx_accompanying_registration ON accompanying_persons (registration_id);
+
+-- Visa Requests table
+CREATE TABLE
+    IF NOT EXISTS visa_requests (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        name TEXT NOT NULL,
+        country TEXT NOT NULL,
+        notes TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000),
+        updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)
+    );
+
+CREATE INDEX IF NOT EXISTS idx_visa_requests_email ON visa_requests (email);
+
+CREATE INDEX IF NOT EXISTS idx_visa_requests_status ON visa_requests (status);
+
+CREATE INDEX IF NOT EXISTS idx_visa_requests_date ON visa_requests (created_at);
+
+-- Abstract Submissions table
+CREATE TABLE
+    IF NOT EXISTS abstractions (
+        id TEXT PRIMARY KEY,
+        submission_date INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        category TEXT NOT NULL,
+        keywords TEXT NOT NULL,
+        abstract TEXT NOT NULL,
+        word_count INTEGER NOT NULL,
+        presentation_preference TEXT NOT NULL,
+        conflict_of_interest TEXT NOT NULL,
+        conflict_details TEXT,
+        presenter_name TEXT NOT NULL,
+        presenter_email TEXT NOT NULL,
+        status TEXT DEFAULT 'submitted',
+        reviewer_notes TEXT,
+        acceptance_status TEXT DEFAULT 'pending',
+        created_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000),
+        updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)
+    );
+
+-- Affiliations table (normalized, linked to abstractions)
+CREATE TABLE
+    IF NOT EXISTS affiliations (
+        id TEXT PRIMARY KEY,
+        abstract_id TEXT NOT NULL,
+        author_name TEXT NOT NULL,
+        department TEXT,
+        institution TEXT NOT NULL,
+        city TEXT NOT NULL,
+        country TEXT NOT NULL,
+        position INTEGER DEFAULT 0,
+        created_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000),
+        FOREIGN KEY (abstract_id) REFERENCES abstractions (id)
+    );
+
+-- Authors table (normalized, linked to abstractions)
+CREATE TABLE
+    IF NOT EXISTS authors (
+        id TEXT PRIMARY KEY,
+        abstract_id TEXT NOT NULL,
+        first_name TEXT NOT NULL,
+        middle_name TEXT,
+        last_name TEXT NOT NULL,
+        email TEXT,
+        is_presenter INTEGER DEFAULT 0,
+        is_corresponding INTEGER DEFAULT 0,
+        position INTEGER NOT NULL,
+        created_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000),
+        FOREIGN KEY (abstract_id) REFERENCES abstractions (id)
+    );
+
+CREATE INDEX IF NOT EXISTS idx_affiliations_abstract ON affiliations (abstract_id);
+
+CREATE INDEX IF NOT EXISTS idx_affiliations_institution ON affiliations (institution);
+
+CREATE INDEX IF NOT EXISTS idx_affiliations_country ON affiliations (country);
+
+CREATE INDEX IF NOT EXISTS idx_authors_abstract ON authors (abstract_id);
+
+CREATE INDEX IF NOT EXISTS idx_authors_email ON authors (email);
+
+CREATE INDEX IF NOT EXISTS idx_authors_presenter ON authors (is_presenter);
+
+CREATE INDEX IF NOT EXISTS idx_abstractions_email ON abstractions (presenter_email);
+
+CREATE INDEX IF NOT EXISTS idx_abstractions_status ON abstractions (acceptance_status);
+
+CREATE INDEX IF NOT EXISTS idx_abstractions_category ON abstractions (category);
+
+CREATE INDEX IF NOT EXISTS idx_abstractions_date ON abstractions (submission_date);

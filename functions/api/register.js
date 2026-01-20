@@ -41,7 +41,8 @@ export async function onRequestPost(context) {
       ticketPrices[data.ticketType]?.[isEarlyBird ? "early" : "standard"] || 0;
     const accompanyingPrice =
       (isEarlyBird ? 250 : 350) * (data.accompanyingPersonCount || 0);
-    const totalPrice = ticketPrice + accompanyingPrice;
+    const galaDinnerPrice = data.galaDinner ? 100 : 0;
+    const totalPrice = ticketPrice + accompanyingPrice + galaDinnerPrice;
 
     // Insert into D1 database
     const result = await env.ISIR_DB.prepare(
@@ -59,6 +60,7 @@ export async function onRequestPost(context) {
         credentials,
         badge_name,
         pronouns,
+        department,
         address1,
         address2,
         city,
@@ -70,6 +72,7 @@ export async function onRequestPost(context) {
         is_physician,
         ticket_type,
         accompanying_count,
+        gala_dinner,
         ticket_price,
         total_price,
         is_early_bird,
@@ -86,7 +89,7 @@ export async function onRequestPost(context) {
         payment_status,
         membership_level,
         membership_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     )
       .bind(
@@ -102,6 +105,7 @@ export async function onRequestPost(context) {
         data.credentials || null,
         data.badgeName || null,
         data.pronouns || null,
+        data.department || null,
         data.address1 || null,
         data.address2 || null,
         data.city || null,
@@ -113,6 +117,7 @@ export async function onRequestPost(context) {
         data.isPhysician || null,
         data.ticketType,
         data.accompanyingPersonCount || 0,
+        data.galaDinner ? 1 : 0,
         ticketPrice,
         totalPrice,
         isEarlyBird ? 1 : 0,
