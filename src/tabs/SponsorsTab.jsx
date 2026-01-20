@@ -31,16 +31,22 @@ const SponsorsTab = () => (
         </span>
       </div>
       <div className="bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-100 p-8 rounded-2xl border-4 border-amber-400 shadow-2xl">
-        <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
-          <div className="w-full lg:w-1/3 bg-white rounded-xl p-8 shadow-inner border border-amber-200 flex items-center justify-center min-h-[200px]">
-            <div className="text-center">
-              <h4 className="text-3xl font-bold text-gray-800 mb-2">
-                강화 (주)
-              </h4>
-              <p className="text-xl text-gray-600">Kang Wha, Inc</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Logo Section */}
+          <div className="w-full bg-white rounded-xl p-8 shadow-inner border border-amber-200 flex items-center justify-center min-h-[300px]">
+            <div className="w-full h-64 bg-gray-100 rounded-lg border-2 border-dashed border-amber-300 flex items-center justify-center">
+              <span className="text-gray-400 text-sm">Sponsor Logo</span>
             </div>
           </div>
-          <div className="flex-1 text-center lg:text-left">
+
+          {/* Text Section */}
+          <div className="flex flex-col justify-center">
+            <div className="mb-6">
+              <h4 className="text-3xl font-bold text-gray-800 mb-1">
+                강화 (주)
+              </h4>
+              <p className="text-xl text-gray-600 mb-4">Kang Wha, Inc</p>
+            </div>
             <h4
               className="text-2xl font-bold mb-3"
               style={{ color: "var(--color-primary)" }}
@@ -51,7 +57,7 @@ const SponsorsTab = () => (
               We extend our deepest gratitude to Kang Wha, Inc for their
               exceptional support as our Tier 1 Principal Sponsor for ISIR 2026.
             </p>
-            <div className="flex flex-wrap justify-center lg:justify-start gap-3">
+            <div className="flex flex-wrap gap-3">
               <span className="inline-flex items-center px-4 py-2 bg-white rounded-full text-sm font-medium text-gray-700 border border-gray-200">
                 <svg
                   className="w-4 h-4 mr-2 text-amber-500"
@@ -146,76 +152,63 @@ const SponsorsTab = () => (
     </div>
 
     <h4
-      className="text-xl font-semibold text-blue-800 mb-4"
+      className="text-xl font-semibold text-blue-800 mb-6"
       style={{ color: "var(--color-primary)" }}
     >
       Supported By
     </h4>
-    {/* Row 1: Logos 1, 2, 3 */}
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+    {/* First Row - Logos 1, 2, 3 */}
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-6">
       {[
         {
           name: "Korean Society for Reproductive Medicine",
           logo: logo1,
-          size: "w-20 md:w-32 lg:w-48 h-12 md:h-14 lg:h-16",
         },
         {
           name: "Korean Society for Reproductive Immunology",
           logo: logo2,
-          size: "w-16 md:w-20 lg:w-28 h-16 md:h-20 lg:h-28",
         },
         {
           name: "Korean Society of Gynecologic Oncology",
           logo: logo3,
-          size: "w-20 md:w-32 lg:w-48 h-12 md:h-14 lg:h-16",
         },
       ].map((org, index) => (
         <div
           key={index}
-          className="flex items-center p-4 bg-gray-50 rounded-xl border border-gray-200 hover:shadow-md transition-shadow"
+          className="h-48 flex items-center justify-center p-6 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 hover:shadow-lg transition-all"
         >
-          <div
-            className={`${org.size} rounded-lg flex items-center justify-center mr-4 flex-shrink-0 bg-white border border-gray-100 p-1 overflow-hidden`}
-          >
-            <img
-              src={org.logo}
-              alt={org.name}
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <span className="text-gray-700 font-medium text-sm">{org.name}</span>
+          <img
+            src={org.logo}
+            alt={org.name}
+            className="w-full h-full object-contain"
+            title={org.name}
+          />
         </div>
       ))}
     </div>
 
-    {/* Row 2: Logos 4, 5 */}
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+    {/* Second Row - Logos 4, 5 */}
+    <div className="grid grid-cols-2 gap-6 mb-10">
       {[
         {
           name: "Korean Society of Ultrasound in Obstetrics and Gynecology",
           logo: logo4,
-          size: "w-24 md:w-40 lg:w-64 h-16 md:h-20 lg:h-24",
         },
         {
           name: "Korean College of Obstetrics and Gynecology",
           logo: logo5,
-          size: "w-24 md:w-40 lg:w-64 h-16 md:h-20 lg:h-24",
         },
       ].map((org, index) => (
         <div
           key={index}
-          className="flex items-center p-4 bg-gray-50 rounded-xl border border-gray-200 hover:shadow-md transition-shadow"
+          className="h-48 flex items-center justify-center p-6 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 hover:shadow-lg transition-all"
         >
-          <div
-            className={`${org.size} rounded-lg flex items-center justify-center mr-4 flex-shrink-0 bg-white border border-gray-100 p-1 overflow-hidden`}
-          >
-            <img
-              src={org.logo}
-              alt={org.name}
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <span className="text-gray-700 font-medium text-sm">{org.name}</span>
+          <img
+            src={org.logo}
+            alt={org.name}
+            className="w-full h-full object-contain"
+            title={org.name}
+          />
         </div>
       ))}
     </div>
