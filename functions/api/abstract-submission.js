@@ -32,6 +32,8 @@ export async function onRequestPost(context) {
       "affiliations",
       "presenterName",
       "presenterEmail",
+      "correspondingName",
+      "correspondingEmail",
       "category",
       "keywords",
       "abstract",
@@ -87,7 +89,18 @@ export async function onRequestPost(context) {
     if (!emailRegex.test(data.presenterEmail)) {
       return new Response(
         JSON.stringify({
-          error: "Invalid email format",
+          error: "Invalid presenter email format",
+        }),
+        {
+          status: 400,
+          headers: corsHeaders,
+        }
+      );
+    }
+    if (!emailRegex.test(data.correspondingEmail)) {
+      return new Response(
+        JSON.stringify({
+          error: "Invalid corresponding author email format",
         }),
         {
           status: 400,
@@ -254,9 +267,11 @@ export async function onRequestPost(context) {
         conflict_details,
         presenter_name,
         presenter_email,
+        corresponding_name,
+        corresponding_email,
         status,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     )
       .bind(
@@ -272,6 +287,8 @@ export async function onRequestPost(context) {
         data.conflictOfInterest === "yes" ? data.conflictDetails?.trim() : null,
         data.presenterName.trim(),
         data.presenterEmail.trim(),
+        data.correspondingName.trim(),
+        data.correspondingEmail.trim(),
         "submitted",
         submissionDate
       )

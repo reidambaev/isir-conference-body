@@ -322,9 +322,9 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
     await env.ISIR_DB.prepare(
       `INSERT INTO abstractions (
         id, submission_date, title, category, keywords, abstract,
-        word_count, presentation_preference, presenter_role,
+        word_count, presentation_preference,
         presenter_name, presenter_email, affiliations, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         submissionId,
@@ -335,7 +335,6 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         data.abstract.trim(),
         wordCount,
         data.presentationPreference,
-        data.presenterRole || null,
         data.presenterName.trim(),
         data.presenterEmail.trim(),
         data.affiliations || null,

@@ -1,58 +1,63 @@
 import React from "react";
+import headshot1 from "../assets/headshots/headshot1.jpg";
+import headshot2 from "../assets/headshots/headshot2.png";
+import headshot3 from "../assets/headshots/headshot3.jpg";
+import headshot4 from "../assets/headshots/headshot4.jpg";
+import headshot5 from "../assets/headshots/headshot5.jpg";
+import headshot6 from "../assets/headshots/headshot6.jpg";
+import headshot7 from "../assets/headshots/headshot7.jpg";
+import headshot8 from "../assets/headshots/headshot8.jpg";
+import headshot9 from "../assets/headshots/headshot9.jpg";
 
-const SpeakersTab = () => {
-  // Keynote speakers data
-  const keynoteSpeakers = [
-    {
-      name: "To Be Announced",
-      title: "Keynote Speaker",
-      affiliation: "Details coming soon",
-      topic: "Opening Keynote",
-      image: null,
-    },
-    {
-      name: "To Be Announced",
-      title: "Keynote Speaker",
-      affiliation: "Details coming soon",
-      topic: "Plenary Session",
-      image: null,
-    },
-  ];
+const speakers = [
+  {
+    name: "Sarah Robertson",
+    affiliation: "The University of Adelaide, Australia",
+    image: headshot1,
+  },
+  {
+    name: "Gil Mor",
+    affiliation: "Wayne State University, USA",
+    image: headshot2,
+  },
+  {
+    name: "Udo Markert",
+    affiliation: "Universitätsklinikum Jena, Germany",
+    image: headshot3,
+  },
+  {
+    name: "David Sharkey",
+    affiliation: "The University of Adelaide, Australia",
+    image: headshot4,
+  },
+  {
+    name: "Petra Arck",
+    affiliation: "University Medical Center Hamburg, Germany",
+    image: headshot5,
+  },
+  {
+    name: "Atsushi Fukui",
+    affiliation: "Hyogo College of Medicine, Japan",
+    image: headshot6,
+  },
+  {
+    name: "Sandra M Blois",
+    affiliation: "Universitätsklinikum Hamburg-Eppendorf, Germany",
+    image: headshot7,
+  },
+  {
+    name: "Akitoshi Nakashima",
+    affiliation: "University of Toyama, Japan",
+    image: headshot8,
+  },
+  {
+    name: "Nardhy Gomez-Lopez",
+    affiliation: "Washington University School of Medicine, USA",
+    image: headshot9,
+  },
+];
 
-  // Invited speakers data (placeholder)
-  const invitedSpeakers = [
-    {
-      name: "Speaker TBA",
-      affiliation: "Institution TBA",
-      session: "Session 1",
-    },
-    {
-      name: "Speaker TBA",
-      affiliation: "Institution TBA",
-      session: "Session 2",
-    },
-    {
-      name: "Speaker TBA",
-      affiliation: "Institution TBA",
-      session: "Session 3",
-    },
-    {
-      name: "Speaker TBA",
-      affiliation: "Institution TBA",
-      session: "Session 4",
-    },
-    {
-      name: "Speaker TBA",
-      affiliation: "Institution TBA",
-      session: "Session 5",
-    },
-    {
-      name: "Speaker TBA",
-      affiliation: "Institution TBA",
-      session: "Session 6",
-    },
-  ];
-
+function SpeakersTab() {
   return (
     <div role="tabpanel">
       {/* Header Section */}
@@ -81,7 +86,7 @@ const SpeakersTab = () => {
               className="text-2xl font-bold"
               style={{ color: "var(--color-primary)" }}
             >
-              Speakers & Faculty
+              Speakers
             </h3>
             <p className="text-gray-600">
               Distinguished experts in reproductive immunology
@@ -90,45 +95,7 @@ const SpeakersTab = () => {
         </div>
       </div>
 
-      {/* Coming Soon Banner */}
-      <div className="mb-10 p-6 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200">
-        <div className="flex flex-col md:flex-row items-center justify-between">
-          <div className="flex items-center mb-4 md:mb-0">
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center mr-4"
-              style={{ backgroundColor: "var(--color-primary)" }}
-            >
-              <svg
-                className="w-7 h-7 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h4
-                className="text-xl font-bold"
-                style={{ color: "var(--color-primary)" }}
-              >
-                Speaker Lineup Coming Soon
-              </h4>
-              <p className="text-gray-700">
-                Our scientific committee is finalizing the speaker program.
-                Check back for updates!
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Keynote Speakers Section */}
+      {/* Speaker Grid */}
       <div className="mb-10">
         <h4
           className="text-xl font-semibold mb-6 flex items-center"
@@ -149,58 +116,44 @@ const SpeakersTab = () => {
           </svg>
           Keynote Speakers
         </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {keynoteSpeakers.map((speaker, index) => (
-            <div
-              key={index}
-              className="bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow"
-            >
-              <div className="flex items-start">
-                <div
-                  className="w-20 h-20 rounded-full flex items-center justify-center mr-4 flex-shrink-0"
-                  style={{ backgroundColor: "var(--color-secondary)" }}
+        <div className="mb-8 p-6 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200">
+          <div className="flex flex-col md:flex-row items-center justify-between">
+            <div className="flex items-center mb-4 md:mb-0">
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center mr-4"
+                style={{ backgroundColor: "var(--color-primary)" }}
+              >
+                <svg
+                  className="w-7 h-7 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  <svg
-                    className="w-10 h-10"
-                    style={{ color: "var(--color-primary)" }}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <span
-                    className="inline-block px-3 py-1 text-xs font-semibold rounded-full mb-2"
-                    style={{
-                      backgroundColor: "var(--color-secondary)",
-                      color: "var(--color-primary)",
-                    }}
-                  >
-                    {speaker.topic}
-                  </span>
-                  <h5
-                    className="text-lg font-bold"
-                    style={{ color: "var(--color-primary)" }}
-                  >
-                    {speaker.name}
-                  </h5>
-                  <p className="text-gray-600 text-sm">{speaker.title}</p>
-                  <p className="text-gray-500 text-sm">{speaker.affiliation}</p>
-                </div>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h4
+                  className="text-xl font-bold"
+                  style={{ color: "var(--color-primary)" }}
+                >
+                  Coming Soon
+                </h4>
+                <p className="text-gray-700">
+                  Distinguished keynote speakers to be announced soon.
+                </p>
               </div>
             </div>
-          ))}
+          </div>
         </div>
       </div>
 
-      {/* Invited Speakers Section */}
+      {/* Speaker Grid */}
       <div className="mb-10">
         <h4
           className="text-xl font-semibold mb-6 flex items-center"
@@ -216,57 +169,38 @@ const SpeakersTab = () => {
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
             />
           </svg>
-          Invited Speakers
+          Speakers
         </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {invitedSpeakers.map((speaker, index) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {speakers.map((speaker, index) => (
             <div
               key={index}
-              className="bg-gray-50 rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow"
+              className="bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow flex flex-col items-center"
             >
-              <div className="flex items-center">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center mr-3 flex-shrink-0"
-                  style={{
-                    backgroundColor: "var(--color-primary)",
-                    opacity: 0.1,
-                  }}
-                >
-                  <svg
-                    className="w-6 h-6"
-                    style={{ color: "var(--color-primary)" }}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h5 className="font-semibold text-gray-800">
-                    {speaker.name}
-                  </h5>
-                  <p className="text-gray-500 text-sm">{speaker.affiliation}</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {speaker.session}
-                  </p>
-                </div>
-              </div>
+              <img
+                src={speaker.image}
+                alt={speaker.name}
+                className="w-28 h-28 rounded-full object-cover mb-4 border-2 border-blue-200"
+              />
+              <h5
+                className="text-lg font-bold mb-1"
+                style={{ color: "var(--color-primary)" }}
+              >
+                {speaker.name}
+              </h5>
+              <p className="text-gray-600 text-sm text-center mb-2 whitespace-pre-line">
+                {speaker.affiliation}
+              </p>
             </div>
           ))}
         </div>
       </div>
 
       {/* Session Topics Preview */}
-      <div className="mb-10">
+      {/* <div className="mb-10">
         <h4
           className="text-xl font-semibold mb-6 flex items-center"
           style={{ color: "var(--color-primary)" }}
@@ -313,7 +247,7 @@ const SpeakersTab = () => {
             </div>
           ))}
         </div>
-      </div>
+      </div> */}
 
       {/* Call for Abstracts */}
       <div className="bg-gradient-to-r from-blue-900 to-blue-800 rounded-2xl p-8 text-center shadow-xl">
@@ -367,6 +301,6 @@ const SpeakersTab = () => {
       </div>
     </div>
   );
-};
+}
 
 export default SpeakersTab;

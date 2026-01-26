@@ -11,10 +11,17 @@ const SubmissionTab = () => {
         lastName: "",
         email: "",
         isPresenter: true,
+        isCorresponding: true,
+        affiliations: [
+          {
+            institution: "",
+            department: "",
+            city: "",
+            country: "",
+          },
+        ],
       },
     ],
-    presenterRole: "",
-    affiliations: [],
     category: "",
     keywords: "",
     abstract: "",
@@ -58,6 +65,10 @@ const SubmissionTab = () => {
     const presenter = formData.allAuthors.find((a) => a.isPresenter);
     if (!presenter) return "A presenting author must be designated";
 
+    // Find corresponding author
+    const corresponding = formData.allAuthors.find((a) => a.isCorresponding);
+    if (!corresponding) return "A corresponding author must be designated";
+
     // Validate presenter author
     if (!presenter.firstName || !presenter.firstName.trim())
       return "Presenter first name is required";
@@ -65,6 +76,14 @@ const SubmissionTab = () => {
       return "Presenter last name is required";
     if (!presenter.email || !presenter.email.trim())
       return "Presenter email is required";
+
+    // Validate corresponding author
+    if (!corresponding.firstName || !corresponding.firstName.trim())
+      return "Corresponding author first name is required";
+    if (!corresponding.lastName || !corresponding.lastName.trim())
+      return "Corresponding author last name is required";
+    if (!corresponding.email || !corresponding.email.trim())
+      return "Corresponding author email is required";
 
     // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -80,25 +99,20 @@ const SubmissionTab = () => {
       if (!author.lastName || !author.lastName.trim()) {
         return "Last name is required for all authors";
       }
-    }
-
-    if (
-      !Array.isArray(formData.affiliations) ||
-      formData.affiliations.length === 0
-    ) {
-      return "At least one affiliation is required";
-    }
-
-    // Validate each affiliation
-    for (const aff of formData.affiliations) {
-      if (!aff.institution || !aff.institution.trim()) {
-        return "Institution is required for all affiliations";
+      if (!author.affiliations || author.affiliations.length === 0) {
+        return "Each author must have at least one affiliation";
       }
-      if (!aff.country || !aff.country.trim()) {
-        return "Country is required for all affiliations";
-      }
-      if (!aff.city || !aff.city.trim()) {
-        return "City is required for all affiliations";
+      // Validate each affiliation
+      for (const aff of author.affiliations) {
+        if (!aff.institution || !aff.institution.trim()) {
+          return "Institution is required for all affiliations";
+        }
+        if (!aff.city || !aff.city.trim()) {
+          return "City is required for all affiliations";
+        }
+        if (!aff.country || !aff.country.trim()) {
+          return "Country is required for all affiliations";
+        }
       }
     }
 
@@ -115,10 +129,6 @@ const SubmissionTab = () => {
       return "Abstract must be at least 50 words";
     }
 
-    if (!formData.presenterRole) {
-      return "Please select your role";
-    }
-
     return null;
   };
 
@@ -132,6 +142,15 @@ const SubmissionTab = () => {
           lastName: "Johnson",
           email: "sarah.johnson@university.edu",
           isPresenter: true,
+          isCorresponding: true,
+          affiliations: [
+            {
+              institution: "University of Medical Sciences",
+              department: "Department of Reproductive Immunology",
+              city: "Boston",
+              country: "United States",
+            },
+          ],
         },
         {
           firstName: "Michael",
@@ -139,6 +158,21 @@ const SubmissionTab = () => {
           lastName: "Chen",
           email: "m.chen@research.org",
           isPresenter: false,
+          isCorresponding: false,
+          affiliations: [
+            {
+              institution: "International Research Institute",
+              department: "Center for Maternal-Fetal Medicine",
+              city: "London",
+              country: "United Kingdom",
+            },
+            {
+              institution: "University of Cambridge",
+              department: "Department of Obstetrics",
+              city: "Cambridge",
+              country: "United Kingdom",
+            },
+          ],
         },
         {
           firstName: "Elena",
@@ -146,23 +180,15 @@ const SubmissionTab = () => {
           lastName: "Rodriguez",
           email: "e.rodriguez@institute.edu",
           isPresenter: false,
-        },
-      ],
-      presenterRole: "phd-student",
-      affiliations: [
-        {
-          institution: "University of Medical Sciences",
-          department: "Department of Reproductive Immunology",
-          city: "Boston",
-          state: "Massachusetts",
-          country: "United States",
-        },
-        {
-          institution: "International Research Institute",
-          department: "Center for Maternal-Fetal Medicine",
-          city: "London",
-          state: "",
-          country: "United Kingdom",
+          isCorresponding: false,
+          affiliations: [
+            {
+              institution: "University of Medical Sciences",
+              department: "Department of Reproductive Immunology",
+              city: "Boston",
+              country: "United States",
+            },
+          ],
         },
       ],
       category: "Immune Regulation in Reproduction",
@@ -190,16 +216,24 @@ const SubmissionTab = () => {
       return;
     }
 
-    // Build authors array
-    const authors = formData.allAuthors.map((author) => ({
+    // Build authors array with affiliations
+    const authors = formData.allAuthors.map((author, authorIndex) => ({
       firstName: author.firstName.trim(),
       middleName: author.middleName?.trim() || null,
       lastName: author.lastName.trim(),
       email: author.email?.trim() || null,
       isPresenter: author.isPresenter || false,
+      isCorresponding: author.isCorresponding || false,
+      affiliations: author.affiliations.map((aff) => ({
+        institution: aff.institution.trim(),
+        department: aff.department?.trim() || null,
+        city: aff.city.trim(),
+        country: aff.country.trim(),
+      })),
     }));
 
     const presenter = formData.allAuthors.find((a) => a.isPresenter);
+    const corresponding = formData.allAuthors.find((a) => a.isCorresponding);
 
     setLoading(true);
     setSubmitStatus("submitting");
@@ -217,10 +251,10 @@ const SubmissionTab = () => {
           keywords: formData.keywords,
           abstract: formData.abstract,
           presentationPreference: formData.presentationPreference,
-          presenterRole: formData.presenterRole,
           presenterName: `${presenter.firstName} ${presenter.lastName}`,
           presenterEmail: presenter.email,
-          affiliations: JSON.stringify(formData.affiliations),
+          correspondingName: `${corresponding.firstName} ${corresponding.lastName}`,
+          correspondingEmail: corresponding.email,
         }),
       });
 
@@ -242,10 +276,17 @@ const SubmissionTab = () => {
               lastName: "",
               email: "",
               isPresenter: true,
+              isCorresponding: true,
+              affiliations: [
+                {
+                  institution: "",
+                  department: "",
+                  city: "",
+                  country: "",
+                },
+              ],
             },
           ],
-          presenterRole: "",
-          affiliations: [],
           category: "",
           keywords: "",
           abstract: "",
@@ -333,8 +374,8 @@ const SubmissionTab = () => {
               1
             </div>
             <div>
-              <strong>Title:</strong> Maximum 150 characters, bold format. Only
-              the first word should be capitalized.
+              <strong>Title:</strong> Maximum 150 characters. Only the first
+              word should be capitalized.
             </div>
           </div>
           <div className="flex items-start">
@@ -378,17 +419,6 @@ const SubmissionTab = () => {
               style={{ backgroundColor: "var(--color-primary)" }}
             >
               5
-            </div>
-            <div>
-              <strong>Formatting:</strong> Use Times New Roman font, size 12.
-            </div>
-          </div>
-          <div className="flex items-start">
-            <div
-              className="w-6 h-6 rounded-full flex items-center justify-center text-white text-sm font-bold mr-3 mt-0.5 flex-shrink-0"
-              style={{ backgroundColor: "var(--color-primary)" }}
-            >
-              6
             </div>
             <div>
               <strong>Presentation Type:</strong> Select oral or poster
@@ -606,13 +636,15 @@ const SubmissionTab = () => {
             </label>
             <p className="text-xs text-gray-500 mb-3">
               List all authors. Use the ↑↓ buttons to reorder. Mark one author
-              as the presenting author (required). Authors will appear in the
-              order shown.
+              as the presenting author and one as the corresponding author (both
+              required). Authors will appear in the order shown.
             </p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
               <p className="text-xs text-blue-800">
                 <strong>Note:</strong> All correspondence regarding this
-                abstract will be sent to the presenting author's email address.
+                abstract will be sent to the corresponding author's email
+                address. The presenting author will deliver the presentation at
+                the conference.
               </p>
             </div>
 
@@ -688,6 +720,14 @@ const SubmissionTab = () => {
                             newAuthors[0].isPresenter = true;
                           }
 
+                          // If we're removing the corresponding author, make the first author the new corresponding author
+                          if (
+                            authorToRemove.isCorresponding &&
+                            newAuthors.length > 0
+                          ) {
+                            newAuthors[0].isCorresponding = true;
+                          }
+
                           setFormData((prev) => ({
                             ...prev,
                             allAuthors: newAuthors,
@@ -707,6 +747,11 @@ const SubmissionTab = () => {
                     {author.isPresenter && (
                       <span className="text-xs font-bold text-blue-700 bg-blue-100 px-2 py-1 rounded">
                         PRESENTING AUTHOR
+                      </span>
+                    )}
+                    {author.isCorresponding && (
+                      <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded">
+                        CORRESPONDING AUTHOR
                       </span>
                     )}
                   </div>
@@ -777,7 +822,7 @@ const SubmissionTab = () => {
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1">
                         Email{" "}
-                        {author.isPresenter && (
+                        {(author.isPresenter || author.isCorresponding) && (
                           <span className="text-red-500">*</span>
                         )}
                       </label>
@@ -794,7 +839,7 @@ const SubmissionTab = () => {
                         }}
                         placeholder="author@example.com"
                         className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required={author.isPresenter}
+                        required={author.isPresenter || author.isCorresponding}
                       />
                     </div>
 
@@ -824,7 +869,190 @@ const SubmissionTab = () => {
                           Presenting Author
                         </span>
                       </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name="correspondingAuthor"
+                          checked={author.isCorresponding || false}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              const newAuthors = formData.allAuthors.map(
+                                (a, i) => ({
+                                  ...a,
+                                  isCorresponding: i === index,
+                                })
+                              );
+                              setFormData((prev) => ({
+                                ...prev,
+                                allAuthors: newAuthors,
+                              }));
+                            }
+                          }}
+                          className="w-4 h-4 text-green-600"
+                        />
+                        <span className="text-gray-700 font-semibold">
+                          Corresponding Author
+                        </span>
+                      </label>
                     </div>
+                  </div>
+
+                  {/* Affiliations for this author */}
+                  <div className="mt-4 pt-4 border-t border-gray-300">
+                    <label className="block text-xs font-semibold text-gray-700 mb-2">
+                      Affiliations <span className="text-red-500">*</span>
+                      <span className="font-normal text-gray-500 ml-1">
+                        (at least one required)
+                      </span>
+                    </label>
+
+                    <div className="space-y-2">
+                      {(author.affiliations || []).map((aff, affIndex) => (
+                        <div
+                          key={affIndex}
+                          className="p-3 bg-white rounded-lg border border-gray-300 relative"
+                        >
+                          {author.affiliations.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newAuthors = [...formData.allAuthors];
+                                newAuthors[index].affiliations = newAuthors[
+                                  index
+                                ].affiliations.filter((_, i) => i !== affIndex);
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  allAuthors: newAuthors,
+                                }));
+                              }}
+                              className="absolute top-1 right-1 text-red-500 hover:text-red-700 text-lg"
+                              title="Remove affiliation"
+                            >
+                              ×
+                            </button>
+                          )}
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pr-6">
+                            <div className="md:col-span-2">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Institution{" "}
+                                <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={aff.institution || ""}
+                                onChange={(e) => {
+                                  const newAuthors = [...formData.allAuthors];
+                                  newAuthors[index].affiliations[
+                                    affIndex
+                                  ].institution = e.target.value;
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    allAuthors: newAuthors,
+                                  }));
+                                }}
+                                placeholder="e.g., Harvard University"
+                                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                required
+                              />
+                            </div>
+
+                            <div className="md:col-span-2">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Department (optional)
+                              </label>
+                              <input
+                                type="text"
+                                value={aff.department || ""}
+                                onChange={(e) => {
+                                  const newAuthors = [...formData.allAuthors];
+                                  newAuthors[index].affiliations[
+                                    affIndex
+                                  ].department = e.target.value;
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    allAuthors: newAuthors,
+                                  }));
+                                }}
+                                placeholder="e.g., Department of Biology"
+                                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                City <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={aff.city || ""}
+                                onChange={(e) => {
+                                  const newAuthors = [...formData.allAuthors];
+                                  newAuthors[index].affiliations[
+                                    affIndex
+                                  ].city = e.target.value;
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    allAuthors: newAuthors,
+                                  }));
+                                }}
+                                placeholder="e.g., Boston"
+                                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                required
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Country <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={aff.country || ""}
+                                onChange={(e) => {
+                                  const newAuthors = [...formData.allAuthors];
+                                  newAuthors[index].affiliations[
+                                    affIndex
+                                  ].country = e.target.value;
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    allAuthors: newAuthors,
+                                  }));
+                                }}
+                                placeholder="e.g., United States"
+                                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Add Affiliation Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newAuthors = [...formData.allAuthors];
+                        if (!newAuthors[index].affiliations) {
+                          newAuthors[index].affiliations = [];
+                        }
+                        newAuthors[index].affiliations.push({
+                          institution: "",
+                          department: "",
+                          city: "",
+                          country: "",
+                        });
+                        setFormData((prev) => ({
+                          ...prev,
+                          allAuthors: newAuthors,
+                        }));
+                      }}
+                      className="mt-2 flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-green-600 bg-green-50 rounded hover:bg-green-100 transition-all border border-green-200"
+                    >
+                      <span>+</span>
+                      Add Another Affiliation
+                    </button>
                   </div>
                 </div>
               ))}
@@ -844,6 +1072,15 @@ const SubmissionTab = () => {
                       lastName: "",
                       email: "",
                       isPresenter: false,
+                      isCorresponding: false,
+                      affiliations: [
+                        {
+                          institution: "",
+                          department: "",
+                          city: "",
+                          country: "",
+                        },
+                      ],
                     },
                   ],
                 }));
@@ -852,202 +1089,6 @@ const SubmissionTab = () => {
             >
               <span>+</span>
               Add Another Author
-            </button>
-          </div>
-
-          {/* I am a */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              I am a: <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="presenterRole"
-              value={formData.presenterRole || ""}
-              onChange={handleInputChange}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
-              required
-            >
-              <option value="">Select your role...</option>
-              <option value="Post Doc">Post Doc</option>
-              <option value="Resident">Resident</option>
-              <option value="Graduate Student">Graduate Student</option>
-              <option value="Medical Student">Medical Student</option>
-              <option value="Clinical Fellow">Clinical Fellow</option>
-              <option value="N/A">N/A</option>
-            </select>
-          </div>
-
-          {/* Affiliations */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Affiliations <span className="text-red-500">*</span>
-            </label>
-            <p className="text-xs text-gray-500 mb-3">
-              Add the institutional affiliations for authors. Each affiliation
-              includes department, institution, city, and country.
-            </p>
-
-            {/* Affiliations List */}
-            <div className="space-y-3 mb-4">
-              {formData.affiliations.map((aff, index) => (
-                <div
-                  key={index}
-                  className="p-4 bg-gray-50 rounded-lg border border-gray-200 relative"
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        affiliations: prev.affiliations.filter(
-                          (_, i) => i !== index
-                        ),
-                      }));
-                    }}
-                    className="absolute top-2 right-2 text-red-500 hover:text-red-700 text-lg"
-                  >
-                    ×
-                  </button>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pr-8">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">
-                        Author Name (optional)
-                      </label>
-                      <select
-                        value={aff.authorName || ""}
-                        onChange={(e) => {
-                          const newAff = [...formData.affiliations];
-                          newAff[index].authorName = e.target.value;
-                          setFormData((prev) => ({
-                            ...prev,
-                            affiliations: newAff,
-                          }));
-                        }}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                      >
-                        <option value="">Select an author...</option>
-                        {formData.allAuthors.map((author, authIdx) => (
-                          <option
-                            key={authIdx}
-                            value={`${author.firstName} ${author.lastName}`.trim()}
-                          >
-                            {`${author.firstName} ${author.lastName}`.trim()}
-                            {author.isPresenter ? " (Presenter)" : ""}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">
-                        Department (optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={aff.department || ""}
-                        onChange={(e) => {
-                          const newAff = [...formData.affiliations];
-                          newAff[index].department = e.target.value;
-                          setFormData((prev) => ({
-                            ...prev,
-                            affiliations: newAff,
-                          }));
-                        }}
-                        placeholder="e.g., Department of Biology"
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">
-                        Institution <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={aff.institution || ""}
-                        onChange={(e) => {
-                          const newAff = [...formData.affiliations];
-                          newAff[index].institution = e.target.value;
-                          setFormData((prev) => ({
-                            ...prev,
-                            affiliations: newAff,
-                          }));
-                        }}
-                        placeholder="e.g., Harvard University"
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">
-                        City <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={aff.city || ""}
-                        onChange={(e) => {
-                          const newAff = [...formData.affiliations];
-                          newAff[index].city = e.target.value;
-                          setFormData((prev) => ({
-                            ...prev,
-                            affiliations: newAff,
-                          }));
-                        }}
-                        placeholder="e.g., Boston"
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">
-                        Country <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={aff.country || ""}
-                        onChange={(e) => {
-                          const newAff = [...formData.affiliations];
-                          newAff[index].country = e.target.value;
-                          setFormData((prev) => ({
-                            ...prev,
-                            affiliations: newAff,
-                          }));
-                        }}
-                        placeholder="e.g., United States"
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Add Affiliation Button */}
-            <button
-              type="button"
-              onClick={() => {
-                setFormData((prev) => ({
-                  ...prev,
-                  affiliations: [
-                    ...prev.affiliations,
-                    {
-                      authorName: "",
-                      department: "",
-                      institution: "",
-                      city: "",
-                      country: "",
-                    },
-                  ],
-                }));
-              }}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-all border border-blue-200"
-            >
-              <span>+</span>
-              Add Another Affiliation
             </button>
           </div>
 
@@ -1127,7 +1168,7 @@ const SubmissionTab = () => {
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
               Presentation Preference <span className="text-red-500">*</span>
             </label>
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col gap-3">
               <label className="flex items-center cursor-pointer">
                 <input
                   type="radio"
@@ -1137,7 +1178,22 @@ const SubmissionTab = () => {
                   onChange={handleInputChange}
                   className="w-4 h-4 text-blue-600"
                 />
-                <span className="ml-2 text-gray-700">Oral presentation</span>
+                <span className="ml-2 text-gray-700">
+                  Oral presentation only
+                </span>
+              </label>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="presentationPreference"
+                  value="either"
+                  checked={formData.presentationPreference === "either"}
+                  onChange={handleInputChange}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <span className="ml-2 text-gray-700">
+                  Oral preferred, but willing to present as poster
+                </span>
               </label>
               <label className="flex items-center cursor-pointer">
                 <input
@@ -1148,7 +1204,9 @@ const SubmissionTab = () => {
                   onChange={handleInputChange}
                   className="w-4 h-4 text-blue-600"
                 />
-                <span className="ml-2 text-gray-700">Poster presentation</span>
+                <span className="ml-2 text-gray-700">
+                  Poster presentation only
+                </span>
               </label>
             </div>
           </div>

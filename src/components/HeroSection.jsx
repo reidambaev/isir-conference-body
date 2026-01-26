@@ -18,12 +18,12 @@ const HeroSection = ({ onRegisterClick }) => {
             "url('https://cache.marriott.com/content/dam/marriott-renditions/PUSWI/puswi-view-detail-2081-hor-clsc.jpg?output-quality=70&interpolation=progressive-bilinear&downsize=1336px:*')",
           backgroundSize: "cover",
           backgroundPosition: "center",
-          opacity: 0.25,
+          opacity: 0.5,
         }}
       ></div>
       <div className="items-center relative max-w-7xl mx-auto px-4 py-10 sm:px-6 lg:px-8 text-center flex-1 flex flex-col justify-center">
         <span
-          className="inline-block px-4 py-1 mb-4 text-sm font-semibold rounded-full whitespace-nowrap"
+          className="inline-block px-4 py-1 mb-4 text-md font-semibold rounded-full whitespace-nowrap"
           style={{
             backgroundColor: "var(--color-secondary)",
             color: "var(--color-primary)",
@@ -31,18 +31,18 @@ const HeroSection = ({ onRegisterClick }) => {
         >
           16th ISIR World Congress
         </span>
-        <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 leading-tight">
+        <h2 className="text-6xl md:text-7xl font-bold text-white mb-4 leading-tight">
           Global Dialogue on
           <br className="hidden md:block" /> Women's Health
         </h2>
-        <p className="text-lg text-blue-200 mb-8 max-w-2xl mx-auto">
+        <p className="text-2xl text-blue-200 mb-8 max-w-2xl mx-auto">
           Join leading researchers and clinicians from around the world
         </p>
 
         <div className="flex flex-wrap justify-center gap-4 mb-12">
           <button
             onClick={onRegisterClick}
-            className="px-8 py-2 text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer"
+            className="px-8 py-2 text-2xl; font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer"
             style={{
               backgroundColor: "var(--color-secondary)",
               color: "var(--color-primary)",
@@ -56,7 +56,7 @@ const HeroSection = ({ onRegisterClick }) => {
           onClick={scrollToNav}
           className="text-white hover:text-blue-200 transition-colors flex items-center gap-2 mx-auto animate-bounce"
         >
-          <span>Learn More</span>
+          <span className="text-lg">Learn More</span>
           <svg
             className="w-5 h-5"
             fill="none"
