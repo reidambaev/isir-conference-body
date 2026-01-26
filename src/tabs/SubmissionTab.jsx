@@ -32,6 +32,11 @@ const SubmissionTab = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [successId, setSuccessId] = useState("");
 
+  const handleCloseError = () => {
+    setSubmitStatus(null);
+    setErrorMessage("");
+  };
+
   const categories = [
     "Immune Regulation in Reproduction",
     "Early Pregnancy and Implantation",
@@ -239,6 +244,20 @@ const SubmissionTab = () => {
     setSubmitStatus("submitting");
 
     try {
+      // Flatten affiliations from authors for API payload
+      const affiliations = authors.flatMap((author) =>
+        (author.affiliations || []).map((aff) => ({
+          authorName: `${author.firstName} ${author.lastName}`.trim(),
+          department: aff.department?.trim() || "",
+          institution: aff.institution.trim(),
+          city: aff.city.trim(),
+          country: aff.country.trim(),
+        }))
+      );
+
+      // Default conflict of interest (no UI yet)
+      const conflictOfInterest = "no";
+
       const response = await fetch("/api/abstract-submission", {
         method: "POST",
         headers: {
@@ -247,6 +266,7 @@ const SubmissionTab = () => {
         body: JSON.stringify({
           title: formData.title,
           authors: JSON.stringify(authors),
+          affiliations: JSON.stringify(affiliations),
           category: formData.category,
           keywords: formData.keywords,
           abstract: formData.abstract,
@@ -255,6 +275,8 @@ const SubmissionTab = () => {
           presenterEmail: presenter.email,
           correspondingName: `${corresponding.firstName} ${corresponding.lastName}`,
           correspondingEmail: corresponding.email,
+          conflictOfInterest,
+          conflictDetails: "",
         }),
       });
 
@@ -568,7 +590,7 @@ const SubmissionTab = () => {
           </div>
         )}
 
-        {/* Error Message */}
+        {/* Error Message Banner */}
         {submitStatus === "error" && (
           <div className="p-6 bg-red-50 border-b-2 border-red-500">
             <div className="flex items-start gap-4">
@@ -587,11 +609,67 @@ const SubmissionTab = () => {
                   />
                 </svg>
               </div>
-              <div>
+              <div className="flex-1">
                 <h3 className="text-lg font-bold text-red-900 mb-1">
                   Submission Failed
                 </h3>
                 <p className="text-red-800">{errorMessage}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseError}
+                className="text-red-700 hover:text-red-900 font-semibold"
+                aria-label="Close error"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Error Modal Overlay */}
+        {submitStatus === "error" && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-xl shadow-xl max-w-lg w-[90%] p-6 border border-red-200">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <svg
+                    className="h-8 w-8 text-red-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-red-900 mb-2">
+                    Submission Failed
+                  </h3>
+                  <p className="text-red-800 leading-relaxed">{errorMessage}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseError}
+                  className="text-red-700 hover:text-red-900 font-semibold text-xl"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleCloseError}
+                  className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

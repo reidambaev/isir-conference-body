@@ -101,6 +101,7 @@ CREATE TABLE
         presenter_email TEXT NOT NULL,
         corresponding_name TEXT,
         corresponding_email TEXT,
+        corresponding_author_id TEXT,
         conflict_of_interest TEXT,
         conflict_details TEXT,
         affiliations TEXT,

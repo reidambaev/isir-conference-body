@@ -212,10 +212,13 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
       "affiliations",
       "presenterName",
       "presenterEmail",
+      "correspondingName",
+      "correspondingEmail",
       "category",
       "keywords",
       "abstract",
       "presentationPreference",
+      "conflictOfInterest",
     ];
 
     for (const field of requiredFields) {
@@ -255,6 +258,15 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         headers: corsHeaders,
       });
     }
+    if (!emailRegex.test(data.correspondingEmail)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid corresponding author email format" }),
+        {
+          status: 400,
+          headers: corsHeaders,
+        }
+      );
+    }
 
     // Validate word count (max 300 words)
     const wordCount = data.abstract.split(/\s+/).filter((w) => w).length;
@@ -272,6 +284,15 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
     if (!validPreferences.includes(data.presentationPreference)) {
       return new Response(
         JSON.stringify({ error: "Invalid presentation preference" }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // Validate conflict of interest
+    const validConflict = ["yes", "no"];
+    if (!validConflict.includes(data.conflictOfInterest)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid conflict of interest value" }),
         { status: 400, headers: corsHeaders }
       );
     }
@@ -318,13 +339,28 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
       }
     }
 
+    // Determine corresponding author id for linkage
+    const correspondingIdx = authorsData.findIndex(
+      (author) => author.isCorresponding
+    );
+    if (correspondingIdx === -1) {
+      return new Response(
+        JSON.stringify({ error: "A corresponding author must be designated" }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+    const correspondingAuthorId = `AUTH-${submissionId}-${correspondingIdx}`;
+
     // Insert abstract
     await env.ISIR_DB.prepare(
       `INSERT INTO abstractions (
         id, submission_date, title, category, keywords, abstract,
         word_count, presentation_preference,
-        presenter_name, presenter_email, affiliations, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        presenter_name, presenter_email,
+        corresponding_name, corresponding_email, corresponding_author_id,
+        conflict_of_interest, conflict_details,
+        affiliations, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         submissionId,
@@ -337,6 +373,13 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         data.presentationPreference,
         data.presenterName.trim(),
         data.presenterEmail.trim(),
+        data.correspondingName.trim(),
+        data.correspondingEmail.trim(),
+        correspondingAuthorId,
+        data.conflictOfInterest,
+        data.conflictOfInterest === "yes"
+          ? data.conflictDetails?.trim() || null
+          : null,
         data.affiliations || null,
         "submitted",
         submissionDate

@@ -251,6 +251,25 @@ export async function onRequestPost(context) {
       }
     }
 
+    // Identify corresponding author id (will be used in abstractions table)
+    const correspondingAuthorIndex = authorsData.findIndex(
+      (author) => author.isCorresponding
+    );
+
+    if (correspondingAuthorIndex === -1) {
+      return new Response(
+        JSON.stringify({
+          error: "A corresponding author must be designated",
+        }),
+        {
+          status: 400,
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    const correspondingAuthorId = `AUTH-${submissionId}-${correspondingAuthorIndex}`;
+
     // Insert abstract into D1 database
     const abstractResult = await env.ISIR_DB.prepare(
       `
@@ -269,9 +288,10 @@ export async function onRequestPost(context) {
         presenter_email,
         corresponding_name,
         corresponding_email,
+        corresponding_author_id,
         status,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     )
       .bind(
@@ -289,6 +309,7 @@ export async function onRequestPost(context) {
         data.presenterEmail.trim(),
         data.correspondingName.trim(),
         data.correspondingEmail.trim(),
+        correspondingAuthorId,
         "submitted",
         submissionDate
       )
