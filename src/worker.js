@@ -53,6 +53,14 @@ async function handleApiRequest(request, env, url) {
     return handleVisaRequest(request, env, corsHeaders);
   }
 
+  // POST /api/create-payment-intent
+  if (
+    url.pathname === "/api/create-payment-intent" &&
+    request.method === "POST"
+  ) {
+    return handleCreatePaymentIntent(request, env, corsHeaders);
+  }
+
   return new Response(JSON.stringify({ error: "Not Found" }), {
     status: 404,
     headers: corsHeaders,
@@ -292,7 +300,7 @@ async function handleRegistration(request, env, corsHeaders) {
       JSON.stringify(errorResponse),
       {
         status: 500,
-        headers: errorHeaders,
+        headers: corsHeaders,
       }
     );
   }
@@ -638,6 +646,74 @@ async function handleVisaRequest(request, env, corsHeaders) {
         error: "Failed to submit visa request",
       }),
       { status: 500, headers: corsHeaders }
+    );
+  }
+}
+
+async function handleCreatePaymentIntent(request, env, corsHeaders) {
+  try {
+    // Check if Stripe is configured
+    if (!env.STRIPE_SECRET_KEY) {
+      throw new Error("Stripe secret key not configured");
+    }
+
+    const data = await request.json();
+    const { amount, currency, registrationId, metadata } = data;
+
+    if (!amount || !currency || !registrationId) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Missing required fields: amount, currency, registrationId",
+        }),
+        {
+          status: 400,
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    // Import Stripe (using dynamic import for Cloudflare Workers)
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+      apiVersion: "2024-11-20.acacia",
+    });
+
+    // Create payment intent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount), // Amount in smallest currency unit (cents for USD, won for KRW)
+      currency: currency.toLowerCase(),
+      metadata: {
+        registrationId: registrationId,
+        ...metadata,
+      },
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+      }),
+      {
+        status: 200,
+        headers: corsHeaders,
+      }
+    );
+  } catch (error) {
+    console.error("Payment intent creation error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || "Failed to create payment intent",
+      }),
+      {
+        status: 500,
+        headers: corsHeaders,
+      }
     );
   }
 }
