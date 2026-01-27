@@ -233,7 +233,7 @@ const RegistrationForm = ({ onClose }) => {
     address1: "",
     address2: "",
     city: "",
-    state: "",
+    state: null,
     zip: "",
     country: null,
     phone: "",
@@ -510,7 +510,7 @@ const RegistrationForm = ({ onClose }) => {
       address1: "123 Medical Plaza",
       address2: "Suite 456",
       city: "Boston",
-      state: "Massachusetts",
+      state: { id: 1433, name: "Massachusetts" },
       zip: "02115",
       country: { id: 233, name: "United States" },
       phone: "(617) 555-0100",
@@ -1585,7 +1585,7 @@ const RegistrationForm = ({ onClose }) => {
                       setFormData((prev) => ({
                         ...prev,
                         state: null,
-                        city: null,
+                        city: "",
                       }));
                     }}
                     placeHolder="Select Country"
@@ -1596,11 +1596,19 @@ const RegistrationForm = ({ onClose }) => {
                 </div>
                 <div>
                   <FormLabel>State/Province</FormLabel>
-                  <FormInput
-                    name="state"
-                    value={formData.state}
-                    onChange={handleChange}
-                    placeholder="State or province"
+                  <StateSelect
+                    countryid={countryid}
+                    onChange={(e) => {
+                      setStateid(e.id);
+                      setFormData((prev) => ({ ...prev, state: e }));
+                      // Reset city when state changes
+                      setCityid(0);
+                      setFormData((prev) => ({ ...prev, city: "" }));
+                    }}
+                    placeHolder="Select State (Optional)"
+                    defaultValue={formData.state}
+                    containerClassName="w-full"
+                    inputClassName="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>

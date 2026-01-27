@@ -21,10 +21,20 @@ export async function onRequestPost(context) {
   };
 
   try {
+    console.log("=== REGISTRATION API CALLED ===");
+    console.log("Version:", CODE_VERSION);
+    
     const rawData = await request.json();
     
-    // Log incoming data to identify objects
+    // Log incoming data to identify objects - THIS IS CRITICAL FOR DEBUGGING
     console.log("Raw data received:", JSON.stringify(rawData, null, 2));
+    
+    // Check for objects in raw data immediately
+    for (const [key, value] of Object.entries(rawData)) {
+      if (typeof value === 'object' && value !== null && !Array.isArray(value) && key !== 'dietary') {
+        console.error(`⚠️ OBJECT DETECTED in rawData.${key}:`, JSON.stringify(value));
+      }
+    }
     
     // Deep sanitize all data to ensure no objects/arrays are passed to D1
     const sanitizeForD1 = (value) => {
