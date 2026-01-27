@@ -4,7 +4,10 @@
  *
  * Endpoint: /api/register
  * Method: POST
+ * Version: 2.0.0 - Comprehensive D1 object sanitization
  */
+
+const CODE_VERSION = "2.0.0-sanitized-" + Date.now();
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -361,6 +364,7 @@ export async function onRequestPost(context) {
         registrationId: registrationId,
         totalPrice: totalPrice,
         message: "Registration saved successfully",
+        version: CODE_VERSION, // For debugging - verify deployed version
       }),
       {
         status: 200,
@@ -369,10 +373,13 @@ export async function onRequestPost(context) {
     );
   } catch (error) {
     console.error("Registration error:", error);
+    console.error("Error stack:", error.stack);
     return new Response(
       JSON.stringify({
         success: false,
         error: error.message || "Failed to save registration",
+        version: CODE_VERSION, // For debugging - verify deployed version
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       }),
       {
         status: 500,
