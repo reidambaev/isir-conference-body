@@ -4,10 +4,12 @@
  *
  * Endpoint: /api/register
  * Method: POST
- * Version: 2.0.0 - Comprehensive D1 object sanitization
+ * Version: 2.1.0 - Enhanced logging with console.error + detailed bind error handling
  */
 
-const CODE_VERSION = "2.0.0-sanitized-" + Date.now();
+// Static version for deployment verification (change this when deploying)
+const CODE_VERSION_STATIC = "2.1.0-enhanced-logging";
+const CODE_VERSION = CODE_VERSION_STATIC + "-" + Date.now();
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -22,7 +24,8 @@ export async function onRequestPost(context) {
 
   try {
     console.error("=== REGISTRATION API CALLED ===");
-    console.error("Version:", CODE_VERSION);
+    console.error("Static Version:", CODE_VERSION_STATIC);
+    console.error("Full Version:", CODE_VERSION);
     
     const rawData = await request.json();
     
@@ -401,7 +404,8 @@ export async function onRequestPost(context) {
         registrationId: registrationId,
         totalPrice: totalPrice,
         message: "Registration saved successfully",
-        version: CODE_VERSION, // For debugging - verify deployed version
+        version: CODE_VERSION_STATIC, // Static version for deployment verification
+        timestamp: Date.now(), // When this request was processed
       }),
       {
         status: 200,
@@ -430,6 +434,7 @@ export async function onRequestPost(context) {
       JSON.stringify({
         success: false,
         error: error.message || "Failed to save registration",
+        version: CODE_VERSION_STATIC, // Static version for deployment verification
         ...errorDetails,
       }),
       {
