@@ -60,8 +60,54 @@ async function handleApiRequest(request, env, url) {
 }
 
 async function handleRegistration(request, env, corsHeaders) {
+  const CODE_VERSION = "2.1.0-worker-fixed";
+  
   try {
-    const data = await request.json();
+    console.error("=== REGISTRATION API CALLED (worker.js) ===");
+    console.error("Version:", CODE_VERSION);
+    
+    const rawData = await request.json();
+    console.error("Raw data received:", JSON.stringify(rawData, null, 2));
+    
+    // Sanitize all data to ensure no objects are passed to D1
+    const extractString = (value) => {
+      if (!value) return null;
+      if (typeof value === 'string') return value;
+      if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+      if (typeof value === 'object' && value !== null) {
+        if (value.name) return String(value.name);
+        try {
+          return JSON.stringify(value);
+        } catch {
+          return String(value);
+        }
+      }
+      return String(value);
+    };
+    
+    const normalizeForD1 = (value) => {
+      if (value === undefined || value === null) return null;
+      const type = typeof value;
+      if (type === "string" || type === "number" || type === "boolean") {
+        return value;
+      }
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    };
+    
+    // Extract city, state, country as strings
+    const cityName = extractString(rawData.city);
+    const stateName = extractString(rawData.state) || extractString(rawData.stateSelect) || extractString(rawData.stateText);
+    const countryName = extractString(rawData.country) || '';
+    
+    // Normalize membership fields
+    const membershipLevel = normalizeForD1(rawData.membershipLevel);
+    const membershipStatus = normalizeForD1(rawData.membershipStatus);
+    
+    const data = rawData; // Keep original for other fields
 
     // Generate unique registration ID
     const registrationId = `REG-${Date.now()}-${Math.random()
@@ -84,47 +130,50 @@ async function handleRegistration(request, env, corsHeaders) {
       ticketPrices[data.ticketType]?.[isEarlyBird ? "early" : "standard"] || 0;
     const accompanyingPrice =
       (isEarlyBird ? 250 : 350) * (data.accompanyingPersonCount || 0);
-    const totalPrice = ticketPrice + accompanyingPrice;
+    const galaDinnerPrice = 100 * (data.galaDinnerCount || 0);
+    const totalPrice = ticketPrice + accompanyingPrice + galaDinnerPrice;
 
-    // Insert into D1 database
+    // Insert into D1 database - use sanitized values
     await env.ISIR_DB.prepare(
       `
       INSERT INTO registrations (
         id, registration_date, email, first_name, middle_name, last_name,
         salutation, suffix, institution, credentials, badge_name, pronouns,
-        address1, address2, city, state, zip, country, phone, cell_phone,
-        is_physician, ticket_type, accompanying_count, ticket_price, total_price,
+        department, address1, address2, city, state, zip, country, phone, cell_phone,
+        is_physician, ticket_type, accompanying_count, gala_dinner, ticket_price, total_price,
         is_early_bird, dietary_vegan, dietary_vegetarian, dietary_gluten_free,
         dietary_kosher, dietary_other, special_assistance, policy_agreed,
         privacy_marketing, privacy_app, opt_out_mailing, payment_status,
         membership_level, membership_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     )
       .bind(
         registrationId,
         registrationDate,
-        data.email,
-        data.firstName,
-        data.middleName || null,
-        data.lastName,
-        data.salutation || null,
-        data.suffix || null,
-        data.institution || null,
-        data.credentials || null,
-        data.badgeName || null,
-        data.pronouns || null,
-        data.address1 || null,
-        data.address2 || null,
-        data.city || null,
-        data.stateSelect || data.stateText || null,
-        data.zip || null,
-        data.country || null,
-        data.phone || null,
-        data.cellPhone || null,
-        data.isPhysician || null,
-        data.ticketType,
+        normalizeForD1(data.email),
+        normalizeForD1(data.firstName),
+        normalizeForD1(data.middleName),
+        normalizeForD1(data.lastName),
+        normalizeForD1(data.salutation),
+        normalizeForD1(data.suffix),
+        normalizeForD1(data.institution),
+        normalizeForD1(data.credentials),
+        normalizeForD1(data.badgeName),
+        normalizeForD1(data.pronouns),
+        normalizeForD1(data.department),
+        normalizeForD1(data.address1),
+        normalizeForD1(data.address2),
+        cityName, // SANITIZED - was data.city (object)
+        stateName, // SANITIZED - was data.stateSelect (object)
+        normalizeForD1(data.zip),
+        countryName || null, // SANITIZED - was data.country (object)
+        normalizeForD1(data.phone),
+        normalizeForD1(data.cellPhone),
+        normalizeForD1(data.isPhysician),
+        normalizeForD1(data.ticketType),
         data.accompanyingPersonCount || 0,
+        data.galaDinnerCount || 0,
         ticketPrice,
         totalPrice,
         isEarlyBird ? 1 : 0,
@@ -139,10 +188,24 @@ async function handleRegistration(request, env, corsHeaders) {
         data.privacyApp ? 1 : 0,
         data.optOutMailing ? 1 : 0,
         "pending",
-        data.membershipLevel || null,
-        data.membershipStatus || null
+        membershipLevel, // SANITIZED - was data.membershipLevel (could be object)
+        membershipStatus // SANITIZED - was data.membershipStatus (could be object)
       )
       .run();
+
+    // Update currency if column exists
+    try {
+      const isKorean = countryName.toLowerCase().includes("korea");
+      const currency = isKorean ? "KRW" : "USD";
+      await env.ISIR_DB.prepare(
+        `UPDATE registrations SET currency = ? WHERE id = ?`
+      )
+        .bind(currency, registrationId)
+        .run();
+    } catch (err) {
+      // Currency column might not exist yet - that's okay
+      console.error("Currency column not available, skipping update");
+    }
 
     return new Response(
       JSON.stringify({
@@ -150,15 +213,34 @@ async function handleRegistration(request, env, corsHeaders) {
         registrationId: registrationId,
         totalPrice: totalPrice,
         message: "Registration saved successfully",
+        version: CODE_VERSION,
       }),
       {
         status: 200,
-        headers: corsHeaders,
+        headers: {
+          ...corsHeaders,
+          "X-API-Version": CODE_VERSION,
+        },
       }
     );
   } catch (error) {
-    console.error("Registration error:", error);
+    console.error("=== REGISTRATION ERROR (worker.js) ===");
+    console.error("Error:", error.message);
+    console.error("Stack:", error.stack);
     return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || "Failed to save registration",
+        version: CODE_VERSION,
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          "X-API-Version": CODE_VERSION,
+        },
+      }
+    );
       JSON.stringify({
         success: false,
         error: error.message || "Failed to save registration",
