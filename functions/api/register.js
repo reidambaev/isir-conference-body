@@ -12,22 +12,48 @@ const CODE_VERSION_STATIC = "2.1.0-enhanced-logging";
 const CODE_VERSION = CODE_VERSION_STATIC + "-" + Date.now();
 
 export async function onRequestPost(context) {
-  const { request, env } = context;
-
-  // CORS headers
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Content-Type": "application/json",
-  };
-
+  // VERSION HEADER - always set this first
+  const versionHeader = { "X-API-Version": CODE_VERSION_STATIC };
+  
   try {
+    const { request, env } = context;
+
+    // CORS headers
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Content-Type": "application/json",
+    };
+
+    // IMMEDIATE VERSION CHECK - return version in response headers too
+    const responseHeaders = {
+      ...corsHeaders,
+      ...versionHeader,
+    };
     console.error("=== REGISTRATION API CALLED ===");
     console.error("Static Version:", CODE_VERSION_STATIC);
     console.error("Full Version:", CODE_VERSION);
+    console.error("This code was deployed at:", new Date().toISOString());
     
-    const rawData = await request.json();
+    // Parse request body
+    let rawData;
+    try {
+      rawData = await request.json();
+    } catch (parseError) {
+      console.error("Failed to parse request JSON:", parseError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid JSON in request body",
+          version: CODE_VERSION_STATIC,
+        }),
+        {
+          status: 400,
+          headers: responseHeaders,
+        }
+      );
+    }
     
     // Log incoming data to identify objects - THIS IS CRITICAL FOR DEBUGGING
     console.error("Raw data received:", JSON.stringify(rawData, null, 2));
@@ -398,7 +424,7 @@ export async function onRequestPost(context) {
       console.error("Currency column not available, skipping update");
     }
 
-    return new Response(
+      return new Response(
       JSON.stringify({
         success: true,
         registrationId: registrationId,
@@ -409,7 +435,7 @@ export async function onRequestPost(context) {
       }),
       {
         status: 200,
-        headers: corsHeaders,
+        headers: responseHeaders,
       }
     );
   } catch (error) {
@@ -418,11 +444,19 @@ export async function onRequestPost(context) {
     console.error("Error name:", error.name);
     console.error("Error stack:", error.stack);
     
+    // Ensure we have headers even if error happened early
+    const errorHeaders = responseHeaders || {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Content-Type": "application/json",
+      "X-API-Version": CODE_VERSION_STATIC,
+    };
+    
     // Include more details in response for debugging
     const errorDetails = {
       message: error.message,
       name: error.name,
-      version: CODE_VERSION,
     };
     
     // In development or if error contains useful info, include it
@@ -430,16 +464,21 @@ export async function onRequestPost(context) {
       errorDetails.hint = "An object was passed to D1. Check Cloudflare logs for parameter details.";
     }
     
+    // ALWAYS include version in error response - THIS PROVES CODE IS DEPLOYED
+    const errorResponse = {
+      success: false,
+      error: error.message || "Failed to save registration",
+      version: CODE_VERSION_STATIC, // Static version - MUST be in every response
+      ...errorDetails,
+    };
+    
+    console.error("Sending error response:", JSON.stringify(errorResponse));
+    
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message || "Failed to save registration",
-        version: CODE_VERSION_STATIC, // Static version for deployment verification
-        ...errorDetails,
-      }),
+      JSON.stringify(errorResponse),
       {
         status: 500,
-        headers: corsHeaders,
+        headers: errorHeaders,
       }
     );
   }
