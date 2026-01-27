@@ -175,7 +175,7 @@ const RegistrationForm = ({ onClose }) => {
   const [formData, setFormData] = useState({
     ticketType: "",
     accompanyingPersonCount: 0,
-    galaDinner: false,
+    galaDinnerCount: 0,
     cardNumber: "",
     cardName: "",
     expiryMonth: "",
@@ -415,11 +415,13 @@ const RegistrationForm = ({ onClose }) => {
 
   const getAccompanyingPrice = () => (isEarlyBirdPeriod ? 250 : 350);
 
+  const getGalaDinnerPrice = () => 100; // Price per gala dinner ticket
+
   const getTotalPrice = () => {
     const ticketPrice = getTicketPrice(formData.ticketType);
     const accompanyingPrice =
       getAccompanyingPrice() * formData.accompanyingPersonCount;
-    const galaDinnerPrice = formData.galaDinner ? 100 : 0;
+    const galaDinnerPrice = getGalaDinnerPrice() * formData.galaDinnerCount;
     return ticketPrice + accompanyingPrice + galaDinnerPrice;
   };
 
@@ -672,6 +674,7 @@ const RegistrationForm = ({ onClose }) => {
                     ...prev,
                     ticketType: "isir-member",
                     accompanyingPersonCount: 1,
+                    galaDinnerCount: 1,
                   }))
                 }
                 className="px-4 py-2 text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all"
@@ -812,9 +815,11 @@ const RegistrationForm = ({ onClose }) => {
                 <FormLabel className="!text-base mb-3">
                   Accompanying Person Tickets
                 </FormLabel>
-                <p className="text-sm text-gray-600 mb-5">
-                  Accompanying person fee includes Welcome Reception and Gala
-                  Dinner.
+                <p className="text-sm text-gray-600 mb-2">
+                  Accompanying person fee includes breakfast, lunch, and welcome reception.
+                </p>
+                <p className="text-sm text-amber-600 font-medium mb-5">
+                  Note: Accompanying person tickets do NOT include gala dinner. Gala dinner tickets must be purchased separately below.
                 </p>
 
                 <div className="bg-gradient-to-br from-amber-50 to-white rounded-xl p-5 border-2 border-amber-200">
@@ -869,44 +874,64 @@ const RegistrationForm = ({ onClose }) => {
                   </div>
                 </div>
 
-                {/* Gala Dinner Add-on */}
-                <div className="bg-white rounded-xl p-6 shadow-md border-2 border-gray-200 mt-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <svg
-                          className="w-6 h-6 text-yellow-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"
-                          />
-                        </svg>
-                        <p className="font-semibold text-gray-800 text-lg">
-                          Gala Dinner
+                {/* Gala Dinner Tickets */}
+                <div className="border-t-2 border-gray-100 pt-8 mt-8">
+                  <FormLabel className="!text-base mb-3">
+                    Gala Dinner Tickets (Optional)
+                  </FormLabel>
+                  <p className="text-sm text-gray-600 mb-5">
+                    Join us for an elegant evening celebration. You can purchase multiple gala dinner tickets.
+                  </p>
+
+                  <div className="bg-gradient-to-br from-yellow-50 to-white rounded-xl p-5 border-2 border-yellow-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      <div>
+                        <p className="font-semibold text-gray-800">
+                          Gala Dinner Ticket
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          ${getGalaDinnerPrice()} each
                         </p>
                       </div>
-                      <p className="text-sm text-gray-600 ml-9">
-                        Join us for an elegant evening celebration - $100
-                      </p>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              galaDinnerCount: Math.max(
+                                0,
+                                prev.galaDinnerCount - 1
+                              ),
+                            }))
+                          }
+                          className="w-10 h-10 border-2 border-gray-300 rounded-xl bg-white hover:bg-gray-100 font-bold text-xl shadow-sm transition-all"
+                        >
+                          −
+                        </button>
+                        <span
+                          className="w-14 text-center font-bold text-2xl"
+                          style={{ color: "var(--color-primary)" }}
+                        >
+                          {formData.galaDinnerCount}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              galaDinnerCount: Math.min(
+                                20,
+                                prev.galaDinnerCount + 1
+                              ),
+                            }))
+                          }
+                          className="w-10 h-10 border-2 border-gray-300 rounded-xl bg-white hover:bg-gray-100 font-bold text-xl shadow-sm transition-all"
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="galaDinner"
-                        checked={formData.galaDinner}
-                        onChange={handleChange}
-                        className="w-6 h-6 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                      />
-                      <span className="ml-3 text-gray-700 font-medium">
-                        ${formData.galaDinner ? "100" : "0"}
-                      </span>
-                    </label>
                   </div>
                 </div>
               </div>
@@ -1362,10 +1387,14 @@ const RegistrationForm = ({ onClose }) => {
                     </span>
                   </div>
                 )}
-                {formData.galaDinner && (
+                {formData.galaDinnerCount > 0 && (
                   <div className="flex justify-between text-base py-3 border-b border-gray-200">
-                    <span className="text-gray-700">Gala Dinner</span>
-                    <span className="font-bold text-lg">$100</span>
+                    <span className="text-gray-700">
+                      Gala Dinner × {formData.galaDinnerCount}
+                    </span>
+                    <span className="font-bold text-lg">
+                      ${getGalaDinnerPrice() * formData.galaDinnerCount}
+                    </span>
                   </div>
                 )}
                 <div className="border-t-2 border-gray-300 pt-4 mt-3">
@@ -1697,10 +1726,14 @@ const RegistrationForm = ({ onClose }) => {
                         </span>
                       </div>
                     )}
-                    {formData.galaDinner && (
+                    {formData.galaDinnerCount > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-gray-700">Gala Dinner</span>
-                        <span className="font-bold">$100</span>
+                        <span className="text-gray-700">
+                          Gala Dinner × {formData.galaDinnerCount}
+                        </span>
+                        <span className="font-bold">
+                          ${getGalaDinnerPrice() * formData.galaDinnerCount}
+                        </span>
                       </div>
                     )}
                   </div>

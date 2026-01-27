@@ -4,6 +4,7 @@ import logo2 from "../assets/logo2.png";
 import logo3 from "../assets/logo3.png";
 import logo4 from "../assets/logo4.png";
 import logo5 from "../assets/logo5.png";
+import logo6 from "../assets/logo6.jpg";
 
 const SponsorsTab = () => (
   <div role="tabpanel">
@@ -57,50 +58,6 @@ const SponsorsTab = () => (
               We extend our deepest gratitude to Kang Wha, Inc for their
               exceptional support as our Tier 1 Principal Sponsor for ISIR 2026.
             </p>
-            <div className="flex flex-wrap gap-3">
-              <span className="inline-flex items-center px-4 py-2 bg-white rounded-full text-sm font-medium text-gray-700 border border-gray-200">
-                <svg
-                  className="w-4 h-4 mr-2 text-amber-500"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Premium Exhibition Space
-              </span>
-              <span className="inline-flex items-center px-4 py-2 bg-white rounded-full text-sm font-medium text-gray-700 border border-gray-200">
-                <svg
-                  className="w-4 h-4 mr-2 text-amber-500"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Keynote Session Sponsor
-              </span>
-              <span className="inline-flex items-center px-4 py-2 bg-white rounded-full text-sm font-medium text-gray-700 border border-gray-200">
-                <svg
-                  className="w-4 h-4 mr-2 text-amber-500"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Gala Dinner Sponsor
-              </span>
-            </div>
           </div>
         </div>
       </div>
@@ -187,8 +144,8 @@ const SponsorsTab = () => (
       ))}
     </div>
 
-    {/* Second Row - Logos 4, 5 */}
-    <div className="grid grid-cols-2 gap-6 mb-10">
+    {/* Second Row - Logos 4, 5, 6 */}
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-10">
       {[
         {
           name: "Korean Society of Ultrasound in Obstetrics and Gynecology",
@@ -197,6 +154,10 @@ const SponsorsTab = () => (
         {
           name: "Korean College of Obstetrics and Gynecology",
           logo: logo5,
+        },
+        {
+          name: "Korean Society of Obstetrics and Gynecology",
+          logo: logo6,
         },
       ].map((org, index) => (
         <div

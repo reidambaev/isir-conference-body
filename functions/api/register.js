@@ -41,7 +41,7 @@ export async function onRequestPost(context) {
       ticketPrices[data.ticketType]?.[isEarlyBird ? "early" : "standard"] || 0;
     const accompanyingPrice =
       (isEarlyBird ? 250 : 350) * (data.accompanyingPersonCount || 0);
-    const galaDinnerPrice = data.galaDinner ? 100 : 0;
+    const galaDinnerPrice = 100 * (data.galaDinnerCount || 0);
     const totalPrice = ticketPrice + accompanyingPrice + galaDinnerPrice;
 
     // Insert into D1 database
@@ -117,7 +117,7 @@ export async function onRequestPost(context) {
         data.isPhysician || null,
         data.ticketType,
         data.accompanyingPersonCount || 0,
-        data.galaDinner ? 1 : 0,
+        data.galaDinnerCount || 0,
         ticketPrice,
         totalPrice,
         isEarlyBird ? 1 : 0,

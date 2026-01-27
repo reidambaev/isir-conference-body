@@ -11,34 +11,9 @@ import headshot9 from "../assets/headshots/headshot9.jpg";
 
 const speakers = [
   {
-    name: "Sarah Robertson",
-    affiliation: "The University of Adelaide, Australia",
-    image: headshot1,
-  },
-  {
-    name: "Gil Mor",
-    affiliation: "Wayne State University, USA",
-    image: headshot2,
-  },
-  {
-    name: "Udo Markert",
-    affiliation: "Universitätsklinikum Jena, Germany",
-    image: headshot3,
-  },
-  {
-    name: "David Sharkey",
-    affiliation: "The University of Adelaide, Australia",
-    image: headshot4,
-  },
-  {
     name: "Petra Arck",
     affiliation: "University Medical Center Hamburg, Germany",
     image: headshot5,
-  },
-  {
-    name: "Atsushi Fukui",
-    affiliation: "Hyogo College of Medicine, Japan",
-    image: headshot6,
   },
   {
     name: "Sandra M Blois",
@@ -46,14 +21,39 @@ const speakers = [
     image: headshot7,
   },
   {
-    name: "Akitoshi Nakashima",
-    affiliation: "University of Toyama, Japan",
-    image: headshot8,
+    name: "Atsushi Fukui",
+    affiliation: "Hyogo College of Medicine, Japan",
+    image: headshot6,
   },
   {
     name: "Nardhy Gomez-Lopez",
     affiliation: "Washington University School of Medicine, USA",
     image: headshot9,
+  },
+  {
+    name: "Udo Markert",
+    affiliation: "Universitätsklinikum Jena, Germany",
+    image: headshot3,
+  },
+  {
+    name: "Gil Mor",
+    affiliation: "Wayne State University, USA",
+    image: headshot2,
+  },
+  {
+    name: "Akitoshi Nakashima",
+    affiliation: "University of Toyama, Japan",
+    image: headshot8,
+  },
+  {
+    name: "Sarah Robertson",
+    affiliation: "The University of Adelaide, Australia",
+    image: headshot1,
+  },
+  {
+    name: "David Sharkey",
+    affiliation: "The University of Adelaide, Australia",
+    image: headshot4,
   },
 ];
 
