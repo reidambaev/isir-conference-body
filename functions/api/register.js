@@ -18,7 +18,60 @@ export async function onRequestPost(context) {
   };
 
   try {
-    const data = await request.json();
+    const rawData = await request.json();
+    
+    // Log incoming data to identify objects
+    console.log("Raw data received:", JSON.stringify(rawData, null, 2));
+    
+    // Deep sanitize all data to ensure no objects/arrays are passed to D1
+    const sanitizeForD1 = (value) => {
+      if (value === undefined || value === null) return null;
+      const type = typeof value;
+      if (type === "string" || type === "number" || type === "boolean") {
+        return value;
+      }
+      if (type === "object") {
+        if (Array.isArray(value)) {
+          return JSON.stringify(value);
+        }
+        // For objects, try to extract useful string values
+        if (value.name) return String(value.name);
+        if (value.id) return String(value.id);
+        // Otherwise stringify
+        try {
+          return JSON.stringify(value);
+        } catch {
+          return String(value);
+        }
+      }
+      return String(value);
+    };
+    
+    // Sanitize the entire data object - ensure no objects remain
+    const data = {};
+    for (const [key, value] of Object.entries(rawData)) {
+      if (key === 'dietary' && typeof value === 'object' && value !== null) {
+        // Keep dietary as object temporarily, we'll extract individual boolean fields
+        data[key] = value;
+      } else {
+        const sanitized = sanitizeForD1(value);
+        data[key] = sanitized;
+        // Log if we sanitized an object
+        if (typeof value === 'object' && value !== null && typeof sanitized === 'string') {
+          console.log(`Sanitized ${key}:`, JSON.stringify(value), '->', sanitized);
+        }
+      }
+    }
+    
+    // Ensure dietary is an object with boolean properties, not a string
+    if (data.dietary && typeof data.dietary !== 'object') {
+      console.warn('dietary was sanitized to string, attempting to parse:', data.dietary);
+      try {
+        data.dietary = JSON.parse(data.dietary);
+      } catch {
+        data.dietary = { vegan: false, vegetarian: false, glutenFree: false, kosher: false, other: false };
+      }
+    }
 
     // Generate unique registration ID
     const registrationId = `REG-${Date.now()}-${Math.random()
@@ -217,12 +270,34 @@ export async function onRequestPost(context) {
       const normalized = normalizeForD1(value);
       // Log if we're converting an object to help debug
       if (typeof value === 'object' && value !== null && typeof normalized === 'string') {
-        console.log(`Normalized object for ${paramNames[index]}:`, value, '->', normalized);
+        console.log(`⚠️ Normalized object for ${paramNames[index]}:`, JSON.stringify(value), '->', normalized);
+      }
+      // Double-check: if normalized is still an object, that's a problem
+      if (typeof normalized === 'object' && normalized !== null) {
+        console.error(`❌ ERROR: ${paramNames[index]} is still an object after normalization!`, normalized);
+        return JSON.stringify(normalized);
       }
       return normalized;
     });
 
-    const result = await stmt.bind(...normalizedParams).run();
+    // Final safety check: ensure NO objects remain
+    const finalParams = normalizedParams.map((param, index) => {
+      if (typeof param === 'object' && param !== null) {
+        console.error(`🚨 CRITICAL: ${paramNames[index]} is still an object!`, param);
+        return JSON.stringify(param);
+      }
+      return param;
+    });
+    
+    // Log all parameters before binding to catch any remaining objects
+    console.log("Final parameters to bind:", paramNames.map((name, i) => ({ 
+      name, 
+      value: finalParams[i], 
+      type: typeof finalParams[i],
+      isObject: typeof finalParams[i] === 'object' && finalParams[i] !== null
+    })));
+    
+    const result = await stmt.bind(...finalParams).run();
 
     // Update currency if column exists (for new schema)
     try {
