@@ -295,15 +295,6 @@ async function handleRegistration(request, env, corsHeaders) {
         headers: errorHeaders,
       }
     );
-      JSON.stringify({
-        success: false,
-        error: error.message || "Failed to save registration",
-      }),
-      {
-        status: 500,
-        headers: corsHeaders,
-      }
-    );
   }
 }
 
