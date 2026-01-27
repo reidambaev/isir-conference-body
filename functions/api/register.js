@@ -69,6 +69,24 @@ export async function onRequestPost(context) {
       ? data.state.name || data.state.toString()
       : (data.stateSelect || data.stateText || null);
 
+    // Normalize membership fields to strings to avoid D1 object-type errors
+    const normalizeMembershipField = (value) => {
+      if (value === undefined || value === null) return null;
+      if (typeof value === "string") return value;
+      if (typeof value === "number" || typeof value === "boolean") {
+        return String(value);
+      }
+      // For unexpected object/array values, store a JSON string
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    };
+
+    const membershipLevel = normalizeMembershipField(data.membershipLevel);
+    const membershipStatus = normalizeMembershipField(data.membershipStatus);
+
     // Insert into D1 database
     const result = await env.ISIR_DB.prepare(
       `
@@ -157,8 +175,8 @@ export async function onRequestPost(context) {
         data.privacyApp ? 1 : 0,
         data.optOutMailing ? 1 : 0,
         "pending", // payment_status
-        data.membershipLevel || null,
-        data.membershipStatus || null
+        membershipLevel,
+        membershipStatus
       )
       .run();
 
