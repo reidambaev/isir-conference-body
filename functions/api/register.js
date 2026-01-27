@@ -42,7 +42,19 @@ export async function onRequestPost(context) {
     const accompanyingPrice =
       (isEarlyBird ? 250 : 350) * (data.accompanyingPersonCount || 0);
     const galaDinnerPrice = 100 * (data.galaDinnerCount || 0);
-    const totalPrice = ticketPrice + accompanyingPrice + galaDinnerPrice;
+    
+    // Determine currency and apply Korean tax if applicable
+    const isKorean = data.country?.name?.toLowerCase().includes("korea") || 
+                     data.country?.toLowerCase().includes("korea");
+    let totalPrice = ticketPrice + accompanyingPrice + galaDinnerPrice;
+    let currency = "USD";
+    
+    if (isKorean) {
+      // Convert to KRW and apply 10% tax
+      const usdToKrwRate = 1350; // Should use real-time rate in production
+      totalPrice = Math.round(totalPrice * usdToKrwRate * 1.1);
+      currency = "KRW";
+    }
 
     // Insert into D1 database
     const result = await env.ISIR_DB.prepare(
@@ -89,7 +101,7 @@ export async function onRequestPost(context) {
         payment_status,
         membership_level,
         membership_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     )
       .bind(
@@ -136,6 +148,18 @@ export async function onRequestPost(context) {
         data.membershipStatus || null
       )
       .run();
+
+    // Update currency if column exists (for new schema)
+    try {
+      await env.ISIR_DB.prepare(
+        `UPDATE registrations SET currency = ? WHERE id = ?`
+      )
+        .bind(currency, registrationId)
+        .run();
+    } catch (err) {
+      // Currency column might not exist yet - that's okay
+      console.log("Currency column not available, skipping update");
+    }
 
     return new Response(
       JSON.stringify({

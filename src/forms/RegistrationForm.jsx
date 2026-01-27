@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import {
@@ -7,7 +7,29 @@ import {
   StateSelect,
 } from "react-country-state-city";
 import "react-country-state-city/dist/react-country-state-city.css";
+import { loadStripe } from "@stripe/stripe-js";
+import {
+  Elements,
+  CardElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js";
 import { ISIR_API_CONFIG } from "../config/constants";
+import {
+  isKorea,
+  getCurrency,
+  getFinalPrice,
+  formatCurrency,
+  getCurrencySymbol,
+  applyKoreanTax,
+  usdToKrw,
+} from "../utils/currency";
+import PaymentForm from "../components/PaymentForm";
+
+// Initialize Stripe
+const stripePromise = loadStripe(
+  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || ""
+);
 
 // --- Registration Form UI Components ---
 const FormSectionHeader = ({ children, icon }) => (
@@ -311,13 +333,20 @@ const RegistrationForm = ({ onClose }) => {
     setStep(4);
   };
 
-  const handlePayment = async (e) => {
-    e.preventDefault();
-    setIsProcessingPayment(true);
+  const [registrationId, setRegistrationId] = useState(null);
+  const [clientSecret, setClientSecret] = useState(null);
 
+  // Create payment intent when entering payment step
+  useEffect(() => {
+    if (step === 4 && !clientSecret && formData.country) {
+      createPaymentIntent();
+    }
+  }, [step, formData.country]);
+
+  const createPaymentIntent = async () => {
     try {
-      // Save registration to D1 database
-      const response = await fetch("/api/register", {
+      // First, save registration to get registration ID
+      const registerResponse = await fetch("/api/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -329,22 +358,67 @@ const RegistrationForm = ({ onClose }) => {
         }),
       });
 
-      const result = await response.json();
+      const registerResult = await registerResponse.json();
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "Failed to save registration");
+      if (!registerResponse.ok || !registerResult.success) {
+        throw new Error(registerResult.error || "Failed to save registration");
       }
 
-      console.log("Registration saved:", result);
+      setRegistrationId(registerResult.registrationId);
       setFormData((prev) => ({
         ...prev,
-        registrationId: result.registrationId,
+        registrationId: registerResult.registrationId,
       }));
+
+      // Create payment intent
+      const paymentResponse = await fetch("/api/create-payment-intent", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: getStripeAmount(),
+          currency: currency.toLowerCase(),
+          registrationId: registerResult.registrationId,
+          metadata: {
+            ticketType: formData.ticketType,
+            email: formData.email,
+          },
+        }),
+      });
+
+      const paymentResult = await paymentResponse.json();
+
+      if (!paymentResponse.ok || !paymentResult.success) {
+        throw new Error(paymentResult.error || "Failed to create payment intent");
+      }
+
+      setClientSecret(paymentResult.clientSecret);
+    } catch (error) {
+      console.error("Payment setup error:", error);
+      alert(
+        "There was an error setting up payment. Please try again or contact support@theisir.org"
+      );
+    }
+  };
+
+  const handlePayment = async (e) => {
+    e.preventDefault();
+    setIsProcessingPayment(true);
+
+    try {
+      if (!clientSecret) {
+        await createPaymentIntent();
+        return;
+      }
+
+      // Payment will be handled by Stripe Elements component
+      // This is just a placeholder - actual payment confirmation happens in PaymentForm component
       setStep(5);
     } catch (error) {
-      console.error("Payment/Registration error:", error);
+      console.error("Payment error:", error);
       alert(
-        "There was an error processing your registration. Please try again or contact support@theisir.org"
+        "There was an error processing your payment. Please try again or contact support@theisir.org"
       );
     } finally {
       setIsProcessingPayment(false);
@@ -406,27 +480,50 @@ const RegistrationForm = ({ onClose }) => {
     },
   };
 
-  const getTicketPrice = (type) => {
+  // Get currency based on country
+  const currency = getCurrency(formData.country);
+  const isKoreanCustomer = isKorea(formData.country);
+
+  const getTicketPrice = (type, inBaseCurrency = false) => {
     if (!type || !ticketPrices[type]) return 0;
-    return isEarlyBirdPeriod
+    const basePrice = isEarlyBirdPeriod
       ? ticketPrices[type].early
       : ticketPrices[type].standard;
+    
+    if (inBaseCurrency) return basePrice;
+    return getFinalPrice(basePrice, formData.country);
   };
 
-  const getAccompanyingPrice = () => (isEarlyBirdPeriod ? 250 : 350);
+  const getAccompanyingPrice = (inBaseCurrency = false) => {
+    const basePrice = isEarlyBirdPeriod ? 250 : 350;
+    if (inBaseCurrency) return basePrice;
+    return getFinalPrice(basePrice, formData.country);
+  };
 
-  const getGalaDinnerPrice = () => 100; // Price per gala dinner ticket
+  const getGalaDinnerPrice = (inBaseCurrency = false) => {
+    const basePrice = 100;
+    if (inBaseCurrency) return basePrice;
+    return getFinalPrice(basePrice, formData.country);
+  };
 
-  const getTotalPrice = () => {
-    const ticketPrice = getTicketPrice(formData.ticketType);
+  const getTotalPrice = (inBaseCurrency = false) => {
+    const ticketPrice = getTicketPrice(formData.ticketType, inBaseCurrency);
     const accompanyingPrice =
-      getAccompanyingPrice() * formData.accompanyingPersonCount;
-    const galaDinnerPrice = getGalaDinnerPrice() * formData.galaDinnerCount;
+      getAccompanyingPrice(inBaseCurrency) * formData.accompanyingPersonCount;
+    const galaDinnerPrice = getGalaDinnerPrice(inBaseCurrency) * formData.galaDinnerCount;
     return ticketPrice + accompanyingPrice + galaDinnerPrice;
   };
 
+  // Get price for Stripe (in smallest currency unit)
+  const getStripeAmount = () => {
+    const total = getTotalPrice();
+    // Stripe amounts are in smallest currency unit (cents for USD, won for KRW)
+    return currency === "KRW" ? total : Math.round(total * 100);
+  };
+
   return (
-    <div className="animate-in fade-in duration-300">
+    <Elements stripe={stripePromise}>
+      <div className="animate-in fade-in duration-300">
       {/* Header with Close Button */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
@@ -793,12 +890,18 @@ const RegistrationForm = ({ onClose }) => {
                             className="text-xl font-bold"
                             style={{ color: "var(--color-primary)" }}
                           >
-                            ${early}
+                            {formatCurrency(
+                              getFinalPrice(early, formData.country),
+                              getCurrency(formData.country)
+                            )}
                           </span>
                         </div>
                         <div className="p-5 text-center flex items-center justify-center">
                           <span className="text-xl font-bold text-gray-500">
-                            ${standard}
+                            {formatCurrency(
+                              getFinalPrice(standard, formData.country),
+                              getCurrency(formData.country)
+                            )}
                           </span>
                         </div>
                       </label>
@@ -829,8 +932,11 @@ const RegistrationForm = ({ onClose }) => {
                         Accompanying Person
                       </p>
                       <p className="text-sm text-gray-600">
-                        ${getAccompanyingPrice()} each (
-                        {isEarlyBirdPeriod ? "Early Bird" : "Standard"})
+                        {formatCurrency(
+                          getAccompanyingPrice(),
+                          getCurrency(formData.country)
+                        )}{" "}
+                        each ({isEarlyBirdPeriod ? "Early Bird" : "Standard"})
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -890,7 +996,11 @@ const RegistrationForm = ({ onClose }) => {
                           Gala Dinner Ticket
                         </p>
                         <p className="text-sm text-gray-600">
-                          ${getGalaDinnerPrice()} each
+                          {formatCurrency(
+                            getGalaDinnerPrice(),
+                            getCurrency(formData.country)
+                          )}{" "}
+                          each
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
@@ -946,8 +1056,15 @@ const RegistrationForm = ({ onClose }) => {
               >
                 <div className="flex justify-between items-center">
                   <span className="text-xl font-bold">TOTAL:</span>
-                  <span className="text-4xl font-bold">${getTotalPrice()}</span>
+                  <span className="text-4xl font-bold">
+                    {formatCurrency(getTotalPrice(), getCurrency(formData.country))}
+                  </span>
                 </div>
+                {isKorea(formData.country) && (
+                  <p className="text-sm text-blue-100 mt-2 italic">
+                    * Includes 10% Korean tax
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-between pt-4">
@@ -1372,7 +1489,7 @@ const RegistrationForm = ({ onClose }) => {
                     </span>
                   </span>
                   <span className="font-bold text-lg">
-                    ${getTicketPrice(formData.ticketType)}
+                    {formatCurrency(getTicketPrice(formData.ticketType), currency)}
                   </span>
                 </div>
                 {formData.accompanyingPersonCount > 0 && (
@@ -1381,9 +1498,10 @@ const RegistrationForm = ({ onClose }) => {
                       Accompanying Person × {formData.accompanyingPersonCount}
                     </span>
                     <span className="font-bold text-lg">
-                      $
-                      {getAccompanyingPrice() *
-                        formData.accompanyingPersonCount}
+                      {formatCurrency(
+                        getAccompanyingPrice() * formData.accompanyingPersonCount,
+                        currency
+                      )}
                     </span>
                   </div>
                 )}
@@ -1393,8 +1511,16 @@ const RegistrationForm = ({ onClose }) => {
                       Gala Dinner × {formData.galaDinnerCount}
                     </span>
                     <span className="font-bold text-lg">
-                      ${getGalaDinnerPrice() * formData.galaDinnerCount}
+                      {formatCurrency(
+                        getGalaDinnerPrice() * formData.galaDinnerCount,
+                        currency
+                      )}
                     </span>
+                  </div>
+                )}
+                {isKoreanCustomer && (
+                  <div className="text-xs text-gray-500 italic pt-2">
+                    * Prices include 10% Korean tax
                   </div>
                 )}
                 <div className="border-t-2 border-gray-300 pt-4 mt-3">
@@ -1406,7 +1532,7 @@ const RegistrationForm = ({ onClose }) => {
                       className="text-3xl font-bold"
                       style={{ color: "var(--color-primary)" }}
                     >
-                      ${getTotalPrice()}
+                      {formatCurrency(getTotalPrice(), currency)}
                     </span>
                   </div>
                 </div>
@@ -1416,234 +1542,92 @@ const RegistrationForm = ({ onClose }) => {
 
           {/* Payment Form */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <form onSubmit={handlePayment}>
-              <FormSectionHeader
-                icon={
+            <FormSectionHeader
+              icon={
+                <svg
+                  className="w-5 h-5 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                  />
+                </svg>
+              }
+            >
+              Payment Information
+            </FormSectionHeader>
+            <div className="p-8">
+              {clientSecret ? (
+                <Elements
+                  stripe={stripePromise}
+                  options={{
+                    clientSecret,
+                    appearance: {
+                      theme: "stripe",
+                    },
+                  }}
+                >
+                  <PaymentForm
+                    clientSecret={clientSecret}
+                    amount={getStripeAmount()}
+                    currency={currency}
+                    onSuccess={(paymentIntent) => {
+                      console.log("Payment succeeded:", paymentIntent);
+                      setIsProcessingPayment(false);
+                      setStep(5);
+                    }}
+                    onError={(error) => {
+                      console.error("Payment error:", error);
+                      setIsProcessingPayment(false);
+                      alert(
+                        error.message ||
+                          "Payment failed. Please try again or contact support@theisir.org"
+                      );
+                    }}
+                    isProcessing={isProcessingPayment}
+                    setIsProcessing={setIsProcessingPayment}
+                  />
+                </Elements>
+              ) : (
+                <div className="text-center py-8">
                   <svg
-                    className="w-5 h-5 text-white"
+                    className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-4"
                     fill="none"
-                    stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
                     <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                }
-              >
-                Payment Information
-              </FormSectionHeader>
-              <div className="p-8">
-                <div className="mb-6 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        cardNumber: "4532 1234 5678 9010",
-                        cardName: "Jane Smith",
-                        expiryMonth: "12",
-                        expiryYear: "2028",
-                        cvv: "123",
-                        billingZip: "02115",
-                      }))
-                    }
-                    className="px-4 py-2 text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all"
-                    style={{
-                      backgroundColor: "var(--color-secondary)",
-                      color: "var(--color-primary)",
-                    }}
-                  >
-                    🔧 Fill Example
-                  </button>
+                  <p className="text-gray-600">Setting up secure payment...</p>
                 </div>
+              )}
 
-                <div className="space-y-5">
-                  <div>
-                    <FormLabel required>Card Number</FormLabel>
-                    <FormInput
-                      name="cardNumber"
-                      value={formData.cardNumber}
-                      onChange={(e) => {
-                        const value = e.target.value
-                          .replace(/\s/g, "")
-                          .replace(/\D/g, "");
-                        const formatted =
-                          value.match(/.{1,4}/g)?.join(" ") || value;
-                        setFormData((prev) => ({
-                          ...prev,
-                          cardNumber: formatted,
-                        }));
-                      }}
-                      placeholder="1234 5678 9012 3456"
-                      maxLength="19"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <FormLabel required>Cardholder Name</FormLabel>
-                    <FormInput
-                      name="cardName"
-                      value={formData.cardName}
-                      onChange={handleChange}
-                      placeholder="Name as it appears on card"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <FormLabel required>Exp. Month</FormLabel>
-                      <select
-                        name="expiryMonth"
-                        value={formData.expiryMonth}
-                        onChange={handleChange}
-                        className="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        required
-                      >
-                        <option value="">MM</option>
-                        {Array.from({ length: 12 }, (_, i) => {
-                          const month = String(i + 1).padStart(2, "0");
-                          return (
-                            <option key={month} value={month}>
-                              {month}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </div>
-                    <div>
-                      <FormLabel required>Exp. Year</FormLabel>
-                      <select
-                        name="expiryYear"
-                        value={formData.expiryYear}
-                        onChange={handleChange}
-                        className="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        required
-                      >
-                        <option value="">YYYY</option>
-                        {Array.from({ length: 10 }, (_, i) => {
-                          const year = new Date().getFullYear() + i;
-                          return (
-                            <option key={year} value={year}>
-                              {year}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </div>
-                    <div>
-                      <FormLabel required>CVV</FormLabel>
-                      <FormInput
-                        name="cvv"
-                        value={formData.cvv}
-                        onChange={(e) => {
-                          const value = e.target.value
-                            .replace(/\D/g, "")
-                            .slice(0, 4);
-                          setFormData((prev) => ({ ...prev, cvv: value }));
-                        }}
-                        placeholder="123"
-                        maxLength="4"
-                        type="password"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <FormLabel required>Billing Zip Code</FormLabel>
-                    <div className="w-full md:w-48">
-                      <FormInput
-                        name="billingZip"
-                        value={formData.billingZip}
-                        onChange={handleChange}
-                        placeholder="12345"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-8 bg-green-50 border-2 border-green-200 rounded-xl p-5">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                      <svg
-                        className="w-5 h-5 text-white"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                        />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-800">Secure Payment</p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Your payment information is encrypted and secure. We
-                        accept Visa, MasterCard, American Express, and Discover.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-between pt-8 mt-6 border-t-2 border-gray-200">
-                  <button
-                    type="button"
-                    className="px-8 py-3 border-2 border-gray-300 bg-white text-gray-700 rounded-xl shadow-md hover:bg-gray-50 font-bold text-base transition-all"
-                    onClick={() => setStep(3)}
-                  >
-                    ← Back to Registration
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isProcessingPayment}
-                    className="px-10 py-3 text-white rounded-xl shadow-lg hover:shadow-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed text-base"
-                    style={{
-                      background: isProcessingPayment
-                        ? "#9ca3af"
-                        : "linear-gradient(135deg, #1a3a6c 0%, #2d5a9e 100%)",
-                    }}
-                  >
-                    {isProcessingPayment ? (
-                      <span className="flex items-center">
-                        <svg
-                          className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          />
-                        </svg>
-                        Processing...
-                      </span>
-                    ) : (
-                      "Complete Payment →"
-                    )}
-                  </button>
-                </div>
+              <div className="flex justify-start pt-8 mt-6 border-t-2 border-gray-200">
+                <button
+                  type="button"
+                  className="px-8 py-3 border-2 border-gray-300 bg-white text-gray-700 rounded-xl shadow-md hover:bg-gray-50 font-bold text-base transition-all"
+                  onClick={() => setStep(3)}
+                >
+                  ← Back to Registration
+                </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
@@ -1710,7 +1694,10 @@ const RegistrationForm = ({ onClose }) => {
                         </span>
                       </span>
                       <span className="font-bold">
-                        ${getTicketPrice(formData.ticketType)}
+                        {formatCurrency(
+                          getTicketPrice(formData.ticketType),
+                          currency
+                        )}
                       </span>
                     </div>
                     {formData.accompanyingPersonCount > 0 && (
@@ -1720,9 +1707,11 @@ const RegistrationForm = ({ onClose }) => {
                           {formData.accompanyingPersonCount}
                         </span>
                         <span className="font-bold">
-                          $
-                          {getAccompanyingPrice() *
-                            formData.accompanyingPersonCount}
+                          {formatCurrency(
+                            getAccompanyingPrice() *
+                              formData.accompanyingPersonCount,
+                            currency
+                          )}
                         </span>
                       </div>
                     )}
@@ -1732,7 +1721,10 @@ const RegistrationForm = ({ onClose }) => {
                           Gala Dinner × {formData.galaDinnerCount}
                         </span>
                         <span className="font-bold">
-                          ${getGalaDinnerPrice() * formData.galaDinnerCount}
+                          {formatCurrency(
+                            getGalaDinnerPrice() * formData.galaDinnerCount,
+                            currency
+                          )}
                         </span>
                       </div>
                     )}
@@ -1748,9 +1740,14 @@ const RegistrationForm = ({ onClose }) => {
                       className="text-3xl font-bold"
                       style={{ color: "var(--color-primary)" }}
                     >
-                      ${getTotalPrice()}
+                      {formatCurrency(getTotalPrice(), currency)}
                     </span>
                   </div>
+                  {isKoreanCustomer && (
+                    <p className="text-xs text-gray-500 italic mt-2">
+                      * Includes 10% Korean tax
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1820,6 +1817,7 @@ const RegistrationForm = ({ onClose }) => {
         </div>
       )}
     </div>
+    </Elements>
   );
 };
 
