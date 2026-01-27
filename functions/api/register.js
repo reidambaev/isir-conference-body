@@ -69,14 +69,14 @@ export async function onRequestPost(context) {
       ? data.state.name || data.state.toString()
       : (data.stateSelect || data.stateText || null);
 
-    // Normalize membership fields to strings to avoid D1 object-type errors
-    const normalizeMembershipField = (value) => {
+    // Generic normalizer to ensure no raw objects/arrays are passed to D1
+    const normalizeForD1 = (value) => {
       if (value === undefined || value === null) return null;
-      if (typeof value === "string") return value;
-      if (typeof value === "number" || typeof value === "boolean") {
-        return String(value);
+      const type = typeof value;
+      if (type === "string" || type === "number" || type === "boolean") {
+        return value;
       }
-      // For unexpected object/array values, store a JSON string
+      // Convert objects/arrays/Dates to a JSON/string representation
       try {
         return JSON.stringify(value);
       } catch {
@@ -84,11 +84,12 @@ export async function onRequestPost(context) {
       }
     };
 
-    const membershipLevel = normalizeMembershipField(data.membershipLevel);
-    const membershipStatus = normalizeMembershipField(data.membershipStatus);
+    // Normalize membership fields explicitly (they can sometimes be objects)
+    const membershipLevel = normalizeForD1(data.membershipLevel);
+    const membershipStatus = normalizeForD1(data.membershipStatus);
 
     // Insert into D1 database
-    const result = await env.ISIR_DB.prepare(
+    const stmt = env.ISIR_DB.prepare(
       `
       INSERT INTO registrations (
         id,
@@ -134,51 +135,54 @@ export async function onRequestPost(context) {
         membership_status
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
-    )
-      .bind(
-        registrationId,
-        registrationDate,
-        data.email,
-        data.firstName,
-        data.middleName || null,
-        data.lastName,
-        data.salutation || null,
-        data.suffix || null,
-        data.institution || null,
-        data.credentials || null,
-        data.badgeName || null,
-        data.pronouns || null,
-        data.department || null,
-        data.address1 || null,
-        data.address2 || null,
-        cityName,
-        stateName,
-        data.zip || null,
-        countryName || null,
-        data.phone || null,
-        data.cellPhone || null,
-        data.isPhysician || null,
-        data.ticketType,
-        data.accompanyingPersonCount || 0,
-        data.galaDinnerCount || 0,
-        ticketPrice,
-        totalPrice,
-        isEarlyBird ? 1 : 0,
-        data.dietary?.vegan ? 1 : 0,
-        data.dietary?.vegetarian ? 1 : 0,
-        data.dietary?.glutenFree ? 1 : 0,
-        data.dietary?.kosher ? 1 : 0,
-        data.dietary?.other ? 1 : 0,
-        data.specialAssistance ? 1 : 0,
-        data.policyAgreed ? 1 : 0,
-        data.privacyMarketing ? 1 : 0,
-        data.privacyApp ? 1 : 0,
-        data.optOutMailing ? 1 : 0,
-        "pending", // payment_status
-        membershipLevel,
-        membershipStatus
-      )
-      .run();
+    );
+
+    // Build parameter list and normalize every value for D1 safety
+    const params = [
+      registrationId,
+      registrationDate,
+      data.email,
+      data.firstName,
+      data.middleName || null,
+      data.lastName,
+      data.salutation || null,
+      data.suffix || null,
+      data.institution || null,
+      data.credentials || null,
+      data.badgeName || null,
+      data.pronouns || null,
+      data.department || null,
+      data.address1 || null,
+      data.address2 || null,
+      cityName,
+      stateName,
+      data.zip || null,
+      countryName || null,
+      data.phone || null,
+      data.cellPhone || null,
+      data.isPhysician || null,
+      data.ticketType,
+      data.accompanyingPersonCount || 0,
+      data.galaDinnerCount || 0,
+      ticketPrice,
+      totalPrice,
+      isEarlyBird ? 1 : 0,
+      data.dietary?.vegan ? 1 : 0,
+      data.dietary?.vegetarian ? 1 : 0,
+      data.dietary?.glutenFree ? 1 : 0,
+      data.dietary?.kosher ? 1 : 0,
+      data.dietary?.other ? 1 : 0,
+      data.specialAssistance ? 1 : 0,
+      data.policyAgreed ? 1 : 0,
+      data.privacyMarketing ? 1 : 0,
+      data.privacyApp ? 1 : 0,
+      data.optOutMailing ? 1 : 0,
+      "pending", // payment_status
+      membershipLevel,
+      membershipStatus,
+    ].map(normalizeForD1);
+
+    const result = await stmt.bind(...params).run();
 
     // Update currency if column exists (for new schema)
     try {
