@@ -133,6 +133,98 @@ async function handleRegistration(request, env, corsHeaders) {
     const galaDinnerPrice = 100 * (data.galaDinnerCount || 0);
     const totalPrice = ticketPrice + accompanyingPrice + galaDinnerPrice;
 
+    // Build all parameters with comprehensive sanitization
+    const paramNames = [
+      'id', 'registration_date', 'email', 'first_name', 'middle_name', 'last_name',
+      'salutation', 'suffix', 'institution', 'credentials', 'badge_name', 'pronouns',
+      'department', 'address1', 'address2', 'city', 'state', 'zip', 'country', 'phone', 'cell_phone',
+      'is_physician', 'ticket_type', 'accompanying_count', 'gala_dinner', 'ticket_price', 'total_price',
+      'is_early_bird', 'dietary_vegan', 'dietary_vegetarian', 'dietary_gluten_free',
+      'dietary_kosher', 'dietary_other', 'special_assistance', 'policy_agreed',
+      'privacy_marketing', 'privacy_app', 'opt_out_mailing', 'payment_status',
+      'membership_level', 'membership_status'
+    ];
+    
+    const paramValues = [
+      registrationId,
+      registrationDate,
+      normalizeForD1(data.email),
+      normalizeForD1(data.firstName),
+      normalizeForD1(data.middleName),
+      normalizeForD1(data.lastName),
+      normalizeForD1(data.salutation),
+      normalizeForD1(data.suffix),
+      normalizeForD1(data.institution),
+      normalizeForD1(data.credentials),
+      normalizeForD1(data.badgeName),
+      normalizeForD1(data.pronouns),
+      normalizeForD1(data.department),
+      normalizeForD1(data.address1),
+      normalizeForD1(data.address2),
+      cityName, // SANITIZED
+      stateName, // SANITIZED
+      normalizeForD1(data.zip),
+      countryName || null, // SANITIZED
+      normalizeForD1(data.phone),
+      normalizeForD1(data.cellPhone),
+      normalizeForD1(data.isPhysician),
+      normalizeForD1(data.ticketType),
+      Number(data.accompanyingPersonCount) || 0,
+      Number(data.galaDinnerCount) || 0,
+      Number(ticketPrice),
+      Number(totalPrice),
+      isEarlyBird ? 1 : 0,
+      data.dietary?.vegan ? 1 : 0,
+      data.dietary?.vegetarian ? 1 : 0,
+      data.dietary?.glutenFree ? 1 : 0,
+      data.dietary?.kosher ? 1 : 0,
+      data.dietary?.other ? 1 : 0,
+      data.specialAssistance ? 1 : 0,
+      data.policyAgreed ? 1 : 0,
+      data.privacyMarketing ? 1 : 0,
+      data.privacyApp ? 1 : 0,
+      data.optOutMailing ? 1 : 0,
+      "pending",
+      membershipLevel, // SANITIZED
+      membershipStatus // SANITIZED
+    ];
+    
+    // Final safety check - ensure NO objects remain
+    const finalParams = paramValues.map((param, index) => {
+      const paramType = typeof param;
+      if (paramType === 'object' && param !== null) {
+        console.error(`🚨 CRITICAL: ${paramNames[index]} is still an object!`, param);
+        try {
+          return JSON.stringify(param);
+        } catch {
+          return String(param);
+        }
+      }
+      return param;
+    });
+    
+    // Log all parameters before binding
+    console.error("Final parameters to bind:", JSON.stringify(
+      paramNames.map((name, i) => ({
+        name,
+        value: finalParams[i],
+        type: typeof finalParams[i],
+        isObject: typeof finalParams[i] === 'object' && finalParams[i] !== null
+      })),
+      null,
+      2
+    ));
+    
+    // Check for any remaining objects
+    const hasObjects = finalParams.some(p => typeof p === 'object' && p !== null);
+    if (hasObjects) {
+      const error = new Error("D1_TYPE_ERROR: Objects detected in parameters. Check logs.");
+      console.error("FATAL: Cannot proceed with objects:", paramNames.filter((name, i) => 
+        typeof finalParams[i] === 'object' && finalParams[i] !== null
+      ));
+      throw error;
+    }
+    
     // Insert into D1 database - use sanitized values
     await env.ISIR_DB.prepare(
       `
@@ -148,49 +240,7 @@ async function handleRegistration(request, env, corsHeaders) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     )
-      .bind(
-        registrationId,
-        registrationDate,
-        normalizeForD1(data.email),
-        normalizeForD1(data.firstName),
-        normalizeForD1(data.middleName),
-        normalizeForD1(data.lastName),
-        normalizeForD1(data.salutation),
-        normalizeForD1(data.suffix),
-        normalizeForD1(data.institution),
-        normalizeForD1(data.credentials),
-        normalizeForD1(data.badgeName),
-        normalizeForD1(data.pronouns),
-        normalizeForD1(data.department),
-        normalizeForD1(data.address1),
-        normalizeForD1(data.address2),
-        cityName, // SANITIZED - was data.city (object)
-        stateName, // SANITIZED - was data.stateSelect (object)
-        normalizeForD1(data.zip),
-        countryName || null, // SANITIZED - was data.country (object)
-        normalizeForD1(data.phone),
-        normalizeForD1(data.cellPhone),
-        normalizeForD1(data.isPhysician),
-        normalizeForD1(data.ticketType),
-        data.accompanyingPersonCount || 0,
-        data.galaDinnerCount || 0,
-        ticketPrice,
-        totalPrice,
-        isEarlyBird ? 1 : 0,
-        data.dietary?.vegan ? 1 : 0,
-        data.dietary?.vegetarian ? 1 : 0,
-        data.dietary?.glutenFree ? 1 : 0,
-        data.dietary?.kosher ? 1 : 0,
-        data.dietary?.other ? 1 : 0,
-        data.specialAssistance ? 1 : 0,
-        data.policyAgreed ? 1 : 0,
-        data.privacyMarketing ? 1 : 0,
-        data.privacyApp ? 1 : 0,
-        data.optOutMailing ? 1 : 0,
-        "pending",
-        membershipLevel, // SANITIZED - was data.membershipLevel (could be object)
-        membershipStatus // SANITIZED - was data.membershipStatus (could be object)
-      )
+      .bind(...finalParams)
       .run();
 
     // Update currency if column exists
@@ -227,18 +277,22 @@ async function handleRegistration(request, env, corsHeaders) {
     console.error("=== REGISTRATION ERROR (worker.js) ===");
     console.error("Error:", error.message);
     console.error("Stack:", error.stack);
+    
+    // ALWAYS include version - this proves which code is running
+    const errorResponse = {
+      success: false,
+      error: error.message || "Failed to save registration",
+      version: CODE_VERSION, // MUST be in response to verify deployment
+      timestamp: new Date().toISOString(),
+    };
+    
+    console.error("Error response being sent:", JSON.stringify(errorResponse));
+    
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message || "Failed to save registration",
-        version: CODE_VERSION,
-      }),
+      JSON.stringify(errorResponse),
       {
         status: 500,
-        headers: {
-          ...corsHeaders,
-          "X-API-Version": CODE_VERSION,
-        },
+        headers: errorHeaders,
       }
     );
       JSON.stringify({
