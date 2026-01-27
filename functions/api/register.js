@@ -43,9 +43,13 @@ export async function onRequestPost(context) {
       (isEarlyBird ? 250 : 350) * (data.accompanyingPersonCount || 0);
     const galaDinnerPrice = 100 * (data.galaDinnerCount || 0);
     
+    // Extract country name as string (handle both object and string formats)
+    const countryName = typeof data.country === 'object' && data.country !== null
+      ? data.country.name || data.country.toString()
+      : data.country || '';
+    
     // Determine currency and apply Korean tax if applicable
-    const isKorean = data.country?.name?.toLowerCase().includes("korea") || 
-                     data.country?.toLowerCase().includes("korea");
+    const isKorean = countryName.toLowerCase().includes("korea");
     let totalPrice = ticketPrice + accompanyingPrice + galaDinnerPrice;
     let currency = "USD";
     
@@ -55,6 +59,15 @@ export async function onRequestPost(context) {
       totalPrice = Math.round(totalPrice * usdToKrwRate * 1.1);
       currency = "KRW";
     }
+    
+    // Extract city and state as strings (handle both object and string formats)
+    const cityName = typeof data.city === 'object' && data.city !== null
+      ? data.city.name || data.city.toString()
+      : data.city || null;
+    
+    const stateName = typeof data.state === 'object' && data.state !== null
+      ? data.state.name || data.state.toString()
+      : (data.stateSelect || data.stateText || null);
 
     // Insert into D1 database
     const result = await env.ISIR_DB.prepare(
@@ -120,10 +133,10 @@ export async function onRequestPost(context) {
         data.department || null,
         data.address1 || null,
         data.address2 || null,
-        data.city || null,
-        data.stateSelect || data.stateText || null,
+        cityName,
+        stateName,
         data.zip || null,
-        data.country || null,
+        countryName || null,
         data.phone || null,
         data.cellPhone || null,
         data.isPhysician || null,

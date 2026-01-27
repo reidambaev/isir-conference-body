@@ -284,25 +284,15 @@ const RegistrationForm = ({ onClose }) => {
 
       setMembershipData(data.data);
 
-      if (data.is_member) {
-        // Member verified - proceed to ticket selection
-        setStep(2);
+      // Allow both members and non-members to proceed to ticket selection
+      // Non-members will see member pricing but won't be able to select member tickets
+      if (!data.data.email_registered) {
+        setVerificationError(
+          "No account found with this email address. Please check your email or register at theisir.org first."
+        );
       } else {
-        // Not a member - show appropriate message
-        if (!data.data.email_registered) {
-          setVerificationError(
-            "No account found with this email address. Please check your email or register at theisir.org first."
-          );
-        } else if (!data.data.has_membership) {
-          setVerificationError(
-            data.message ||
-              "No active ISIR membership found. Please renew your membership at theisir.org to access member pricing."
-          );
-        } else {
-          setVerificationError(
-            "Verification failed. Please contact support@theisir.org for assistance."
-          );
-        }
+        // Proceed to ticket selection for both members and non-members
+        setStep(2);
       }
     } catch (error) {
       console.error("Verification error:", error);
@@ -320,6 +310,18 @@ const RegistrationForm = ({ onClose }) => {
       alert("Please select a ticket type.");
       return;
     }
+    
+    // Validate that the selected ticket is available
+    if (membershipData?.ticket_options?.available_tickets) {
+      const selectedTicket = membershipData.ticket_options.available_tickets.find(
+        (ticket) => ticket.id === formData.ticketType
+      );
+      if (selectedTicket && !selectedTicket.available) {
+        alert(selectedTicket.unavailable_reason || "This ticket type is not available for your membership status.");
+        return;
+      }
+    }
+    
     setStep(3);
   };
 
@@ -335,6 +337,18 @@ const RegistrationForm = ({ onClose }) => {
 
   const [registrationId, setRegistrationId] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
+
+  // Clear member ticket selection for non-members when entering ticket selection step
+  useEffect(() => {
+    if (step === 2 && membershipData && !membershipData.has_membership) {
+      // Check if current selection is a member ticket
+      const memberTicketIds = ['isir-member', 'trainee-member'];
+      if (memberTicketIds.includes(formData.ticketType)) {
+        // Clear selection if it's a member ticket
+        setFormData((prev) => ({ ...prev, ticketType: "" }));
+      }
+    }
+  }, [step, membershipData]);
 
   // Create payment intent when entering payment step
   useEffect(() => {
@@ -485,7 +499,22 @@ const RegistrationForm = ({ onClose }) => {
   const isKoreanCustomer = isKorea(formData.country);
 
   const getTicketPrice = (type, inBaseCurrency = false) => {
-    if (!type || !ticketPrices[type]) return 0;
+    if (!type) return 0;
+    
+    // Try to get price from API data first
+    if (membershipData?.ticket_options?.available_tickets) {
+      const ticket = membershipData.ticket_options.available_tickets.find(
+        (t) => t.id === type
+      );
+      if (ticket && ticket.current_price !== undefined) {
+        const basePrice = ticket.current_price;
+        if (inBaseCurrency) return basePrice;
+        return getFinalPrice(basePrice, formData.country);
+      }
+    }
+    
+    // Fallback to hardcoded prices
+    if (!ticketPrices[type]) return 0;
     const basePrice = isEarlyBirdPeriod
       ? ticketPrices[type].early
       : ticketPrices[type].standard;
@@ -495,6 +524,17 @@ const RegistrationForm = ({ onClose }) => {
   };
 
   const getAccompanyingPrice = (inBaseCurrency = false) => {
+    // Try to get price from API data first
+    if (membershipData?.ticket_options?.accompanying) {
+      const basePrice = membershipData.ticket_options.accompanying.current_price || 
+        (isEarlyBirdPeriod 
+          ? membershipData.ticket_options.accompanying.early_price 
+          : membershipData.ticket_options.accompanying.standard_price);
+      if (inBaseCurrency) return basePrice;
+      return getFinalPrice(basePrice, formData.country);
+    }
+    
+    // Fallback to hardcoded prices
     const basePrice = isEarlyBirdPeriod ? 250 : 350;
     if (inBaseCurrency) return basePrice;
     return getFinalPrice(basePrice, formData.country);
@@ -622,7 +662,7 @@ const RegistrationForm = ({ onClose }) => {
                     ...prev,
                     firstName: "Jane",
                     lastName: "Smith",
-                    email: "jane.smith@example.com",
+                    email: "test@isir2026.com",
                   }))
                 }
                 className="px-4 py-2 text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all"
@@ -785,47 +825,54 @@ const RegistrationForm = ({ onClose }) => {
             </div>
 
             {/* Early Bird Status */}
-            <div
-              className={`${
-                isEarlyBirdPeriod
-                  ? "bg-green-50 border-green-300"
-                  : "bg-amber-50 border-amber-300"
-              } border-2 rounded-xl p-5 mb-8`}
-            >
-              <div className="flex items-center gap-3">
+            {(() => {
+              const apiEarlyBird = membershipData?.ticket_options?.is_early_bird ?? isEarlyBirdPeriod;
+              const earlyBirdDeadline = membershipData?.ticket_options?.early_bird_deadline || "July 10, 2026";
+              
+              return (
                 <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                    isEarlyBirdPeriod ? "bg-green-500" : "bg-amber-500"
-                  }`}
+                  className={`${
+                    apiEarlyBird
+                      ? "bg-green-50 border-green-300"
+                      : "bg-amber-50 border-amber-300"
+                  } border-2 rounded-xl p-5 mb-8`}
                 >
-                  <svg
-                    className="w-6 h-6 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                        apiEarlyBird ? "bg-green-500" : "bg-amber-500"
+                      }`}
+                    >
+                      <svg
+                        className="w-6 h-6 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-800 text-lg">
+                        {apiEarlyBird
+                          ? "🎉 Early Bird Pricing Available!"
+                          : "Early Bird Pricing Has Ended"}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {apiEarlyBird
+                          ? `Register by ${earlyBirdDeadline} to get early bird rates.`
+                          : `Standard pricing applies (Early bird ended ${earlyBirdDeadline}).`}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-bold text-gray-800 text-lg">
-                    {isEarlyBirdPeriod
-                      ? "🎉 Early Bird Pricing Available!"
-                      : "Early Bird Pricing Has Ended"}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    {isEarlyBirdPeriod
-                      ? "Register by July 10, 2026 to get early bird rates."
-                      : "Standard pricing applies (Early bird ended July 10, 2026)."}
-                  </p>
-                </div>
-              </div>
-            </div>
+              );
+            })()}
 
             <form onSubmit={handleTicketSelection} className="space-y-8">
               {/* Ticket Type Selection */}
@@ -833,6 +880,48 @@ const RegistrationForm = ({ onClose }) => {
                 <FormLabel required className="!text-base mb-4">
                   Select Your Ticket Type
                 </FormLabel>
+                
+                {/* Membership Status Banner */}
+                {membershipData && (
+                  <div className={`mb-4 p-4 rounded-xl border-2 ${
+                    membershipData.has_membership 
+                      ? "bg-green-50 border-green-300" 
+                      : "bg-amber-50 border-amber-300"
+                  }`}>
+                    <div className="flex items-start">
+                      {membershipData.has_membership ? (
+                        <>
+                          <svg className="w-5 h-5 text-green-600 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          <div>
+                            <p className="font-semibold text-green-800 text-sm">
+                              ISIR Member Verified
+                            </p>
+                            <p className="text-green-700 text-xs mt-1">
+                              You have access to member pricing. {membershipData.membership_level && `Membership: ${membershipData.membership_level}`}
+                            </p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5 text-amber-600 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          <div>
+                            <p className="font-semibold text-amber-800 text-sm">
+                              Non-Member Registration
+                            </p>
+                            <p className="text-amber-700 text-xs mt-1">
+                              Member tickets are shown for reference only. Join ISIR to access member pricing!
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
                 <div className="border-2 border-gray-200 rounded-2xl overflow-hidden">
                   {/* Table Header */}
                   <div
@@ -858,53 +947,147 @@ const RegistrationForm = ({ onClose }) => {
                       STANDARD
                     </div>
                   </div>
-                  {Object.entries(ticketPrices).map(
-                    ([value, { early, standard, label }], index) => (
-                      <label
-                        key={value}
-                        className={`grid grid-cols-3 cursor-pointer transition-all duration-200 hover:bg-blue-50 ${
-                          formData.ticketType === value
-                            ? "bg-blue-100 ring-2 ring-blue-500 ring-inset"
-                            : ""
-                        } ${
-                          index !== Object.keys(ticketPrices).length - 1
-                            ? "border-b border-gray-200"
-                            : ""
-                        }`}
-                      >
-                        <div className="p-5 flex items-center gap-3">
-                          <input
-                            type="radio"
-                            name="ticketType"
-                            value={value}
-                            checked={formData.ticketType === value}
-                            onChange={handleChange}
-                            className="w-5 h-5 text-blue-600"
-                          />
-                          <span className="font-semibold text-gray-800">
-                            {label}
-                          </span>
-                        </div>
-                        <div className="p-5 text-center flex items-center justify-center">
-                          <span
-                            className="text-xl font-bold"
-                            style={{ color: "var(--color-primary)" }}
+                  {membershipData?.ticket_options?.available_tickets ? (
+                    // Use ticket options from API
+                    membershipData.ticket_options.available_tickets.map(
+                      (ticket, index) => {
+                        const isAvailable = ticket.available !== false;
+                        const isSelected = formData.ticketType === ticket.id;
+                        
+                        return (
+                          <div
+                            key={ticket.id}
+                            className={`grid grid-cols-3 transition-all duration-200 ${
+                              isAvailable
+                                ? "cursor-pointer hover:bg-blue-50"
+                                : "cursor-not-allowed opacity-60"
+                            } ${
+                              isSelected && isAvailable
+                                ? "bg-blue-100 ring-2 ring-blue-500 ring-inset"
+                                : ""
+                            } ${
+                              index !== membershipData.ticket_options.available_tickets.length - 1
+                                ? "border-b border-gray-200"
+                                : ""
+                            }`}
                           >
-                            {formatCurrency(
-                              getFinalPrice(early, formData.country),
-                              getCurrency(formData.country)
-                            )}
-                          </span>
-                        </div>
-                        <div className="p-5 text-center flex items-center justify-center">
-                          <span className="text-xl font-bold text-gray-500">
-                            {formatCurrency(
-                              getFinalPrice(standard, formData.country),
-                              getCurrency(formData.country)
-                            )}
-                          </span>
-                        </div>
-                      </label>
+                            <div className="p-5 flex items-center gap-3">
+                              <input
+                                type="radio"
+                                name="ticketType"
+                                value={ticket.id}
+                                checked={isSelected}
+                                onChange={handleChange}
+                                disabled={!isAvailable}
+                                className="w-5 h-5 text-blue-600 disabled:cursor-not-allowed"
+                              />
+                              <div className="flex-1">
+                                <span className={`font-semibold ${
+                                  isAvailable ? "text-gray-800" : "text-gray-500"
+                                }`}>
+                                  {ticket.label}
+                                </span>
+                                {!isAvailable && ticket.unavailable_reason && (
+                                  <div className="mt-1 text-xs text-amber-600">
+                                    <p>{ticket.unavailable_reason}</p>
+                                    <a
+                                      href="https://theisir.org/membership-account/membership-levels/"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:text-blue-800 underline font-semibold mt-1 inline-block"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      Join ISIR →
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="p-5 text-center flex items-center justify-center">
+                              <span
+                                className={`text-xl font-bold ${
+                                  isAvailable
+                                    ? ""
+                                    : "text-gray-400"
+                                }`}
+                                style={isAvailable ? { color: "var(--color-primary)" } : {}}
+                              >
+                                {formatCurrency(
+                                  getFinalPrice(
+                                    ticket.current_price || ticket.early_price,
+                                    formData.country
+                                  ),
+                                  getCurrency(formData.country)
+                                )}
+                              </span>
+                            </div>
+                            <div className="p-5 text-center flex items-center justify-center">
+                              <span className={`text-xl font-bold ${
+                                isAvailable ? "text-gray-500" : "text-gray-300"
+                              }`}>
+                                {formatCurrency(
+                                  getFinalPrice(
+                                    ticket.standard_price,
+                                    formData.country
+                                  ),
+                                  getCurrency(formData.country)
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+                    )
+                  ) : (
+                    // Fallback to hardcoded prices if API data not available
+                    Object.entries(ticketPrices).map(
+                      ([value, { early, standard, label }], index) => (
+                        <label
+                          key={value}
+                          className={`grid grid-cols-3 cursor-pointer transition-all duration-200 hover:bg-blue-50 ${
+                            formData.ticketType === value
+                              ? "bg-blue-100 ring-2 ring-blue-500 ring-inset"
+                              : ""
+                          } ${
+                            index !== Object.keys(ticketPrices).length - 1
+                              ? "border-b border-gray-200"
+                              : ""
+                          }`}
+                        >
+                          <div className="p-5 flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="ticketType"
+                              value={value}
+                              checked={formData.ticketType === value}
+                              onChange={handleChange}
+                              className="w-5 h-5 text-blue-600"
+                            />
+                            <span className="font-semibold text-gray-800">
+                              {label}
+                            </span>
+                          </div>
+                          <div className="p-5 text-center flex items-center justify-center">
+                            <span
+                              className="text-xl font-bold"
+                              style={{ color: "var(--color-primary)" }}
+                            >
+                              {formatCurrency(
+                                getFinalPrice(early, formData.country),
+                                getCurrency(formData.country)
+                              )}
+                            </span>
+                          </div>
+                          <div className="p-5 text-center flex items-center justify-center">
+                            <span className="text-xl font-bold text-gray-500">
+                              {formatCurrency(
+                                getFinalPrice(standard, formData.country),
+                                getCurrency(formData.country)
+                              )}
+                            </span>
+                          </div>
+                        </label>
+                      )
                     )
                   )}
                 </div>
@@ -936,7 +1119,7 @@ const RegistrationForm = ({ onClose }) => {
                           getAccompanyingPrice(),
                           getCurrency(formData.country)
                         )}{" "}
-                        each ({isEarlyBirdPeriod ? "Early Bird" : "Standard"})
+                        each ({(membershipData?.ticket_options?.is_early_bird ?? isEarlyBirdPeriod) ? "Early Bird" : "Standard"})
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -1290,7 +1473,7 @@ const RegistrationForm = ({ onClose }) => {
                   />
                 </div>
                 <div>
-                  <FormLabel required>State/Province</FormLabel>
+                  <FormLabel>State/Province</FormLabel>
                   <StateSelect
                     countryid={countryid}
                     onChange={(e) => {
@@ -1300,7 +1483,7 @@ const RegistrationForm = ({ onClose }) => {
                       setCityid(0);
                       setFormData((prev) => ({ ...prev, city: null }));
                     }}
-                    placeHolder="Select State"
+                    placeHolder="Select State (Optional)"
                     defaultValue={formData.state}
                     containerClassName="w-full"
                     inputClassName="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500"
