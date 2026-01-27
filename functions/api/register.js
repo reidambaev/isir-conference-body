@@ -111,15 +111,27 @@ export async function onRequestPost(context) {
       }
     };
 
-    // Extract country name as string (handle both object and string formats)
-    let countryName = '';
-    if (data.country) {
-      if (typeof data.country === 'object' && data.country !== null) {
-        countryName = data.country.name || JSON.stringify(data.country);
-      } else {
-        countryName = String(data.country);
+    // Force extract country/city/state as strings - handle ALL cases
+    const extractString = (value) => {
+      if (!value) return null;
+      if (typeof value === 'string') return value;
+      if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+      if (typeof value === 'object' && value !== null) {
+        // Try to extract name property first
+        if (value.name) return String(value.name);
+        // Otherwise stringify
+        try {
+          return JSON.stringify(value);
+        } catch {
+          return String(value);
+        }
       }
-    }
+      return String(value);
+    };
+    
+    const countryName = extractString(data.country) || '';
+    const cityName = extractString(data.city);
+    const stateName = extractString(data.state) || extractString(data.stateSelect) || extractString(data.stateText);
     
     // Determine currency and apply Korean tax if applicable
     const isKorean = countryName.toLowerCase().includes("korea");
@@ -131,28 +143,6 @@ export async function onRequestPost(context) {
       const usdToKrwRate = 1350; // Should use real-time rate in production
       totalPrice = Math.round(totalPrice * usdToKrwRate * 1.1);
       currency = "KRW";
-    }
-    
-    // Extract city and state as strings (handle both object and string formats)
-    let cityName = null;
-    if (data.city) {
-      if (typeof data.city === 'object' && data.city !== null) {
-        cityName = data.city.name || JSON.stringify(data.city);
-      } else {
-        cityName = String(data.city);
-      }
-    }
-    
-    let stateName = null;
-    if (data.state) {
-      if (typeof data.state === 'object' && data.state !== null) {
-        stateName = data.state.name || JSON.stringify(data.state);
-      } else {
-        stateName = String(data.state);
-      }
-    }
-    if (!stateName && (data.stateSelect || data.stateText)) {
-      stateName = String(data.stateSelect || data.stateText);
     }
 
     // Normalize membership fields explicitly (they can sometimes be objects)
@@ -221,48 +211,78 @@ export async function onRequestPost(context) {
       'payment_status', 'membershipLevel', 'membershipStatus'
     ];
     
+    // Ensure all values are primitives before building params
+    const safeNumber = (val) => {
+      if (val === null || val === undefined) return 0;
+      const num = Number(val);
+      return isNaN(num) ? 0 : num;
+    };
+    
+    const safeBoolean = (val) => {
+      if (typeof val === 'boolean') return val ? 1 : 0;
+      if (typeof val === 'number') return val ? 1 : 0;
+      if (typeof val === 'string') {
+        const lower = val.toLowerCase();
+        return (lower === 'true' || lower === '1' || lower === 'yes') ? 1 : 0;
+      }
+      return val ? 1 : 0;
+    };
+    
+    const safeString = (val) => {
+      if (val === null || val === undefined) return null;
+      return extractString(val);
+    };
+    
+    // Extract dietary values safely
+    const dietary = data.dietary || {};
+    const dietaryVegan = safeBoolean(dietary.vegan || dietary.vegan === true);
+    const dietaryVegetarian = safeBoolean(dietary.vegetarian || dietary.vegetarian === true);
+    const dietaryGlutenFree = safeBoolean(dietary.glutenFree || dietary.gluten_free || dietary.glutenFree === true);
+    const dietaryKosher = safeBoolean(dietary.kosher || dietary.kosher === true);
+    const dietaryOther = safeBoolean(dietary.other || dietary.other === true);
+    
     const paramValues = [
-      registrationId,
-      registrationDate,
-      data.email,
-      data.firstName,
-      data.middleName || null,
-      data.lastName,
-      data.salutation || null,
-      data.suffix || null,
-      data.institution || null,
-      data.credentials || null,
-      data.badgeName || null,
-      data.pronouns || null,
-      data.department || null,
-      data.address1 || null,
-      data.address2 || null,
-      cityName,
-      stateName,
-      data.zip || null,
-      countryName || null,
-      data.phone || null,
-      data.cellPhone || null,
-      data.isPhysician || null,
-      data.ticketType,
-      data.accompanyingPersonCount || 0,
-      data.galaDinnerCount || 0,
-      ticketPrice,
-      totalPrice,
+      registrationId, // string
+      registrationDate, // number
+      safeString(data.email),
+      safeString(data.firstName),
+      safeString(data.middleName),
+      safeString(data.lastName),
+      safeString(data.salutation),
+      safeString(data.suffix),
+      safeString(data.institution),
+      safeString(data.credentials),
+      safeString(data.badgeName),
+      safeString(data.pronouns),
+      safeString(data.department),
+      safeString(data.address1),
+      safeString(data.address2),
+      cityName, // already extracted as string
+      stateName, // already extracted as string
+      safeString(data.zip),
+      countryName || null, // already extracted as string
+      safeString(data.phone),
+      safeString(data.cellPhone),
+      safeString(data.isPhysician),
+      safeString(data.ticketType),
+      safeNumber(data.accompanyingPersonCount),
+      safeNumber(data.galaDinnerCount),
+      safeNumber(ticketPrice),
+      safeNumber(totalPrice),
       isEarlyBird ? 1 : 0,
-      data.dietary?.vegan ? 1 : 0,
-      data.dietary?.vegetarian ? 1 : 0,
-      data.dietary?.glutenFree ? 1 : 0,
-      data.dietary?.kosher ? 1 : 0,
-      data.dietary?.other ? 1 : 0,
-      data.specialAssistance ? 1 : 0,
-      data.policyAgreed ? 1 : 0,
-      data.privacyMarketing ? 1 : 0,
-      data.privacyApp ? 1 : 0,
-      data.optOutMailing ? 1 : 0,
-      "pending", // payment_status
-      membershipLevel,
-      membershipStatus,
+      dietaryVegan,
+      dietaryVegetarian,
+      dietaryGlutenFree,
+      dietaryKosher,
+      dietaryOther,
+      safeBoolean(data.specialAssistance),
+      safeBoolean(data.policyAgreed),
+      safeBoolean(data.privacyMarketing),
+      safeBoolean(data.privacyApp),
+      safeBoolean(data.optOutMailing),
+      "pending", // payment_status - hardcoded string
+      membershipLevel, // already normalized
+      membershipStatus, // already normalized
     ];
 
     // Validate and normalize all parameters before binding
@@ -280,22 +300,46 @@ export async function onRequestPost(context) {
       return normalized;
     });
 
-    // Final safety check: ensure NO objects remain
+    // Final safety check: ensure NO objects remain - this should NEVER happen
     const finalParams = normalizedParams.map((param, index) => {
-      if (typeof param === 'object' && param !== null) {
-        console.error(`🚨 CRITICAL: ${paramNames[index]} is still an object!`, param);
-        return JSON.stringify(param);
+      const paramType = typeof param;
+      if (paramType === 'object' && param !== null) {
+        const errorMsg = `🚨 CRITICAL ERROR: ${paramNames[index]} is still an object after all normalization! Value: ${JSON.stringify(param)}`;
+        console.error(errorMsg);
+        // Force convert to string
+        try {
+          return JSON.stringify(param);
+        } catch {
+          return String(param);
+        }
+      }
+      // Double-check: ensure it's a valid D1 type
+      if (paramType !== 'string' && paramType !== 'number' && paramType !== 'boolean' && param !== null) {
+        console.warn(`⚠️ Unexpected type for ${paramNames[index]}: ${paramType}, value: ${param}`);
+        return String(param);
       }
       return param;
     });
     
     // Log all parameters before binding to catch any remaining objects
-    console.log("Final parameters to bind:", paramNames.map((name, i) => ({ 
-      name, 
-      value: finalParams[i], 
-      type: typeof finalParams[i],
-      isObject: typeof finalParams[i] === 'object' && finalParams[i] !== null
-    })));
+    const paramLog = paramNames.map((name, i) => {
+      const val = finalParams[i];
+      const type = typeof val;
+      const isObject = type === 'object' && val !== null;
+      if (isObject) {
+        console.error(`❌ OBJECT FOUND: ${name} =`, val);
+      }
+      return { name, value: val, type, isObject };
+    });
+    console.log("Final parameters to bind:", JSON.stringify(paramLog, null, 2));
+    
+    // One more check - if ANY object remains, throw error before binding
+    const hasObjects = finalParams.some(p => typeof p === 'object' && p !== null);
+    if (hasObjects) {
+      const error = new Error("D1_TYPE_ERROR: Objects detected in parameters after normalization. Check logs for details.");
+      console.error("FATAL: Cannot proceed with objects in parameters:", paramLog.filter(p => p.isObject));
+      throw error;
+    }
     
     const result = await stmt.bind(...finalParams).run();
 
