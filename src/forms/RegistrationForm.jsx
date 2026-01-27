@@ -183,6 +183,22 @@ const RegistrationForm = ({ onClose }) => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [verificationError, setVerificationError] = useState(null);
   const [membershipData, setMembershipData] = useState(null);
+  const isVerifiedMember = React.useMemo(() => {
+    if (!membershipData) return false;
+    // Only consider verified if is_member is true AND membership_level is not "Non-Member"
+    const level = (membershipData.membership_level || "").toLowerCase();
+    const isNonMemberLevel = 
+      level.includes("non-member") || 
+      level.includes("non member") ||
+      level === "none" ||
+      !membershipData.has_membership;
+    
+    return membershipData.is_member === true && !isNonMemberLevel;
+  }, [membershipData]);
+  const isTrainee = React.useMemo(
+    () => membershipData?.is_trainee === true,
+    [membershipData]
+  );
 
   // Auto-detect early bird period (before July 10, 2026)
   const earlyBirdDeadline = new Date("2026-07-10");
@@ -273,6 +289,7 @@ const RegistrationForm = ({ onClose }) => {
         },
         body: JSON.stringify({
           email: formData.email,
+          name: `${formData.firstName || ""} ${formData.lastName || ""}`.trim(),
         }),
       });
 
@@ -282,7 +299,13 @@ const RegistrationForm = ({ onClose }) => {
         throw new Error(data.message || "Verification failed");
       }
 
-      setMembershipData(data.data);
+      // Persist the entire "data" payload, plus top-level flags we care about.
+      // We use `is_member` (active membership + name match) to gate member discounts.
+      setMembershipData({
+        ...(data.data || {}),
+        is_member: Boolean(data.is_member),
+        api_message: data.message,
+      });
 
       // Allow both members and non-members to proceed to ticket selection
       // Non-members will see member pricing but won't be able to select member tickets
@@ -311,14 +334,34 @@ const RegistrationForm = ({ onClose }) => {
       return;
     }
     
-    // Validate that the selected ticket is available
+    // Validate that the selected ticket is allowed for this user
+    const memberTicketIds = ["isir-member", "trainee-member"];
+    if (!isVerifiedMember && memberTicketIds.includes(formData.ticketType)) {
+      alert(
+        "ISIR membership is required to select this ticket type. Please join or log in with your member email."
+      );
+      return;
+    }
+
     if (membershipData?.ticket_options?.available_tickets) {
       const selectedTicket = membershipData.ticket_options.available_tickets.find(
         (ticket) => ticket.id === formData.ticketType
       );
-      if (selectedTicket && !selectedTicket.available) {
-        alert(selectedTicket.unavailable_reason || "This ticket type is not available for your membership status.");
-        return;
+      if (selectedTicket) {
+        const requiresMembership = selectedTicket.requires_membership === true;
+        const apiAvailable = selectedTicket.available !== false;
+        const finalAvailable =
+          apiAvailable && (!requiresMembership || isVerifiedMember);
+
+        if (!finalAvailable) {
+          alert(
+            selectedTicket.unavailable_reason ||
+              (requiresMembership && !isVerifiedMember
+                ? "ISIR membership verification required to select this ticket type."
+                : "This ticket type is not available for your membership status.")
+          );
+          return;
+        }
       }
     }
     
@@ -340,15 +383,27 @@ const RegistrationForm = ({ onClose }) => {
 
   // Clear member ticket selection for non-members when entering ticket selection step
   useEffect(() => {
-    if (step === 2 && membershipData && !membershipData.has_membership) {
-      // Check if current selection is a member ticket
-      const memberTicketIds = ['isir-member', 'trainee-member'];
-      if (memberTicketIds.includes(formData.ticketType)) {
-        // Clear selection if it's a member ticket
+    const verifiedMember = isVerifiedMember;
+    const current = formData.ticketType;
+    const memberTickets = ["isir-member", "trainee-member"];
+
+    // Determine if current selection should be cleared based on visibility rules
+    const isTraineeMemberTicket = current === "trainee-member";
+    const isMemberOnlyTicket = memberTickets.includes(current);
+
+    if (step === 2 && membershipData) {
+      // Hide trainee tickets from non-trainee users
+      if (!isTrainee && isTraineeMemberTicket) {
         setFormData((prev) => ({ ...prev, ticketType: "" }));
+        return;
+      }
+      // Hide member-only tickets if not verified member
+      if (!verifiedMember && isMemberOnlyTicket) {
+        setFormData((prev) => ({ ...prev, ticketType: "" }));
+        return;
       }
     }
-  }, [step, membershipData]);
+  }, [step, membershipData, isTrainee, isVerifiedMember, formData.ticketType]);
 
   // Create payment intent when entering payment step
   useEffect(() => {
@@ -884,12 +939,12 @@ const RegistrationForm = ({ onClose }) => {
                 {/* Membership Status Banner */}
                 {membershipData && (
                   <div className={`mb-4 p-4 rounded-xl border-2 ${
-                    membershipData.has_membership 
+                    isVerifiedMember
                       ? "bg-green-50 border-green-300" 
                       : "bg-amber-50 border-amber-300"
                   }`}>
                     <div className="flex items-start">
-                      {membershipData.has_membership ? (
+                      {isVerifiedMember ? (
                         <>
                           <svg className="w-5 h-5 text-green-600 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -899,7 +954,10 @@ const RegistrationForm = ({ onClose }) => {
                               ISIR Member Verified
                             </p>
                             <p className="text-green-700 text-xs mt-1">
-                              You have access to member pricing. {membershipData.membership_level && `Membership: ${membershipData.membership_level}`}
+                              You have access to member pricing.
+                              {membershipData.membership_level && 
+                               !membershipData.membership_level.toLowerCase().includes('non-member') &&
+                               ` Membership: ${membershipData.membership_level}`}
                             </p>
                           </div>
                         </>
@@ -913,8 +971,13 @@ const RegistrationForm = ({ onClose }) => {
                               Non-Member Registration
                             </p>
                             <p className="text-amber-700 text-xs mt-1">
-                              Member tickets are shown for reference only. Join ISIR to access member pricing!
+                              Member prices are shown for reference. Verify membership (name + email) to unlock member tickets, or join ISIR to access member pricing.
                             </p>
+                            {membershipData.membership_level && (
+                              <p className="text-amber-700 text-xs mt-1">
+                                Status: {membershipData.membership_level}
+                              </p>
+                            )}
                           </div>
                         </>
                       )}
@@ -949,9 +1012,28 @@ const RegistrationForm = ({ onClose }) => {
                   </div>
                   {membershipData?.ticket_options?.available_tickets ? (
                     // Use ticket options from API
-                    membershipData.ticket_options.available_tickets.map(
-                      (ticket, index) => {
-                        const isAvailable = ticket.available !== false;
+                    membershipData.ticket_options.available_tickets
+                      .filter((ticket) => {
+                        // Only trainees should see trainee-member tickets
+                        if (ticket.id === "trainee-member" && !isTrainee) {
+                          return false;
+                        }
+                        // For verified members, hide non‑member / trainee‑non‑member rows
+                        if (
+                          isVerifiedMember &&
+                          (ticket.id === "non-member" ||
+                            ticket.id === "trainee-non-member")
+                        ) {
+                          return false;
+                        }
+                        // Otherwise keep; we'll disable radios as needed below.
+                        return true;
+                      })
+                      .map((ticket, index) => {
+                        const verifiedMember = isVerifiedMember;
+                        const requiresMembership = ticket.requires_membership === true;
+                        const apiAvailable = ticket.available !== false;
+                        const isAvailable = apiAvailable && (!requiresMembership || verifiedMember);
                         const isSelected = formData.ticketType === ticket.id;
                         
                         return (
@@ -970,6 +1052,10 @@ const RegistrationForm = ({ onClose }) => {
                                 ? "border-b border-gray-200"
                                 : ""
                             }`}
+                            onClick={() => {
+                              if (!isAvailable) return;
+                              setFormData((prev) => ({ ...prev, ticketType: ticket.id }));
+                            }}
                           >
                             <div className="p-5 flex items-center gap-3">
                               <input
@@ -987,9 +1073,14 @@ const RegistrationForm = ({ onClose }) => {
                                 }`}>
                                   {ticket.label}
                                 </span>
-                                {!isAvailable && ticket.unavailable_reason && (
+                                {!isAvailable && (
                                   <div className="mt-1 text-xs text-amber-600">
-                                    <p>{ticket.unavailable_reason}</p>
+                                    <p>
+                                      {ticket.unavailable_reason ||
+                                        (requiresMembership && !verifiedMember
+                                          ? "ISIR membership verification required to select this ticket."
+                                          : "This ticket is not available for your membership status.")}
+                                    </p>
                                     <a
                                       href="https://theisir.org/membership-account/membership-levels/"
                                       target="_blank"
@@ -1040,8 +1131,17 @@ const RegistrationForm = ({ onClose }) => {
                     )
                   ) : (
                     // Fallback to hardcoded prices if API data not available
-                    Object.entries(ticketPrices).map(
-                      ([value, { early, standard, label }], index) => (
+                    Object.entries(ticketPrices)
+                      .filter(([value]) => {
+                        if (
+                          value === "trainee-member" &&
+                          !isTrainee
+                        ) {
+                          return false;
+                        }
+                        return true;
+                      })
+                      .map(([value, { early, standard, label }], index, arr) => (
                         <label
                           key={value}
                           className={`grid grid-cols-3 cursor-pointer transition-all duration-200 hover:bg-blue-50 ${
@@ -1049,23 +1149,51 @@ const RegistrationForm = ({ onClose }) => {
                               ? "bg-blue-100 ring-2 ring-blue-500 ring-inset"
                               : ""
                           } ${
-                            index !== Object.keys(ticketPrices).length - 1
+                            index !== arr.length - 1
                               ? "border-b border-gray-200"
                               : ""
                           }`}
                         >
                           <div className="p-5 flex items-center gap-3">
-                            <input
-                              type="radio"
-                              name="ticketType"
-                              value={value}
-                              checked={formData.ticketType === value}
-                              onChange={handleChange}
-                              className="w-5 h-5 text-blue-600"
-                            />
-                            <span className="font-semibold text-gray-800">
-                              {label}
-                            </span>
+                            {(() => {
+                              const isMemberTicket =
+                                value === "isir-member" ||
+                                value === "trainee-member";
+                              const isAvailable = !isMemberTicket || isVerifiedMember;
+                              return (
+                                <>
+                                  <input
+                                    type="radio"
+                                    name="ticketType"
+                                    value={value}
+                                    checked={formData.ticketType === value}
+                                    onChange={handleChange}
+                                    disabled={!isAvailable}
+                                    className="w-5 h-5 text-blue-600 disabled:cursor-not-allowed"
+                                  />
+                                  <span
+                                    className={`font-semibold ${
+                                      isAvailable ? "text-gray-800" : "text-gray-500"
+                                    }`}
+                                  >
+                                    {label}
+                                  </span>
+                                  {!isAvailable && (
+                                    <span className="ml-2 text-xs text-amber-600">
+                                      ISIR membership required.{" "}
+                                      <a
+                                        href="https://theisir.org/membership-account/membership-levels/"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 underline font-semibold"
+                                      >
+                                        Join ISIR →
+                                      </a>
+                                    </span>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                           <div className="p-5 text-center flex items-center justify-center">
                             <span
@@ -1087,8 +1215,7 @@ const RegistrationForm = ({ onClose }) => {
                             </span>
                           </div>
                         </label>
-                      )
-                    )
+                      ))
                   )}
                 </div>
                 <p className="text-xs text-gray-500 mt-3 italic">
