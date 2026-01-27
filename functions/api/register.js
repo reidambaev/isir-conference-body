@@ -21,13 +21,13 @@ export async function onRequestPost(context) {
   };
 
   try {
-    console.log("=== REGISTRATION API CALLED ===");
-    console.log("Version:", CODE_VERSION);
+    console.error("=== REGISTRATION API CALLED ===");
+    console.error("Version:", CODE_VERSION);
     
     const rawData = await request.json();
     
     // Log incoming data to identify objects - THIS IS CRITICAL FOR DEBUGGING
-    console.log("Raw data received:", JSON.stringify(rawData, null, 2));
+    console.error("Raw data received:", JSON.stringify(rawData, null, 2));
     
     // Check for objects in raw data immediately
     for (const [key, value] of Object.entries(rawData)) {
@@ -71,7 +71,7 @@ export async function onRequestPost(context) {
         data[key] = sanitized;
         // Log if we sanitized an object
         if (typeof value === 'object' && value !== null && typeof sanitized === 'string') {
-          console.log(`Sanitized ${key}:`, JSON.stringify(value), '->', sanitized);
+          console.error(`Sanitized ${key}:`, JSON.stringify(value), '->', sanitized);
         }
       }
     }
@@ -344,7 +344,7 @@ export async function onRequestPost(context) {
       }
       return { name, value: val, type, isObject };
     });
-    console.log("Final parameters to bind:", JSON.stringify(paramLog, null, 2));
+    console.error("Final parameters to bind:", JSON.stringify(paramLog, null, 2));
     
     // One more check - if ANY object remains, throw error before binding
     const hasObjects = finalParams.some(p => typeof p === 'object' && p !== null);
@@ -354,7 +354,34 @@ export async function onRequestPost(context) {
       throw error;
     }
     
-    const result = await stmt.bind(...finalParams).run();
+    // Try to bind with detailed error reporting
+    let result;
+    try {
+      result = await stmt.bind(...finalParams).run();
+    } catch (bindError) {
+      // If bind fails, try to identify which parameter is the problem
+      console.error("D1 bind error:", bindError.message);
+      console.error("Parameter count:", finalParams.length);
+      console.error("Parameter types:", finalParams.map((p, i) => ({
+        index: i,
+        name: paramNames[i],
+        type: typeof p,
+        value: p,
+        isObject: typeof p === 'object' && p !== null,
+        stringified: typeof p === 'object' ? JSON.stringify(p) : p
+      })));
+      
+      // Try binding one parameter at a time to find the culprit
+      for (let i = 0; i < finalParams.length; i++) {
+        const param = finalParams[i];
+        if (typeof param === 'object' && param !== null) {
+          console.error(`🚨 FOUND OBJECT at index ${i} (${paramNames[i]}):`, param);
+          console.error(`   Type: ${typeof param}, Value:`, JSON.stringify(param));
+        }
+      }
+      
+      throw bindError;
+    }
 
     // Update currency if column exists (for new schema)
     try {
@@ -365,7 +392,7 @@ export async function onRequestPost(context) {
         .run();
     } catch (err) {
       // Currency column might not exist yet - that's okay
-      console.log("Currency column not available, skipping update");
+      console.error("Currency column not available, skipping update");
     }
 
     return new Response(
@@ -382,14 +409,28 @@ export async function onRequestPost(context) {
       }
     );
   } catch (error) {
-    console.error("Registration error:", error);
+    console.error("=== REGISTRATION ERROR ===");
+    console.error("Error message:", error.message);
+    console.error("Error name:", error.name);
     console.error("Error stack:", error.stack);
+    
+    // Include more details in response for debugging
+    const errorDetails = {
+      message: error.message,
+      name: error.name,
+      version: CODE_VERSION,
+    };
+    
+    // In development or if error contains useful info, include it
+    if (error.message.includes('D1_TYPE_ERROR') || error.message.includes('object')) {
+      errorDetails.hint = "An object was passed to D1. Check Cloudflare logs for parameter details.";
+    }
+    
     return new Response(
       JSON.stringify({
         success: false,
         error: error.message || "Failed to save registration",
-        version: CODE_VERSION, // For debugging - verify deployed version
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+        ...errorDetails,
       }),
       {
         status: 500,
