@@ -43,32 +43,6 @@ export async function onRequestPost(context) {
       (isEarlyBird ? 250 : 350) * (data.accompanyingPersonCount || 0);
     const galaDinnerPrice = 100 * (data.galaDinnerCount || 0);
     
-    // Extract country name as string (handle both object and string formats)
-    const countryName = typeof data.country === 'object' && data.country !== null
-      ? data.country.name || data.country.toString()
-      : data.country || '';
-    
-    // Determine currency and apply Korean tax if applicable
-    const isKorean = countryName.toLowerCase().includes("korea");
-    let totalPrice = ticketPrice + accompanyingPrice + galaDinnerPrice;
-    let currency = "USD";
-    
-    if (isKorean) {
-      // Convert to KRW and apply 10% tax
-      const usdToKrwRate = 1350; // Should use real-time rate in production
-      totalPrice = Math.round(totalPrice * usdToKrwRate * 1.1);
-      currency = "KRW";
-    }
-    
-    // Extract city and state as strings (handle both object and string formats)
-    const cityName = typeof data.city === 'object' && data.city !== null
-      ? data.city.name || data.city.toString()
-      : data.city || null;
-    
-    const stateName = typeof data.state === 'object' && data.state !== null
-      ? data.state.name || data.state.toString()
-      : (data.stateSelect || data.stateText || null);
-
     // Generic normalizer to ensure no raw objects/arrays are passed to D1
     const normalizeForD1 = (value) => {
       if (value === undefined || value === null) return null;
@@ -83,6 +57,50 @@ export async function onRequestPost(context) {
         return String(value);
       }
     };
+
+    // Extract country name as string (handle both object and string formats)
+    let countryName = '';
+    if (data.country) {
+      if (typeof data.country === 'object' && data.country !== null) {
+        countryName = data.country.name || JSON.stringify(data.country);
+      } else {
+        countryName = String(data.country);
+      }
+    }
+    
+    // Determine currency and apply Korean tax if applicable
+    const isKorean = countryName.toLowerCase().includes("korea");
+    let totalPrice = ticketPrice + accompanyingPrice + galaDinnerPrice;
+    let currency = "USD";
+    
+    if (isKorean) {
+      // Convert to KRW and apply 10% tax
+      const usdToKrwRate = 1350; // Should use real-time rate in production
+      totalPrice = Math.round(totalPrice * usdToKrwRate * 1.1);
+      currency = "KRW";
+    }
+    
+    // Extract city and state as strings (handle both object and string formats)
+    let cityName = null;
+    if (data.city) {
+      if (typeof data.city === 'object' && data.city !== null) {
+        cityName = data.city.name || JSON.stringify(data.city);
+      } else {
+        cityName = String(data.city);
+      }
+    }
+    
+    let stateName = null;
+    if (data.state) {
+      if (typeof data.state === 'object' && data.state !== null) {
+        stateName = data.state.name || JSON.stringify(data.state);
+      } else {
+        stateName = String(data.state);
+      }
+    }
+    if (!stateName && (data.stateSelect || data.stateText)) {
+      stateName = String(data.stateSelect || data.stateText);
+    }
 
     // Normalize membership fields explicitly (they can sometimes be objects)
     const membershipLevel = normalizeForD1(data.membershipLevel);
@@ -138,7 +156,19 @@ export async function onRequestPost(context) {
     );
 
     // Build parameter list and normalize every value for D1 safety
-    const params = [
+    const paramNames = [
+      'registrationId', 'registrationDate', 'email', 'firstName', 'middleName',
+      'lastName', 'salutation', 'suffix', 'institution', 'credentials',
+      'badgeName', 'pronouns', 'department', 'address1', 'address2',
+      'city', 'state', 'zip', 'country', 'phone', 'cellPhone', 'isPhysician',
+      'ticketType', 'accompanyingPersonCount', 'galaDinnerCount',
+      'ticketPrice', 'totalPrice', 'isEarlyBird',
+      'dietary_vegan', 'dietary_vegetarian', 'dietary_glutenFree', 'dietary_kosher', 'dietary_other',
+      'specialAssistance', 'policyAgreed', 'privacyMarketing', 'privacyApp', 'optOutMailing',
+      'payment_status', 'membershipLevel', 'membershipStatus'
+    ];
+    
+    const paramValues = [
       registrationId,
       registrationDate,
       data.email,
@@ -180,16 +210,26 @@ export async function onRequestPost(context) {
       "pending", // payment_status
       membershipLevel,
       membershipStatus,
-    ].map(normalizeForD1);
+    ];
 
-    const result = await stmt.bind(...params).run();
+    // Validate and normalize all parameters before binding
+    const normalizedParams = paramValues.map((value, index) => {
+      const normalized = normalizeForD1(value);
+      // Log if we're converting an object to help debug
+      if (typeof value === 'object' && value !== null && typeof normalized === 'string') {
+        console.log(`Normalized object for ${paramNames[index]}:`, value, '->', normalized);
+      }
+      return normalized;
+    });
+
+    const result = await stmt.bind(...normalizedParams).run();
 
     // Update currency if column exists (for new schema)
     try {
       await env.ISIR_DB.prepare(
         `UPDATE registrations SET currency = ? WHERE id = ?`
       )
-        .bind(currency, registrationId)
+        .bind(normalizeForD1(currency), normalizeForD1(registrationId))
         .run();
     } catch (err) {
       // Currency column might not exist yet - that's okay
