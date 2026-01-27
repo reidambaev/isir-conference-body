@@ -3,6 +3,8 @@ import React, { useState, useRef } from "react";
 const ScheduleTab = () => {
   const scheduleRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedDay, setSelectedDay] = useState(1); // Start on Friday (first full day)
+  const [viewMode, setViewMode] = useState("single"); // "single" or "all"
 
   const handleDownloadPNG = async () => {
     if (!scheduleRef.current) return;
@@ -25,44 +27,394 @@ const ScheduleTab = () => {
     }
   };
 
-  // Color coding for session types
-  const sessionColors = {
-    plenary: {
-      bg: "bg-blue-600",
-      text: "text-white",
-      border: "border-blue-700",
-    },
-    symposium: {
-      bg: "bg-amber-100",
-      text: "text-amber-900",
-      border: "border-amber-300",
-    },
-    oral: {
-      bg: "bg-purple-100",
-      text: "text-purple-900",
-      border: "border-purple-300",
-    },
-    forum: {
-      bg: "bg-teal-100",
-      text: "text-teal-900",
-      border: "border-teal-300",
-    },
-    social: {
-      bg: "bg-emerald-100",
-      text: "text-emerald-900",
-      border: "border-emerald-300",
-    },
-    break: {
-      bg: "bg-gray-100",
-      text: "text-gray-600",
-      border: "border-gray-200",
-    },
-    meal: {
-      bg: "bg-orange-50",
-      text: "text-orange-800",
-      border: "border-orange-200",
-    },
+  // Days configuration
+  const days = [
+    { day: "Thursday", date: "Sept 10", index: 0 },
+    { day: "Friday", date: "Sept 11", index: 1 },
+    { day: "Saturday", date: "Sept 12", index: 2 },
+    { day: "Sunday", date: "Sept 13", index: 3 },
+  ];
+
+  // Schedule data organized by day
+  const scheduleData = {
+    0: [ // Thursday
+      { time: "12:00 PM", type: "social", title: "Registration Opens" },
+      { time: "3:00 PM", type: "social", title: "ISIR Council Meeting" },
+      { 
+        time: "5:00 PM", 
+        type: "plenary", 
+        title: "Welcome Address",
+        subtitle: "Building on a Legacy: Generational Foundations and the Evolution of Reproductive Immunology"
+      },
+      { time: "6:30 PM", type: "social", title: "Welcome Reception" },
+    ],
+    1: [ // Friday
+      { time: "7:30 AM", type: "break", title: "Breakfast", compact: true },
+      { time: "8:20 AM", type: "social", title: "Welcome & Announcements", compact: true },
+      { 
+        time: "8:30 AM", 
+        type: "plenary", 
+        title: "Population Insight Lectures 1"
+      },
+      { time: "10:20 AM", type: "break", title: "Coffee Break", compact: true },
+      {
+        time: "10:35 AM",
+        type: "parallel",
+        sessions: [
+          { type: "symposium", number: "S1", title: "Immune Regulation in the Endometrium" },
+          { type: "symposium", number: "S2", title: "Early Pregnancy and Placental Development" },
+          { type: "symposium", number: "S3", title: "KI Symposium" },
+          { type: "forum", number: "PF1", title: "Public Forum 1" },
+        ]
+      },
+      { time: "12:15 PM", type: "break", title: "Poster Session / Lunch", compact: true },
+      {
+        time: "1:30 PM",
+        type: "parallel",
+        sessions: [
+          { type: "symposium", number: "S4", title: "Current Therapeutic Options for Reproductive Health" },
+          { type: "symposium", number: "S5", title: "Exosomes, Mitochondrial Function, and Cell-Based Therapies" },
+          { type: "symposium", number: "S6", title: "Male Infertility" },
+        ]
+      },
+      { time: "2:50 PM", type: "break", title: "Coffee Break", compact: true },
+      {
+        time: "3:10 PM",
+        type: "parallel",
+        sessions: [
+          { type: "oral", number: "Oral I", title: "Oral Presentations I" },
+          { type: "oral", number: "Oral II", title: "Oral Presentations II" },
+          { type: "symposium", number: "S7", title: "Fetal Outcome with Inflammatory Insult" },
+        ]
+      },
+      { time: "6:00 PM", type: "social", title: "Trainee Social Event" },
+    ],
+    2: [ // Saturday
+      { time: "7:30 AM", type: "break", title: "Breakfast", compact: true },
+      { time: "8:20 AM", type: "social", title: "Welcome & Announcements", compact: true },
+      { 
+        time: "8:30 AM", 
+        type: "plenary", 
+        title: "Population Insight Lectures 2"
+      },
+      { time: "10:20 AM", type: "break", title: "Coffee Break", compact: true },
+      {
+        time: "10:35 AM",
+        type: "parallel",
+        sessions: [
+          { type: "symposium", number: "S8", title: "Current Immunotherapeutic Options for Reproductive Failure" },
+          { type: "symposium", number: "S9", title: "Environmental Exposures and Developmental Origins of Disease" },
+          { type: "symposium", number: "S10", title: "Preeclampsia and Its Systemic Consequences" },
+          { type: "forum", number: "PF2", title: "Public Forum 2" },
+        ]
+      },
+      { time: "12:15 PM", type: "break", title: "Poster Session / Lunch", compact: true },
+      {
+        time: "1:30 PM",
+        type: "parallel",
+        sessions: [
+          { type: "symposium", number: "S11", title: "Update on Reproductive Disorders and Their Management" },
+          { type: "symposium", number: "S12", title: "Gynecologic Malignancies and Immune Abnormalities" },
+          { type: "symposium", number: "S13", title: "Infection, Vaccination, and Pregnancy" },
+        ]
+      },
+      { time: "2:50 PM", type: "break", title: "Coffee Break", compact: true },
+      {
+        time: "3:10 PM",
+        type: "parallel",
+        sessions: [
+          { type: "plenary", number: "Awards", title: "New Investigator Award Session" },
+          { type: "oral", number: "Oral III", title: "Oral Presentations III" },
+          { type: "symposium", number: "S14", title: "Interplay of Hormones and Immune System" },
+        ]
+      },
+      { 
+        time: "6:00 PM", 
+        type: "social", 
+        title: "Award Gala",
+        subtitle: "JRI Editorial Meeting"
+      },
+    ],
+    3: [ // Sunday
+      { 
+        time: "7:30 AM", 
+        type: "parallel",
+        sessions: [
+          { type: "break", title: "Breakfast" },
+          { type: "social", title: "ISIR Member Business Meeting" },
+        ],
+        compact: true
+      },
+      { time: "8:20 AM", type: "social", title: "Welcome & Announcements", compact: true },
+      { 
+        time: "8:30 AM", 
+        type: "plenary", 
+        title: "Population Insight Lectures 3"
+      },
+      { time: "10:20 AM", type: "break", title: "Coffee Break", compact: true },
+      {
+        time: "10:35 AM",
+        type: "parallel",
+        sessions: [
+          { type: "symposium", number: "S15", title: "Immune Regulation in the Endometrium II" },
+          { type: "symposium", number: "S16", title: "Preeclampsia and Its Systemic Consequences II" },
+          { type: "symposium", number: "S17", title: "T Cell Immunity and Pregnancy" },
+          { type: "forum", number: "PF3", title: "Public Forum 3" },
+        ]
+      },
+      { time: "12:15 PM", type: "symposium", title: "Lunch Symposium", compact: true },
+      {
+        time: "1:30 PM",
+        type: "parallel",
+        sessions: [
+          { type: "symposium", number: "S18", title: "Ovarian Inflammatory Disease and Aging" },
+          { type: "symposium", number: "S19", title: "High Risk OB: 2nd and 3rd Trimester Complications" },
+          { type: "symposium", number: "S20", title: "Rheumatic Conditions and Reproductive Outcomes" },
+        ]
+      },
+      { time: "2:50 PM", type: "break", title: "Coffee Break", compact: true },
+      {
+        time: "3:10 PM",
+        type: "parallel",
+        sessions: [
+          { type: "symposium", number: "S21", title: "Microbiome and Pregnancy Outcomes" },
+          { type: "oral", number: "Oral IV", title: "Oral Presentations IV" },
+          { type: "oral", number: "Oral V", title: "Oral Presentations V" },
+        ]
+      },
+      { time: "5:00 PM", type: "plenary", title: "Closing Ceremony & Adjourn" },
+    ],
   };
+
+  // Style configurations
+  const getSessionStyle = (type) => {
+    const styles = {
+      plenary: {
+        bg: "bg-gradient-to-r from-blue-600 to-blue-700",
+        text: "text-white",
+        border: "border-blue-800",
+        cardBg: "bg-blue-600",
+      },
+      symposium: {
+        bg: "bg-gradient-to-r from-amber-50 to-amber-100",
+        text: "text-amber-900",
+        border: "border-amber-300",
+        cardBg: "bg-amber-100",
+        accent: "bg-amber-500",
+      },
+      oral: {
+        bg: "bg-gradient-to-r from-purple-50 to-purple-100",
+        text: "text-purple-900",
+        border: "border-purple-300",
+        cardBg: "bg-purple-100",
+        accent: "bg-purple-500",
+      },
+      forum: {
+        bg: "bg-gradient-to-r from-teal-50 to-teal-100",
+        text: "text-teal-900",
+        border: "border-teal-300",
+        cardBg: "bg-teal-100",
+        accent: "bg-teal-500",
+      },
+      social: {
+        bg: "bg-emerald-50",
+        text: "text-emerald-800",
+        border: "border-emerald-200",
+        cardBg: "bg-emerald-100",
+      },
+      break: {
+        bg: "bg-gray-50",
+        text: "text-gray-500",
+        border: "border-gray-200",
+        cardBg: "bg-gray-100",
+      },
+    };
+    return styles[type] || styles.break;
+  };
+
+  const renderSession = (session, compact = false) => {
+    const style = getSessionStyle(session.type);
+    
+    if (session.type === "parallel") {
+      if (compact) {
+        // Compact view for "at a glance" - show abbreviated info
+        return (
+          <div className="p-1.5">
+            <div className="flex flex-wrap gap-1">
+              {session.sessions.map((s, idx) => {
+                const sStyle = getSessionStyle(s.type);
+                return (
+                  <div
+                    key={idx}
+                    className={`text-[9px] px-1.5 py-0.5 rounded ${sStyle.cardBg} ${sStyle.text} border ${sStyle.border} font-medium`}
+                  >
+                    {s.number || s.title.substring(0, 20)}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+      return (
+        <div className={`p-3 ${session.compact ? 'py-2' : 'py-4'}`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {session.sessions.map((s, idx) => {
+              const sStyle = getSessionStyle(s.type);
+              const isSymposium = s.type === "symposium";
+              return (
+                <div
+                  key={idx}
+                  className={`rounded-lg border ${sStyle.border} ${sStyle.cardBg} overflow-hidden ${
+                    isSymposium ? 'shadow-md hover:shadow-lg transition-shadow' : ''
+                  }`}
+                >
+                  {/* Accent bar for symposiums */}
+                  {sStyle.accent && (
+                    <div className={`h-1 ${sStyle.accent}`}></div>
+                  )}
+                  <div className={`p-3 ${isSymposium ? 'p-4' : ''}`}>
+                    {s.number && (
+                      <div className={`text-xs font-bold ${sStyle.text} opacity-75 mb-1`}>
+                        {s.number}
+                      </div>
+                    )}
+                    <div className={`font-semibold ${sStyle.text} ${isSymposium ? 'text-sm leading-snug' : 'text-xs'}`}>
+                      {s.title}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    if (session.compact || compact) {
+      return (
+        <div className={`px-2 py-1 ${style.bg} flex items-center`}>
+          <div className={`text-[10px] ${style.text} truncate`}>
+            {session.title}
+          </div>
+        </div>
+      );
+    }
+
+    if (session.type === "plenary") {
+      return (
+        <div className={`p-4 ${style.bg}`}>
+          <div className={`font-bold ${style.text} text-sm`}>
+            {session.title}
+          </div>
+          {session.subtitle && (
+            <div className="text-white/80 text-xs mt-1 leading-relaxed">
+              {session.subtitle}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className={`p-3 ${style.bg} border-l-4 ${style.border}`}>
+        <div className={`text-sm font-semibold ${style.text}`}>
+          {session.title}
+        </div>
+        {session.subtitle && (
+          <div className="text-xs text-gray-500 mt-0.5">
+            {session.subtitle}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Get all unique times across all days for "at a glance" view
+  const getAllTimes = () => {
+    const timeSet = new Set();
+    Object.values(scheduleData).forEach(daySchedule => {
+      daySchedule.forEach(session => {
+        timeSet.add(session.time);
+      });
+    });
+    return Array.from(timeSet).sort((a, b) => {
+      // Convert time to comparable format
+      const parseTime = (timeStr) => {
+        const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        if (!match) return { hours: 0, minutes: 0 };
+        let hours = parseInt(match[1]);
+        const minutes = parseInt(match[2]);
+        const period = match[3].toUpperCase();
+        
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+        
+        return { hours, minutes };
+      };
+      
+      const timeA = parseTime(a);
+      const timeB = parseTime(b);
+      
+      if (timeA.hours !== timeB.hours) {
+        return timeA.hours - timeB.hours;
+      }
+      return timeA.minutes - timeB.minutes;
+    });
+  };
+
+  const renderAtAGlanceView = () => {
+    const allTimes = getAllTimes();
+    
+    return (
+      <div
+        ref={scheduleRef}
+        className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm"
+      >
+        {/* Header Row */}
+        <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] bg-gray-900 text-white">
+          <div className="p-3 text-center border-r border-gray-700">
+            <div className="font-bold text-xs">Time</div>
+          </div>
+          {days.map((day, idx) => (
+            <div key={idx} className="p-3 text-center border-r border-gray-700 last:border-r-0">
+              <div className="font-bold text-xs">{day.day}</div>
+              <div className="text-[10px] text-gray-400">{day.date}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Schedule Rows */}
+        <div className="divide-y divide-gray-100">
+          {allTimes.map((time, timeIdx) => (
+            <div key={timeIdx} className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] divide-x divide-gray-100">
+              {/* Time Column */}
+              <div className="bg-gray-50 flex items-center justify-center p-2 border-r border-gray-100">
+                <span className="text-[10px] font-bold text-gray-500">{time}</span>
+              </div>
+              {/* Content for each day */}
+              {days.map((day, dayIdx) => {
+                const daySchedule = scheduleData[dayIdx] || [];
+                const session = daySchedule.find(s => s.time === time);
+                
+                if (!session) {
+                  return <div key={dayIdx} className="p-1 bg-gray-50"></div>;
+                }
+                
+                return (
+                  <div key={dayIdx} className="min-w-0">
+                    {renderSession(session, true)}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const currentSchedule = scheduleData[selectedDay] || [];
 
   return (
     <div role="tabpanel">
@@ -122,704 +474,126 @@ const ScheduleTab = () => {
       </header>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-3 mb-6 p-3 bg-gray-50 rounded-xl">
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-blue-600"></div>
-          <span className="text-xs font-medium text-gray-600">Plenary</span>
+      <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 rounded-xl">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-blue-600"></div>
+          <span className="text-sm font-medium text-gray-700">Plenary/Lectures</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-amber-200 border border-amber-300"></div>
-          <span className="text-xs font-medium text-gray-600">Symposium</span>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-amber-200 border-2 border-amber-400"></div>
+          <span className="text-sm font-medium text-gray-700">Symposium</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-purple-200 border border-purple-300"></div>
-          <span className="text-xs font-medium text-gray-600">
-            Oral Presentations
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-purple-200 border-2 border-purple-400"></div>
+          <span className="text-sm font-medium text-gray-700">Oral Presentations</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-teal-200 border border-teal-300"></div>
-          <span className="text-xs font-medium text-gray-600">
-            Public Forum
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-teal-200 border-2 border-teal-400"></div>
+          <span className="text-sm font-medium text-gray-700">Public Forum</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-emerald-200 border border-emerald-300"></div>
-          <span className="text-xs font-medium text-gray-600">
-            Social/Special
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-gray-200 border border-gray-300"></div>
-          <span className="text-xs font-medium text-gray-600">Break</span>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-emerald-200 border-2 border-emerald-300"></div>
+          <span className="text-sm font-medium text-gray-700">Social/Special</span>
         </div>
       </div>
 
-      {/* Schedule Grid */}
-      <div
-        ref={scheduleRef}
-        className="bg-white rounded-xl border border-gray-200 overflow-hidden text-xs"
-      >
-        {/* Header Row with Time + Days */}
-        <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] bg-gray-900 text-white">
-          <div className="p-2 text-center border-r border-gray-700">
-            <div className="font-bold text-xs">Time</div>
-          </div>
-          {[
-            { day: "Thursday", date: "Sept 10" },
-            { day: "Friday", date: "Sept 11" },
-            { day: "Saturday", date: "Sept 12" },
-            { day: "Sunday", date: "Sept 13" },
-          ].map((d, i) => (
-            <div
-              key={i}
-              className="p-2 text-center border-r border-gray-700 last:border-r-0"
+      {/* View Mode Toggle */}
+      <div className="mb-4 flex items-center gap-4">
+        <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
+          <button
+            onClick={() => setViewMode("single")}
+            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
+              viewMode === "single"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+            style={
+              viewMode === "single"
+                ? { color: "var(--color-primary)" }
+                : {}
+            }
+          >
+            Single Day
+          </button>
+          <button
+            onClick={() => setViewMode("all")}
+            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
+              viewMode === "all"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+            style={
+              viewMode === "all"
+                ? { color: "var(--color-primary)" }
+                : {}
+            }
+          >
+            At a Glance
+          </button>
+        </div>
+      </div>
+
+      {/* Day Selector Tabs - Only show in single day mode */}
+      {viewMode === "single" && (
+        <div className="mb-6 flex flex-wrap gap-2">
+          {days.map((day, index) => (
+            <button
+              key={index}
+              onClick={() => setSelectedDay(index)}
+              className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all ${
+                selectedDay === index
+                  ? "bg-blue-600 text-white shadow-lg"
+                  : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+              }`}
+              style={
+                selectedDay === index
+                  ? { backgroundColor: "var(--color-primary)" }
+                  : {}
+              }
             >
-              <div className="font-bold text-xs">{d.day}</div>
-              <div className="text-[10px] text-gray-400">{d.date}</div>
-            </div>
+              <div className="font-bold">{day.day}</div>
+              <div className="text-xs opacity-90">{day.date}</div>
+            </button>
           ))}
         </div>
+      )}
 
-        {/* Schedule Rows - Each row is a time slot */}
-        <div className="divide-y divide-gray-200">
-          {/* 7:30 AM Row */}
-          <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] divide-x divide-gray-200 min-h-[52px]">
-            <div className="p-3 bg-gray-50 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-gray-500">
-                7:30 AM
-              </span>
-            </div>
-            <div className="p-3 bg-gray-50"></div>
-            <div
-              className={`p-3 ${sessionColors.meal.bg} border-l-4 ${sessionColors.meal.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.meal.text}`}
-              >
-                Breakfast
-              </div>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.meal.bg} border-l-4 ${sessionColors.meal.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.meal.text}`}
-              >
-                Breakfast
-              </div>
-            </div>
-            <div className="p-2 bg-white">
-              <div className="grid grid-cols-2 gap-1">
-                <div
-                  className={`p-1 rounded ${sessionColors.meal.bg} border ${sessionColors.meal.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.meal.text} leading-tight`}
-                  >
-                    Breakfast
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.social.bg} border ${sessionColors.social.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.social.text} leading-tight`}
-                  >
-                    ISIR Members Business Meeting
-                  </div>
-                </div>
-              </div>
-            </div>
+      {/* Schedule Grid */}
+      {viewMode === "all" ? (
+        renderAtAGlanceView()
+      ) : (
+        <div
+          ref={scheduleRef}
+          className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm"
+        >
+          {/* Header Row */}
+          <div className="bg-gray-900 text-white p-4">
+            <div className="font-bold text-lg">{days[selectedDay].day}</div>
+            <div className="text-sm text-gray-400">{days[selectedDay].date}, 2026</div>
           </div>
 
-          {/* 8:30 AM Row */}
-          <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] divide-x divide-gray-200 min-h-[52px]">
-            <div className="p-3 bg-gray-50 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-gray-500">
-                8:30 AM
-              </span>
-            </div>
-            <div className="p-3 bg-gray-50"></div>
-            <div
-              className={`p-3 ${sessionColors.plenary.bg} border-l-4 ${sessionColors.plenary.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.plenary.text}`}
+          {/* Schedule Items */}
+          <div className="divide-y divide-gray-100">
+            {currentSchedule.map((session, idx) => (
+              <div 
+                key={idx} 
+                className={`grid grid-cols-[80px_1fr] ${session.compact ? '' : ''}`}
               >
-                Population Insight Lectures 1
-              </div>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.plenary.bg} border-l-4 ${sessionColors.plenary.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.plenary.text}`}
-              >
-                Population Insight Lectures 2
-              </div>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.plenary.bg} border-l-4 ${sessionColors.plenary.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.plenary.text}`}
-              >
-                Population Insight Lectures 3
-              </div>
-            </div>
-          </div>
-
-          {/* 10:20 AM Row */}
-          <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] divide-x divide-gray-200 min-h-[52px]">
-            <div className="p-3 bg-gray-50 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-gray-500">
-                10:20 AM
-              </span>
-            </div>
-            <div className="p-3 bg-gray-50"></div>
-            <div
-              className={`p-3 ${sessionColors.break.bg} border-l-4 ${sessionColors.break.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.break.text}`}
-              >
-                Coffee Break
-              </div>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.break.bg} border-l-4 ${sessionColors.break.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.break.text}`}
-              >
-                Coffee Break
-              </div>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.break.bg} border-l-4 ${sessionColors.break.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.break.text}`}
-              >
-                Coffee Break
-              </div>
-            </div>
-          </div>
-
-          {/* 10:35 AM Row - Parallel Sessions */}
-          <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] divide-x divide-gray-200">
-            <div className="p-3 bg-gray-50 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-gray-500">
-                10:35 AM
-              </span>
-            </div>
-            <div className="p-3 bg-gray-50"></div>
-            <div className="p-2 bg-white">
-              <div className="grid grid-cols-2 gap-1">
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S1: Immune Regulation
-                  </div>
+                {/* Time Column */}
+                <div className={`bg-gray-50 flex items-center justify-center border-r border-gray-100 ${session.compact ? 'py-2' : 'py-4'}`}>
+                  <span className={`font-bold text-gray-500 ${session.compact ? 'text-[10px]' : 'text-xs'}`}>
+                    {session.time}
+                  </span>
                 </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S2: Early Pregnancy
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S3: KI Symposium
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.forum.bg} border ${sessionColors.forum.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.forum.text} leading-tight`}
-                  >
-                    Public Forum 1
-                  </div>
+                {/* Content Column */}
+                <div className="min-w-0">
+                  {renderSession(session)}
                 </div>
               </div>
-            </div>
-            <div className="p-2 bg-white">
-              <div className="grid grid-cols-2 gap-1">
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S8: Immunotherapy
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S9: Environment
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S10: Preeclampsia
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.forum.bg} border ${sessionColors.forum.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.forum.text} leading-tight`}
-                  >
-                    Public Forum 2
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="p-2 bg-white">
-              <div className="grid grid-cols-2 gap-1">
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S15: Immune Reg II
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S16: Preeclampsia II
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S17: T Cell Immunity
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.forum.bg} border ${sessionColors.forum.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.forum.text} leading-tight`}
-                  >
-                    Public Forum 3
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 12:00 PM Row */}
-          <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] divide-x divide-gray-200 min-h-[52px]">
-            <div className="p-3 bg-gray-50 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-gray-500">
-                12:00 PM
-              </span>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.social.bg} border-l-4 ${sessionColors.social.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.social.text}`}
-              >
-                Registration Opens
-              </div>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.social.bg} border-l-4 ${sessionColors.social.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.social.text}`}
-              >
-                Poster Session / Lunch
-              </div>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.social.bg} border-l-4 ${sessionColors.social.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.social.text}`}
-              >
-                Poster Session / Lunch
-              </div>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.social.bg} border-l-4 ${sessionColors.social.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.social.text}`}
-              >
-                Lunch Symposium
-              </div>
-            </div>
-          </div>
-
-          {/* 1:30 PM Row - Parallel Sessions */}
-          <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] divide-x divide-gray-200">
-            <div className="p-3 bg-gray-50 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-gray-500">
-                1:30 PM
-              </span>
-            </div>
-            <div className="p-3 bg-gray-50"></div>
-            <div className="p-2 bg-white">
-              <div className="grid grid-cols-3 gap-0.5">
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S4: Therapeutic
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S5: Exosomes
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S6: Male Infertility
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="p-2 bg-white">
-              <div className="grid grid-cols-3 gap-0.5">
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S11: Repro Disorders
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S12: Gyn Malig
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S13: Infection/Vacc
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="p-2 bg-white">
-              <div className="grid grid-cols-3 gap-0.5">
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S18: Ovarian Aging
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S19: High Risk OB
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S20: Rheumatic
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 2:50 PM Row */}
-          <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] divide-x divide-gray-200 min-h-[52px]">
-            <div className="p-3 bg-gray-50 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-gray-500">
-                2:50 PM
-              </span>
-            </div>
-            <div className="p-3 bg-gray-50"></div>
-            <div
-              className={`p-3 ${sessionColors.break.bg} border-l-4 ${sessionColors.break.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.break.text}`}
-              >
-                Coffee Break
-              </div>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.break.bg} border-l-4 ${sessionColors.break.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.break.text}`}
-              >
-                Coffee Break
-              </div>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.break.bg} border-l-4 ${sessionColors.break.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.break.text}`}
-              >
-                Coffee Break
-              </div>
-            </div>
-          </div>
-
-          {/* 3:10 PM Row */}
-          <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] divide-x divide-gray-200">
-            <div className="p-3 bg-gray-50 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-gray-500">
-                3:10 PM
-              </span>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.social.bg} border-l-4 ${sessionColors.social.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.social.text}`}
-              >
-                ISIR Council Meeting
-              </div>
-              <div className="text-[8px] text-gray-500">3:00 PM</div>
-            </div>
-            <div className="p-2 bg-white">
-              <div className="grid grid-cols-3 gap-0.5">
-                <div
-                  className={`p-1 rounded ${sessionColors.oral.bg} border ${sessionColors.oral.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.oral.text} leading-tight`}
-                  >
-                    Oral I
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.oral.bg} border ${sessionColors.oral.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.oral.text} leading-tight`}
-                  >
-                    Oral II
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S7: Fetal Outcome
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="p-2 bg-white">
-              <div className="grid grid-cols-3 gap-0.5">
-                <div
-                  className={`p-1 rounded ${sessionColors.plenary.bg} border ${sessionColors.plenary.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.plenary.text} leading-tight`}
-                  >
-                    NI Awards
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.oral.bg} border ${sessionColors.oral.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.oral.text} leading-tight`}
-                  >
-                    Oral III
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S14: Hormone
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="p-2 bg-white">
-              <div className="grid grid-cols-3 gap-0.5">
-                <div
-                  className={`p-1 rounded ${sessionColors.symposium.bg} border ${sessionColors.symposium.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.symposium.text} leading-tight`}
-                  >
-                    S21: Microbiome
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.oral.bg} border ${sessionColors.oral.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.oral.text} leading-tight`}
-                  >
-                    Oral IV
-                  </div>
-                </div>
-                <div
-                  className={`p-1 rounded ${sessionColors.oral.bg} border ${sessionColors.oral.border}`}
-                >
-                  <div
-                    className={`text-[8px] font-bold ${sessionColors.oral.text} leading-tight`}
-                  >
-                    Oral V
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 5:00 PM Row */}
-          <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] divide-x divide-gray-200 min-h-[52px]">
-            <div className="p-3 bg-gray-50 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-gray-500">
-                5:00 PM
-              </span>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.plenary.bg} border-l-4 ${sessionColors.plenary.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.plenary.text}`}
-              >
-                Welcome Address
-              </div>
-              <div className="text-[8px] text-blue-200">
-                Building on a Legacy
-              </div>
-            </div>
-            <div className="p-3 bg-gray-50"></div>
-            <div className="p-3 bg-gray-50"></div>
-            <div
-              className={`p-3 ${sessionColors.plenary.bg} border-l-4 ${sessionColors.plenary.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.plenary.text}`}
-              >
-                Closing & Adjourn
-              </div>
-            </div>
-          </div>
-
-          {/* 6:00 PM Row */}
-          <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] divide-x divide-gray-200 min-h-[52px]">
-            <div className="p-3 bg-gray-50 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-gray-500">
-                6:00 PM
-              </span>
-            </div>
-            <div className="p-3 bg-gray-50"></div>
-            <div
-              className={`p-3 ${sessionColors.social.bg} border-l-4 ${sessionColors.social.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.social.text}`}
-              >
-                Trainee Social Event
-              </div>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.social.bg} border-l-4 ${sessionColors.social.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.social.text}`}
-              >
-                Award Gala
-              </div>
-              <div className="text-[8px] text-gray-500">
-                JRI Editorial Meeting
-              </div>
-            </div>
-            <div className="p-3 bg-gray-50"></div>
-          </div>
-
-          {/* 6:30 PM Row */}
-          <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] divide-x divide-gray-200 min-h-[52px]">
-            <div className="p-3 bg-gray-50 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-gray-500">
-                6:30 PM
-              </span>
-            </div>
-            <div
-              className={`p-3 ${sessionColors.social.bg} border-l-4 ${sessionColors.social.border}`}
-            >
-              <div
-                className={`text-[10px] font-bold ${sessionColors.social.text}`}
-              >
-                Welcome Reception
-              </div>
-            </div>
-            <div className="p-3 bg-gray-50"></div>
-            <div className="p-3 bg-gray-50"></div>
-            <div className="p-3 bg-gray-50"></div>
+            ))}
           </div>
         </div>
-      </div>
+      )}
 
       {/* Note about schedule */}
       <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100">
