@@ -19,26 +19,60 @@ export default {
     // For SPA routing, try to fetch the asset first
     let response = await env.ASSETS.fetch(request);
     
-    // If the asset doesn't exist (404) and it's not a file extension, serve index.html
-    if (response.status === 404) {
-      // Check if it's a route (no file extension) - serve index.html for SPA routing
-      const hasFileExtension = /\.\w+$/.test(pathname);
-      if (!hasFileExtension) {
-        console.log(`[Worker] Serving index.html for SPA route: ${pathname}`);
-        // Create a new request for index.html
-        const indexRequest = new Request(new URL("/index.html", url.origin).toString(), request);
-        response = await env.ASSETS.fetch(indexRequest);
-        // Ensure we return 200 status, not 404, for SPA routes
-        if (response.status === 200) {
-          return new Response(response.body, {
-            status: 200,
-            statusText: "OK",
-            headers: {
-              ...Object.fromEntries(response.headers),
-              "Content-Type": "text/html; charset=utf-8",
-            },
-          });
+    // If the asset doesn't exist (404) or is redirected (307/301/302), and it's not a file extension, serve index.html
+    const hasFileExtension = /\.\w+$/.test(pathname);
+    if ((response.status === 404 || response.status === 307 || response.status === 301 || response.status === 302) && !hasFileExtension) {
+      console.log(`[Worker] Serving index.html for SPA route: ${pathname} (original status: ${response.status})`);
+      
+      // Try fetching root path first (since index.html might redirect to /)
+      const rootRequest = new Request(new URL("/", url.origin).toString(), {
+        method: "GET",
+        headers: {
+          "Accept": "text/html",
+        },
+      });
+      
+      let indexResponse = await env.ASSETS.fetch(rootRequest);
+      
+      // If root also redirects, try index.html
+      if (indexResponse.status === 307 || indexResponse.status === 301 || indexResponse.status === 302) {
+        const redirectLocation = indexResponse.headers.get("Location");
+        console.log(`[Worker] Root redirects to: ${redirectLocation}, following...`);
+        if (redirectLocation) {
+          const redirectUrl = new URL(redirectLocation, url.origin);
+          indexResponse = await env.ASSETS.fetch(new Request(redirectUrl.toString(), rootRequest));
         }
+      }
+      
+      // If still redirecting, try index.html directly
+      if (indexResponse.status === 307 || indexResponse.status === 301 || indexResponse.status === 302) {
+        const indexRequest = new Request(new URL("/index.html", url.origin).toString(), rootRequest);
+        indexResponse = await env.ASSETS.fetch(indexRequest);
+        
+        // Follow redirect if needed
+        if (indexResponse.status === 307 || indexResponse.status === 301 || indexResponse.status === 302) {
+          const redirectLocation = indexResponse.headers.get("Location");
+          if (redirectLocation) {
+            const redirectUrl = new URL(redirectLocation, url.origin);
+            indexResponse = await env.ASSETS.fetch(new Request(redirectUrl.toString(), rootRequest));
+          }
+        }
+      }
+      
+      // Return the content with 200 status for SPA routes (preserve the original pathname)
+      if (indexResponse.status === 200) {
+        const body = await indexResponse.text();
+        console.log(`[Worker] Successfully serving SPA content for ${pathname}`);
+        return new Response(body, {
+          status: 200,
+          statusText: "OK",
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "public, max-age=0, must-revalidate",
+          },
+        });
+      } else {
+        console.log(`[Worker] Failed to get index.html, status: ${indexResponse.status}`);
       }
     }
 

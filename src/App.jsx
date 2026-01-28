@@ -33,29 +33,51 @@ export default function App() {
 
   // Check if we're on the admin page - use state to track pathname changes
   const [isAdminPage, setIsAdminPage] = useState(() => {
-    const pathname = window.location.pathname;
+    // Check both window.location and document.location
+    const pathname = window.location.pathname || document.location.pathname;
     const isAdmin = pathname === "/admin" || pathname === "/admin/" || pathname.startsWith("/admin");
-    console.log("Initial pathname check:", pathname, "isAdmin:", isAdmin);
+    console.log("Initial pathname check:", {
+      pathname,
+      windowLocation: window.location.pathname,
+      documentLocation: document.location.pathname,
+      href: window.location.href,
+      isAdmin
+    });
     return isAdmin;
   });
 
   // Update admin page state when pathname changes
   useEffect(() => {
     const checkPath = () => {
-      const pathname = window.location.pathname;
-      const isAdmin = pathname === "/admin" || pathname === "/admin/" || pathname.startsWith("/admin");
-      console.log("Pathname changed:", pathname, "isAdmin:", isAdmin);
-      setIsAdminPage(isAdmin);
+      // Use a small delay to ensure pathname is set correctly
+      setTimeout(() => {
+        const pathname = window.location.pathname || document.location.pathname;
+        const isAdmin = pathname === "/admin" || pathname === "/admin/" || pathname.startsWith("/admin");
+        console.log("Pathname check:", {
+          pathname,
+          windowLocation: window.location.pathname,
+          documentLocation: document.location.pathname,
+          href: window.location.href,
+          isAdmin
+        });
+        setIsAdminPage(isAdmin);
+      }, 0);
     };
     
-    // Check on mount
+    // Check immediately and after a short delay
     checkPath();
+    const timeout = setTimeout(checkPath, 100);
     
     // Listen for popstate events (back/forward button)
     window.addEventListener("popstate", checkPath);
     
+    // Also listen for hashchange in case URL changes
+    window.addEventListener("hashchange", checkPath);
+    
     return () => {
+      clearTimeout(timeout);
       window.removeEventListener("popstate", checkPath);
+      window.removeEventListener("hashchange", checkPath);
     };
   }, []);
 
@@ -123,6 +145,26 @@ export default function App() {
       // No need for a separate window.resize listener now, as ResizeObserver handles that too.
     };
   }, [activeTab]); // Rerun setup when the tab changes to ensure instant update
+
+  // Prevent navigation away from /admin if we're on admin page
+  useEffect(() => {
+    if (isAdminPage) {
+      const preventNav = (e) => {
+        const pathname = window.location.pathname;
+        if (!pathname.startsWith("/admin")) {
+          console.warn("Attempted navigation away from /admin detected, pathname:", pathname);
+          // Don't prevent default, but log it for debugging
+        }
+      };
+      
+      // Monitor for navigation attempts
+      window.addEventListener("beforeunload", preventNav);
+      
+      return () => {
+        window.removeEventListener("beforeunload", preventNav);
+      };
+    }
+  }, [isAdminPage]);
 
   // Render admin page if on /admin route
   if (isAdminPage) {
