@@ -6,9 +6,13 @@
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const pathname = url.pathname;
+
+    // Log for debugging
+    console.log(`[Worker] Request: ${request.method} ${pathname}`);
 
     // Handle API routes first
-    if (url.pathname.startsWith("/api/")) {
+    if (pathname.startsWith("/api/")) {
       return handleApiRequest(request, env, url);
     }
 
@@ -17,10 +21,10 @@ export default {
     
     // If the asset doesn't exist (404) and it's not a file extension, serve index.html
     if (response.status === 404) {
-      const pathname = url.pathname;
       // Check if it's a route (no file extension) - serve index.html for SPA routing
       const hasFileExtension = /\.\w+$/.test(pathname);
       if (!hasFileExtension) {
+        console.log(`[Worker] Serving index.html for SPA route: ${pathname}`);
         // Create a new request for index.html
         const indexRequest = new Request(new URL("/index.html", url.origin).toString(), request);
         response = await env.ASSETS.fetch(indexRequest);
@@ -29,12 +33,16 @@ export default {
           return new Response(response.body, {
             status: 200,
             statusText: "OK",
-            headers: response.headers,
+            headers: {
+              ...Object.fromEntries(response.headers),
+              "Content-Type": "text/html; charset=utf-8",
+            },
           });
         }
       }
     }
 
+    console.log(`[Worker] Returning response with status: ${response.status}`);
     return response;
   },
 };
