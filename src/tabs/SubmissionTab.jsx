@@ -255,9 +255,6 @@ const SubmissionTab = () => {
         }))
       );
 
-      // Default conflict of interest (no UI yet)
-      const conflictOfInterest = "no";
-
       const response = await fetch("/api/abstract-submission", {
         method: "POST",
         headers: {
@@ -275,8 +272,6 @@ const SubmissionTab = () => {
           presenterEmail: presenter.email,
           correspondingName: `${corresponding.firstName} ${corresponding.lastName}`,
           correspondingEmail: corresponding.email,
-          conflictOfInterest,
-          conflictDetails: "",
         }),
       });
 

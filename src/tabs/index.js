@@ -9,6 +9,7 @@ export { default as DeadlinesTab } from "./DeadlinesTab";
 export { default as TravelTab } from "./TravelTab";
 export { default as SponsorsTab } from "./SponsorsTab";
 export { default as WelcomeTab } from "./WelcomeTab";
+export { default as AdminTab } from "./AdminTab";
 
 // Form exports
 export { default as VisaRequestForm } from "../forms/VisaRequestForm";

@@ -12,8 +12,22 @@ export default {
       return handleApiRequest(request, env, url);
     }
 
-    // Serve static assets for everything else
-    return env.ASSETS.fetch(request);
+    // For SPA routing, try to fetch the asset first
+    let response = await env.ASSETS.fetch(request);
+    
+    // If the asset doesn't exist (404) and it's not a file extension, serve index.html
+    if (response.status === 404) {
+      const pathname = url.pathname;
+      // Check if it's a route (no file extension) - serve index.html for SPA routing
+      const hasFileExtension = /\.\w+$/.test(pathname);
+      if (!hasFileExtension) {
+        // Create a new request for index.html
+        const indexRequest = new Request(new URL("/index.html", url.origin).toString(), request);
+        response = await env.ASSETS.fetch(indexRequest);
+      }
+    }
+
+    return response;
   },
 };
 
@@ -353,7 +367,6 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
       "keywords",
       "abstract",
       "presentationPreference",
-      "conflictOfInterest",
     ];
 
     for (const field of requiredFields) {
@@ -423,15 +436,6 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
       );
     }
 
-    // Validate conflict of interest
-    const validConflict = ["yes", "no"];
-    if (!validConflict.includes(data.conflictOfInterest)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid conflict of interest value" }),
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
     // Check submission window
     const submissionDeadline = new Date("2026-04-30").getTime();
     const submissionOpens = new Date("2026-01-15").getTime();
@@ -493,9 +497,8 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         word_count, presentation_preference,
         presenter_name, presenter_email,
         corresponding_name, corresponding_email, corresponding_author_id,
-        conflict_of_interest, conflict_details,
         affiliations, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         submissionId,
@@ -511,10 +514,6 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         data.correspondingName.trim(),
         data.correspondingEmail.trim(),
         correspondingAuthorId,
-        data.conflictOfInterest,
-        data.conflictOfInterest === "yes"
-          ? data.conflictDetails?.trim() || null
-          : null,
         data.affiliations || null,
         "submitted",
         submissionDate

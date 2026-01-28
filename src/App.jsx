@@ -20,6 +20,7 @@ import {
   TravelTab,
   SponsorsTab,
   WelcomeTab,
+  AdminTab,
 } from "./tabs";
 
 export default function App() {
@@ -29,6 +30,9 @@ export default function App() {
 
   // *** IMPORTANT: REPLACE THE '*' WITH YOUR ACTUAL WORDPRESS DOMAIN ***
   const parentOrigin = "*";
+
+  // Check if we're on the admin page
+  const isAdminPage = window.location.pathname === "/admin";
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -94,6 +98,19 @@ export default function App() {
       // No need for a separate window.resize listener now, as ResizeObserver handles that too.
     };
   }, [activeTab]); // Rerun setup when the tab changes to ensure instant update
+
+  // Render admin page if on /admin route
+  if (isAdminPage) {
+    return (
+      <div ref={appRef} className="min-h-screen bg-gray-50">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
+            <AdminTab />
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     // 6. Attach the ref to the outermost container

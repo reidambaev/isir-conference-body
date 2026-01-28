@@ -38,7 +38,6 @@ export async function onRequestPost(context) {
       "keywords",
       "abstract",
       "presentationPreference",
-      "conflictOfInterest",
     ];
 
     for (const field of requiredFields) {
@@ -129,20 +128,6 @@ export async function onRequestPost(context) {
       return new Response(
         JSON.stringify({
           error: "Invalid presentation preference",
-        }),
-        {
-          status: 400,
-          headers: corsHeaders,
-        }
-      );
-    }
-
-    // Validate conflict of interest
-    const validConflict = ["yes", "no"];
-    if (!validConflict.includes(data.conflictOfInterest)) {
-      return new Response(
-        JSON.stringify({
-          error: "Invalid conflict of interest value",
         }),
         {
           status: 400,
@@ -282,8 +267,6 @@ export async function onRequestPost(context) {
         abstract,
         word_count,
         presentation_preference,
-        conflict_of_interest,
-        conflict_details,
         presenter_name,
         presenter_email,
         corresponding_name,
@@ -291,7 +274,7 @@ export async function onRequestPost(context) {
         corresponding_author_id,
         status,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     )
       .bind(
@@ -303,8 +286,6 @@ export async function onRequestPost(context) {
         data.abstract.trim(),
         wordCount,
         data.presentationPreference,
-        data.conflictOfInterest,
-        data.conflictOfInterest === "yes" ? data.conflictDetails?.trim() : null,
         data.presenterName.trim(),
         data.presenterEmail.trim(),
         data.correspondingName.trim(),
