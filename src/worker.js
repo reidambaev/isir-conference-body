@@ -125,6 +125,16 @@ async function handleApiRequest(request, env, url) {
     return handleCreatePaymentIntent(request, env, corsHeaders);
   }
 
+  // GET /api/admin/abstracts (admin endpoint)
+  if (url.pathname === "/api/admin/abstracts" && request.method === "GET") {
+    return handleGetAbstracts(env, corsHeaders);
+  }
+
+  // GET /api/admin/visa-requests (admin endpoint)
+  if (url.pathname === "/api/admin/visa-requests" && request.method === "GET") {
+    return handleGetVisaRequests(env, corsHeaders);
+  }
+
   return new Response(JSON.stringify({ error: "Not Found" }), {
     status: 404,
     headers: corsHeaders,
@@ -758,6 +768,92 @@ async function handleCreatePaymentIntent(request, env, corsHeaders) {
       JSON.stringify({
         success: false,
         error: error.message || "Failed to create payment intent",
+      }),
+      {
+        status: 500,
+        headers: corsHeaders,
+      }
+    );
+  }
+}
+
+async function handleGetAbstracts(env, corsHeaders) {
+  try {
+    // Get all abstracts
+    const abstractsResult = await env.ISIR_DB.prepare(
+      "SELECT * FROM abstractions ORDER BY submission_date DESC"
+    ).all();
+
+    const abstracts = abstractsResult.results || [];
+
+    // For each abstract, fetch authors and affiliations
+    const abstractsWithDetails = await Promise.all(
+      abstracts.map(async (abstract) => {
+        // Get authors for this abstract
+        const authorsResult = await env.ISIR_DB.prepare(
+          "SELECT * FROM authors WHERE abstract_id = ? ORDER BY position ASC"
+        ).bind(abstract.id).all();
+
+        // Get affiliations for this abstract
+        const affiliationsResult = await env.ISIR_DB.prepare(
+          "SELECT * FROM affiliations WHERE abstract_id = ? ORDER BY position ASC"
+        ).bind(abstract.id).all();
+
+        return {
+          ...abstract,
+          authors: authorsResult.results || [],
+          affiliations: affiliationsResult.results || [],
+        };
+      })
+    );
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: abstractsWithDetails,
+      }),
+      {
+        status: 200,
+        headers: corsHeaders,
+      }
+    );
+  } catch (error) {
+    console.error("Get abstracts error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || "Failed to fetch abstracts",
+      }),
+      {
+        status: 500,
+        headers: corsHeaders,
+      }
+    );
+  }
+}
+
+async function handleGetVisaRequests(env, corsHeaders) {
+  try {
+    const result = await env.ISIR_DB.prepare(
+      "SELECT * FROM visa_requests ORDER BY created_at DESC"
+    ).all();
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: result.results || [],
+      }),
+      {
+        status: 200,
+        headers: corsHeaders,
+      }
+    );
+  } catch (error) {
+    console.error("Get visa requests error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || "Failed to fetch visa requests",
       }),
       {
         status: 500,
