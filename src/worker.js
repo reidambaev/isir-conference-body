@@ -24,6 +24,14 @@ export default {
         // Create a new request for index.html
         const indexRequest = new Request(new URL("/index.html", url.origin).toString(), request);
         response = await env.ASSETS.fetch(indexRequest);
+        // Ensure we return 200 status, not 404, for SPA routes
+        if (response.status === 200) {
+          return new Response(response.body, {
+            status: 200,
+            statusText: "OK",
+            headers: response.headers,
+          });
+        }
       }
     }
 
