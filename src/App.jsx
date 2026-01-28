@@ -31,8 +31,33 @@ export default function App() {
   // *** IMPORTANT: REPLACE THE '*' WITH YOUR ACTUAL WORDPRESS DOMAIN ***
   const parentOrigin = "*";
 
-  // Check if we're on the admin page
-  const isAdminPage = window.location.pathname === "/admin";
+  // Check if we're on the admin page - use state to track pathname changes
+  const [isAdminPage, setIsAdminPage] = useState(() => {
+    const pathname = window.location.pathname;
+    const isAdmin = pathname === "/admin" || pathname === "/admin/" || pathname.startsWith("/admin");
+    console.log("Initial pathname check:", pathname, "isAdmin:", isAdmin);
+    return isAdmin;
+  });
+
+  // Update admin page state when pathname changes
+  useEffect(() => {
+    const checkPath = () => {
+      const pathname = window.location.pathname;
+      const isAdmin = pathname === "/admin" || pathname === "/admin/" || pathname.startsWith("/admin");
+      console.log("Pathname changed:", pathname, "isAdmin:", isAdmin);
+      setIsAdminPage(isAdmin);
+    };
+    
+    // Check on mount
+    checkPath();
+    
+    // Listen for popstate events (back/forward button)
+    window.addEventListener("popstate", checkPath);
+    
+    return () => {
+      window.removeEventListener("popstate", checkPath);
+    };
+  }, []);
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -101,6 +126,7 @@ export default function App() {
 
   // Render admin page if on /admin route
   if (isAdminPage) {
+    console.log("Rendering admin page");
     return (
       <div ref={appRef} className="min-h-screen bg-gray-50">
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -111,6 +137,8 @@ export default function App() {
       </div>
     );
   }
+  
+  console.log("Rendering main app, pathname:", window.location.pathname);
 
   return (
     // 6. Attach the ref to the outermost container
