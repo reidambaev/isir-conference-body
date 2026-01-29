@@ -25,6 +25,8 @@ import {
   usdToKrw,
 } from "../utils/currency";
 import PaymentForm from "../components/PaymentForm";
+import { pdf } from "@react-pdf/renderer";
+import RegistrationConfirmationPDF from "../components/RegistrationConfirmationPDF";
 
 // Initialize Stripe
 const stripePromise = loadStripe(
@@ -380,6 +382,7 @@ const RegistrationForm = ({ onClose }) => {
 
   const [registrationId, setRegistrationId] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
+  const [paymentIntent, setPaymentIntent] = useState(null);
 
   // Clear member ticket selection for non-members when entering ticket selection step
   useEffect(() => {
@@ -491,6 +494,77 @@ const RegistrationForm = ({ onClose }) => {
       );
     } finally {
       setIsProcessingPayment(false);
+    }
+  };
+
+  const getTicketLabel = () => {
+    if (membershipData?.ticket_options?.available_tickets) {
+      const t = membershipData.ticket_options.available_tickets.find(
+        (x) => x.id === formData.ticketType
+      );
+      return t?.label || ticketPrices[formData.ticketType]?.label || formData.ticketType;
+    }
+    return ticketPrices[formData.ticketType]?.label || formData.ticketType;
+  };
+
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const handleDownloadPdf = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      const ticketLabel = getTicketLabel();
+      const doc = (
+        <RegistrationConfirmationPDF
+          attendeeName={`${formData.firstName || ""} ${formData.lastName || ""}`.trim()}
+          email={formData.email}
+          ticketLabel={ticketLabel}
+          ticketBadge={isEarlyBirdPeriod ? "Early Bird" : "Standard"}
+          ticketPrice={formatCurrency(getTicketPrice(formData.ticketType), currency)}
+          accompanyingLabel={
+            formData.accompanyingPersonCount > 0
+              ? `Accompanying Person × ${formData.accompanyingPersonCount}`
+              : null
+          }
+          accompanyingPrice={
+            formData.accompanyingPersonCount > 0
+              ? formatCurrency(
+                  getAccompanyingPrice() * formData.accompanyingPersonCount,
+                  currency
+                )
+              : null
+          }
+          galaLabel={
+            formData.galaDinnerCount > 0
+              ? `Gala Dinner × ${formData.galaDinnerCount}`
+              : null
+          }
+          galaPrice={
+            formData.galaDinnerCount > 0
+              ? formatCurrency(
+                  getGalaDinnerPrice() * formData.galaDinnerCount,
+                  currency
+                )
+              : null
+          }
+          totalLabel="Total Amount Paid"
+          totalAmount={formatCurrency(getTotalPrice(), currency)}
+          taxNote={isKoreanCustomer ? "* Includes 10% Korean tax" : null}
+          registrationId={registrationId ?? undefined}
+          paymentId={paymentIntent?.id ?? undefined}
+          generatedDate={new Date().toLocaleString()}
+        />
+      );
+      const blob = await pdf(doc).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ISIR-2026-Registration-Confirmation-${formData.lastName || "confirmation"}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      alert("Could not generate PDF. Please try again or use Print.");
+    } finally {
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -1876,8 +1950,9 @@ const RegistrationForm = ({ onClose }) => {
                     clientSecret={clientSecret}
                     amount={getStripeAmount()}
                     currency={currency}
-                    onSuccess={(paymentIntent) => {
-                      console.log("Payment succeeded:", paymentIntent);
+                    onSuccess={(intent) => {
+                      console.log("Payment succeeded:", intent);
+                      setPaymentIntent(intent);
                       setIsProcessingPayment(false);
                       setStep(5);
                     }}
@@ -2082,11 +2157,59 @@ const RegistrationForm = ({ onClose }) => {
               <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
                 <button
                   type="button"
-                  className="px-8 py-4 text-white rounded-xl shadow-lg hover:shadow-xl font-bold transition-all text-base flex items-center justify-center"
+                  className="px-8 py-4 text-white rounded-xl shadow-lg hover:shadow-xl font-bold transition-all text-base flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     background:
                       "linear-gradient(135deg, #1a3a6c 0%, #2d5a9e 100%)",
                   }}
+                  onClick={handleDownloadPdf}
+                  disabled={isGeneratingPdf}
+                >
+                  {isGeneratingPdf ? (
+                    <>
+                      <svg
+                        className="animate-spin w-5 h-5 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      Generating PDF...
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-5 h-5 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      Download PDF
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="px-8 py-4 border-2 border-gray-300 bg-white text-gray-700 rounded-xl shadow-md hover:bg-gray-50 font-bold transition-all text-base flex items-center justify-center"
                   onClick={() => window.print()}
                 >
                   <svg
