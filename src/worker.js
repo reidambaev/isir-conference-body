@@ -145,6 +145,26 @@ async function handleApiRequest(request, env, url) {
     return handleGetVisaRequests(env, corsHeaders);
   }
 
+  // GET /api/debug-env – reports which env vars the worker sees (no values). Remove or restrict in production.
+  if (url.pathname === "/api/debug-env" && request.method === "GET") {
+    const vars = [
+      "RESEND_API_KEY",
+      "CONFIRMATION_FROM_EMAIL",
+      "TEST_EMAIL_SECRET",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+    ];
+    const status = {};
+    for (const name of vars) {
+      const v = env[name];
+      status[name] = v !== undefined && v !== null && String(v).trim() !== "" ? "set" : "missing";
+    }
+    return new Response(JSON.stringify(status, null, 2), {
+      status: 200,
+      headers: { ...corsHeaders, "Cache-Control": "no-store" },
+    });
+  }
+
   return new Response(JSON.stringify({ error: "Not Found" }), {
     status: 404,
     headers: corsHeaders,
