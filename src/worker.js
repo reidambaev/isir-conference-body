@@ -85,7 +85,7 @@ async function handleApiRequest(request, env, url) {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, X-Test-Email-Secret, stripe-signature",
     "Content-Type": "application/json",
   };
 
@@ -125,6 +125,16 @@ async function handleApiRequest(request, env, url) {
     return handleCreatePaymentIntent(request, env, corsHeaders);
   }
 
+  // POST /api/stripe-webhook (Stripe sends here; no CORS)
+  if (url.pathname === "/api/stripe-webhook" && request.method === "POST") {
+    return handleStripeWebhook(request, env);
+  }
+
+  // POST /api/test-email
+  if (url.pathname === "/api/test-email" && request.method === "POST") {
+    return handleTestEmail(request, env, corsHeaders);
+  }
+
   // GET /api/admin/abstracts (admin endpoint)
   if (url.pathname === "/api/admin/abstracts" && request.method === "GET") {
     return handleGetAbstracts(env, corsHeaders);
@@ -139,6 +149,27 @@ async function handleApiRequest(request, env, url) {
     status: 404,
     headers: corsHeaders,
   });
+}
+
+function escapeHtml(s) {
+  if (s == null) return "";
+  const t = String(s);
+  return t
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formatTicketLabel(slug) {
+  if (!slug) return "Conference";
+  const labels = {
+    "isir-member": "ISIR Member",
+    "non-member": "Non-Member",
+    "trainee-member": "Trainee (ISIR Member)",
+    "trainee-non-member": "Trainee (Non-Member)",
+  };
+  return labels[slug] || slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 async function handleRegistration(request, env, corsHeaders) {
@@ -636,6 +667,74 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
       }
     }
 
+    // Send confirmation email to corresponding author if Resend is configured
+    if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
+      const toEmail = data.correspondingEmail?.trim();
+      if (toEmail) {
+        const name = data.correspondingName?.trim() || "Author";
+        const title = data.title?.trim() || "";
+        const category = data.category?.trim() || "";
+        const pref = (data.presentationPreference || "").toLowerCase();
+        const prefLabel = pref === "oral" ? "Oral" : pref === "poster" ? "Poster" : pref === "either" ? "Oral or Poster" : data.presentationPreference || "";
+        const abstractSnippet = (data.abstract?.trim() || "").slice(0, 280);
+        const abstractDisplay = abstractSnippet + (abstractSnippet.length >= 280 ? "…" : "");
+        const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Abstract Received – ISIR 2026</title></head>
+<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
+  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
+    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Abstract submission received</p>
+  </div>
+  <p>Dear ${escapeHtml(name)},</p>
+  <p>Thank you for submitting your abstract to the ISIR 2026 World Congress. We have received your submission and it will be reviewed by the scientific committee.</p>
+  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Submission details</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+      <tr><td style="padding: 4px 0; vertical-align: top;">Submission ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(submissionId)}</strong></td></tr>
+      <tr><td style="padding: 4px 0; vertical-align: top;">Title</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(title)}</td></tr>
+      <tr><td style="padding: 4px 0;">Category</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(category)}</td></tr>
+      <tr><td style="padding: 4px 0;">Presentation preference</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(prefLabel)}</td></tr>
+      <tr><td style="padding: 4px 0;">Word count</td><td style="padding: 4px 0; text-align: right;">${wordCount} / 300</td></tr>
+    </table>
+    ${abstractDisplay ? `<p style="margin: 12px 0 0 0; font-size: 0.9rem; color: #555;"><strong>Abstract (excerpt):</strong><br/>${escapeHtml(abstractDisplay)}</p>` : ""}
+  </div>
+  <p><strong>What happens next</strong></p>
+  <ul style="margin: 0 0 20px 0; padding-left: 1.2rem;">
+    <li><strong>Save your Submission ID</strong> (${escapeHtml(submissionId)}) — you may need it when contacting us or checking status.</li>
+    <li>Your abstract will be reviewed by the scientific committee. You will be notified of the outcome by email.</li>
+  </ul>
+  <p>If you have any questions, please contact the organizers at <a href="mailto:support@theisir.org" style="color: #1a3a6c;">support@theisir.org</a> and quote your submission ID.</p>
+  <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
+</body>
+</html>`;
+        try {
+          const res = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${env.RESEND_API_KEY}`,
+            },
+            body: JSON.stringify({
+              from: env.CONFIRMATION_FROM_EMAIL,
+              to: [toEmail],
+              subject: "ISIR 2026 – Abstract submission received",
+              html,
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.text();
+            console.error("Resend abstract confirmation failed:", res.status, err);
+          } else {
+            console.log(`Abstract confirmation email sent to ${toEmail}`);
+          }
+        } catch (emailError) {
+          console.error("Abstract confirmation email error:", emailError);
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -773,6 +872,260 @@ async function handleCreatePaymentIntent(request, env, corsHeaders) {
         status: 500,
         headers: corsHeaders,
       }
+    );
+  }
+}
+
+async function handleStripeWebhook(request, env) {
+  const jsonHeaders = { "Content-Type": "application/json" };
+  try {
+    if (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET) {
+      console.error("Stripe not configured");
+      return new Response("Stripe not configured", { status: 500, headers: jsonHeaders });
+    }
+
+    const body = await request.text();
+    const signature = request.headers.get("stripe-signature");
+    if (!signature) {
+      return new Response("No signature", { status: 400, headers: jsonHeaders });
+    }
+
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+      apiVersion: "2024-11-20.acacia",
+    });
+
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        body,
+        signature,
+        env.STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err) {
+      console.error("Webhook signature verification failed:", err.message);
+      return new Response(`Webhook Error: ${err.message}`, { status: 400, headers: jsonHeaders });
+    }
+
+    switch (event.type) {
+      case "payment_intent.succeeded": {
+        const paymentIntent = event.data.object;
+        const registrationId = paymentIntent.metadata?.registrationId;
+
+        if (registrationId && env.ISIR_DB) {
+          try {
+            await env.ISIR_DB.prepare(
+              `UPDATE registrations 
+               SET payment_status = 'completed',
+                   payment_intent_id = ?,
+                   payment_date = ?
+               WHERE id = ?`
+            )
+              .bind(paymentIntent.id, Date.now(), registrationId)
+              .run();
+
+            console.log(`Payment confirmed for registration: ${registrationId}`);
+
+            if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
+              const row = await env.ISIR_DB.prepare(
+                `SELECT email, first_name, middle_name, last_name, ticket_type, ticket_price, total_price, currency,
+                 accompanying_count, gala_dinner, institution, badge_name FROM registrations WHERE id = ?`
+              )
+                .bind(registrationId)
+                .first();
+              if (row?.email) {
+                const name = [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(" ") || "Attendee";
+                const ticketLabel = formatTicketLabel(row.ticket_type);
+                const amount = row.total_price != null ? `${row.currency || "USD"} ${Number(row.total_price).toFixed(2)}` : "";
+                const acc = Number(row.accompanying_count) || 0;
+                const gala = Number(row.gala_dinner) || 0;
+                const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Registration Confirmed – ISIR 2026</title></head>
+<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
+  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
+    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Registration confirmed</p>
+  </div>
+  <p>Dear ${escapeHtml(name)},</p>
+  <p>Thank you for registering. Your payment has been received and your place at the ISIR 2026 World Congress is confirmed.</p>
+  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Registration summary</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+      <tr><td style="padding: 4px 0;">Registration ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(registrationId)}</strong></td></tr>
+      <tr><td style="padding: 4px 0;">Ticket type</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(ticketLabel)}</td></tr>
+      ${acc > 0 ? `<tr><td style="padding: 4px 0;">Accompanying persons</td><td style="padding: 4px 0; text-align: right;">${acc}</td></tr>` : ""}
+      ${gala > 0 ? `<tr><td style="padding: 4px 0;">Gala dinner tickets</td><td style="padding: 4px 0; text-align: right;">${gala}</td></tr>` : ""}
+      ${row.badge_name ? `<tr><td style="padding: 4px 0;">Badge name</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(row.badge_name)}</td></tr>` : ""}
+      ${amount ? `<tr><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd;">Amount paid</td><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd; text-align: right;"><strong>${escapeHtml(amount)}</strong></td></tr>` : ""}
+    </table>
+  </div>
+  <p><strong>What happens next</strong></p>
+  <ul style="margin: 0 0 20px 0; padding-left: 1.2rem;">
+    <li>Keep this email as your confirmation. You may be asked for your registration ID.</li>
+    <li>We will send further details (programme, venue, travel) closer to the event.</li>
+  </ul>
+  <p>If you have any questions, please contact the organizers at <a href="mailto:support@theisir.org" style="color: #1a3a6c;">support@theisir.org</a>.</p>
+  <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
+</body>
+</html>`;
+                const res = await fetch("https://api.resend.com/emails", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${env.RESEND_API_KEY}`,
+                  },
+                  body: JSON.stringify({
+                    from: env.CONFIRMATION_FROM_EMAIL,
+                    to: [row.email],
+                    subject: "ISIR 2026 – Registration confirmed",
+                    html,
+                  }),
+                });
+                if (!res.ok) {
+                  const err = await res.text();
+                  console.error("Resend email failed:", res.status, err);
+                } else {
+                  console.log(`Confirmation email sent to ${row.email}`);
+                }
+              }
+            }
+          } catch (dbError) {
+            console.error("Database update error:", dbError);
+          }
+        }
+        break;
+      }
+      case "payment_intent.payment_failed": {
+        const failedPayment = event.data.object;
+        const failedRegistrationId = failedPayment.metadata?.registrationId;
+        if (failedRegistrationId && env.ISIR_DB) {
+          try {
+            await env.ISIR_DB.prepare(
+              `UPDATE registrations SET payment_status = 'failed' WHERE id = ?`
+            )
+              .bind(failedRegistrationId)
+              .run();
+            console.log(`Payment failed for registration: ${failedRegistrationId}`);
+          } catch (dbError) {
+            console.error("Database update error:", dbError);
+          }
+        }
+        break;
+      }
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
+    }
+
+    return new Response(JSON.stringify({ received: true }), {
+      status: 200,
+      headers: jsonHeaders,
+    });
+  } catch (error) {
+    console.error("Webhook error:", error);
+    return new Response(`Webhook Error: ${error.message}`, { status: 500, headers: { "Content-Type": "application/json" } });
+  }
+}
+
+async function handleTestEmail(request, env, corsHeaders) {
+  if (!env.TEST_EMAIL_SECRET) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Test email is disabled. Set TEST_EMAIL_SECRET (and RESEND_API_KEY, CONFIRMATION_FROM_EMAIL) in env to enable.",
+      }),
+      { status: 501, headers: corsHeaders }
+    );
+  }
+
+  let body = {};
+  try {
+    body = await request.json();
+  } catch (_) {}
+  const secret = request.headers.get("X-Test-Email-Secret");
+  const providedSecret = secret || body.secret;
+  if (providedSecret !== env.TEST_EMAIL_SECRET) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Invalid or missing secret (use header X-Test-Email-Secret or body.secret)." }),
+      { status: 401, headers: corsHeaders }
+    );
+  }
+
+  if (!env.RESEND_API_KEY || !env.CONFIRMATION_FROM_EMAIL) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Resend not configured. Set RESEND_API_KEY and CONFIRMATION_FROM_EMAIL.",
+      }),
+      { status: 503, headers: corsHeaders }
+    );
+  }
+
+  const to = (body.to || "").trim();
+  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Valid 'to' email required in request body." }),
+      { status: 400, headers: corsHeaders }
+    );
+  }
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Test Email – ISIR 2026</title></head>
+<body style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; line-height: 1.5;">
+  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
+    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 – Test Email</h1>
+  </div>
+  <p>This is a test confirmation email from the ISIR 2026 system.</p>
+  <p>If you received this, Resend and your "from" address are working correctly.</p>
+  <p style="color: #666; font-size: 0.9rem;">Sent at ${new Date().toISOString()}</p>
+  <p>Best regards,<br/><strong>ISIR 2026 Team</strong></p>
+</body>
+</html>`;
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: env.CONFIRMATION_FROM_EMAIL,
+        to: [to],
+        subject: "ISIR 2026 – Test confirmation email",
+        html,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Resend API error",
+          status: res.status,
+          details: data,
+        }),
+        { status: 502, headers: corsHeaders }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Test email sent to ${to}`,
+        id: data.id || null,
+      }),
+      { status: 200, headers: corsHeaders }
+    );
+  } catch (err) {
+    console.error("Test email error:", err);
+    return new Response(
+      JSON.stringify({ success: false, error: err.message || "Failed to send" }),
+      { status: 500, headers: corsHeaders }
     );
   }
 }
