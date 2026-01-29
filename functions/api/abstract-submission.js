@@ -6,6 +6,16 @@
  * Method: POST
  */
 
+function escapeHtml(s) {
+  if (s == null) return "";
+  const t = String(s);
+  return t
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -328,6 +338,75 @@ export async function onRequestPost(context) {
           i
         )
         .run();
+    }
+
+    // Send confirmation email to corresponding author if Resend is configured
+    if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
+      const toEmail = data.correspondingEmail?.trim();
+      if (toEmail) {
+        const name = data.correspondingName?.trim() || "Author";
+        const title = data.title?.trim() || "";
+        const category = data.category?.trim() || "";
+        const pref = (data.presentationPreference || "").toLowerCase();
+        const prefLabel = pref === "oral" ? "Oral" : pref === "poster" ? "Poster" : pref === "either" ? "Oral or Poster" : data.presentationPreference || "";
+        const abstractSnippet = (data.abstract?.trim() || "").slice(0, 280);
+        const abstractDisplay = abstractSnippet + (abstractSnippet.length >= 280 ? "…" : "");
+        const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Abstract Received – ISIR 2026</title></head>
+<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
+  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
+    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Abstract submission received</p>
+  </div>
+  <p>Dear ${escapeHtml(name)},</p>
+  <p>Thank you for submitting your abstract to the ISIR 2026 World Congress. We have received your submission and it will be reviewed by the scientific committee.</p>
+  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Submission details</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+      <tr><td style="padding: 4px 0; vertical-align: top;">Submission ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(submissionId)}</strong></td></tr>
+      <tr><td style="padding: 4px 0; vertical-align: top;">Title</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(title)}</td></tr>
+      <tr><td style="padding: 4px 0;">Category</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(category)}</td></tr>
+      <tr><td style="padding: 4px 0;">Presentation preference</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(prefLabel)}</td></tr>
+      <tr><td style="padding: 4px 0;">Word count</td><td style="padding: 4px 0; text-align: right;">${wordCount} / 300</td></tr>
+    </table>
+    ${abstractDisplay ? `<p style="margin: 12px 0 0 0; font-size: 0.9rem; color: #555;"><strong>Abstract (excerpt):</strong><br/>${escapeHtml(abstractDisplay)}</p>` : ""}
+  </div>
+  <p><strong>What happens next</strong></p>
+  <ul style="margin: 0 0 20px 0; padding-left: 1.2rem;">
+    <li><strong>Save your Submission ID</strong> (${escapeHtml(submissionId)}) — you may need it when contacting us or checking status.</li>
+    <li>Your abstract will be reviewed by the scientific committee. You will be notified of the outcome by email.</li>
+  </ul>
+  <p>If you have any questions, please contact the organizers at <a href="mailto:support@theisir.org" style="color: #1a3a6c;">support@theisir.org</a> and quote your submission ID.</p>
+  <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
+</body>
+</html>`;
+        try {
+          const res = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${env.RESEND_API_KEY}`,
+            },
+            body: JSON.stringify({
+              from: env.CONFIRMATION_FROM_EMAIL,
+              to: [toEmail],
+              subject: "ISIR 2026 – Abstract submission received",
+              html,
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.text();
+            console.error("Resend abstract confirmation failed:", res.status, err);
+          } else {
+            console.log(`Abstract confirmation email sent to ${toEmail}`);
+          }
+        } catch (emailError) {
+          console.error("Abstract confirmation email error:", emailError);
+          // Don't fail the submission
+        }
+      }
     }
 
     return new Response(

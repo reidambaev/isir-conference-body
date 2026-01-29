@@ -39,11 +39,47 @@ In **Cloudflare Pages**: same variable names under **Settings → Environment va
 
 ## 2. When emails are sent
 
-- **Payment succeeded** (`payment_intent.succeeded`): the Stripe webhook updates the registration and, if `RESEND_API_KEY` and `CONFIRMATION_FROM_EMAIL` are set, sends one confirmation email to the registrant’s email from the DB.
+- **Registration payment succeeded** (`payment_intent.succeeded`): the Stripe webhook updates the registration and, if `RESEND_API_KEY` and `CONFIRMATION_FROM_EMAIL` are set, sends one confirmation email to the registrant’s email.
+- **Abstract submitted** (`/api/abstract-submission`): after the abstract is saved, if the same env vars are set, a confirmation email is sent to the **corresponding author** email with the submission ID, title, category, and presentation preference.
 
-If either env var is missing, the webhook still succeeds; it just skips sending the email.
+If either env var is missing, the request still succeeds; it just skips sending the email.
 
-## 3. Optional: Send via Gmail SMTP instead
+## 3. Test email from the browser console
+
+To verify that Resend and your “from” address work, you can send a test email from the browser console.
+
+1. **Enable the test endpoint** by setting a **runtime** env var (e.g. in Cloudflare Pages → Preview, or in `.dev.vars` for local):
+   - `TEST_EMAIL_SECRET` – any random string you keep private (e.g. `my-test-secret-123`).
+
+2. **Open your site** (local or deployed), open DevTools (F12) → **Console**, and run (replace the email and secret):
+
+```javascript
+fetch('/api/test-email', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    to: 'your@email.com',
+    secret: 'your-test-secret'  // same as TEST_EMAIL_SECRET
+  })
+}).then(r => r.json()).then(console.log);
+```
+
+Or send the secret in a header (so it’s not in the request body):
+
+```javascript
+fetch('/api/test-email', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Test-Email-Secret': 'your-test-secret'
+  },
+  body: JSON.stringify({ to: 'your@email.com' })
+}).then(r => r.json()).then(console.log);
+```
+
+If it works, you’ll see `{ success: true, message: "Test email sent to your@email.com", ... }` and receive a short test email. Do **not** set `TEST_EMAIL_SECRET` in Production if you want to disable this endpoint there.
+
+## 4. Optional: Send via Gmail SMTP instead
 
 If you prefer to send through Gmail/Google Workspace SMTP (e.g. with Nodemailer):
 
