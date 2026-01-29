@@ -1,4 +1,5 @@
 import React from "react";
+import heroSkyline from "../assets/hero_skyline.jpg";
 
 const HeroSection = ({ onRegisterClick }) => {
   const scrollToNav = () => {
@@ -14,8 +15,7 @@ const HeroSection = ({ onRegisterClick }) => {
       <div
         className="absolute inset-0"
         style={{
-          backgroundImage:
-            "url('https://cache.marriott.com/content/dam/marriott-renditions/PUSWI/puswi-view-detail-2081-hor-clsc.jpg?output-quality=70&interpolation=progressive-bilinear&downsize=1336px:*')",
+          backgroundImage: `url(${heroSkyline})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           opacity: 0.5,

@@ -79,6 +79,12 @@ fetch('/api/test-email', {
 
 If it works, you’ll see `{ success: true, message: "Test email sent to your@email.com", ... }` and receive a short test email. Do **not** set `TEST_EMAIL_SECRET` in Production if you want to disable this endpoint there.
 
+**If you get 502 Bad Gateway:** Open the request in the Network tab and check the **response body** (JSON). It will include `error` and often `details` from Resend. Common causes:
+- **Domain not verified** – In [Resend → Domains](https://resend.com/domains), add and verify the domain used in `CONFIRMATION_FROM_EMAIL` (e.g. `noreply@yourdomain.com` → verify `yourdomain.com`).
+- **Invalid API key** – Regenerate the key in Resend → API Keys and set `RESEND_API_KEY` in your deployment (Cloudflare Pages → Settings → Environment variables, **runtime**).
+- **Wrong env in production** – Ensure `RESEND_API_KEY`, `CONFIRMATION_FROM_EMAIL`, and `TEST_EMAIL_SECRET` are set for the **same** environment you’re calling (e.g. Production).
+- **Worker not used** – If you deploy with Pages only (no worker), the request may hit a different handler; ensure the worker (`src/worker.js`) is your entry point so `/api/test-email` is handled there.
+
 ## 4. Optional: Send via Gmail SMTP instead
 
 If you prefer to send through Gmail/Google Workspace SMTP (e.g. with Nodemailer):

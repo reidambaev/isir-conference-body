@@ -1102,10 +1102,11 @@ async function handleTestEmail(request, env, corsHeaders) {
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      const msg = data?.message || data?.msg || (typeof data === "string" ? data : null) || "Resend API error";
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Resend API error",
+          error: `Resend API error: ${msg}`,
           status: res.status,
           details: data,
         }),
