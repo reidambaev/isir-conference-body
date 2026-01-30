@@ -46,6 +46,31 @@ If either env var is missing, the request still succeeds; it just skips sending 
 
 ---
 
+## Force-send a registration confirmation email
+
+You can resend the same confirmation email for any registration (e.g. if it failed the first time or the attendee didn’t receive it).
+
+**Endpoint:** `POST /api/resend-confirmation`  
+**Auth:** Same as test email – use `TEST_EMAIL_SECRET` (header `X-Test-Email-Secret` or body `secret`).  
+**Body:** `{ "registrationId": "REG-xxx...", "secret": "your-test-secret" }`
+
+Example from the browser console (replace the registration ID and secret):
+
+```javascript
+fetch('/api/resend-confirmation', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    registrationId: 'REG-1234567890-XXXXXXXXX',
+    secret: 'your-test-secret'
+  })
+}).then(r => r.json()).then(console.log);
+```
+
+The email is the same as the automatic one (summary + Stripe receipt link when available). You can get the registration ID from the admin registrations list or from your D1 data.
+
+---
+
 ## Registration confirmation not sending (test email works)
 
 If the **test email** works but the **registration confirmation** (after payment) does not, the flow is: Stripe calls your webhook → worker updates the DB → worker sends the email. Check the following:

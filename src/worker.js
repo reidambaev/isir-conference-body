@@ -135,6 +135,11 @@ async function handleApiRequest(request, env, url) {
     return handleTestEmail(request, env, corsHeaders);
   }
 
+  // POST /api/resend-confirmation – force-send registration confirmation email (same secret as test-email)
+  if (url.pathname === "/api/resend-confirmation" && request.method === "POST") {
+    return handleResendConfirmation(request, env, corsHeaders);
+  }
+
   // GET /api/admin/abstracts (admin endpoint)
   if (url.pathname === "/api/admin/abstracts" && request.method === "GET") {
     return handleGetAbstracts(env, corsHeaders);
@@ -1170,6 +1175,180 @@ async function handleTestEmail(request, env, corsHeaders) {
     );
   } catch (err) {
     console.error("Test email error:", err);
+    return new Response(
+      JSON.stringify({ success: false, error: err.message || "Failed to send" }),
+      { status: 500, headers: corsHeaders }
+    );
+  }
+}
+
+async function handleResendConfirmation(request, env, corsHeaders) {
+  if (!env.TEST_EMAIL_SECRET) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Resend confirmation is disabled. Set TEST_EMAIL_SECRET to enable.",
+      }),
+      { status: 501, headers: corsHeaders }
+    );
+  }
+
+  let body = {};
+  try {
+    body = await request.json();
+  } catch (_) {}
+  const secret = request.headers.get("X-Test-Email-Secret");
+  const providedSecret = secret || body.secret;
+  if (providedSecret !== env.TEST_EMAIL_SECRET) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Invalid or missing secret (use header X-Test-Email-Secret or body.secret)." }),
+      { status: 401, headers: corsHeaders }
+    );
+  }
+
+  const registrationId = (body.registrationId || body.registration_id || "").trim();
+  if (!registrationId) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Missing registrationId in request body." }),
+      { status: 400, headers: corsHeaders }
+    );
+  }
+
+  if (!env.RESEND_API_KEY || !env.CONFIRMATION_FROM_EMAIL) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Resend not configured." }),
+      { status: 503, headers: corsHeaders }
+    );
+  }
+
+  if (!env.ISIR_DB) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Database not configured." }),
+      { status: 503, headers: corsHeaders }
+    );
+  }
+
+  try {
+    let row = null;
+    try {
+      row = await env.ISIR_DB.prepare(
+        `SELECT email, first_name, middle_name, last_name, ticket_type, ticket_price, total_price, currency,
+         accompanying_count, gala_dinner, institution, badge_name, payment_intent_id FROM registrations WHERE id = ?`
+      )
+        .bind(registrationId)
+        .first();
+    } catch (selectErr) {
+      row = await env.ISIR_DB.prepare(
+        `SELECT email, first_name, middle_name, last_name, ticket_type, total_price, currency FROM registrations WHERE id = ?`
+      )
+        .bind(registrationId)
+        .first();
+    }
+    if (!row) {
+      return new Response(
+        JSON.stringify({ success: false, error: `No registration found for id: ${registrationId}` }),
+        { status: 404, headers: corsHeaders }
+      );
+    }
+    if (!row.email) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Registration has no email." }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    const name = [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(" ") || "Attendee";
+    const ticketLabel = formatTicketLabel(row.ticket_type);
+    const amount = row.total_price != null ? `${row.currency || "USD"} ${Number(row.total_price).toFixed(2)}` : "";
+    const acc = row.accompanying_count != null ? Number(row.accompanying_count) : 0;
+    const gala = row.gala_dinner != null ? Number(row.gala_dinner) : 0;
+    const badgeName = row.badge_name;
+
+    let receiptUrl = null;
+    if (row.payment_intent_id && env.STRIPE_SECRET_KEY) {
+      try {
+        const Stripe = (await import("stripe")).default;
+        const stripe = new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: "2024-11-20.acacia" });
+        const pi = await stripe.paymentIntents.retrieve(row.payment_intent_id);
+        if (pi.latest_charge) {
+          const charge = await stripe.charges.retrieve(pi.latest_charge);
+          receiptUrl = charge.receipt_url || null;
+        }
+      } catch (_) {}
+    }
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Registration Confirmed – ISIR 2026</title></head>
+<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
+  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
+    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Registration confirmed</p>
+  </div>
+  <p>Dear ${escapeHtml(name)},</p>
+  <p>Thank you for registering. Your payment has been received and your place at the ISIR 2026 World Congress is confirmed.</p>
+  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Registration summary</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+      <tr><td style="padding: 4px 0;">Registration ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(registrationId)}</strong></td></tr>
+      <tr><td style="padding: 4px 0;">Ticket type</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(ticketLabel)}</td></tr>
+      ${acc > 0 ? `<tr><td style="padding: 4px 0;">Accompanying persons</td><td style="padding: 4px 0; text-align: right;">${acc}</td></tr>` : ""}
+      ${gala > 0 ? `<tr><td style="padding: 4px 0;">Gala dinner tickets</td><td style="padding: 4px 0; text-align: right;">${gala}</td></tr>` : ""}
+      ${badgeName ? `<tr><td style="padding: 4px 0;">Badge name</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(badgeName)}</td></tr>` : ""}
+      ${amount ? `<tr><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd;">Amount paid</td><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd; text-align: right;"><strong>${escapeHtml(amount)}</strong></td></tr>` : ""}
+    </table>
+  </div>
+  ${receiptUrl ? `<p><a href="${escapeHtml(receiptUrl)}" style="color: #1a3a6c; font-weight: 600;">View your payment receipt (Stripe)</a></p>` : ""}
+  <p><strong>What happens next</strong></p>
+  <ul style="margin: 0 0 20px 0; padding-left: 1.2rem;">
+    <li>Keep this email as your confirmation. You may be asked for your registration ID.</li>
+    <li>We will send further details (programme, venue, travel) closer to the event.</li>
+  </ul>
+  <p>If you have any questions, please contact the organizers at <a href="mailto:support@theisir.org" style="color: #1a3a6c;">support@theisir.org</a>.</p>
+  <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
+</body>
+</html>`;
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: env.CONFIRMATION_FROM_EMAIL,
+        to: [row.email],
+        subject: "ISIR 2026 – Registration confirmed",
+        html,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data?.message || data?.msg || (typeof data === "string" ? data : null) || "Resend API error";
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Resend API error: ${msg}`,
+          status: res.status,
+          details: data,
+        }),
+        { status: 502, headers: corsHeaders }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Confirmation email sent to ${row.email}`,
+        registrationId,
+        id: data.id || null,
+      }),
+      { status: 200, headers: corsHeaders }
+    );
+  } catch (err) {
+    console.error("Resend confirmation error:", err);
     return new Response(
       JSON.stringify({ success: false, error: err.message || "Failed to send" }),
       { status: 500, headers: corsHeaders }
