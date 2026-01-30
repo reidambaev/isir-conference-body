@@ -44,6 +44,38 @@ In **Cloudflare Pages**: same variable names under **Settings → Environment va
 
 If either env var is missing, the request still succeeds; it just skips sending the email.
 
+---
+
+## Registration confirmation not sending (test email works)
+
+If the **test email** works but the **registration confirmation** (after payment) does not, the flow is: Stripe calls your webhook → worker updates the DB → worker sends the email. Check the following:
+
+1. **Stripe webhook URL**  
+   In [Stripe Dashboard → Developers → Webhooks](https://dashboard.stripe.com/webhooks), the endpoint URL must be your worker URL, e.g.  
+   `https://www.isir2026.org/api/stripe-webhook`  
+   If it points to an old or different URL, Stripe never hits your worker.
+
+2. **Events**  
+   The webhook must subscribe to **`payment_intent.succeeded`** (and optionally `payment_intent.payment_failed`). Without `payment_intent.succeeded`, the confirmation email is never triggered.
+
+3. **Webhook secret**  
+   After adding or changing the endpoint, Stripe shows a **Signing secret** (starts with `whsec_`). That value must be set as **`STRIPE_WEBHOOK_SECRET`** in your Worker’s Variables and Secrets (or via `wrangler secret put STRIPE_WEBHOOK_SECRET`). If the secret is wrong, the worker returns 400 and Stripe may show “Webhook signature verification failed”.
+
+4. **Registration exists in D1**  
+   The confirmation email is sent only if a row exists in `registrations` with the same `id` as `payment_intent.metadata.registrationId`. Registrations are created when the user submits the form (POST `/api/register`). If the user pays without having registered first, or the registration ID in the payment intent doesn’t match, no email is sent. In Cloudflare Dashboard → Workers & Pages → your worker → **Logs**, look for:  
+   - `Payment confirmed for registration: REG-...` (webhook ran and DB updated)  
+   - `Registration confirmation: no row found for id=...` (no matching registration)  
+   - `Confirmation email sent to ...` (email sent)
+
+5. **Local testing with Stripe CLI**  
+   If you use `stripe listen --forward-to https://www.isir2026.org/api/stripe-webhook`, the CLI uses a **temporary** signing secret. Use that secret in your env (e.g. `.dev.vars`) while testing; for production, use the secret from the Dashboard webhook.
+
+6. **See what Stripe is doing**  
+   In [Stripe Dashboard → Developers → Webhooks](https://dashboard.stripe.com/webhooks), click your endpoint → **Recent deliveries**. After a test payment, you should see a `payment_intent.succeeded` event. Check:
+   - **Response code 200** – webhook reached your worker and succeeded.
+   - **Response code 400** – signature verification failed; fix `STRIPE_WEBHOOK_SECRET`.
+   - **No event or failed** – endpoint URL is wrong, or the event isn’t selected.
+
 ## 3. Test email from the browser console
 
 To verify that Resend and your “from” address work, you can send a test email from the browser console.

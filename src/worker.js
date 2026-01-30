@@ -917,7 +917,7 @@ async function handleStripeWebhook(request, env) {
 
     let event;
     try {
-      event = stripe.webhooks.constructEvent(
+      event = await stripe.webhooks.constructEventAsync(
         body,
         signature,
         env.STRIPE_WEBHOOK_SECRET
@@ -953,7 +953,11 @@ async function handleStripeWebhook(request, env) {
               )
                 .bind(registrationId)
                 .first();
-              if (row?.email) {
+              if (!row) {
+                console.error(`Registration confirmation: no row found for id=${registrationId}`);
+              } else if (!row.email) {
+                console.error(`Registration confirmation: row found but no email for id=${registrationId}`);
+              } else if (row?.email) {
                 const name = [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(" ") || "Attendee";
                 const ticketLabel = formatTicketLabel(row.ticket_type);
                 const amount = row.total_price != null ? `${row.currency || "USD"} ${Number(row.total_price).toFixed(2)}` : "";
