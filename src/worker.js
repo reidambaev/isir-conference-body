@@ -201,12 +201,8 @@ async function handleRegistration(request, env, corsHeaders) {
   const CODE_VERSION = "2.1.0-worker-fixed";
   
   try {
-    console.error("=== REGISTRATION API CALLED (worker.js) ===");
-    console.error("Version:", CODE_VERSION);
-    
     const rawData = await request.json();
-    console.error("Raw data received:", JSON.stringify(rawData, null, 2));
-    
+
     // Sanitize all data to ensure no objects are passed to D1
     const extractString = (value) => {
       if (!value) return null;
@@ -340,19 +336,7 @@ async function handleRegistration(request, env, corsHeaders) {
       }
       return param;
     });
-    
-    // Log all parameters before binding
-    console.error("Final parameters to bind:", JSON.stringify(
-      paramNames.map((name, i) => ({
-        name,
-        value: finalParams[i],
-        type: typeof finalParams[i],
-        isObject: typeof finalParams[i] === 'object' && finalParams[i] !== null
-      })),
-      null,
-      2
-    ));
-    
+
     // Check for any remaining objects
     const hasObjects = finalParams.some(p => typeof p === 'object' && p !== null);
     if (hasObjects) {
@@ -390,9 +374,8 @@ async function handleRegistration(request, env, corsHeaders) {
       )
         .bind(currency, registrationId)
         .run();
-    } catch (err) {
-      // Currency column might not exist yet - that's okay
-      console.error("Currency column not available, skipping update");
+    } catch (_) {
+      // Currency column might not exist yet - skip update
     }
 
     return new Response(
