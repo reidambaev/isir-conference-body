@@ -947,23 +947,41 @@ async function handleStripeWebhook(request, env) {
             console.log(`Payment confirmed for registration: ${registrationId}`);
 
             if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
-              const row = await env.ISIR_DB.prepare(
-                `SELECT email, first_name, middle_name, last_name, ticket_type, ticket_price, total_price, currency,
-                 accompanying_count, gala_dinner, institution, badge_name FROM registrations WHERE id = ?`
-              )
-                .bind(registrationId)
-                .first();
-              if (!row) {
-                console.error(`Registration confirmation: no row found for id=${registrationId}`);
-              } else if (!row.email) {
-                console.error(`Registration confirmation: row found but no email for id=${registrationId}`);
-              } else if (row?.email) {
-                const name = [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(" ") || "Attendee";
-                const ticketLabel = formatTicketLabel(row.ticket_type);
-                const amount = row.total_price != null ? `${row.currency || "USD"} ${Number(row.total_price).toFixed(2)}` : "";
-                const acc = Number(row.accompanying_count) || 0;
-                const gala = Number(row.gala_dinner) || 0;
-                const html = `
+              try {
+                let row = null;
+                try {
+                  row = await env.ISIR_DB.prepare(
+                    `SELECT email, first_name, middle_name, last_name, ticket_type, ticket_price, total_price, currency,
+                     accompanying_count, gala_dinner, institution, badge_name FROM registrations WHERE id = ?`
+                  )
+                    .bind(registrationId)
+                    .first();
+                } catch (selectErr) {
+                  row = await env.ISIR_DB.prepare(
+                    `SELECT email, first_name, middle_name, last_name, ticket_type, total_price, currency FROM registrations WHERE id = ?`
+                  )
+                    .bind(registrationId)
+                    .first();
+                }
+                if (!row) {
+                  console.error(`Registration confirmation: no row found for id=${registrationId}`);
+                } else if (!row.email) {
+                  console.error(`Registration confirmation: row found but no email for id=${registrationId}`);
+                } else {
+                  const name = [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(" ") || "Attendee";
+                  const ticketLabel = formatTicketLabel(row.ticket_type);
+                  const amount = row.total_price != null ? `${row.currency || "USD"} ${Number(row.total_price).toFixed(2)}` : "";
+                  const acc = row.accompanying_count != null ? Number(row.accompanying_count) : 0;
+                  const gala = row.gala_dinner != null ? Number(row.gala_dinner) : 0;
+                  const badgeName = row.badge_name;
+                  let receiptUrl = null;
+                  if (paymentIntent.latest_charge) {
+                    try {
+                      const charge = await stripe.charges.retrieve(paymentIntent.latest_charge);
+                      receiptUrl = charge.receipt_url || null;
+                    } catch (_) {}
+                  }
+                  const html = `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>Registration Confirmed – ISIR 2026</title></head>
@@ -981,10 +999,11 @@ async function handleStripeWebhook(request, env) {
       <tr><td style="padding: 4px 0;">Ticket type</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(ticketLabel)}</td></tr>
       ${acc > 0 ? `<tr><td style="padding: 4px 0;">Accompanying persons</td><td style="padding: 4px 0; text-align: right;">${acc}</td></tr>` : ""}
       ${gala > 0 ? `<tr><td style="padding: 4px 0;">Gala dinner tickets</td><td style="padding: 4px 0; text-align: right;">${gala}</td></tr>` : ""}
-      ${row.badge_name ? `<tr><td style="padding: 4px 0;">Badge name</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(row.badge_name)}</td></tr>` : ""}
+      ${badgeName ? `<tr><td style="padding: 4px 0;">Badge name</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(badgeName)}</td></tr>` : ""}
       ${amount ? `<tr><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd;">Amount paid</td><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd; text-align: right;"><strong>${escapeHtml(amount)}</strong></td></tr>` : ""}
     </table>
   </div>
+  ${receiptUrl ? `<p><a href="${escapeHtml(receiptUrl)}" style="color: #1a3a6c; font-weight: 600;">View your payment receipt (Stripe)</a></p>` : ""}
   <p><strong>What happens next</strong></p>
   <ul style="margin: 0 0 20px 0; padding-left: 1.2rem;">
     <li>Keep this email as your confirmation. You may be asked for your registration ID.</li>
@@ -994,25 +1013,28 @@ async function handleStripeWebhook(request, env) {
   <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
 </body>
 </html>`;
-                const res = await fetch("https://api.resend.com/emails", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${env.RESEND_API_KEY}`,
-                  },
-                  body: JSON.stringify({
-                    from: env.CONFIRMATION_FROM_EMAIL,
-                    to: [row.email],
-                    subject: "ISIR 2026 – Registration confirmed",
-                    html,
-                  }),
-                });
-                if (!res.ok) {
-                  const err = await res.text();
-                  console.error("Resend email failed:", res.status, err);
-                } else {
-                  console.log(`Confirmation email sent to ${row.email}`);
+                  const res = await fetch("https://api.resend.com/emails", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+                    },
+                    body: JSON.stringify({
+                      from: env.CONFIRMATION_FROM_EMAIL,
+                      to: [row.email],
+                      subject: "ISIR 2026 – Registration confirmed",
+                      html,
+                    }),
+                  });
+                  if (!res.ok) {
+                    const err = await res.text();
+                    console.error("Resend email failed:", res.status, err);
+                  } else {
+                    console.log(`Confirmation email sent to ${row.email}`);
+                  }
                 }
+              } catch (emailErr) {
+                console.error("Registration confirmation email error:", emailErr);
               }
             }
           } catch (dbError) {

@@ -36,6 +36,11 @@ Your database schema already supports `gala_dinner` as an INTEGER (count), so no
    npx wrangler d1 execute isir-registrations --file=./db/migration_add_corresponding_author.sql
    ```
 
+   **If the Stripe webhook fails with "no such column: payment_intent_id":**
+   ```bash
+   npx wrangler d1 execute isir-registrations --file=./db/migration_add_payment_intent_id.sql
+   ```
+
 ### Option 2: Using Cloudflare Dashboard
 
 1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/)
