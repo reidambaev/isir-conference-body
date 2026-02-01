@@ -62,7 +62,7 @@ const AboutTab = () => (
     <p className="text-gray-700 mb-6">
       You are cordially invited to the 16th Congress of the International
       Society for Immunology of Reproduction (ISIR) in the beautiful city of
-      Busan, Korea. Join us from September 10-13, 2026, for a "Global Dialog on
+      Busan, Korea. Join us from November 5-8, 2026, for a "Global Dialog on
       Population Balance and Women's Health through Reproductive Immunology." We
       look forward to welcoming leading researchers, clinicians, and industry
       partners to share the latest advancements in our field.
@@ -96,10 +96,10 @@ const AboutTab = () => (
         </h4>
         <ul className="list-disc list-inside text-gray-700 space-y-2 grid grid-cols-1 md:grid-cols-2 gap-x-8">
           <li>
-            <strong>Abstract Submission Opens:</strong> February 1, 2026
+            <strong>Abstract Submission Opens:</strong> March 1, 2026
           </li>
           <li>
-            <strong>Early Bird Registration Opens:</strong> February 1, 2026
+            <strong>Early Bird Registration Opens:</strong> March 1, 2026
           </li>
           <li>
             <strong>Abstract Submission Deadline:</strong> April 30, 2026
@@ -241,11 +241,11 @@ const ScheduleTab = () => {
 
   // 2. Define the Day Columns (Matching your conference dates/days)
   const days = [
-    { key: "day0", label: "SUN Sept 10" }, // This key is temporary for the one Sunday event
-    { key: "day1", label: "MON Sept 11" },
-    { key: "day2", label: "TUES Sept 12" },
-    { key: "day3", label: "WED Sept 13" },
-    { key: "day4", label: "THURS Sept 14" }, // Departure day
+    { key: "day0", label: "THURS Nov 5" },
+    { key: "day1", label: "FRI Nov 6" },
+    { key: "day2", label: "SAT Nov 7" },
+    { key: "day3", label: "SUN Nov 8" },
+    { key: "day4", label: "MON Nov 9" }, // Departure day
   ];
 
   // 3. The Schedule Data, reorganized to match the new image structure
@@ -646,7 +646,7 @@ const RegistrationTab = () => (
           </h4>
           <p className="text-gray-700 mb-3">
             Registration and abstract submission are handled through the same
-            portal. Portals open February 1, 2026.
+            portal. Portals open March 1, 2026.
           </p>
           <a
             href="https://theisir.org/membership-account/membership-levels/"
@@ -749,7 +749,7 @@ const CircleCheckIcon = ({ className }) => (
 
 const deadlines = [
   {
-    date: "Feb 1",
+    date: "Mar 1",
     title: "Registration & Abstract Submissions Open",
     desc: "The portal for both congress registration and abstract submission will be available.",
   },
@@ -776,7 +776,7 @@ const deadlines = [
   {
     date: "Aug 30",
     title: "Registration Deadline",
-    desc: "Final day for advance registration. On-site registration available September 10-13.",
+    desc: "Final day for advance registration. On-site registration available November 5-8.",
   },
 ];
 
@@ -843,14 +843,14 @@ const DeadlinesTab = () => {
           const dateBlockClasses = isPast
             ? "bg-gray-100 text-gray-400" // Gray if past
             : isUrgent
-            ? "bg-red-50 text-red-700" // Red if urgent
-            : "bg-indigo-50 text-indigo-700"; // Normal
+              ? "bg-red-50 text-red-700" // Red if urgent
+              : "bg-indigo-50 text-indigo-700"; // Normal
 
           const titleClasses = isPast
             ? "text-gray-900 line-through" // Strike-through if past
             : isUrgent
-            ? "text-red-900" // Red if urgent
-            : "text-gray-900";
+              ? "text-red-900" // Red if urgent
+              : "text-gray-900";
 
           const descClasses = isPast
             ? "text-gray-600 line-through" // Strike-through if past
