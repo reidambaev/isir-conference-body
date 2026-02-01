@@ -22,7 +22,6 @@ The app sends a **registration confirmation email** after a successful Stripe pa
    - Add the DNS records Resend shows (MX, TXT, etc.) in your DNS (e.g. in Google Admin or your registrar). This does **not** change how you receive email in Google Workspace; it only allows Resend to send **from** that domain.
 
 3. **Set environment variables** (for local dev use `.dev.vars`; for production use Cloudflare Pages → your project → Settings → Environment variables):
-
    - `RESEND_API_KEY` – your Resend API key (e.g. `re_...`).
    - `CONFIRMATION_FROM_EMAIL` – the “From” address, e.g. `ISIR 2026 <noreply@yourdomain.com>` (must use the verified domain).
 
@@ -57,17 +56,19 @@ You can resend the same confirmation email for any registration (e.g. if it fail
 Example from the browser console (replace the registration ID and secret):
 
 ```javascript
-fetch('/api/resend-confirmation', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+fetch("/api/resend-confirmation", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
-    registrationId: 'REG-1234567890-XXXXXXXXX',
-    secret: 'your-test-secret'
-  })
-}).then(r => r.json()).then(console.log);
+    registrationId: "REG-1234567890-XXXXXXXXX",
+    secret: "your-test-secret",
+  }),
+})
+  .then((r) => r.json())
+  .then(console.log);
 ```
 
-The email is the same as the automatic one (summary + Stripe receipt link when available). You can get the registration ID from the admin registrations list or from your D1 data.
+The email is the same as the automatic one (registration summary). You can get the registration ID from the admin registrations list or from your D1 data.
 
 ---
 
@@ -87,9 +88,9 @@ If the **test email** works but the **registration confirmation** (after payment
    After adding or changing the endpoint, Stripe shows a **Signing secret** (starts with `whsec_`). That value must be set as **`STRIPE_WEBHOOK_SECRET`** in your Worker’s Variables and Secrets (or via `wrangler secret put STRIPE_WEBHOOK_SECRET`). If the secret is wrong, the worker returns 400 and Stripe may show “Webhook signature verification failed”.
 
 4. **Registration exists in D1**  
-   The confirmation email is sent only if a row exists in `registrations` with the same `id` as `payment_intent.metadata.registrationId`. Registrations are created when the user submits the form (POST `/api/register`). If the user pays without having registered first, or the registration ID in the payment intent doesn’t match, no email is sent. In Cloudflare Dashboard → Workers & Pages → your worker → **Logs**, look for:  
-   - `Payment confirmed for registration: REG-...` (webhook ran and DB updated)  
-   - `Registration confirmation: no row found for id=...` (no matching registration)  
+   The confirmation email is sent only if a row exists in `registrations` with the same `id` as `payment_intent.metadata.registrationId`. Registrations are created when the user submits the form (POST `/api/register`). If the user pays without having registered first, or the registration ID in the payment intent doesn’t match, no email is sent. In Cloudflare Dashboard → Workers & Pages → your worker → **Logs**, look for:
+   - `Payment confirmed for registration: REG-...` (webhook ran and DB updated)
+   - `Registration confirmation: no row found for id=...` (no matching registration)
    - `Confirmation email sent to ...` (email sent)
 
 5. **Local testing with Stripe CLI**  
@@ -111,32 +112,37 @@ To verify that Resend and your “from” address work, you can send a test emai
 2. **Open your site** (local or deployed), open DevTools (F12) → **Console**, and run (replace the email and secret):
 
 ```javascript
-fetch('/api/test-email', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+fetch("/api/test-email", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
-    to: 'your@email.com',
-    secret: 'your-test-secret'  // same as TEST_EMAIL_SECRET
-  })
-}).then(r => r.json()).then(console.log);
+    to: "your@email.com",
+    secret: "your-test-secret", // same as TEST_EMAIL_SECRET
+  }),
+})
+  .then((r) => r.json())
+  .then(console.log);
 ```
 
 Or send the secret in a header (so it’s not in the request body):
 
 ```javascript
-fetch('/api/test-email', {
-  method: 'POST',
+fetch("/api/test-email", {
+  method: "POST",
   headers: {
-    'Content-Type': 'application/json',
-    'X-Test-Email-Secret': 'your-test-secret'
+    "Content-Type": "application/json",
+    "X-Test-Email-Secret": "your-test-secret",
   },
-  body: JSON.stringify({ to: 'your@email.com' })
-}).then(r => r.json()).then(console.log);
+  body: JSON.stringify({ to: "your@email.com" }),
+})
+  .then((r) => r.json())
+  .then(console.log);
 ```
 
 If it works, you’ll see `{ success: true, message: "Test email sent to your@email.com", ... }` and receive a short test email. Do **not** set `TEST_EMAIL_SECRET` in Production if you want to disable this endpoint there.
 
 **If you get 502 Bad Gateway:** Open the request in the Network tab and check the **response body** (JSON). It will include `error` and often `details` from Resend. Common causes:
+
 - **Domain not verified** – In [Resend → Domains](https://resend.com/domains), add and verify the domain used in `CONFIRMATION_FROM_EMAIL` (e.g. `noreply@yourdomain.com` → verify `yourdomain.com`).
 - **Invalid API key** – Regenerate the key in Resend → API Keys and set `RESEND_API_KEY` in your deployment (Cloudflare Pages → Settings → Environment variables, **runtime**).
 - **Wrong env in production** – Ensure `RESEND_API_KEY`, `CONFIRMATION_FROM_EMAIL`, and `TEST_EMAIL_SECRET` are set for the **same** environment you’re calling (e.g. Production).

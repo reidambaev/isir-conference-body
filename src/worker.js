@@ -18,51 +18,82 @@ export default {
 
     // For SPA routing, try to fetch the asset first
     let response = await env.ASSETS.fetch(request);
-    
+
     // If the asset doesn't exist (404) or is redirected (307/301/302), and it's not a file extension, serve index.html
     const hasFileExtension = /\.\w+$/.test(pathname);
-    if ((response.status === 404 || response.status === 307 || response.status === 301 || response.status === 302) && !hasFileExtension) {
-      console.log(`[Worker] Serving index.html for SPA route: ${pathname} (original status: ${response.status})`);
-      
+    if (
+      (response.status === 404 ||
+        response.status === 307 ||
+        response.status === 301 ||
+        response.status === 302) &&
+      !hasFileExtension
+    ) {
+      console.log(
+        `[Worker] Serving index.html for SPA route: ${pathname} (original status: ${response.status})`,
+      );
+
       // Try fetching root path first (since index.html might redirect to /)
       const rootRequest = new Request(new URL("/", url.origin).toString(), {
         method: "GET",
         headers: {
-          "Accept": "text/html",
+          Accept: "text/html",
         },
       });
-      
+
       let indexResponse = await env.ASSETS.fetch(rootRequest);
-      
+
       // If root also redirects, try index.html
-      if (indexResponse.status === 307 || indexResponse.status === 301 || indexResponse.status === 302) {
+      if (
+        indexResponse.status === 307 ||
+        indexResponse.status === 301 ||
+        indexResponse.status === 302
+      ) {
         const redirectLocation = indexResponse.headers.get("Location");
-        console.log(`[Worker] Root redirects to: ${redirectLocation}, following...`);
+        console.log(
+          `[Worker] Root redirects to: ${redirectLocation}, following...`,
+        );
         if (redirectLocation) {
           const redirectUrl = new URL(redirectLocation, url.origin);
-          indexResponse = await env.ASSETS.fetch(new Request(redirectUrl.toString(), rootRequest));
+          indexResponse = await env.ASSETS.fetch(
+            new Request(redirectUrl.toString(), rootRequest),
+          );
         }
       }
-      
+
       // If still redirecting, try index.html directly
-      if (indexResponse.status === 307 || indexResponse.status === 301 || indexResponse.status === 302) {
-        const indexRequest = new Request(new URL("/index.html", url.origin).toString(), rootRequest);
+      if (
+        indexResponse.status === 307 ||
+        indexResponse.status === 301 ||
+        indexResponse.status === 302
+      ) {
+        const indexRequest = new Request(
+          new URL("/index.html", url.origin).toString(),
+          rootRequest,
+        );
         indexResponse = await env.ASSETS.fetch(indexRequest);
-        
+
         // Follow redirect if needed
-        if (indexResponse.status === 307 || indexResponse.status === 301 || indexResponse.status === 302) {
+        if (
+          indexResponse.status === 307 ||
+          indexResponse.status === 301 ||
+          indexResponse.status === 302
+        ) {
           const redirectLocation = indexResponse.headers.get("Location");
           if (redirectLocation) {
             const redirectUrl = new URL(redirectLocation, url.origin);
-            indexResponse = await env.ASSETS.fetch(new Request(redirectUrl.toString(), rootRequest));
+            indexResponse = await env.ASSETS.fetch(
+              new Request(redirectUrl.toString(), rootRequest),
+            );
           }
         }
       }
-      
+
       // Return the content with 200 status for SPA routes (preserve the original pathname)
       if (indexResponse.status === 200) {
         const body = await indexResponse.text();
-        console.log(`[Worker] Successfully serving SPA content for ${pathname}`);
+        console.log(
+          `[Worker] Successfully serving SPA content for ${pathname}`,
+        );
         return new Response(body, {
           status: 200,
           statusText: "OK",
@@ -72,7 +103,9 @@ export default {
           },
         });
       } else {
-        console.log(`[Worker] Failed to get index.html, status: ${indexResponse.status}`);
+        console.log(
+          `[Worker] Failed to get index.html, status: ${indexResponse.status}`,
+        );
       }
     }
 
@@ -85,7 +118,8 @@ async function handleApiRequest(request, env, url) {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-Test-Email-Secret, stripe-signature",
+    "Access-Control-Allow-Headers":
+      "Content-Type, X-Test-Email-Secret, stripe-signature",
     "Content-Type": "application/json",
   };
 
@@ -136,7 +170,10 @@ async function handleApiRequest(request, env, url) {
   }
 
   // POST /api/resend-confirmation – force-send registration confirmation email (same secret as test-email)
-  if (url.pathname === "/api/resend-confirmation" && request.method === "POST") {
+  if (
+    url.pathname === "/api/resend-confirmation" &&
+    request.method === "POST"
+  ) {
     return handleResendConfirmation(request, env, corsHeaders);
   }
 
@@ -162,7 +199,10 @@ async function handleApiRequest(request, env, url) {
     const status = {};
     for (const name of vars) {
       const v = env[name];
-      status[name] = v !== undefined && v !== null && String(v).trim() !== "" ? "set" : "missing";
+      status[name] =
+        v !== undefined && v !== null && String(v).trim() !== ""
+          ? "set"
+          : "missing";
     }
     return new Response(JSON.stringify(status, null, 2), {
       status: 200,
@@ -194,21 +234,25 @@ function formatTicketLabel(slug) {
     "trainee-member": "Trainee (ISIR Member)",
     "trainee-non-member": "Trainee (Non-Member)",
   };
-  return labels[slug] || slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return (
+    labels[slug] ||
+    slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
 }
 
 async function handleRegistration(request, env, corsHeaders) {
   const CODE_VERSION = "2.1.0-worker-fixed";
-  
+
   try {
     const rawData = await request.json();
 
     // Sanitize all data to ensure no objects are passed to D1
     const extractString = (value) => {
       if (!value) return null;
-      if (typeof value === 'string') return value;
-      if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-      if (typeof value === 'object' && value !== null) {
+      if (typeof value === "string") return value;
+      if (typeof value === "number" || typeof value === "boolean")
+        return String(value);
+      if (typeof value === "object" && value !== null) {
         if (value.name) return String(value.name);
         try {
           return JSON.stringify(value);
@@ -218,7 +262,7 @@ async function handleRegistration(request, env, corsHeaders) {
       }
       return String(value);
     };
-    
+
     const normalizeForD1 = (value) => {
       if (value === undefined || value === null) return null;
       const type = typeof value;
@@ -231,16 +275,19 @@ async function handleRegistration(request, env, corsHeaders) {
         return String(value);
       }
     };
-    
+
     // Extract city, state, country as strings
     const cityName = extractString(rawData.city);
-    const stateName = extractString(rawData.state) || extractString(rawData.stateSelect) || extractString(rawData.stateText);
-    const countryName = extractString(rawData.country) || '';
-    
+    const stateName =
+      extractString(rawData.state) ||
+      extractString(rawData.stateSelect) ||
+      extractString(rawData.stateText);
+    const countryName = extractString(rawData.country) || "";
+
     // Normalize membership fields
     const membershipLevel = normalizeForD1(rawData.membershipLevel);
     const membershipStatus = normalizeForD1(rawData.membershipStatus);
-    
+
     const data = rawData; // Keep original for other fields
 
     // Generate unique registration ID
@@ -269,16 +316,49 @@ async function handleRegistration(request, env, corsHeaders) {
 
     // Build all parameters with comprehensive sanitization
     const paramNames = [
-      'id', 'registration_date', 'email', 'first_name', 'middle_name', 'last_name',
-      'salutation', 'suffix', 'institution', 'credentials', 'badge_name', 'pronouns',
-      'department', 'address1', 'address2', 'city', 'state', 'zip', 'country', 'phone', 'cell_phone',
-      'is_physician', 'ticket_type', 'accompanying_count', 'gala_dinner', 'ticket_price', 'total_price',
-      'is_early_bird', 'dietary_vegan', 'dietary_vegetarian', 'dietary_gluten_free',
-      'dietary_kosher', 'dietary_other', 'special_assistance', 'policy_agreed',
-      'privacy_marketing', 'privacy_app', 'opt_out_mailing', 'payment_status',
-      'membership_level', 'membership_status'
+      "id",
+      "registration_date",
+      "email",
+      "first_name",
+      "middle_name",
+      "last_name",
+      "salutation",
+      "suffix",
+      "institution",
+      "credentials",
+      "badge_name",
+      "pronouns",
+      "department",
+      "address1",
+      "address2",
+      "city",
+      "state",
+      "zip",
+      "country",
+      "phone",
+      "cell_phone",
+      "is_physician",
+      "ticket_type",
+      "accompanying_count",
+      "gala_dinner",
+      "ticket_price",
+      "total_price",
+      "is_early_bird",
+      "dietary_vegan",
+      "dietary_vegetarian",
+      "dietary_gluten_free",
+      "dietary_kosher",
+      "dietary_other",
+      "special_assistance",
+      "policy_agreed",
+      "privacy_marketing",
+      "privacy_app",
+      "opt_out_mailing",
+      "payment_status",
+      "membership_level",
+      "membership_status",
     ];
-    
+
     const paramValues = [
       registrationId,
       registrationDate,
@@ -320,14 +400,17 @@ async function handleRegistration(request, env, corsHeaders) {
       data.optOutMailing ? 1 : 0,
       "pending",
       membershipLevel, // SANITIZED
-      membershipStatus // SANITIZED
+      membershipStatus, // SANITIZED
     ];
-    
+
     // Final safety check - ensure NO objects remain
     const finalParams = paramValues.map((param, index) => {
       const paramType = typeof param;
-      if (paramType === 'object' && param !== null) {
-        console.error(`🚨 CRITICAL: ${paramNames[index]} is still an object!`, param);
+      if (paramType === "object" && param !== null) {
+        console.error(
+          `🚨 CRITICAL: ${paramNames[index]} is still an object!`,
+          param,
+        );
         try {
           return JSON.stringify(param);
         } catch {
@@ -338,15 +421,23 @@ async function handleRegistration(request, env, corsHeaders) {
     });
 
     // Check for any remaining objects
-    const hasObjects = finalParams.some(p => typeof p === 'object' && p !== null);
+    const hasObjects = finalParams.some(
+      (p) => typeof p === "object" && p !== null,
+    );
     if (hasObjects) {
-      const error = new Error("D1_TYPE_ERROR: Objects detected in parameters. Check logs.");
-      console.error("FATAL: Cannot proceed with objects:", paramNames.filter((name, i) => 
-        typeof finalParams[i] === 'object' && finalParams[i] !== null
-      ));
+      const error = new Error(
+        "D1_TYPE_ERROR: Objects detected in parameters. Check logs.",
+      );
+      console.error(
+        "FATAL: Cannot proceed with objects:",
+        paramNames.filter(
+          (name, i) =>
+            typeof finalParams[i] === "object" && finalParams[i] !== null,
+        ),
+      );
       throw error;
     }
-    
+
     // Insert into D1 database - use sanitized values
     await env.ISIR_DB.prepare(
       `
@@ -360,7 +451,7 @@ async function handleRegistration(request, env, corsHeaders) {
         privacy_marketing, privacy_app, opt_out_mailing, payment_status,
         membership_level, membership_status
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `
+    `,
     )
       .bind(...finalParams)
       .run();
@@ -370,7 +461,7 @@ async function handleRegistration(request, env, corsHeaders) {
       const isKorean = countryName.toLowerCase().includes("korea");
       const currency = isKorean ? "KRW" : "USD";
       await env.ISIR_DB.prepare(
-        `UPDATE registrations SET currency = ? WHERE id = ?`
+        `UPDATE registrations SET currency = ? WHERE id = ?`,
       )
         .bind(currency, registrationId)
         .run();
@@ -392,13 +483,13 @@ async function handleRegistration(request, env, corsHeaders) {
           ...corsHeaders,
           "X-API-Version": CODE_VERSION,
         },
-      }
+      },
     );
   } catch (error) {
     console.error("=== REGISTRATION ERROR (worker.js) ===");
     console.error("Error:", error.message);
     console.error("Stack:", error.stack);
-    
+
     // ALWAYS include version - this proves which code is running
     const errorResponse = {
       success: false,
@@ -406,23 +497,20 @@ async function handleRegistration(request, env, corsHeaders) {
       version: CODE_VERSION, // MUST be in response to verify deployment
       timestamp: new Date().toISOString(),
     };
-    
+
     console.error("Error response being sent:", JSON.stringify(errorResponse));
-    
-    return new Response(
-      JSON.stringify(errorResponse),
-      {
-        status: 500,
-        headers: corsHeaders,
-      }
-    );
+
+    return new Response(JSON.stringify(errorResponse), {
+      status: 500,
+      headers: corsHeaders,
+    });
   }
 }
 
 async function handleGetRegistrations(env, corsHeaders) {
   try {
     const result = await env.ISIR_DB.prepare(
-      "SELECT * FROM registrations ORDER BY registration_date DESC LIMIT 100"
+      "SELECT * FROM registrations ORDER BY registration_date DESC LIMIT 100",
     ).all();
 
     return new Response(
@@ -433,7 +521,7 @@ async function handleGetRegistrations(env, corsHeaders) {
       {
         status: 200,
         headers: corsHeaders,
-      }
+      },
     );
   } catch (error) {
     return new Response(
@@ -444,7 +532,7 @@ async function handleGetRegistrations(env, corsHeaders) {
       {
         status: 500,
         headers: corsHeaders,
-      }
+      },
     );
   }
 }
@@ -479,20 +567,20 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
               JSON.stringify({
                 error: `Invalid ${field} format. Must be valid JSON array.`,
               }),
-              { status: 400, headers: corsHeaders }
+              { status: 400, headers: corsHeaders },
             );
           }
         }
         if (!Array.isArray(fieldData) || fieldData.length === 0) {
           return new Response(
             JSON.stringify({ error: `${field} must be a non-empty array` }),
-            { status: 400, headers: corsHeaders }
+            { status: 400, headers: corsHeaders },
           );
         }
       } else if (!data[field] || data[field].trim() === "") {
         return new Response(
           JSON.stringify({ error: `Missing required field: ${field}` }),
-          { status: 400, headers: corsHeaders }
+          { status: 400, headers: corsHeaders },
         );
       }
     }
@@ -511,7 +599,7 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         {
           status: 400,
           headers: corsHeaders,
-        }
+        },
       );
     }
 
@@ -522,7 +610,7 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         JSON.stringify({
           error: `Abstract exceeds 300 word limit (current: ${wordCount} words)`,
         }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: corsHeaders },
       );
     }
 
@@ -531,7 +619,7 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
     if (!validPreferences.includes(data.presentationPreference)) {
       return new Response(
         JSON.stringify({ error: "Invalid presentation preference" }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: corsHeaders },
       );
     }
 
@@ -543,13 +631,13 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
     if (now > submissionDeadline) {
       return new Response(
         JSON.stringify({ error: "Submission deadline has passed" }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: corsHeaders },
       );
     }
     if (now < submissionOpens) {
       return new Response(
         JSON.stringify({ error: "Submission window has not opened yet" }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: corsHeaders },
       );
     }
 
@@ -572,19 +660,19 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
           JSON.stringify({
             error: "All authors must have first and last name",
           }),
-          { status: 400, headers: corsHeaders }
+          { status: 400, headers: corsHeaders },
         );
       }
     }
 
     // Determine corresponding author id for linkage
     const correspondingIdx = authorsData.findIndex(
-      (author) => author.isCorresponding
+      (author) => author.isCorresponding,
     );
     if (correspondingIdx === -1) {
       return new Response(
         JSON.stringify({ error: "A corresponding author must be designated" }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: corsHeaders },
       );
     }
     const correspondingAuthorId = `AUTH-${submissionId}-${correspondingIdx}`;
@@ -597,7 +685,7 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         presenter_name, presenter_email,
         corresponding_name, corresponding_email, corresponding_author_id,
         affiliations, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         submissionId,
@@ -615,7 +703,7 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         correspondingAuthorId,
         data.affiliations || null,
         "submitted",
-        submissionDate
+        submissionDate,
       )
       .run();
 
@@ -628,7 +716,7 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         `INSERT INTO authors (
           id, abstract_id, first_name, middle_name, last_name,
           email, is_presenter, is_corresponding, position
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
         .bind(
           authorId,
@@ -639,7 +727,7 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
           author.email?.trim() || null,
           author.isPresenter ? 1 : 0,
           author.isCorresponding ? 1 : 0,
-          i
+          i,
         )
         .run();
     }
@@ -659,7 +747,7 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
           `INSERT INTO affiliations (
             id, abstract_id, author_name, department, institution,
             city, country, position
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         )
           .bind(
             affId,
@@ -669,7 +757,7 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
             aff.institution?.trim() || null,
             aff.city?.trim() || null,
             aff.country?.trim() || null,
-            i
+            i,
           )
           .run();
       }
@@ -683,9 +771,17 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         const title = data.title?.trim() || "";
         const category = data.category?.trim() || "";
         const pref = (data.presentationPreference || "").toLowerCase();
-        const prefLabel = pref === "oral" ? "Oral" : pref === "poster" ? "Poster" : pref === "either" ? "Oral or Poster" : data.presentationPreference || "";
+        const prefLabel =
+          pref === "oral"
+            ? "Oral"
+            : pref === "poster"
+              ? "Poster"
+              : pref === "either"
+                ? "Oral or Poster"
+                : data.presentationPreference || "";
         const abstractSnippet = (data.abstract?.trim() || "").slice(0, 280);
-        const abstractDisplay = abstractSnippet + (abstractSnippet.length >= 280 ? "…" : "");
+        const abstractDisplay =
+          abstractSnippet + (abstractSnippet.length >= 280 ? "…" : "");
         const html = `
 <!DOCTYPE html>
 <html>
@@ -733,7 +829,11 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
           });
           if (!res.ok) {
             const err = await res.text();
-            console.error("Resend abstract confirmation failed:", res.status, err);
+            console.error(
+              "Resend abstract confirmation failed:",
+              res.status,
+              err,
+            );
           } else {
             console.log(`Abstract confirmation email sent to ${toEmail}`);
           }
@@ -749,13 +849,13 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         submissionId: submissionId,
         message: "Abstract submitted successfully!",
       }),
-      { status: 201, headers: corsHeaders }
+      { status: 201, headers: corsHeaders },
     );
   } catch (error) {
     console.error("Abstract submission error:", error);
     return new Response(
       JSON.stringify({ error: error.message || "Failed to submit abstract" }),
-      { status: 500, headers: corsHeaders }
+      { status: 500, headers: corsHeaders },
     );
   }
 }
@@ -772,7 +872,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
           success: false,
           error: "Email, name, and country are required",
         }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: corsHeaders },
       );
     }
 
@@ -783,7 +883,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
     // Insert visa request
     await env.ISIR_DB.prepare(
       `INSERT INTO visa_requests (id, email, name, country, notes, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`
+       VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`,
     )
       .bind(
         visaRequestId,
@@ -792,7 +892,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
         country,
         notes || null,
         timestamp,
-        timestamp
+        timestamp,
       )
       .run();
 
@@ -802,7 +902,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
         visaRequestId: visaRequestId,
         message: "Visa request submitted successfully",
       }),
-      { status: 200, headers: corsHeaders }
+      { status: 200, headers: corsHeaders },
     );
   } catch (error) {
     console.error("Visa request error:", error);
@@ -811,7 +911,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
         success: false,
         error: "Failed to submit visa request",
       }),
-      { status: 500, headers: corsHeaders }
+      { status: 500, headers: corsHeaders },
     );
   }
 }
@@ -835,7 +935,7 @@ async function handleCreatePaymentIntent(request, env, corsHeaders) {
         {
           status: 400,
           headers: corsHeaders,
-        }
+        },
       );
     }
 
@@ -867,7 +967,7 @@ async function handleCreatePaymentIntent(request, env, corsHeaders) {
       {
         status: 200,
         headers: corsHeaders,
-      }
+      },
     );
   } catch (error) {
     console.error("Payment intent creation error:", error);
@@ -879,7 +979,7 @@ async function handleCreatePaymentIntent(request, env, corsHeaders) {
       {
         status: 500,
         headers: corsHeaders,
-      }
+      },
     );
   }
 }
@@ -889,13 +989,19 @@ async function handleStripeWebhook(request, env) {
   try {
     if (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET) {
       console.error("Stripe not configured");
-      return new Response("Stripe not configured", { status: 500, headers: jsonHeaders });
+      return new Response("Stripe not configured", {
+        status: 500,
+        headers: jsonHeaders,
+      });
     }
 
     const body = await request.text();
     const signature = request.headers.get("stripe-signature");
     if (!signature) {
-      return new Response("No signature", { status: 400, headers: jsonHeaders });
+      return new Response("No signature", {
+        status: 400,
+        headers: jsonHeaders,
+      });
     }
 
     const Stripe = (await import("stripe")).default;
@@ -908,11 +1014,14 @@ async function handleStripeWebhook(request, env) {
       event = await stripe.webhooks.constructEventAsync(
         body,
         signature,
-        env.STRIPE_WEBHOOK_SECRET
+        env.STRIPE_WEBHOOK_SECRET,
       );
     } catch (err) {
       console.error("Webhook signature verification failed:", err.message);
-      return new Response(`Webhook Error: ${err.message}`, { status: 400, headers: jsonHeaders });
+      return new Response(`Webhook Error: ${err.message}`, {
+        status: 400,
+        headers: jsonHeaders,
+      });
     }
 
     switch (event.type) {
@@ -927,12 +1036,14 @@ async function handleStripeWebhook(request, env) {
                SET payment_status = 'completed',
                    payment_intent_id = ?,
                    payment_date = ?
-               WHERE id = ?`
+               WHERE id = ?`,
             )
               .bind(paymentIntent.id, Date.now(), registrationId)
               .run();
 
-            console.log(`Payment confirmed for registration: ${registrationId}`);
+            console.log(
+              `Payment confirmed for registration: ${registrationId}`,
+            );
 
             if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
               try {
@@ -940,32 +1051,48 @@ async function handleStripeWebhook(request, env) {
                 try {
                   row = await env.ISIR_DB.prepare(
                     `SELECT email, first_name, middle_name, last_name, ticket_type, ticket_price, total_price, currency,
-                     accompanying_count, gala_dinner, institution, badge_name FROM registrations WHERE id = ?`
+                     accompanying_count, gala_dinner, institution, badge_name FROM registrations WHERE id = ?`,
                   )
                     .bind(registrationId)
                     .first();
                 } catch (selectErr) {
                   row = await env.ISIR_DB.prepare(
-                    `SELECT email, first_name, middle_name, last_name, ticket_type, total_price, currency FROM registrations WHERE id = ?`
+                    `SELECT email, first_name, middle_name, last_name, ticket_type, total_price, currency FROM registrations WHERE id = ?`,
                   )
                     .bind(registrationId)
                     .first();
                 }
                 if (!row) {
-                  console.error(`Registration confirmation: no row found for id=${registrationId}`);
+                  console.error(
+                    `Registration confirmation: no row found for id=${registrationId}`,
+                  );
                 } else if (!row.email) {
-                  console.error(`Registration confirmation: row found but no email for id=${registrationId}`);
+                  console.error(
+                    `Registration confirmation: row found but no email for id=${registrationId}`,
+                  );
                 } else {
-                  const name = [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(" ") || "Attendee";
+                  const name =
+                    [row.first_name, row.middle_name, row.last_name]
+                      .filter(Boolean)
+                      .join(" ") || "Attendee";
                   const ticketLabel = formatTicketLabel(row.ticket_type);
-                  const amount = row.total_price != null ? `${row.currency || "USD"} ${Number(row.total_price).toFixed(2)}` : "";
-                  const acc = row.accompanying_count != null ? Number(row.accompanying_count) : 0;
-                  const gala = row.gala_dinner != null ? Number(row.gala_dinner) : 0;
+                  const amount =
+                    row.total_price != null
+                      ? `${row.currency || "USD"} ${Number(row.total_price).toFixed(2)}`
+                      : "";
+                  const acc =
+                    row.accompanying_count != null
+                      ? Number(row.accompanying_count)
+                      : 0;
+                  const gala =
+                    row.gala_dinner != null ? Number(row.gala_dinner) : 0;
                   const badgeName = row.badge_name;
                   let receiptUrl = null;
                   if (paymentIntent.latest_charge) {
                     try {
-                      const charge = await stripe.charges.retrieve(paymentIntent.latest_charge);
+                      const charge = await stripe.charges.retrieve(
+                        paymentIntent.latest_charge,
+                      );
                       receiptUrl = charge.receipt_url || null;
                     } catch (_) {}
                   }
@@ -1022,7 +1149,10 @@ async function handleStripeWebhook(request, env) {
                   }
                 }
               } catch (emailErr) {
-                console.error("Registration confirmation email error:", emailErr);
+                console.error(
+                  "Registration confirmation email error:",
+                  emailErr,
+                );
               }
             }
           } catch (dbError) {
@@ -1037,11 +1167,13 @@ async function handleStripeWebhook(request, env) {
         if (failedRegistrationId && env.ISIR_DB) {
           try {
             await env.ISIR_DB.prepare(
-              `UPDATE registrations SET payment_status = 'failed' WHERE id = ?`
+              `UPDATE registrations SET payment_status = 'failed' WHERE id = ?`,
             )
               .bind(failedRegistrationId)
               .run();
-            console.log(`Payment failed for registration: ${failedRegistrationId}`);
+            console.log(
+              `Payment failed for registration: ${failedRegistrationId}`,
+            );
           } catch (dbError) {
             console.error("Database update error:", dbError);
           }
@@ -1058,7 +1190,10 @@ async function handleStripeWebhook(request, env) {
     });
   } catch (error) {
     console.error("Webhook error:", error);
-    return new Response(`Webhook Error: ${error.message}`, { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(`Webhook Error: ${error.message}`, {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
 
@@ -1067,9 +1202,10 @@ async function handleTestEmail(request, env, corsHeaders) {
     return new Response(
       JSON.stringify({
         success: false,
-        error: "Test email is disabled. Set TEST_EMAIL_SECRET (and RESEND_API_KEY, CONFIRMATION_FROM_EMAIL) in env to enable.",
+        error:
+          "Test email is disabled. Set TEST_EMAIL_SECRET (and RESEND_API_KEY, CONFIRMATION_FROM_EMAIL) in env to enable.",
       }),
-      { status: 501, headers: corsHeaders }
+      { status: 501, headers: corsHeaders },
     );
   }
 
@@ -1081,8 +1217,12 @@ async function handleTestEmail(request, env, corsHeaders) {
   const providedSecret = secret || body.secret;
   if (providedSecret !== env.TEST_EMAIL_SECRET) {
     return new Response(
-      JSON.stringify({ success: false, error: "Invalid or missing secret (use header X-Test-Email-Secret or body.secret)." }),
-      { status: 401, headers: corsHeaders }
+      JSON.stringify({
+        success: false,
+        error:
+          "Invalid or missing secret (use header X-Test-Email-Secret or body.secret).",
+      }),
+      { status: 401, headers: corsHeaders },
     );
   }
 
@@ -1090,17 +1230,21 @@ async function handleTestEmail(request, env, corsHeaders) {
     return new Response(
       JSON.stringify({
         success: false,
-        error: "Resend not configured. Set RESEND_API_KEY and CONFIRMATION_FROM_EMAIL.",
+        error:
+          "Resend not configured. Set RESEND_API_KEY and CONFIRMATION_FROM_EMAIL.",
       }),
-      { status: 503, headers: corsHeaders }
+      { status: 503, headers: corsHeaders },
     );
   }
 
   const to = (body.to || "").trim();
   if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
     return new Response(
-      JSON.stringify({ success: false, error: "Valid 'to' email required in request body." }),
-      { status: 400, headers: corsHeaders }
+      JSON.stringify({
+        success: false,
+        error: "Valid 'to' email required in request body.",
+      }),
+      { status: 400, headers: corsHeaders },
     );
   }
 
@@ -1136,7 +1280,11 @@ async function handleTestEmail(request, env, corsHeaders) {
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const msg = data?.message || data?.msg || (typeof data === "string" ? data : null) || "Resend API error";
+      const msg =
+        data?.message ||
+        data?.msg ||
+        (typeof data === "string" ? data : null) ||
+        "Resend API error";
       return new Response(
         JSON.stringify({
           success: false,
@@ -1144,7 +1292,7 @@ async function handleTestEmail(request, env, corsHeaders) {
           status: res.status,
           details: data,
         }),
-        { status: 502, headers: corsHeaders }
+        { status: 502, headers: corsHeaders },
       );
     }
 
@@ -1154,13 +1302,16 @@ async function handleTestEmail(request, env, corsHeaders) {
         message: `Test email sent to ${to}`,
         id: data.id || null,
       }),
-      { status: 200, headers: corsHeaders }
+      { status: 200, headers: corsHeaders },
     );
   } catch (err) {
     console.error("Test email error:", err);
     return new Response(
-      JSON.stringify({ success: false, error: err.message || "Failed to send" }),
-      { status: 500, headers: corsHeaders }
+      JSON.stringify({
+        success: false,
+        error: err.message || "Failed to send",
+      }),
+      { status: 500, headers: corsHeaders },
     );
   }
 }
@@ -1170,9 +1321,10 @@ async function handleResendConfirmation(request, env, corsHeaders) {
     return new Response(
       JSON.stringify({
         success: false,
-        error: "Resend confirmation is disabled. Set TEST_EMAIL_SECRET to enable.",
+        error:
+          "Resend confirmation is disabled. Set TEST_EMAIL_SECRET to enable.",
       }),
-      { status: 501, headers: corsHeaders }
+      { status: 501, headers: corsHeaders },
     );
   }
 
@@ -1184,30 +1336,41 @@ async function handleResendConfirmation(request, env, corsHeaders) {
   const providedSecret = secret || body.secret;
   if (providedSecret !== env.TEST_EMAIL_SECRET) {
     return new Response(
-      JSON.stringify({ success: false, error: "Invalid or missing secret (use header X-Test-Email-Secret or body.secret)." }),
-      { status: 401, headers: corsHeaders }
+      JSON.stringify({
+        success: false,
+        error:
+          "Invalid or missing secret (use header X-Test-Email-Secret or body.secret).",
+      }),
+      { status: 401, headers: corsHeaders },
     );
   }
 
-  const registrationId = (body.registrationId || body.registration_id || "").trim();
+  const registrationId = (
+    body.registrationId ||
+    body.registration_id ||
+    ""
+  ).trim();
   if (!registrationId) {
     return new Response(
-      JSON.stringify({ success: false, error: "Missing registrationId in request body." }),
-      { status: 400, headers: corsHeaders }
+      JSON.stringify({
+        success: false,
+        error: "Missing registrationId in request body.",
+      }),
+      { status: 400, headers: corsHeaders },
     );
   }
 
   if (!env.RESEND_API_KEY || !env.CONFIRMATION_FROM_EMAIL) {
     return new Response(
       JSON.stringify({ success: false, error: "Resend not configured." }),
-      { status: 503, headers: corsHeaders }
+      { status: 503, headers: corsHeaders },
     );
   }
 
   if (!env.ISIR_DB) {
     return new Response(
       JSON.stringify({ success: false, error: "Database not configured." }),
-      { status: 503, headers: corsHeaders }
+      { status: 503, headers: corsHeaders },
     );
   }
 
@@ -1216,49 +1379,46 @@ async function handleResendConfirmation(request, env, corsHeaders) {
     try {
       row = await env.ISIR_DB.prepare(
         `SELECT email, first_name, middle_name, last_name, ticket_type, ticket_price, total_price, currency,
-         accompanying_count, gala_dinner, institution, badge_name, payment_intent_id FROM registrations WHERE id = ?`
+         accompanying_count, gala_dinner, institution, badge_name, payment_intent_id FROM registrations WHERE id = ?`,
       )
         .bind(registrationId)
         .first();
     } catch (selectErr) {
       row = await env.ISIR_DB.prepare(
-        `SELECT email, first_name, middle_name, last_name, ticket_type, total_price, currency FROM registrations WHERE id = ?`
+        `SELECT email, first_name, middle_name, last_name, ticket_type, total_price, currency FROM registrations WHERE id = ?`,
       )
         .bind(registrationId)
         .first();
     }
     if (!row) {
       return new Response(
-        JSON.stringify({ success: false, error: `No registration found for id: ${registrationId}` }),
-        { status: 404, headers: corsHeaders }
+        JSON.stringify({
+          success: false,
+          error: `No registration found for id: ${registrationId}`,
+        }),
+        { status: 404, headers: corsHeaders },
       );
     }
     if (!row.email) {
       return new Response(
         JSON.stringify({ success: false, error: "Registration has no email." }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: corsHeaders },
       );
     }
 
-    const name = [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(" ") || "Attendee";
+    const name =
+      [row.first_name, row.middle_name, row.last_name]
+        .filter(Boolean)
+        .join(" ") || "Attendee";
     const ticketLabel = formatTicketLabel(row.ticket_type);
-    const amount = row.total_price != null ? `${row.currency || "USD"} ${Number(row.total_price).toFixed(2)}` : "";
-    const acc = row.accompanying_count != null ? Number(row.accompanying_count) : 0;
+    const amount =
+      row.total_price != null
+        ? `${row.currency || "USD"} ${Number(row.total_price).toFixed(2)}`
+        : "";
+    const acc =
+      row.accompanying_count != null ? Number(row.accompanying_count) : 0;
     const gala = row.gala_dinner != null ? Number(row.gala_dinner) : 0;
     const badgeName = row.badge_name;
-
-    let receiptUrl = null;
-    if (row.payment_intent_id && env.STRIPE_SECRET_KEY) {
-      try {
-        const Stripe = (await import("stripe")).default;
-        const stripe = new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: "2024-11-20.acacia" });
-        const pi = await stripe.paymentIntents.retrieve(row.payment_intent_id);
-        if (pi.latest_charge) {
-          const charge = await stripe.charges.retrieve(pi.latest_charge);
-          receiptUrl = charge.receipt_url || null;
-        }
-      } catch (_) {}
-    }
 
     const html = `
 <!DOCTYPE html>
@@ -1309,7 +1469,11 @@ async function handleResendConfirmation(request, env, corsHeaders) {
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const msg = data?.message || data?.msg || (typeof data === "string" ? data : null) || "Resend API error";
+      const msg =
+        data?.message ||
+        data?.msg ||
+        (typeof data === "string" ? data : null) ||
+        "Resend API error";
       return new Response(
         JSON.stringify({
           success: false,
@@ -1317,7 +1481,7 @@ async function handleResendConfirmation(request, env, corsHeaders) {
           status: res.status,
           details: data,
         }),
-        { status: 502, headers: corsHeaders }
+        { status: 502, headers: corsHeaders },
       );
     }
 
@@ -1328,13 +1492,16 @@ async function handleResendConfirmation(request, env, corsHeaders) {
         registrationId,
         id: data.id || null,
       }),
-      { status: 200, headers: corsHeaders }
+      { status: 200, headers: corsHeaders },
     );
   } catch (err) {
     console.error("Resend confirmation error:", err);
     return new Response(
-      JSON.stringify({ success: false, error: err.message || "Failed to send" }),
-      { status: 500, headers: corsHeaders }
+      JSON.stringify({
+        success: false,
+        error: err.message || "Failed to send",
+      }),
+      { status: 500, headers: corsHeaders },
     );
   }
 }
@@ -1343,7 +1510,7 @@ async function handleGetAbstracts(env, corsHeaders) {
   try {
     // Get all abstracts
     const abstractsResult = await env.ISIR_DB.prepare(
-      "SELECT * FROM abstractions ORDER BY submission_date DESC"
+      "SELECT * FROM abstractions ORDER BY submission_date DESC",
     ).all();
 
     const abstracts = abstractsResult.results || [];
@@ -1353,20 +1520,24 @@ async function handleGetAbstracts(env, corsHeaders) {
       abstracts.map(async (abstract) => {
         // Get authors for this abstract
         const authorsResult = await env.ISIR_DB.prepare(
-          "SELECT * FROM authors WHERE abstract_id = ? ORDER BY position ASC"
-        ).bind(abstract.id).all();
+          "SELECT * FROM authors WHERE abstract_id = ? ORDER BY position ASC",
+        )
+          .bind(abstract.id)
+          .all();
 
         // Get affiliations for this abstract
         const affiliationsResult = await env.ISIR_DB.prepare(
-          "SELECT * FROM affiliations WHERE abstract_id = ? ORDER BY position ASC"
-        ).bind(abstract.id).all();
+          "SELECT * FROM affiliations WHERE abstract_id = ? ORDER BY position ASC",
+        )
+          .bind(abstract.id)
+          .all();
 
         return {
           ...abstract,
           authors: authorsResult.results || [],
           affiliations: affiliationsResult.results || [],
         };
-      })
+      }),
     );
 
     return new Response(
@@ -1377,7 +1548,7 @@ async function handleGetAbstracts(env, corsHeaders) {
       {
         status: 200,
         headers: corsHeaders,
-      }
+      },
     );
   } catch (error) {
     console.error("Get abstracts error:", error);
@@ -1389,7 +1560,7 @@ async function handleGetAbstracts(env, corsHeaders) {
       {
         status: 500,
         headers: corsHeaders,
-      }
+      },
     );
   }
 }
@@ -1397,7 +1568,7 @@ async function handleGetAbstracts(env, corsHeaders) {
 async function handleGetVisaRequests(env, corsHeaders) {
   try {
     const result = await env.ISIR_DB.prepare(
-      "SELECT * FROM visa_requests ORDER BY created_at DESC"
+      "SELECT * FROM visa_requests ORDER BY created_at DESC",
     ).all();
 
     return new Response(
@@ -1408,7 +1579,7 @@ async function handleGetVisaRequests(env, corsHeaders) {
       {
         status: 200,
         headers: corsHeaders,
-      }
+      },
     );
   } catch (error) {
     console.error("Get visa requests error:", error);
@@ -1420,7 +1591,7 @@ async function handleGetVisaRequests(env, corsHeaders) {
       {
         status: 500,
         headers: corsHeaders,
-      }
+      },
     );
   }
 }
