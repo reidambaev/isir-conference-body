@@ -5,13 +5,14 @@ import beach2 from "../assets/beach2.jpg";
 import village from "../assets/village.jpg";
 import temple2 from "../assets/temple2.jpg";
 import market from "../assets/market.jpg";
+import saveTheDate from "../assets/1.png";
 
 const AboutTab = () => (
   <div role="tabpanel">
     {/* Congress Banner */}
     <div className="mb-8 rounded-xl overflow-hidden shadow-lg">
       <img
-        src="https://theisir.org/wp-content/uploads/2025/10/1.png"
+        src={saveTheDate}
         alt="16th ISIR World Congress - Save the Date - November 5-8, 2026 - Busan, Korea"
         className="w-full h-auto"
       />
