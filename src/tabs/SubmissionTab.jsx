@@ -252,7 +252,7 @@ const SubmissionTab = () => {
           institution: aff.institution.trim(),
           city: aff.city.trim(),
           country: aff.country.trim(),
-        }))
+        })),
       );
 
       const response = await fetch("/api/abstract-submission", {
@@ -361,7 +361,7 @@ const SubmissionTab = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white/10 rounded-lg p-3">
             <div className="text-sm opacity-80">Submission Opens</div>
-            <div className="font-bold">February 1, 2026</div>
+            <div className="font-bold">March 1, 2026</div>
           </div>
           <div className="bg-white/10 rounded-lg p-3">
             <div className="text-sm opacity-80">Submission Deadline</div>
@@ -782,7 +782,7 @@ const SubmissionTab = () => {
                         onClick={() => {
                           const authorToRemove = formData.allAuthors[index];
                           const newAuthors = formData.allAuthors.filter(
-                            (_, i) => i !== index
+                            (_, i) => i !== index,
                           );
 
                           // If we're removing the presenter, make the first author the new presenter
@@ -928,7 +928,7 @@ const SubmissionTab = () => {
                                 (a, i) => ({
                                   ...a,
                                   isPresenter: i === index,
-                                })
+                                }),
                               );
                               setFormData((prev) => ({
                                 ...prev,
@@ -953,7 +953,7 @@ const SubmissionTab = () => {
                                 (a, i) => ({
                                   ...a,
                                   isCorresponding: i === index,
-                                })
+                                }),
                               );
                               setFormData((prev) => ({
                                 ...prev,

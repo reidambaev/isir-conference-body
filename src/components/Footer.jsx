@@ -36,7 +36,7 @@ const Footer = () => (
           </p>
           <div className="flex space-x-4 mb-6">
             <a
-              href="https://twitter.com/intent/tweet?url=https://isir2026.org&text=Join%20us%20at%20the%2016th%20ISIR%20World%20Congress%20in%20Busan%2C%20Korea!%20September%2010-13%2C%202026"
+              href="https://twitter.com/intent/tweet?url=https://isir2026.org&text=Join%20us%20at%20the%2016th%20ISIR%20World%20Congress%20in%20Busan%2C%20Korea!%20November%205-8%2C%202026"
               target="_blank"
               rel="noopener noreferrer"
               className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors"
@@ -47,7 +47,7 @@ const Footer = () => (
               </svg>
             </a>
             <a
-              href="https://www.linkedin.com/shareArticle?mini=true&url=https://isir2026.org&title=16th%20ISIR%20World%20Congress&summary=Join%20us%20in%20Busan%2C%20Korea%20for%20the%2016th%20ISIR%20World%20Congress%20on%20Reproductive%20Immunology.%20September%2010-13%2C%202026."
+              href="https://www.linkedin.com/shareArticle?mini=true&url=https://isir2026.org&title=16th%20ISIR%20World%20Congress&summary=Join%20us%20in%20Busan%2C%20Korea%20for%20the%2016th%20ISIR%20World%20Congress%20on%20Reproductive%20Immunology.%20November%205-8%2C%202026."
               target="_blank"
               rel="noopener noreferrer"
               className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-800 transition-colors"
@@ -179,7 +179,7 @@ const Footer = () => (
               </svg>
               <div>
                 <p className="font-medium text-white">Congress Dates</p>
-                <p>September 10-13, 2026</p>
+                <p>November 5-8, 2026</p>
               </div>
             </li>
             <li className="flex items-start">

@@ -2,14 +2,15 @@ import React from "react";
 
 // NAVIGATION COMPONENT
 const Navigation = ({ activeTab, onTabClick }) => {
+  // Registration and Submission tabs hidden for now (code kept for re-enabling)
   const tabs = [
     { id: "about", label: "About" },
     { id: "welcome", label: "Welcome" },
     { id: "committee", label: "Committee" },
     { id: "speakers", label: "Speakers" },
     { id: "schedule", label: "Schedule" },
-    { id: "submission", label: "Submission" },
-    { id: "registration", label: "Registration" },
+    // { id: "submission", label: "Submission" },
+    // { id: "registration", label: "Registration" },
     { id: "deadlines", label: "Deadlines" },
     { id: "travel", label: "Travel" },
     { id: "sponsors", label: "Sponsors" },

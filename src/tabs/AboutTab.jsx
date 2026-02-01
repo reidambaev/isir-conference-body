@@ -12,7 +12,7 @@ const AboutTab = () => (
     <div className="mb-8 rounded-xl overflow-hidden shadow-lg">
       <img
         src="https://theisir.org/wp-content/uploads/2025/10/1.png"
-        alt="16th ISIR World Congress - Save the Date - September 10-13, 2026 - Busan, Korea"
+        alt="16th ISIR World Congress - Save the Date - November 5-8, 2026 - Busan, Korea"
         className="w-full h-auto"
       />
     </div>
@@ -26,7 +26,7 @@ const AboutTab = () => (
     <p className="text-gray-700 mb-6 text-lg leading-relaxed">
       You are cordially invited to the 16th Congress of the International
       Society for Immunology of Reproduction (ISIR) in the beautiful city of
-      Busan, Korea. Join us from September 10-13, 2026, for a "Global Dialog on
+      Busan, Korea. Join us from November 5-8, 2026, for a "Global Dialog on
       Population Balance and Women's Health through Reproductive Immunology." We
       look forward to welcoming leading researchers, clinicians, and industry
       partners to share the latest advancements in our field.
@@ -126,7 +126,7 @@ const AboutTab = () => (
               <div>
                 <strong>Abstract Submission Opens:</strong>
                 <br />
-                February 1, 2026
+                March 1, 2026
               </div>
             </li>
             <li className="flex items-start">
@@ -159,7 +159,7 @@ const AboutTab = () => (
               <div>
                 <strong>Registration Closes:</strong>
                 <br />
-                August 30, 2026
+                October 30, 2026
               </div>
             </li>
           </ul>

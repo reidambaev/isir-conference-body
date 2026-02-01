@@ -3,7 +3,7 @@ import React from "react";
 // Deadlines data
 const deadlines = [
   {
-    date: "Feb 1",
+    date: "Mar 1",
     title: "Registration & Abstract Submissions Open",
     desc: "The portal for both congress registration and abstract submission will be available.",
     actions: [
@@ -35,9 +35,9 @@ const deadlines = [
     desc: "Last day to book hotel rooms at the early discounted rate.",
   },
   {
-    date: "Aug 30",
+    date: "Oct 30",
     title: "Registration Deadline",
-    desc: "Final day for advance registration. On-site registration available September 10-13.",
+    desc: "Final day for advance registration. On-site registration available November 5-8.",
     actions: [{ label: "Register Now", tab: "registration" }],
   },
 ];
@@ -181,8 +181,8 @@ const DeadlinesTab = ({ onTabChange }) => {
                       isPast
                         ? "bg-gray-100 text-gray-400"
                         : isUrgent
-                        ? "bg-gradient-to-br from-red-500 to-red-600 text-white"
-                        : "bg-gradient-to-br from-blue-500 to-blue-600 text-white"
+                          ? "bg-gradient-to-br from-red-500 to-red-600 text-white"
+                          : "bg-gradient-to-br from-blue-500 to-blue-600 text-white"
                     }`}
                   >
                     <span className="text-xs font-bold uppercase tracking-wide">
@@ -198,8 +198,8 @@ const DeadlinesTab = ({ onTabChange }) => {
                     isPast
                       ? "bg-gray-50 border border-gray-200"
                       : isUrgent
-                      ? "bg-gradient-to-r from-red-50 to-white border-2 border-red-300 ring-4 ring-red-100"
-                      : "bg-white border border-gray-200 hover:shadow-xl"
+                        ? "bg-gradient-to-r from-red-50 to-white border-2 border-red-300 ring-4 ring-red-100"
+                        : "bg-white border border-gray-200 hover:shadow-xl"
                   }`}
                 >
                   <div className="p-5">
@@ -212,8 +212,8 @@ const DeadlinesTab = ({ onTabChange }) => {
                               isPast
                                 ? "bg-gray-200 text-gray-500"
                                 : isUrgent
-                                ? "bg-red-100 text-red-700"
-                                : "bg-blue-100 text-blue-700"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-blue-100 text-blue-700"
                             }`}
                           >
                             {month} {day}
@@ -227,8 +227,8 @@ const DeadlinesTab = ({ onTabChange }) => {
                               isPast
                                 ? "text-gray-500 line-through"
                                 : isUrgent
-                                ? "text-red-800"
-                                : "text-gray-900"
+                                  ? "text-red-800"
+                                  : "text-gray-900"
                             }`}
                           >
                             {item.title}

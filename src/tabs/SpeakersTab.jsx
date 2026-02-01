@@ -256,7 +256,7 @@ function SpeakersTab() {
         </h4>
         <p className="text-blue-200 mb-6 max-w-2xl mx-auto">
           Submit your abstract and join our distinguished speakers at ISIR 2026.
-          Abstract submission opens February 1, 2026.
+          Abstract submission opens March 1, 2026.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button

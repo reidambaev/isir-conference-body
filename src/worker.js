@@ -625,7 +625,7 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
 
     // Check submission window
     const submissionDeadline = new Date("2026-04-30").getTime();
-    const submissionOpens = new Date("2026-01-15").getTime();
+    const submissionOpens = new Date("2026-03-01").getTime();
     const now = Date.now();
 
     if (now > submissionDeadline) {

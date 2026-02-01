@@ -65,7 +65,7 @@ export async function onRequestPost(context) {
               {
                 status: 400,
                 headers: corsHeaders,
-              }
+              },
             );
           }
         }
@@ -77,7 +77,7 @@ export async function onRequestPost(context) {
             {
               status: 400,
               headers: corsHeaders,
-            }
+            },
           );
         }
       } else if (!data[field] || data[field].trim() === "") {
@@ -88,7 +88,7 @@ export async function onRequestPost(context) {
           {
             status: 400,
             headers: corsHeaders,
-          }
+          },
         );
       }
     }
@@ -103,7 +103,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: corsHeaders,
-        }
+        },
       );
     }
     if (!emailRegex.test(data.correspondingEmail)) {
@@ -114,7 +114,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: corsHeaders,
-        }
+        },
       );
     }
 
@@ -128,7 +128,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: corsHeaders,
-        }
+        },
       );
     }
 
@@ -142,7 +142,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: corsHeaders,
-        }
+        },
       );
     }
 
@@ -157,12 +157,12 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: corsHeaders,
-        }
+        },
       );
     }
 
-    // Check if submission window has opened (January 15, 2026)
-    const submissionOpens = new Date("2026-01-15").getTime();
+    // Check if submission window has opened (March 1, 2026)
+    const submissionOpens = new Date("2026-03-01").getTime();
     if (now < submissionOpens) {
       return new Response(
         JSON.stringify({
@@ -171,7 +171,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: corsHeaders,
-        }
+        },
       );
     }
 
@@ -197,7 +197,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: corsHeaders,
-        }
+        },
       );
     }
 
@@ -216,7 +216,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: corsHeaders,
-        }
+        },
       );
     }
 
@@ -230,7 +230,7 @@ export async function onRequestPost(context) {
           {
             status: 400,
             headers: corsHeaders,
-          }
+          },
         );
       }
       if (!author.lastName || !author.lastName.trim()) {
@@ -241,14 +241,14 @@ export async function onRequestPost(context) {
           {
             status: 400,
             headers: corsHeaders,
-          }
+          },
         );
       }
     }
 
     // Identify corresponding author id (will be used in abstractions table)
     const correspondingAuthorIndex = authorsData.findIndex(
-      (author) => author.isCorresponding
+      (author) => author.isCorresponding,
     );
 
     if (correspondingAuthorIndex === -1) {
@@ -259,7 +259,7 @@ export async function onRequestPost(context) {
         {
           status: 400,
           headers: corsHeaders,
-        }
+        },
       );
     }
 
@@ -285,7 +285,7 @@ export async function onRequestPost(context) {
         status,
         created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `
+    `,
     )
       .bind(
         submissionId,
@@ -302,7 +302,7 @@ export async function onRequestPost(context) {
         data.correspondingEmail.trim(),
         correspondingAuthorId,
         "submitted",
-        submissionDate
+        submissionDate,
       )
       .run();
 
@@ -324,7 +324,7 @@ export async function onRequestPost(context) {
           is_corresponding,
           position
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `
+      `,
       )
         .bind(
           authorId,
@@ -335,7 +335,7 @@ export async function onRequestPost(context) {
           author.email?.trim() || null,
           author.isPresenter ? 1 : 0,
           author.isCorresponding ? 1 : 0,
-          i
+          i,
         )
         .run();
     }
@@ -348,9 +348,17 @@ export async function onRequestPost(context) {
         const title = data.title?.trim() || "";
         const category = data.category?.trim() || "";
         const pref = (data.presentationPreference || "").toLowerCase();
-        const prefLabel = pref === "oral" ? "Oral" : pref === "poster" ? "Poster" : pref === "either" ? "Oral or Poster" : data.presentationPreference || "";
+        const prefLabel =
+          pref === "oral"
+            ? "Oral"
+            : pref === "poster"
+              ? "Poster"
+              : pref === "either"
+                ? "Oral or Poster"
+                : data.presentationPreference || "";
         const abstractSnippet = (data.abstract?.trim() || "").slice(0, 280);
-        const abstractDisplay = abstractSnippet + (abstractSnippet.length >= 280 ? "…" : "");
+        const abstractDisplay =
+          abstractSnippet + (abstractSnippet.length >= 280 ? "…" : "");
         const html = `
 <!DOCTYPE html>
 <html>
@@ -398,7 +406,11 @@ export async function onRequestPost(context) {
           });
           if (!res.ok) {
             const err = await res.text();
-            console.error("Resend abstract confirmation failed:", res.status, err);
+            console.error(
+              "Resend abstract confirmation failed:",
+              res.status,
+              err,
+            );
           } else {
             console.log(`Abstract confirmation email sent to ${toEmail}`);
           }
@@ -418,7 +430,7 @@ export async function onRequestPost(context) {
       {
         status: 201,
         headers: corsHeaders,
-      }
+      },
     );
   } catch (error) {
     console.error("Abstract submission error:", error);
@@ -429,7 +441,7 @@ export async function onRequestPost(context) {
       {
         status: 500,
         headers: corsHeaders,
-      }
+      },
     );
   }
 }
