@@ -91,12 +91,6 @@ const CHAIRMEN_DATA = [
     signature: dambaevaSignature,
     message: (
       <>
-        <strong>
-          Invitation from the Meeting Co-Chair, Svetlana Dambaeva, Rosalind
-          Franklin University of Medicine and Science, North Chicago, IL, USA
-        </strong>
-        <br />
-        <br />
         <strong>Dear Colleagues and Friends of ISIR</strong>
         <br />
         <br />I am honored to serve as a co-chair of the{" "}
