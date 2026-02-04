@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { SUBMISSION_OPEN } from "../config/constants";
 
 const SubmissionTab = () => {
   const [abstractType, setAbstractType] = useState("");
@@ -210,6 +211,13 @@ const SubmissionTab = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!SUBMISSION_OPEN) {
+      setErrorMessage(
+        "Abstract submission is currently closed. Please check back later.",
+      );
+      return;
+    }
+
     // Reset previous messages
     setErrorMessage("");
     setSuccessId("");
@@ -354,6 +362,30 @@ const SubmissionTab = () => {
           </div>
         </div>
       </header>
+
+      {/* Submission closed banner */}
+      {!SUBMISSION_OPEN && (
+        <div className="mb-6 p-4 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-800 flex items-center gap-3">
+          <svg
+            className="w-8 h-8 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+            />
+          </svg>
+          <div>
+            <strong>Abstract submission is currently closed.</strong> All
+            guidelines and dates below are for your information. Please check
+            back later when submission opens.
+          </div>
+        </div>
+      )}
 
       {/* Important Dates Banner */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 mb-8 text-white">
@@ -1297,9 +1329,9 @@ const SubmissionTab = () => {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !SUBMISSION_OPEN}
               className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${
-                loading
+                loading || !SUBMISSION_OPEN
                   ? "bg-blue-400 cursor-not-allowed opacity-75"
                   : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 cursor-pointer"
               }`}
@@ -1321,8 +1353,10 @@ const SubmissionTab = () => {
                   </svg>
                   Submitting...
                 </span>
-              ) : (
+              ) : SUBMISSION_OPEN ? (
                 "Submit Abstract"
+              ) : (
+                "Submission closed"
               )}
             </button>
             <p className="text-center text-sm text-gray-500 mt-3">

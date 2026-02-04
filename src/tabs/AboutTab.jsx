@@ -102,7 +102,7 @@ const AboutTab = () => (
               <div className="text-white">
                 <p className="font-semibold text-lg">The Westin Josun Busan</p>
                 <p className="text-sm opacity-90">
-                  67 Dongbaek-ro, Haeundae-gu, Busan, South Korea
+                  67 Dongbaek-ro, Haeundae-gu, Busan, Korea
                 </p>
               </div>
             </div>
@@ -192,7 +192,7 @@ const AboutTab = () => (
         Discover Beautiful Busan
       </h4>
       <p className="text-gray-700 mb-4">
-        Busan, South Korea's second-largest city, offers a captivating blend of
+        Busan, Korea's second-largest city, offers a captivating blend of
         stunning beaches, vibrant markets, ancient temples, and modern
         attractions. Take time before or after the congress to explore this
         incredible destination.

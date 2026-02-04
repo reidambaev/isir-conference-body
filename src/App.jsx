@@ -35,13 +35,16 @@ export default function App() {
   const [isAdminPage, setIsAdminPage] = useState(() => {
     // Check both window.location and document.location
     const pathname = window.location.pathname || document.location.pathname;
-    const isAdmin = pathname === "/admin" || pathname === "/admin/" || pathname.startsWith("/admin");
+    const isAdmin =
+      pathname === "/admin" ||
+      pathname === "/admin/" ||
+      pathname.startsWith("/admin");
     console.log("Initial pathname check:", {
       pathname,
       windowLocation: window.location.pathname,
       documentLocation: document.location.pathname,
       href: window.location.href,
-      isAdmin
+      isAdmin,
     });
     return isAdmin;
   });
@@ -52,28 +55,31 @@ export default function App() {
       // Use a small delay to ensure pathname is set correctly
       setTimeout(() => {
         const pathname = window.location.pathname || document.location.pathname;
-        const isAdmin = pathname === "/admin" || pathname === "/admin/" || pathname.startsWith("/admin");
+        const isAdmin =
+          pathname === "/admin" ||
+          pathname === "/admin/" ||
+          pathname.startsWith("/admin");
         console.log("Pathname check:", {
           pathname,
           windowLocation: window.location.pathname,
           documentLocation: document.location.pathname,
           href: window.location.href,
-          isAdmin
+          isAdmin,
         });
         setIsAdminPage(isAdmin);
       }, 0);
     };
-    
+
     // Check immediately and after a short delay
     checkPath();
     const timeout = setTimeout(checkPath, 100);
-    
+
     // Listen for popstate events (back/forward button)
     window.addEventListener("popstate", checkPath);
-    
+
     // Also listen for hashchange in case URL changes
     window.addEventListener("hashchange", checkPath);
-    
+
     return () => {
       clearTimeout(timeout);
       window.removeEventListener("popstate", checkPath);
@@ -89,10 +95,8 @@ export default function App() {
         return <WelcomeTab />;
       case "committee":
         return <CommitteeTab />;
-      case "speakers":
-        return <SpeakersTab />;
-      case "schedule":
-        return <ScheduleTab />;
+      // case "speakers": return <SpeakersTab />;   // hidden for now
+      // case "schedule": return <ScheduleTab />;   // hidden for now
       case "submission":
         return <SubmissionTab />;
       case "registration":
@@ -152,14 +156,17 @@ export default function App() {
       const preventNav = (e) => {
         const pathname = window.location.pathname;
         if (!pathname.startsWith("/admin")) {
-          console.warn("Attempted navigation away from /admin detected, pathname:", pathname);
+          console.warn(
+            "Attempted navigation away from /admin detected, pathname:",
+            pathname,
+          );
           // Don't prevent default, but log it for debugging
         }
       };
-      
+
       // Monitor for navigation attempts
       window.addEventListener("beforeunload", preventNav);
-      
+
       return () => {
         window.removeEventListener("beforeunload", preventNav);
       };
@@ -179,7 +186,7 @@ export default function App() {
       </div>
     );
   }
-  
+
   console.log("Rendering main app, pathname:", window.location.pathname);
 
   return (

@@ -3,8 +3,8 @@ import React from "react";
 // Deadlines data
 const deadlines = [
   {
-    date: "Mar 1",
-    title: "Registration & Abstract Submissions Open",
+    date: "Mar 15",
+    title: "Abstract AND registration Submission Opens",
     desc: "The portal for both congress registration and abstract submission will be available.",
     actions: [
       { label: "Register Now", tab: "registration" },
@@ -12,31 +12,26 @@ const deadlines = [
     ],
   },
   {
-    date: "Apr 30",
+    date: "Jul 1",
     title: "Abstract Submission Deadline",
     desc: "Final day to submit abstracts for consideration.",
     actions: [{ label: "Submit Abstract", tab: "submission" }],
   },
   {
-    date: "May 20",
-    title: "Notification of Acceptance",
-    desc: "Authors will be notified of their abstract status.",
-  },
-  {
-    date: "Jul 10",
-    title: "Early Bird Registration Closes",
+    date: "Jul 31",
+    title: "Early Bird Registration Deadline",
     desc: "Register by this date to secure the discounted rate. Presenting authors must be registered.",
     isUrgent: true,
     actions: [{ label: "Register Now", tab: "registration" }],
   },
   {
-    date: "Jul 10",
+    date: "Jul 31",
     title: "Hotel Discount Deadline",
     desc: "Last day to book hotel rooms at the early discounted rate.",
   },
   {
     date: "Oct 30",
-    title: "Registration Deadline",
+    title: "Online Registration Closes",
     desc: "Final day for advance registration. On-site registration available November 5-8.",
     actions: [{ label: "Register Now", tab: "registration" }],
   },

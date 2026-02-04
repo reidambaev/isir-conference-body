@@ -25,21 +25,14 @@ const SponsorsTab = () => (
     <div className="mb-10">
       <div className="bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-100 p-8 rounded-2xl border-4 border-amber-400 shadow-2xl">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Logo Section */}
-          <div className="w-full bg-white rounded-xl p-8 shadow-inner border border-amber-200 flex items-center justify-center min-h-[300px]">
-            <div className="w-full h-64 bg-gray-100 rounded-lg border-2 border-dashed border-amber-300 flex items-center justify-center">
-              <span className="text-gray-400 text-sm">Sponsor Logo</span>
-            </div>
+          {/* Name Section */}
+          <div className="w-full bg-white rounded-xl p-8 shadow-inner border border-amber-200 flex flex-col items-center justify-center min-h-[300px]">
+            <h4 className="text-3xl font-bold text-gray-800 mb-1">강화 (주)</h4>
+            <p className="text-xl text-gray-600">Kang Wha, Inc</p>
           </div>
 
           {/* Text Section */}
           <div className="flex flex-col justify-center">
-            <div className="mb-6">
-              <h4 className="text-3xl font-bold text-gray-800 mb-1">
-                강화 (주)
-              </h4>
-              <p className="text-xl text-gray-600 mb-4">Kang Wha, Inc</p>
-            </div>
             <h4
               className="text-2xl font-bold mb-3"
               style={{ color: "var(--color-primary)" }}

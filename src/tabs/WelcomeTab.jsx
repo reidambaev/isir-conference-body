@@ -1,38 +1,136 @@
 import React from "react";
-import headshot1 from "../assets/headshots/headshot1.jpg";
-import headshot2 from "../assets/headshots/headshot2.png";
+import presidentHeadshot from "../assets/welcome/welcome-headshot1.jpg";
+import dambaevaHeadshot from "../assets/welcome/welcome-headshot2.jpg";
+import presidentSignature from "../assets/welcome/signature1.png";
+import dambaevaSignature from "../assets/welcome/signature2.png";
 
-// Placeholder data - Replace with actual content and image paths
 const CHAIRMEN_DATA = [
   {
-    name: "Dr. Sang-Mook Lee",
-    title: "Conference Chair",
-    image: headshot1,
-    message: `Dear Colleagues and Friends,
-
-It is with genuine excitement that I welcome you to the International Society for Intelligence Research (ISIR) 2026 Conference in the vibrant coastal city of Busan, South Korea. Having spent countless hours planning this gathering, I am thrilled to finally see our community come together in person.
-
-Busan holds a special place in my heart—its blend of traditional Korean culture and modern innovation mirrors the very essence of our field. As you explore the city's historic temples, bustling markets, and stunning coastline, I hope you'll find inspiration that enriches both your research and your experience here.
-
-This year's conference represents something truly special. We've seen an unprecedented number of submissions from researchers spanning six continents, and the quality of work being presented is remarkable. From groundbreaking neuroimaging studies to innovative computational models, our program showcases the incredible breadth and depth of intelligence research today.
-
-I encourage you to step outside your comfort zones—attend sessions outside your immediate area of expertise, strike up conversations during coffee breaks, and share your ideas freely. Some of the most transformative research emerges from these unexpected connections.`,
+    name: "Joanne Kwak-Kim",
+    title: "President, International Society for Immunology of Reproduction",
+    credentials: "MD, MPH, FCRI ASRI",
+    image: presidentHeadshot,
+    signature: presidentSignature,
+    message: (
+      <>
+        Dear ISIR Members and Guests,
+        <br />
+        <br />
+        On behalf of the Executive Board of the International Society for
+        Immunology of Reproduction (ISIR), it is my great honor to invite you to
+        the <strong>16ᵗʰ ISIR World Congress</strong>, which will be held{" "}
+        <strong>November 5 - 8, 2026, in the Westin Josun, Busan, Korea</strong>
+        . This landmark meeting will bring together our global community of
+        scientists, clinicians, and trainees to exchange groundbreaking research
+        and strengthen the collaborative spirit that defines our Society.
+        <br />
+        <br />
+        The 2026 Congress is organized under the theme:
+        <br />
+        <strong>
+          "Global Dialog on Population Balance and Women's Health through
+          Reproductive Immunology."
+        </strong>{" "}
+        This theme reflects the urgent demographic shifts faced by many nations
+        and highlights the essential role of reproductive immunology in
+        advancing women's health and reproductive science.
+        <br />
+        <br />
+        I extend my sincere appreciation to the Meeting Chairs, Drs. Svetlana
+        Dambaeva, Birdie Lamarca, and Sung-Ki Lee, President-Elect Surendra
+        Sharma, and the Scientific Program Organizing Committee, whose
+        leadership and dedication are shaping an outstanding scientific program.
+        In addition, I express my heartfelt gratitude to our Representative
+        Cooperation Directors and local organizers. Their dedication, logistical
+        coordination, and tireless efforts have built the foundation for an
+        exceptional congress. Their leadership ensures a scientifically
+        rigorous, culturally rich, and seamlessly organized meeting for all
+        global participants.
+        <br />
+        <br />
+        <strong>A special acknowledgment</strong> goes to{" "}
+        <strong>
+          Ms. Eunah Kwak, President & CEO of Kangwha Inc., whose major support
+          and commitment have been pivotal to
+        </strong>{" "}
+        the successful planning of the 2026 Busan Congress. Her generosity,
+        vision, and steadfast encouragement have significantly strengthened our
+        mission and the success of this international gathering. We are also
+        grateful for the partnership of the Korean Medical Societies. Their
+        collaboration reinforces the important connection between reproductive
+        immunology and the broader women's health community in Korea.
+        <br />
+        <br />
+        We warmly encourage you to mark your calendars and begin preparing your
+        abstracts and attendance. The 2026 Congress will offer unparalleled
+        opportunities for clinical and scientific advancement, networking,
+        mentorship, and international collaboration. We look forward to
+        welcoming each of you to <strong>Busan in 2026</strong> for a memorable
+        and inspiring world congress.
+        <br />
+        <br />
+        With warmest regards,
+      </>
+    ),
   },
   {
-    name: "Dr. Jane Doe",
-    title: "Program Committee Chair",
-    image: headshot2,
-    message: `Welcome to ISIR 2026!
-
-As Program Committee Chair, I've had the privilege of reviewing hundreds of submissions over the past year, and I can honestly say this is one of the most compelling programs we've assembled. The passion and innovation evident in your work has been truly inspiring.
-
-What excites me most about this year's program is how it bridges the gap between established research traditions and emerging frontiers. You'll find sessions that honor the foundational work that built our field alongside presentations that challenge our assumptions and push boundaries. This balance—between honoring our past and embracing our future—is what makes ISIR conferences so valuable.
-
-I'm particularly looking forward to our interdisciplinary panels, where cognitive scientists, neuroscientists, and computational researchers will engage in dialogue that rarely happens elsewhere. These conversations often lead to the kind of cross-pollination that generates entirely new research directions.
-
-Beyond the scientific program, I hope you'll immerse yourself in everything Busan has to offer. Whether you're sampling fresh seafood at Jagalchi Market, watching the sunset from Haeundae Beach, or exploring the ancient temples nestled in the mountains, these experiences often provide the mental space needed for breakthrough insights.
-
-Please don't hesitate to reach out if you have questions or ideas you'd like to discuss. This conference belongs to all of us, and your engagement is what makes it meaningful.`,
+    name: "Svetlana (Lana) Dambaeva",
+    title: "Meeting Co-Chair, ISIR 2026 World Congress",
+    credentials: "PhD, D(ABMLI), HCLD(ABB)",
+    footer: (
+      <>
+        Director, Clinical Immunology Laboratory
+        <br />
+        Associate Professor, Center for Cancer Cell Biology, Immunology, and
+        Infection
+        <br />
+        Rosalind Franklin University of Medicine and Science, North Chicago, IL
+      </>
+    ),
+    image: dambaevaHeadshot,
+    signature: dambaevaSignature,
+    message: (
+      <>
+        <strong>
+          Invitation from the Meeting Co-Chair, Svetlana Dambaeva, Rosalind
+          Franklin University of Medicine and Science, North Chicago, IL, USA
+        </strong>
+        <br />
+        <br />
+        <strong>Dear Colleagues and Friends of ISIR</strong>
+        <br />
+        <br />I am honored to serve as a co-chair of the{" "}
+        <strong>
+          16th International Society for Immunology of Reproduction (ISIR) World
+          Congress
+        </strong>
+        . This conference offers a wonderful opportunity to share recent
+        advances in your outstanding work with scientists and physicians from
+        around the world and to reconnect with colleagues across our field. We
+        have received an overwhelmingly enthusiastic response from invited
+        experts, reflecting the strong momentum and vitality of our scientific
+        community.
+        <br />
+        <br />
+        My background is in medical laboratory diagnostics and endometrial
+        immunology, with more than 20 years of experience spanning both basic
+        science research and clinical laboratory practice. Throughout my career,
+        I have come to deeply value meetings such as ISIR, where scientists and
+        clinicians come together to exchange ideas, share expertise, and
+        collectively advance our field.
+        <br />
+        <br />
+        I am especially excited that this Congress will be held in Busan,
+        marking the first time ISIR is hosted in Korea. It will also be my first
+        visit to Korea, and I am very much looking forward to experiencing Busan
+        alongside an outstanding scientific program. I hope you will enjoy both
+        the science and the setting, and I look forward to welcoming you all to
+        Busan.
+        <br />
+        <br />
+        Yours sincerely,
+      </>
+    ),
   },
 ];
 
@@ -71,11 +169,21 @@ const WelcomeTab = () => {
                   <h3 className="text-2xl font-semibold text-[#1a3a6c] tracking-tight">
                     {chair.name}
                   </h3>
+                  {chair.credentials && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      {chair.credentials}
+                    </p>
+                  )}
                   <div className="inline-block">
                     <p className="text-sm font-medium text-[#f3b72c] uppercase tracking-wider px-4 py-1 bg-[#f3b72c]/10 rounded-full">
                       {chair.title}
                     </p>
                   </div>
+                  {chair.footer && (
+                    <div className="text-xs text-gray-600 mt-3 leading-relaxed">
+                      {chair.footer}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -85,12 +193,21 @@ const WelcomeTab = () => {
               <div className="relative">
                 {/* Accent line */}
                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#f3b72c] via-[#1a3a6c] to-transparent rounded-full"></div>
-                
+
                 <div className="pl-8 pr-4">
                   <div className="prose prose-lg max-w-none">
-                    <div className="text-gray-800 leading-[1.9] text-[17px] font-light tracking-wide whitespace-pre-line">
+                    <div className="text-gray-800 leading-[1.9] text-[17px] font-light tracking-wide">
                       {chair.message}
                     </div>
+                    {chair.signature && (
+                      <div className="mt-6 flex justify-start">
+                        <img
+                          src={chair.signature}
+                          alt={`${chair.name} signature`}
+                          className="h-16 md:h-20 object-contain"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

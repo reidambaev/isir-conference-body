@@ -153,7 +153,7 @@ const Footer = () => (
                 <p className="text-sm">Venue</p>
                 <p>The Westin Josun Busan</p>
                 <p className="text-sm">67 Dongbaek-ro, Haeundae-gu</p>
-                <p className="text-sm">Busan, South Korea</p>
+                <p className="text-sm">Busan, Korea</p>
               </div>
             </li>
           </ul>
@@ -236,7 +236,7 @@ const Footer = () => (
               </svg>
               <div>
                 <p className="font-medium text-white">Location</p>
-                <p>Busan, South Korea</p>
+                <p>Busan, Korea</p>
               </div>
             </li>
           </ul>

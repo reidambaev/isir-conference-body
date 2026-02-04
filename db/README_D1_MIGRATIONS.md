@@ -1,6 +1,7 @@
 # Cloudflare D1 Database Migration Guide
 
 ## Current Status
+
 Your database schema already supports `gala_dinner` as an INTEGER (count), so no migration is needed for the gala dinner changes. The column `gala_dinner INTEGER DEFAULT 0` can store 0, 1, 2, or any number of tickets.
 
 ## How to Update Your Cloudflare D1 Database
@@ -8,35 +9,39 @@ Your database schema already supports `gala_dinner` as an INTEGER (count), so no
 ### Option 1: Using Wrangler CLI (Recommended)
 
 1. **Check your database structure:**
+
    ```bash
    npx wrangler d1 execute isir-registrations --local --command "PRAGMA table_info(registrations);"
    ```
-   
 
 2. **For production database:**
+
    ```bash
    npx wrangler d1 execute isir-registrations --command "PRAGMA table_info(registrations);"
    ```
 
 3. **Run SQL commands directly:**
+
    ```bash
    # Local database
    npx wrangler d1 execute isir-registrations --local --file=./db/schema.sql
-   
+
    # Production database
    npx wrangler d1 execute isir-registrations --file=./db/schema.sql
    ```
 
 4. **Run a specific migration:**
+
    ```bash
    # Local
    npx wrangler d1 execute isir-registrations --local --file=./db/migration_add_corresponding_author.sql
-   
+
    # Production
    npx wrangler d1 execute isir-registrations --file=./db/migration_add_corresponding_author.sql
    ```
 
    **If the Stripe webhook fails with "no such column: payment_intent_id":**
+
    ```bash
    npx wrangler d1 execute isir-registrations --file=./db/migration_add_payment_intent_id.sql
    ```

@@ -1,3 +1,7 @@
+// Feature flags: set to true when registration/submission are open
+export const REGISTRATION_OPEN = false;
+export const SUBMISSION_OPEN = false;
+
 // API Configuration for ISIR Member Verification
 export const ISIR_API_CONFIG = {
   endpoint:
@@ -23,7 +27,7 @@ export const TICKET_PRICES = {
 };
 
 // Early Bird Configuration
-export const EARLY_BIRD_DEADLINE = new Date("2026-07-10");
+export const EARLY_BIRD_DEADLINE = new Date("2026-07-31");
 export const GALA_DINNER_PRICE = 100;
 
 // Utility Functions
@@ -38,7 +42,7 @@ export const calculateTotalPrice = (
   ticketType,
   accompanyingCount,
   galaDinner,
-  isEarlyBird
+  isEarlyBird,
 ) => {
   const ticketPrice = getTicketPrice(ticketType, isEarlyBird);
   const accompanyingPrice =

@@ -39,6 +39,7 @@ const HeroSection = ({ onRegisterClick }) => {
           Join leading researchers and clinicians from around the world
         </p>
 
+        {/* Register Now - hidden for now, restore when needed
         <div className="flex flex-wrap justify-center gap-4 mb-12">
           <button
             onClick={onRegisterClick}
@@ -51,6 +52,7 @@ const HeroSection = ({ onRegisterClick }) => {
             Register Now
           </button>
         </div>
+        */}
 
         <button
           onClick={scrollToNav}

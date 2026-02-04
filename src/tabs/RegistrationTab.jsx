@@ -1,15 +1,40 @@
 import React, { useState } from "react";
 import RegistrationForm from "../forms/RegistrationForm";
+import { REGISTRATION_OPEN } from "../config/constants";
 
 const RegistrationTab = () => {
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
 
-  if (showRegistrationForm) {
+  if (showRegistrationForm && REGISTRATION_OPEN) {
     return <RegistrationForm onClose={() => setShowRegistrationForm(false)} />;
   }
 
   return (
     <div role="tabpanel">
+      {/* Registration closed banner */}
+      {!REGISTRATION_OPEN && (
+        <div className="mb-6 p-4 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-800 flex items-center gap-3">
+          <svg
+            className="w-8 h-8 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+            />
+          </svg>
+          <div>
+            <strong>Registration is currently closed.</strong> All details below
+            are for your information. Please check back later when registration
+            opens.
+          </div>
+        </div>
+      )}
+
       {/* Header Section */}
       <div className="mb-8">
         <div className="flex items-center mb-4">
@@ -132,11 +157,12 @@ const RegistrationTab = () => {
             </div>
           </div>
           <button
-            onClick={() => setShowRegistrationForm(true)}
-            className="px-8 py-3 rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer"
+            onClick={() => REGISTRATION_OPEN && setShowRegistrationForm(true)}
+            disabled={!REGISTRATION_OPEN}
+            className="px-8 py-3 rounded-xl font-bold shadow-md transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
             style={{ backgroundColor: "var(--color-primary)", color: "white" }}
           >
-            Register Now
+            {REGISTRATION_OPEN ? "Register Now" : "Registration closed"}
           </button>
         </div>
       </div>
@@ -448,14 +474,17 @@ const RegistrationTab = () => {
                     category. Early bird rates available until July 10, 2026.
                   </p>
                   <button
-                    onClick={() => setShowRegistrationForm(true)}
-                    className="inline-flex items-center px-5 py-2.5 text-sm font-semibold rounded-lg shadow-sm hover:shadow-md hover:scale-105 transition-all duration-300 cursor-pointer"
+                    onClick={() =>
+                      REGISTRATION_OPEN && setShowRegistrationForm(true)
+                    }
+                    disabled={!REGISTRATION_OPEN}
+                    className="inline-flex items-center px-5 py-2.5 text-sm font-semibold rounded-lg shadow-sm transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
                     style={{
                       backgroundColor: "var(--color-secondary)",
                       color: "var(--color-primary)",
                     }}
                   >
-                    Register Now
+                    {REGISTRATION_OPEN ? "Register Now" : "Registration closed"}
                     <svg
                       className="w-4 h-4 ml-2"
                       fill="none"
@@ -655,11 +684,12 @@ const RegistrationTab = () => {
         </h4>
         <p className="text-blue-200 mb-6 max-w-2xl mx-auto">
           Join leading researchers and clinicians from around the world at the
-          16th ISIR World Congress in beautiful Busan, South Korea.
+          16th ISIR World Congress in beautiful Busan, Korea.
         </p>
         <button
-          onClick={() => setShowRegistrationForm(true)}
-          className="inline-flex items-center px-10 py-4 text-lg font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+          onClick={() => REGISTRATION_OPEN && setShowRegistrationForm(true)}
+          disabled={!REGISTRATION_OPEN}
+          className="inline-flex items-center px-10 py-4 text-lg font-bold rounded-xl shadow-lg transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
           style={{
             backgroundColor: "var(--color-secondary)",
             color: "var(--color-primary)",
@@ -678,7 +708,7 @@ const RegistrationTab = () => {
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
             />
           </svg>
-          Start Registration Now
+          {REGISTRATION_OPEN ? "Start Registration Now" : "Registration closed"}
           <svg
             className="w-5 h-5 ml-2"
             fill="none"

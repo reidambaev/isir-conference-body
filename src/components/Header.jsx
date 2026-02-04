@@ -48,7 +48,7 @@ const Header = () => (
               November 5-8, 2026
             </span>
           </div>
-          <p className="text-blue-200 mt-1 text-sm">Busan, South Korea</p>
+          <p className="text-blue-200 mt-1 text-sm">Busan, Korea</p>
         </div>
       </div>
     </div>

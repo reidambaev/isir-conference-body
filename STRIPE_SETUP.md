@@ -97,7 +97,7 @@ Or manually add these columns to your `registrations` table:
 
 ### Testing Korean Currency
 
-1. Select "Korea" or "South Korea" as the country during registration
+1. Select "Korea" or "Korea" as the country during registration
 2. Prices should automatically convert to KRW (₩) and include 10% Korean tax
 3. Complete a test payment using a test card
 
