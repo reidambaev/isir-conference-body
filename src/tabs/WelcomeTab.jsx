@@ -10,6 +10,7 @@ const CHAIRMEN_DATA = [
     title: "President, International Society for Immunology of Reproduction",
     credentials: "MD, MPH, FCRI ASRI",
     image: presidentHeadshot,
+    imagePosition: "center calc(50% + 35px)",
     signature: presidentSignature,
     message: (
       <>
@@ -155,6 +156,11 @@ const WelcomeTab = () => {
                       src={chair.image}
                       alt={chair.name}
                       className="w-full h-full object-cover"
+                      style={
+                        chair.imagePosition
+                          ? { objectPosition: chair.imagePosition }
+                          : undefined
+                      }
                     />
                   </div>
                   <div className="absolute -bottom-3 -right-3 w-16 h-16 bg-[#f3b72c] rounded-full opacity-20"></div>

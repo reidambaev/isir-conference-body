@@ -24,7 +24,10 @@ function formatTicketLabel(slug) {
     "trainee-member": "Trainee (ISIR Member)",
     "trainee-non-member": "Trainee (Non-Member)",
   };
-  return labels[slug] || slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return (
+    labels[slug] ||
+    slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
 }
 
 export async function onRequestPost(context) {
@@ -55,7 +58,7 @@ export async function onRequestPost(context) {
       event = await stripe.webhooks.constructEventAsync(
         body,
         signature,
-        env.STRIPE_WEBHOOK_SECRET
+        env.STRIPE_WEBHOOK_SECRET,
       );
     } catch (err) {
       console.error("Webhook signature verification failed:", err.message);
@@ -76,29 +79,33 @@ export async function onRequestPost(context) {
                SET payment_status = 'completed',
                    payment_intent_id = ?,
                    payment_date = ?
-               WHERE id = ?`
+               WHERE id = ?`,
             )
-              .bind(
-                paymentIntent.id,
-                Date.now(),
-                registrationId
-              )
+              .bind(paymentIntent.id, Date.now(), registrationId)
               .run();
 
-            console.log(`Payment confirmed for registration: ${registrationId}`);
+            console.log(
+              `Payment confirmed for registration: ${registrationId}`,
+            );
 
             // Send confirmation email if Resend is configured (e.g. with Google Workspace domain)
             if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
               const row = await env.ISIR_DB.prepare(
                 `SELECT email, first_name, middle_name, last_name, ticket_type, ticket_price, total_price, currency,
-                 accompanying_count, gala_dinner, institution, badge_name FROM registrations WHERE id = ?`
+                 accompanying_count, gala_dinner, institution, badge_name FROM registrations WHERE id = ?`,
               )
                 .bind(registrationId)
                 .first();
               if (row?.email) {
-                const name = [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(" ") || "Attendee";
+                const name =
+                  [row.first_name, row.middle_name, row.last_name]
+                    .filter(Boolean)
+                    .join(" ") || "Attendee";
                 const ticketLabel = formatTicketLabel(row.ticket_type);
-                const amount = row.total_price != null ? `${row.currency || "USD"} ${Number(row.total_price).toFixed(2)}` : "";
+                const amount =
+                  row.total_price != null
+                    ? `${row.currency || "USD"} ${Number(row.total_price).toFixed(2)}`
+                    : "";
                 const acc = Number(row.accompanying_count) || 0;
                 const gala = Number(row.gala_dinner) || 0;
                 const html = `
@@ -128,7 +135,7 @@ export async function onRequestPost(context) {
     <li>Keep this email as your confirmation. You may be asked for your registration ID.</li>
     <li>We will send further details (programme, venue, travel) closer to the event.</li>
   </ul>
-  <p>If you have any questions, please contact the organizers at <a href="mailto:support@theisir.org" style="color: #1a3a6c;">support@theisir.org</a>.</p>
+  <p>If you have any questions, please contact the organizers at <a href="mailto:support@isir2026.org" style="color: #1a3a6c;">support@isir2026.org</a>.</p>
   <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
 </body>
 </html>`;
@@ -169,12 +176,14 @@ export async function onRequestPost(context) {
             await env.ISIR_DB.prepare(
               `UPDATE registrations 
                SET payment_status = 'failed'
-               WHERE id = ?`
+               WHERE id = ?`,
             )
               .bind(failedRegistrationId)
               .run();
 
-            console.log(`Payment failed for registration: ${failedRegistrationId}`);
+            console.log(
+              `Payment failed for registration: ${failedRegistrationId}`,
+            );
           } catch (dbError) {
             console.error("Database update error:", dbError);
           }

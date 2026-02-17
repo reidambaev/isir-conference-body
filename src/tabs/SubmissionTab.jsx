@@ -28,6 +28,7 @@ const SubmissionTab = () => {
     abstract: "",
     presentationPreference: "oral",
     isInvitedSpeaker: false,
+    youngInvestigator: false,
   });
   const [loading, setLoading] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
@@ -203,6 +204,7 @@ const SubmissionTab = () => {
           keywords: formData.keywords,
           abstract: formData.abstract,
           presentationPreference: formData.presentationPreference,
+          youngInvestigator: formData.youngInvestigator,
           presenterName: `${presenter.firstName} ${presenter.lastName}`,
           presenterEmail: presenter.email,
           correspondingName: `${corresponding.firstName} ${corresponding.lastName}`,
@@ -243,6 +245,7 @@ const SubmissionTab = () => {
           keywords: "",
           abstract: "",
           presentationPreference: "oral",
+          youngInvestigator: false,
         });
         setAbstractType("");
       }
@@ -1283,6 +1286,35 @@ const SubmissionTab = () => {
             </div>
           </div>
 
+          {/* Young Investigator Competition */}
+          <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
+            <label className="flex items-start cursor-pointer">
+              <input
+                type="checkbox"
+                name="youngInvestigator"
+                checked={formData.youngInvestigator}
+                onChange={handleInputChange}
+                className="w-5 h-5 text-blue-600 mt-0.5 rounded"
+              />
+              <div className="ml-3">
+                <span className="font-semibold text-gray-800 block">
+                  Enter the Young Investigator Competition
+                </span>
+                <p className="text-sm text-gray-600 mt-1">
+                  I would like to enter the Young Investigator Competition.
+                  Eligibility: Trainees (graduate students, postdocs, medical
+                  residents/fellows) who are the presenting author of their
+                  abstract.
+                </p>
+                <div className="mt-2 text-xs text-gray-600 bg-blue-100 rounded-lg p-2">
+                  <strong>Note:</strong> Winners will be announced during the
+                  conference and receive awards. You must be registered and
+                  present your work in person to be eligible.
+                </div>
+              </div>
+            </label>
+          </div>
+
           {/* Submit Button */}
           <div className="pt-4 border-t border-gray-100">
             <button
@@ -1329,10 +1361,10 @@ const SubmissionTab = () => {
         <p className="text-sm text-blue-800">
           <strong>Questions about abstract submission?</strong> Contact us at{" "}
           <a
-            href="mailto:abstracts@theisir.org"
+            href="mailto:abstracts@isir2026.org"
             className="underline hover:text-blue-600"
           >
-            abstracts@theisir.org
+            abstracts@isir2026.org
           </a>
         </p>
       </div>

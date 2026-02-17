@@ -27,6 +27,7 @@ import {
 import PaymentForm from "../components/PaymentForm";
 import { pdf } from "@react-pdf/renderer";
 import RegistrationConfirmationPDF from "../components/RegistrationConfirmationPDF";
+import TraineeLetterUpload from "../components/TraineeLetterUpload";
 
 // Initialize Stripe
 const stripePromise = loadStripe(
@@ -104,14 +105,27 @@ const FormCheckbox = ({
 );
 
 // Step Progress Indicator
-const StepIndicator = ({ currentStep, totalSteps = 5 }) => {
-  const steps = [
-    { num: 1, label: "Verify" },
-    { num: 2, label: "Tickets" },
-    { num: 3, label: "Details" },
-    { num: 4, label: "Payment" },
-    { num: 5, label: "Confirm" },
-  ];
+const StepIndicator = ({
+  currentStep,
+  totalSteps = 5,
+  isTraineeFlow = false,
+}) => {
+  const steps = isTraineeFlow
+    ? [
+        { num: 1, label: "Verify" },
+        { num: 2, label: "Tickets" },
+        { num: 3, label: "Letter" },
+        { num: 4, label: "Details" },
+        { num: 5, label: "Payment" },
+        { num: 6, label: "Confirm" },
+      ]
+    : [
+        { num: 1, label: "Verify" },
+        { num: 2, label: "Tickets" },
+        { num: 3, label: "Details" },
+        { num: 4, label: "Payment" },
+        { num: 5, label: "Confirm" },
+      ];
 
   return (
     <div className="mb-8">
@@ -121,7 +135,7 @@ const StepIndicator = ({ currentStep, totalSteps = 5 }) => {
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{
-              width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%`,
+              width: `${((currentStep - 1) / (steps.length - 1)) * 100}%`,
               background: "linear-gradient(135deg, #1a3a6c 0%, #2d5a9e 100%)",
             }}
           />
@@ -254,7 +268,29 @@ const RegistrationForm = ({ onClose }) => {
     privacyMarketing: false,
     privacyApp: false,
     optOutMailing: false,
+    // Trainee letter upload data
+    traineeLetterFile: null,
+    traineeLetterUrl: null,
   });
+
+  // Check if selected ticket is a trainee/student type
+  const isTraineeTicket = React.useMemo(() => {
+    return (
+      formData.ticketType === "trainee-member" ||
+      formData.ticketType === "trainee-non-member"
+    );
+  }, [formData.ticketType]);
+
+  // Calculate total steps based on ticket type
+  const totalSteps = isTraineeTicket ? 6 : 5;
+
+  // Map actual step to display step (for non-trainee flow, skip step 3)
+  const getDisplayStep = (actualStep) => {
+    if (!isTraineeTicket && actualStep >= 3) {
+      return actualStep - 1;
+    }
+    return actualStep;
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -322,7 +358,7 @@ const RegistrationForm = ({ onClose }) => {
     } catch (error) {
       console.error("Verification error:", error);
       setVerificationError(
-        "Unable to verify membership. Please try again or contact support@theisir.org",
+        "Unable to verify membership. Please try again or contact support@isir2026.org",
       );
     } finally {
       setIsVerifying(false);
@@ -368,7 +404,43 @@ const RegistrationForm = ({ onClose }) => {
       }
     }
 
-    setStep(3);
+    // Check if trainee ticket - go to letter upload step (3)
+    // Otherwise skip to details step (4 for trainee flow mapping, but actually 3 for non-trainee)
+    const isTraineeType =
+      formData.ticketType === "trainee-member" ||
+      formData.ticketType === "trainee-non-member";
+
+    if (isTraineeType) {
+      setStep(3); // Go to letter upload
+    } else {
+      setStep(4); // Skip to details (step 4 in trainee flow = step 3 for non-trainee)
+    }
+  };
+
+  // Handle trainee letter upload step submission
+  const handleLetterSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.traineeLetterUrl) {
+      alert(
+        "Please upload your trainee/student verification letter to continue.",
+      );
+      return;
+    }
+    setStep(4); // Proceed to details
+  };
+
+  // Handle trainee letter upload completion
+  const handleLetterUploadComplete = (fileData) => {
+    setFormData((prev) => ({
+      ...prev,
+      traineeLetterFile: fileData,
+      traineeLetterUrl: fileData?.fileUrl || null,
+    }));
+  };
+
+  // Handle trainee letter upload error
+  const handleLetterUploadError = (error) => {
+    console.error("Letter upload error:", error);
   };
 
   const handleSubmit = (e) => {
@@ -378,7 +450,7 @@ const RegistrationForm = ({ onClose }) => {
       return;
     }
     console.log("Registration Info:", formData);
-    setStep(4);
+    setStep(5); // Go to payment step
   };
 
   const [registrationId, setRegistrationId] = useState(null);
@@ -409,9 +481,9 @@ const RegistrationForm = ({ onClose }) => {
     }
   }, [step, membershipData, isTrainee, isVerifiedMember, formData.ticketType]);
 
-  // Create payment intent when entering payment step
+  // Create payment intent when entering payment step (step 5 in new flow)
   useEffect(() => {
-    if (step === 4 && !clientSecret && formData.country) {
+    if (step === 5 && !clientSecret && formData.country) {
       createPaymentIntent();
     }
   }, [step, formData.country]);
@@ -428,6 +500,7 @@ const RegistrationForm = ({ onClose }) => {
           ...formData,
           membershipLevel: membershipData?.membership_level || null,
           membershipStatus: membershipData?.membership_status || null,
+          traineeLetterUrl: formData.traineeLetterUrl || null,
         }),
       });
 
@@ -472,7 +545,7 @@ const RegistrationForm = ({ onClose }) => {
     } catch (error) {
       console.error("Payment setup error:", error);
       alert(
-        "There was an error setting up payment. Please try again or contact support@theisir.org",
+        "There was an error setting up payment. Please try again or contact support@isir2026.org",
       );
     }
   };
@@ -489,11 +562,11 @@ const RegistrationForm = ({ onClose }) => {
 
       // Payment will be handled by Stripe Elements component
       // This is just a placeholder - actual payment confirmation happens in PaymentForm component
-      setStep(5);
+      setStep(6); // Go to confirmation step
     } catch (error) {
       console.error("Payment error:", error);
       alert(
-        "There was an error processing your payment. Please try again or contact support@theisir.org",
+        "There was an error processing your payment. Please try again or contact support@isir2026.org",
       );
     } finally {
       setIsProcessingPayment(false);
@@ -695,14 +768,15 @@ const RegistrationForm = ({ onClose }) => {
               >
                 {step === 1 && "Attendee Verification"}
                 {step === 2 && "Select Your Tickets"}
-                {step === 3 && "Registration Details"}
-                {step === 4 && "Secure Payment"}
-                {step === 5 && "Registration Complete!"}
+                {step === 3 && isTraineeTicket && "Upload Verification Letter"}
+                {step === 4 && "Registration Details"}
+                {step === 5 && "Secure Payment"}
+                {step === 6 && "Registration Complete!"}
               </h3>
               <p className="text-gray-600">ISIR 2026 World Congress</p>
             </div>
           </div>
-          {step !== 5 && (
+          {step !== 6 && (
             <button
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -726,7 +800,7 @@ const RegistrationForm = ({ onClose }) => {
         </div>
 
         {/* Step Progress */}
-        <StepIndicator currentStep={step} />
+        <StepIndicator currentStep={step} isTraineeFlow={isTraineeTicket} />
 
         {/* STEP 1: VERIFICATION */}
         {step === 1 && (
@@ -1472,8 +1546,92 @@ const RegistrationForm = ({ onClose }) => {
           </div>
         )}
 
-        {/* STEP 3: REGISTRATION FORM */}
-        {step === 3 && (
+        {/* STEP 3: TRAINEE LETTER UPLOAD (only for trainee tickets) */}
+        {step === 3 && isTraineeTicket && (
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden animate-in slide-in-from-right duration-300">
+            <FormSectionHeader
+              icon={
+                <svg
+                  className="w-5 h-5 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+              }
+            >
+              Upload Verification Letter
+            </FormSectionHeader>
+            <div className="p-8">
+              <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <svg
+                    className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <div>
+                    <h4 className="font-semibold text-amber-800">
+                      Student/Trainee Verification Required
+                    </h4>
+                    <p className="text-sm text-amber-700 mt-1">
+                      To qualify for the trainee/student rate, please upload an
+                      official document verifying your current student or
+                      trainee status. This will be reviewed by our team.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <form onSubmit={handleLetterSubmit} className="space-y-6">
+                <TraineeLetterUpload
+                  email={formData.email}
+                  registrationType={formData.ticketType}
+                  onUploadComplete={handleLetterUploadComplete}
+                  onUploadError={handleLetterUploadError}
+                  uploadedFile={formData.traineeLetterFile}
+                />
+
+                <div className="flex justify-between pt-4">
+                  <button
+                    type="button"
+                    className="px-8 py-3 border-2 border-gray-300 bg-white text-gray-700 rounded-xl shadow-md hover:bg-gray-50 font-bold text-base transition-all"
+                    onClick={() => setStep(2)}
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!formData.traineeLetterUrl}
+                    className="px-10 py-3 text-white rounded-xl shadow-lg hover:shadow-xl font-bold transition-all text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      background: formData.traineeLetterUrl
+                        ? "linear-gradient(135deg, #1a3a6c 0%, #2d5a9e 100%)"
+                        : "#9ca3af",
+                    }}
+                  >
+                    Continue to Registration →
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4: REGISTRATION FORM */}
+        {step === 4 && (
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden animate-in slide-in-from-right duration-300">
             <form onSubmit={handleSubmit}>
               <FormSectionHeader
@@ -1790,9 +1948,9 @@ const RegistrationForm = ({ onClose }) => {
                 <button
                   type="button"
                   className="px-8 py-3 border-2 border-gray-300 bg-white text-gray-700 rounded-xl shadow-md hover:bg-gray-50 font-bold text-base transition-all"
-                  onClick={() => setStep(2)}
+                  onClick={() => setStep(isTraineeTicket ? 3 : 2)}
                 >
-                  ← Back to Tickets
+                  ← Back {isTraineeTicket ? "to Letter Upload" : "to Tickets"}
                 </button>
                 <button
                   type="submit"
@@ -1809,8 +1967,8 @@ const RegistrationForm = ({ onClose }) => {
           </div>
         )}
 
-        {/* STEP 4: PAYMENT */}
-        {step === 4 && (
+        {/* STEP 5: PAYMENT */}
+        {step === 5 && (
           <div className="animate-in slide-in-from-right duration-300 space-y-6">
             {/* Order Summary */}
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
@@ -1946,14 +2104,14 @@ const RegistrationForm = ({ onClose }) => {
                         console.log("Payment succeeded:", intent);
                         setPaymentIntent(intent);
                         setIsProcessingPayment(false);
-                        setStep(5);
+                        setStep(6);
                       }}
                       onError={(error) => {
                         console.error("Payment error:", error);
                         setIsProcessingPayment(false);
                         alert(
                           error.message ||
-                            "Payment failed. Please try again or contact support@theisir.org",
+                            "Payment failed. Please try again or contact support@isir2026.org",
                         );
                       }}
                       isProcessing={isProcessingPayment}
@@ -1991,7 +2149,7 @@ const RegistrationForm = ({ onClose }) => {
                   <button
                     type="button"
                     className="px-8 py-3 border-2 border-gray-300 bg-white text-gray-700 rounded-xl shadow-md hover:bg-gray-50 font-bold text-base transition-all"
-                    onClick={() => setStep(3)}
+                    onClick={() => setStep(4)}
                   >
                     ← Back to Registration
                   </button>
@@ -2001,8 +2159,8 @@ const RegistrationForm = ({ onClose }) => {
           </div>
         )}
 
-        {/* STEP 5: CONFIRMATION */}
-        {step === 5 && (
+        {/* STEP 6: CONFIRMATION */}
+        {step === 6 && (
           <div className="animate-in fade-in zoom-in duration-500">
             <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
               <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-10 text-center">

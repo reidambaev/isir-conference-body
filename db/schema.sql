@@ -108,6 +108,7 @@ CREATE TABLE
         reviewer_notes TEXT,
         acceptance_status TEXT DEFAULT 'pending',
         is_invited_speaker INTEGER DEFAULT 0,
+        young_investigator INTEGER DEFAULT 0,
         created_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000),
         updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)
     );
