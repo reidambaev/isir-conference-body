@@ -149,11 +149,13 @@ const SubmissionTab = () => {
     // Reset previous messages
     setErrorMessage("");
     setSuccessId("");
+    setSubmitStatus(null);
 
     // Validate form
     const validationError = validateForm();
     if (validationError) {
       setErrorMessage(validationError);
+      setSubmitStatus("error");
       return;
     }
 
