@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { SUBMISSION_OPEN } from "../config/constants";
+import { isSubmissionAccessible } from "../config/constants";
 
 const SubmissionTab = () => {
   const [abstractType, setAbstractType] = useState("");
@@ -258,10 +258,12 @@ const SubmissionTab = () => {
     }
   };
 
+  const submissionOpen = isSubmissionAccessible();
+
   return (
     <div role="tabpanel">
       {/* Submission closed banner */}
-      {!SUBMISSION_OPEN && (
+      {!submissionOpen && (
         <div className="mb-6 p-4 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-800 flex items-center gap-3">
           <svg
             className="w-8 h-8 flex-shrink-0"
@@ -1319,9 +1321,9 @@ const SubmissionTab = () => {
           <div className="pt-4 border-t border-gray-100">
             <button
               type="submit"
-              disabled={loading || !SUBMISSION_OPEN}
+              disabled={loading || !submissionOpen}
               className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${
-                loading || !SUBMISSION_OPEN
+                loading || !submissionOpen
                   ? "bg-blue-400 cursor-not-allowed opacity-75"
                   : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 cursor-pointer"
               }`}
@@ -1343,7 +1345,7 @@ const SubmissionTab = () => {
                   </svg>
                   Submitting...
                 </span>
-              ) : !SUBMISSION_OPEN ? (
+              ) : !submissionOpen ? (
                 "Submission Closed"
               ) : (
                 "Submit Abstract"

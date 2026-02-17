@@ -1,18 +1,19 @@
 import React, { useState } from "react";
 import RegistrationForm from "../forms/RegistrationForm";
-import { REGISTRATION_OPEN } from "../config/constants";
+import { isRegistrationAccessible } from "../config/constants";
 
 const RegistrationTab = () => {
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
+  const registrationOpen = isRegistrationAccessible();
 
-  if (showRegistrationForm && REGISTRATION_OPEN) {
+  if (showRegistrationForm && registrationOpen) {
     return <RegistrationForm onClose={() => setShowRegistrationForm(false)} />;
   }
 
   return (
     <div role="tabpanel">
       {/* Registration closed banner */}
-      {!REGISTRATION_OPEN && (
+      {!registrationOpen && (
         <div className="mb-6 p-4 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-800 flex items-center gap-3">
           <svg
             className="w-8 h-8 flex-shrink-0"
@@ -157,12 +158,12 @@ const RegistrationTab = () => {
             </div>
           </div>
           <button
-            onClick={() => REGISTRATION_OPEN && setShowRegistrationForm(true)}
-            disabled={!REGISTRATION_OPEN}
+            onClick={() => registrationOpen && setShowRegistrationForm(true)}
+            disabled={!registrationOpen}
             className="px-8 py-3 rounded-xl font-bold shadow-md transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
             style={{ backgroundColor: "var(--color-primary)", color: "white" }}
           >
-            {REGISTRATION_OPEN ? "Register Now" : "Registration closed"}
+            {registrationOpen ? "Register Now" : "Registration closed"}
           </button>
         </div>
       </div>
@@ -475,16 +476,16 @@ const RegistrationTab = () => {
                   </p>
                   <button
                     onClick={() =>
-                      REGISTRATION_OPEN && setShowRegistrationForm(true)
+                      registrationOpen && setShowRegistrationForm(true)
                     }
-                    disabled={!REGISTRATION_OPEN}
+                    disabled={!registrationOpen}
                     className="inline-flex items-center px-5 py-2.5 text-sm font-semibold rounded-lg shadow-sm transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
                     style={{
                       backgroundColor: "var(--color-secondary)",
                       color: "var(--color-primary)",
                     }}
                   >
-                    {REGISTRATION_OPEN ? "Register Now" : "Registration closed"}
+                    {registrationOpen ? "Register Now" : "Registration closed"}
                     <svg
                       className="w-4 h-4 ml-2"
                       fill="none"
@@ -687,8 +688,8 @@ const RegistrationTab = () => {
           16th ISIR World Congress in beautiful Busan, Korea.
         </p>
         <button
-          onClick={() => REGISTRATION_OPEN && setShowRegistrationForm(true)}
-          disabled={!REGISTRATION_OPEN}
+          onClick={() => registrationOpen && setShowRegistrationForm(true)}
+          disabled={!registrationOpen}
           className="inline-flex items-center px-10 py-4 text-lg font-bold rounded-xl shadow-lg transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
           style={{
             backgroundColor: "var(--color-secondary)",
@@ -708,7 +709,7 @@ const RegistrationTab = () => {
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
             />
           </svg>
-          {REGISTRATION_OPEN ? "Start Registration Now" : "Registration closed"}
+          {registrationOpen ? "Start Registration Now" : "Registration closed"}
           <svg
             className="w-5 h-5 ml-2"
             fill="none"

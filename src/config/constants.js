@@ -2,6 +2,21 @@
 export const REGISTRATION_OPEN = false;
 export const SUBMISSION_OPEN = false;
 
+// Secret preview key for testing (add ?preview=YOUR_SECRET_KEY to URL)
+const PREVIEW_KEY = "isir2026test"; // Change this to your own secret
+
+// Check if preview mode is enabled via URL parameter
+export const isPreviewMode = () => {
+  if (typeof window === "undefined") return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get("preview") === PREVIEW_KEY;
+};
+
+// Use these in components instead of the raw flags
+export const isRegistrationAccessible = () =>
+  REGISTRATION_OPEN || isPreviewMode();
+export const isSubmissionAccessible = () => SUBMISSION_OPEN || isPreviewMode();
+
 // API Configuration for ISIR Member Verification
 export const ISIR_API_CONFIG = {
   endpoint:
