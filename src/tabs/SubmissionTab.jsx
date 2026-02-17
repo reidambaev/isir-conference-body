@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { isSubmissionAccessible } from "../config/constants";
+import React, { useState, useMemo } from "react";
+import { SUBMISSION_OPEN, isPreviewMode } from "../config/constants";
 
 const SubmissionTab = () => {
   const [abstractType, setAbstractType] = useState("");
@@ -258,10 +258,20 @@ const SubmissionTab = () => {
     }
   };
 
-  const submissionOpen = isSubmissionAccessible();
+  // Check submission access on every render to catch URL parameter changes
+  const submissionOpen = SUBMISSION_OPEN || isPreviewMode();
+  const inPreviewMode = isPreviewMode();
 
   return (
     <div role="tabpanel">
+      {/* Preview mode indicator */}
+      {inPreviewMode && (
+        <div className="mb-4 p-3 rounded-lg bg-purple-100 border border-purple-300 text-purple-800 text-sm flex items-center gap-2">
+          <span className="font-semibold">🔓 Preview Mode</span> - Submission is
+          unlocked for testing
+        </div>
+      )}
+
       {/* Submission closed banner */}
       {!submissionOpen && (
         <div className="mb-6 p-4 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-800 flex items-center gap-3">

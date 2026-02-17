@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import RegistrationForm from "../forms/RegistrationForm";
-import { isRegistrationAccessible } from "../config/constants";
+import { REGISTRATION_OPEN, isPreviewMode } from "../config/constants";
 
 const RegistrationTab = () => {
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
-  const registrationOpen = isRegistrationAccessible();
+  // Check on every render to catch URL parameter changes
+  const registrationOpen = REGISTRATION_OPEN || isPreviewMode();
+  const inPreviewMode = isPreviewMode();
 
   if (showRegistrationForm && registrationOpen) {
     return <RegistrationForm onClose={() => setShowRegistrationForm(false)} />;
@@ -12,6 +14,14 @@ const RegistrationTab = () => {
 
   return (
     <div role="tabpanel">
+      {/* Preview mode indicator */}
+      {inPreviewMode && (
+        <div className="mb-4 p-3 rounded-lg bg-purple-100 border border-purple-300 text-purple-800 text-sm flex items-center gap-2">
+          <span className="font-semibold">🔓 Preview Mode</span> - Registration
+          is unlocked for testing
+        </div>
+      )}
+
       {/* Registration closed banner */}
       {!registrationOpen && (
         <div className="mb-6 p-4 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-800 flex items-center gap-3">
