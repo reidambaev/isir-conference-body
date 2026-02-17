@@ -69,7 +69,10 @@ async function handleApiRequest(request, env, url) {
   }
 
   // POST /api/create-payment-intent
-  if (url.pathname === "/api/create-payment-intent" && request.method === "POST") {
+  if (
+    url.pathname === "/api/create-payment-intent" &&
+    request.method === "POST"
+  ) {
     return handleCreatePaymentIntent(request, env, corsHeaders);
   }
 
@@ -817,7 +820,9 @@ async function handleStripeWebhook(request, env) {
               .bind(paymentIntent.id, Date.now(), registrationId)
               .run();
 
-            console.log(`Payment confirmed for registration: ${registrationId}`);
+            console.log(
+              `Payment confirmed for registration: ${registrationId}`,
+            );
 
             // Send confirmation email if Resend is configured
             if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
@@ -916,7 +921,9 @@ async function handleStripeWebhook(request, env) {
               .bind(failedRegistrationId)
               .run();
 
-            console.log(`Payment failed for registration: ${failedRegistrationId}`);
+            console.log(
+              `Payment failed for registration: ${failedRegistrationId}`,
+            );
           } catch (dbError) {
             console.error("Database update error:", dbError);
           }
