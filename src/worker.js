@@ -101,6 +101,20 @@ async function handleRegistration(request, env, corsHeaders) {
       (isEarlyBird ? 250 : 350) * (data.accompanyingPersonCount || 0);
     const totalPrice = ticketPrice + accompanyingPrice;
 
+    // Extract primitive values from objects (react-country-state-city returns objects)
+    const city =
+      typeof data.city === "object"
+        ? data.city?.name || null
+        : data.city || null;
+    const state =
+      typeof data.stateSelect === "object"
+        ? data.stateSelect?.name || null
+        : data.stateSelect || data.stateText || null;
+    const country =
+      typeof data.country === "object"
+        ? data.country?.name || null
+        : data.country || null;
+
     // Insert into D1 database
     await env.ISIR_DB.prepare(
       `
@@ -131,10 +145,10 @@ async function handleRegistration(request, env, corsHeaders) {
         data.pronouns || null,
         data.address1 || null,
         data.address2 || null,
-        data.city || null,
-        data.stateSelect || data.stateText || null,
+        city,
+        state,
         data.zip || null,
-        data.country || null,
+        country,
         data.phone || null,
         data.cellPhone || null,
         data.isPhysician || null,
