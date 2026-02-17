@@ -4,7 +4,7 @@ import React from "react";
 const deadlines = [
   {
     date: "Mar 15",
-    title: "Abstract AND registration Submission Opens",
+    title: "Abstract and Registration Submission Opens",
     desc: "The portal for both congress registration and abstract submission will be available.",
     actions: [
       { label: "Register Now", tab: "registration" },

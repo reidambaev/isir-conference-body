@@ -99,15 +99,15 @@ CREATE TABLE
         presenter_role TEXT,
         presenter_name TEXT NOT NULL,
         presenter_email TEXT NOT NULL,
+        presenter_author_id TEXT,
         corresponding_name TEXT,
         corresponding_email TEXT,
         corresponding_author_id TEXT,
-        conflict_of_interest TEXT,
-        conflict_details TEXT,
         affiliations TEXT,
         status TEXT DEFAULT 'submitted',
         reviewer_notes TEXT,
         acceptance_status TEXT DEFAULT 'pending',
+        is_invited_speaker INTEGER DEFAULT 0,
         created_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000),
         updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)
     );

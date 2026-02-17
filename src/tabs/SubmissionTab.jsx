@@ -27,6 +27,7 @@ const SubmissionTab = () => {
     keywords: "",
     abstract: "",
     presentationPreference: "oral",
+    isInvitedSpeaker: false,
   });
   const [loading, setLoading] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
@@ -55,8 +56,11 @@ const SubmissionTab = () => {
   ];
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
     setErrorMessage("");
   };
 
@@ -138,85 +142,8 @@ const SubmissionTab = () => {
     return null;
   };
 
-  const fillExample = () => {
-    setFormData({
-      title: "Maternal immune tolerance mechanisms in successful pregnancy",
-      allAuthors: [
-        {
-          firstName: "Sarah",
-          middleName: "Elizabeth",
-          lastName: "Johnson",
-          email: "sarah.johnson@university.edu",
-          isPresenter: true,
-          isCorresponding: true,
-          affiliations: [
-            {
-              institution: "University of Medical Sciences",
-              department: "Department of Reproductive Immunology",
-              city: "Boston",
-              country: "United States",
-            },
-          ],
-        },
-        {
-          firstName: "Michael",
-          middleName: "",
-          lastName: "Chen",
-          email: "m.chen@research.org",
-          isPresenter: false,
-          isCorresponding: false,
-          affiliations: [
-            {
-              institution: "International Research Institute",
-              department: "Center for Maternal-Fetal Medicine",
-              city: "London",
-              country: "United Kingdom",
-            },
-            {
-              institution: "University of Cambridge",
-              department: "Department of Obstetrics",
-              city: "Cambridge",
-              country: "United Kingdom",
-            },
-          ],
-        },
-        {
-          firstName: "Elena",
-          middleName: "",
-          lastName: "Rodriguez",
-          email: "e.rodriguez@institute.edu",
-          isPresenter: false,
-          isCorresponding: false,
-          affiliations: [
-            {
-              institution: "University of Medical Sciences",
-              department: "Department of Reproductive Immunology",
-              city: "Boston",
-              country: "United States",
-            },
-          ],
-        },
-      ],
-      category: "Immune Regulation in Reproduction",
-      keywords:
-        "maternal tolerance, regulatory T cells, immune adaptation, pregnancy immunology, fetal-maternal interface",
-      abstract:
-        "Objectives: To investigate the role of regulatory T cells (Tregs) in establishing maternal immune tolerance during early pregnancy and identify key molecular mechanisms involved in immune adaptation at the maternal-fetal interface. Methods: We conducted a prospective study of 120 pregnant women in their first trimester, analyzing peripheral blood and decidual tissue samples. Flow cytometry was used to characterize Treg populations, while RNA sequencing identified differentially expressed genes. Results: Treg populations showed significant expansion (2.3-fold increase, p<0.001) during early pregnancy compared to non-pregnant controls. We identified upregulation of FOXP3, IL-10, and TGF-β pathways, along with novel markers associated with enhanced suppressive function. Women who later experienced pregnancy complications showed reduced Treg expansion and altered gene expression patterns. Conclusions: Our findings demonstrate that successful pregnancy establishment requires robust Treg expansion and specific molecular adaptations. These insights may inform future therapeutic strategies for preventing pregnancy complications related to immune dysregulation.",
-      presentationPreference: "oral",
-    });
-    setAbstractType("");
-    setErrorMessage("");
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!SUBMISSION_OPEN) {
-      setErrorMessage(
-        "Abstract submission is currently closed. Please check back later.",
-      );
-      return;
-    }
 
     // Reset previous messages
     setErrorMessage("");
@@ -330,6 +257,30 @@ const SubmissionTab = () => {
 
   return (
     <div role="tabpanel">
+      {/* Submission closed banner */}
+      {!SUBMISSION_OPEN && (
+        <div className="mb-6 p-4 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-800 flex items-center gap-3">
+          <svg
+            className="w-8 h-8 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+            />
+          </svg>
+          <div>
+            <strong>Abstract submission is currently closed.</strong> All
+            details below are for your information. Please check back when
+            submission opens on March 15th, 2026.
+          </div>
+        </div>
+      )}
+
       {/* Header Section */}
       <header className="mb-8">
         <div className="flex items-center mb-4">
@@ -363,37 +314,13 @@ const SubmissionTab = () => {
         </div>
       </header>
 
-      {/* Submission closed banner */}
-      {!SUBMISSION_OPEN && (
-        <div className="mb-6 p-4 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-800 flex items-center gap-3">
-          <svg
-            className="w-8 h-8 flex-shrink-0"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-            />
-          </svg>
-          <div>
-            <strong>Abstract submission is currently closed.</strong> All
-            guidelines and dates below are for your information. Please check
-            back later when submission opens.
-          </div>
-        </div>
-      )}
-
       {/* Important Dates Banner */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 mb-8 text-white">
         <h4 className="font-bold text-lg mb-3">Important Submission Dates</h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white/10 rounded-lg p-3">
             <div className="text-sm opacity-80">Submission Opens</div>
-            <div className="font-bold">March 1, 2026</div>
+            <div className="font-bold">February 1, 2026</div>
           </div>
           <div className="bg-white/10 rounded-lg p-3">
             <div className="text-sm opacity-80">Submission Deadline</div>
@@ -1268,6 +1195,46 @@ const SubmissionTab = () => {
             </div>
           </div>
 
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                name="isInvitedSpeaker"
+                checked={formData.isInvitedSpeaker}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    isInvitedSpeaker: e.target.checked,
+                    // Optional: Auto-set preference to Oral if invited
+                    presentationPreference: e.target.checked
+                      ? "oral"
+                      : prev.presentationPreference,
+                  }))
+                }
+                className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-900 focus:ring-blue-900"
+              />
+              <div>
+                <span className="font-bold text-gray-900">
+                  Invited Speaker Submission
+                </span>
+                <div className="text-sm text-gray-700 mt-1 space-y-1">
+                  <p>Please only check this box if:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>
+                      You have received an <strong>official invitation</strong>{" "}
+                      from ISIR to speak.
+                    </li>
+                    <li>
+                      This submission is an abstract of your{" "}
+                      <strong>TALK</strong> (you may submit additional abstracts
+                      separately).
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </label>
+          </div>
+
           {/* Presentation Preference */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
@@ -1318,15 +1285,6 @@ const SubmissionTab = () => {
 
           {/* Submit Button */}
           <div className="pt-4 border-t border-gray-100">
-            {/* Fill Example Button */}
-            <button
-              type="button"
-              onClick={fillExample}
-              className="w-full mb-3 py-3 rounded-xl font-semibold text-blue-600 bg-blue-50 border-2 border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-all"
-            >
-              Fill Example Data
-            </button>
-
             <button
               type="submit"
               disabled={loading || !SUBMISSION_OPEN}
@@ -1353,10 +1311,10 @@ const SubmissionTab = () => {
                   </svg>
                   Submitting...
                 </span>
-              ) : SUBMISSION_OPEN ? (
-                "Submit Abstract"
+              ) : !SUBMISSION_OPEN ? (
+                "Submission Closed"
               ) : (
-                "Submission closed"
+                "Submit Abstract"
               )}
             </button>
             <p className="text-center text-sm text-gray-500 mt-3">
