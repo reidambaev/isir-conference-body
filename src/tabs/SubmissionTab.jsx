@@ -427,8 +427,8 @@ const SubmissionTab = () => {
             </div>
             <div>
               <strong>Registration:</strong> The presenting author must be
-              registered for the congress by September 1, 2026 for the abstract to
-              be included in the program.
+              registered for the congress by September 1, 2026 for the abstract
+              to be included in the program.
             </div>
           </div>
           <div className="flex items-start">
