@@ -125,9 +125,9 @@ const AboutTab = () => (
                 style={{ backgroundColor: "var(--color-secondary)" }}
               ></span>
               <div>
-                <strong>Abstract Submission Opens:</strong>
+                <strong>Registration & Abstract Opens:</strong>
                 <br />
-                March 1, 2026
+                March 15, 2026
               </div>
             </li>
             <li className="flex items-start">
@@ -138,7 +138,18 @@ const AboutTab = () => (
               <div>
                 <strong>Abstract Deadline:</strong>
                 <br />
-                April 30, 2026
+                July 1, 2026
+              </div>
+            </li>
+            <li className="flex items-start">
+              <span
+                className="w-2 h-2 rounded-full mt-2 mr-3 flex-shrink-0"
+                style={{ backgroundColor: "var(--color-secondary)" }}
+              ></span>
+              <div>
+                <strong>Notification of Acceptance:</strong>
+                <br />
+                August 1, 2026
               </div>
             </li>
             <li className="flex items-start">
@@ -149,7 +160,7 @@ const AboutTab = () => (
               <div>
                 <strong>Early Bird Deadline:</strong>
                 <br />
-                July 10, 2026
+                September 1, 2026
               </div>
             </li>
             <li className="flex items-start">

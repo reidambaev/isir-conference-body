@@ -18,14 +18,19 @@ const deadlines = [
     actions: [{ label: "Submit Abstract", tab: "submission" }],
   },
   {
-    date: "Jul 31",
+    date: "Aug 1",
+    title: "Notification of Acceptance",
+    desc: "Authors will be notified of their abstract status.",
+  },
+  {
+    date: "Sept 1",
     title: "Early Bird Registration Deadline",
     desc: "Register by this date to secure the discounted rate. Presenting authors must be registered.",
     isUrgent: true,
     actions: [{ label: "Register Now", tab: "registration" }],
   },
   {
-    date: "Jul 31",
+    date: "Oct 1",
     title: "Hotel Discount Deadline",
     desc: "Last day to book hotel rooms at the early discounted rate.",
   },
