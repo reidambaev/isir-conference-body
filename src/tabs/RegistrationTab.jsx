@@ -482,7 +482,8 @@ const RegistrationTab = () => {
                   </h5>
                   <p className="text-gray-600 text-sm mb-3">
                     Complete your congress registration and select your
-                    category. Early bird rates available until July 10, 2026.
+                    category. Early bird rates available until September 1,
+                    2026.
                   </p>
                   <button
                     onClick={() =>

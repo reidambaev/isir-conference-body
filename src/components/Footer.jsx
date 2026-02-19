@@ -198,7 +198,7 @@ const Footer = () => (
               </svg>
               <div>
                 <p className="font-medium text-white">Early Bird Deadline</p>
-                <p>July 10, 2026</p>
+                <p>September 1, 2026</p>
               </div>
             </li>
             <li className="flex items-start">
@@ -217,7 +217,7 @@ const Footer = () => (
               </svg>
               <div>
                 <p className="font-medium text-white">Abstract Deadline</p>
-                <p>April 30, 2026</p>
+                <p>July 1, 2026</p>
               </div>
             </li>
             <li className="flex items-start">

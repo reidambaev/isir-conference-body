@@ -337,15 +337,15 @@ const SubmissionTab = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white/10 rounded-lg p-3">
             <div className="text-sm opacity-80">Submission Opens</div>
-            <div className="font-bold">February 1, 2026</div>
+            <div className="font-bold">March 15, 2026</div>
           </div>
           <div className="bg-white/10 rounded-lg p-3">
             <div className="text-sm opacity-80">Submission Deadline</div>
-            <div className="font-bold">April 30, 2026</div>
+            <div className="font-bold">July 1, 2026</div>
           </div>
           <div className="bg-white/10 rounded-lg p-3">
             <div className="text-sm opacity-80">Notification of Acceptance</div>
-            <div className="font-bold">May 20, 2026</div>
+            <div className="font-bold">August 1, 2026</div>
           </div>
         </div>
       </div>
@@ -427,7 +427,7 @@ const SubmissionTab = () => {
             </div>
             <div>
               <strong>Registration:</strong> The presenting author must be
-              registered for the congress by July 10, 2026 for the abstract to
+              registered for the congress by September 1, 2026 for the abstract to
               be included in the program.
             </div>
           </div>
@@ -1364,7 +1364,7 @@ const SubmissionTab = () => {
               )}
             </button>
             <p className="text-center text-sm text-gray-500 mt-3">
-              Submission deadline: April 30, 2026
+              Submission deadline: July 1, 2026
             </p>
           </div>
         </form>
