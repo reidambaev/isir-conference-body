@@ -12,6 +12,11 @@ export default {
       return handleApiRequest(request, env, url);
     }
 
+    // Serve trainee letters from R2 storage
+    if (url.pathname.startsWith("/trainee-letters/")) {
+      return handleTraineeLetterGet(request, env, url);
+    }
+
     // Serve static assets for everything else
     // For SPA routing: if asset not found, serve index.html
     const response = await env.ASSETS.fetch(request);
@@ -26,6 +31,31 @@ export default {
     return response;
   },
 };
+
+// Handle GET requests for trainee letters from R2
+async function handleTraineeLetterGet(request, env, url) {
+  const key = url.pathname.slice(1); // Remove leading slash
+
+  try {
+    const object = await env.TRAINEE_LETTERS_BUCKET.get(key);
+
+    if (!object) {
+      return new Response("File not found", { status: 404 });
+    }
+
+    const headers = new Headers();
+    headers.set(
+      "Content-Type",
+      object.httpMetadata?.contentType || "application/octet-stream",
+    );
+    headers.set("Cache-Control", "public, max-age=31536000");
+
+    return new Response(object.body, { headers });
+  } catch (error) {
+    console.error("Error fetching trainee letter:", error);
+    return new Response("Error fetching file", { status: 500 });
+  }
+}
 
 async function handleApiRequest(request, env, url) {
   const corsHeaders = {
