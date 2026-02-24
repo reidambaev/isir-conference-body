@@ -852,9 +852,9 @@ export default function AdminTab() {
                               Authors
                             </h4>
                             <div className="space-y-2">
-                              {abstract.authors?.map((author) => (
+                              {(abstract.authors || []).map((author, index) => (
                                 <div
-                                  key={author.id}
+                                  key={author.id || index}
                                   className="flex items-center gap-2 text-sm bg-white px-3 py-2 rounded-lg border border-gray-100"
                                 >
                                   <span className="font-medium text-gray-800">
@@ -890,33 +890,35 @@ export default function AdminTab() {
                               Affiliations
                             </h4>
                             <div className="space-y-2">
-                              {abstract.affiliations?.map((aff) => (
-                                <div
-                                  key={aff.id}
-                                  className="text-sm text-gray-600 bg-white px-3 py-2 rounded-lg border border-gray-100"
-                                >
-                                  <span className="font-medium text-gray-800">
-                                    {aff.author_name}
-                                  </span>
-                                  {aff.department && (
-                                    <span className="text-gray-500">
-                                      {" "}
-                                      - {aff.department}
+                              {(abstract.affiliations || []).map(
+                                (aff, index) => (
+                                  <div
+                                    key={aff.id || index}
+                                    className="text-sm text-gray-600 bg-white px-3 py-2 rounded-lg border border-gray-100"
+                                  >
+                                    <span className="font-medium text-gray-800">
+                                      {aff.author_name}
                                     </span>
-                                  )}
-                                  {aff.institution && (
-                                    <span className="text-gray-500">
-                                      , {aff.institution}
-                                    </span>
-                                  )}
-                                  {aff.city && aff.country && (
-                                    <span className="text-gray-400">
-                                      {" "}
-                                      - {aff.city}, {aff.country}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
+                                    {aff.department && (
+                                      <span className="text-gray-500">
+                                        {" "}
+                                        - {aff.department}
+                                      </span>
+                                    )}
+                                    {aff.institution && (
+                                      <span className="text-gray-500">
+                                        , {aff.institution}
+                                      </span>
+                                    )}
+                                    {aff.city && aff.country && (
+                                      <span className="text-gray-400">
+                                        {" "}
+                                        - {aff.city}, {aff.country}
+                                      </span>
+                                    )}
+                                  </div>
+                                ),
+                              )}
                             </div>
                           </div>
                         </div>

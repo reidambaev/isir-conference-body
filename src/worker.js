@@ -997,14 +997,61 @@ async function handleStripeWebhook(request, env) {
 // Admin endpoint: Get all abstracts
 async function handleGetAbstracts(env, corsHeaders) {
   try {
-    const result = await env.ISIR_DB.prepare(
+    // Get all abstracts
+    const abstractsResult = await env.ISIR_DB.prepare(
       `SELECT * FROM abstractions ORDER BY submission_date DESC LIMIT 500`,
     ).all();
+
+    const abstracts = abstractsResult.results || [];
+
+    // Get all authors and affiliations for these abstracts
+    if (abstracts.length > 0) {
+      const abstractIds = abstracts.map((a) => a.id);
+      const placeholders = abstractIds.map(() => "?").join(",");
+
+      // Get authors
+      const authorsResult = await env.ISIR_DB.prepare(
+        `SELECT * FROM authors WHERE abstract_id IN (${placeholders})`,
+      )
+        .bind(...abstractIds)
+        .all();
+
+      // Get affiliations
+      const affiliationsResult = await env.ISIR_DB.prepare(
+        `SELECT * FROM affiliations WHERE abstract_id IN (${placeholders})`,
+      )
+        .bind(...abstractIds)
+        .all();
+
+      // Group authors and affiliations by abstract_id
+      const authorsByAbstract = {};
+      const affiliationsByAbstract = {};
+
+      (authorsResult.results || []).forEach((author) => {
+        if (!authorsByAbstract[author.abstract_id]) {
+          authorsByAbstract[author.abstract_id] = [];
+        }
+        authorsByAbstract[author.abstract_id].push(author);
+      });
+
+      (affiliationsResult.results || []).forEach((aff) => {
+        if (!affiliationsByAbstract[aff.abstract_id]) {
+          affiliationsByAbstract[aff.abstract_id] = [];
+        }
+        affiliationsByAbstract[aff.abstract_id].push(aff);
+      });
+
+      // Attach authors and affiliations to each abstract
+      abstracts.forEach((abstract) => {
+        abstract.authors = authorsByAbstract[abstract.id] || [];
+        abstract.affiliations = affiliationsByAbstract[abstract.id] || [];
+      });
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        data: result.results,
+        data: abstracts,
       }),
       {
         status: 200,
