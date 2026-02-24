@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 
 export default function AdminTab() {
   const [abstracts, setAbstracts] = useState([]);
@@ -14,7 +14,13 @@ export default function AdminTab() {
   const [abstractCategoryFilter, setAbstractCategoryFilter] = useState("all");
   const [abstractStatusFilter, setAbstractStatusFilter] = useState("all");
   const [abstractSortBy, setAbstractSortBy] = useState("date-desc");
-  const [abstractViewMode, setAbstractViewMode] = useState("cards"); // "cards" or "table"
+  const [abstractViewMode, setAbstractViewMode] = useState("cards"); // "cards", "table", or "review"
+
+  // Review mode state
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const [reviewUpdating, setReviewUpdating] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
 
   useEffect(() => {
     fetchAllData();
@@ -152,6 +158,95 @@ export default function AdminTab() {
 
     return { byCategory, byStatus, byPreference, total: abstracts.length };
   }, [abstracts]);
+
+  // Pending review abstracts (submitted status only)
+  const pendingReviewAbstracts = useMemo(() => {
+    return abstracts.filter((a) => a.status === "submitted");
+  }, [abstracts]);
+
+  // Current abstract being reviewed
+  const currentReviewAbstract = pendingReviewAbstracts[reviewIndex] || null;
+
+  // Update abstract status
+  const updateAbstractStatus = async (abstractId, status, reason = null) => {
+    setReviewUpdating(true);
+    try {
+      const response = await fetch(
+        `/api/admin/abstracts/${abstractId}/status`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status, rejection_reason: reason }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update status");
+      }
+
+      // Update local state
+      setAbstracts((prev) =>
+        prev.map((a) =>
+          a.id === abstractId ? { ...a, status, rejection_reason: reason } : a,
+        ),
+      );
+
+      // Move to next abstract if in review mode
+      if (abstractViewMode === "review") {
+        // Since the array will shrink, keep the same index (which will show the next item)
+        // But if we're at the end, we need to go back
+        if (reviewIndex >= pendingReviewAbstracts.length - 1) {
+          setReviewIndex(Math.max(0, reviewIndex - 1));
+        }
+      }
+
+      setRejectionReason("");
+      setShowRejectionModal(false);
+    } catch (err) {
+      console.error("Error updating abstract status:", err);
+      alert("Failed to update abstract status");
+    } finally {
+      setReviewUpdating(false);
+    }
+  };
+
+  // Start review mode
+  const startReviewMode = () => {
+    setReviewIndex(0);
+    setAbstractViewMode("review");
+  };
+
+  // Keyboard navigation for review mode
+  useEffect(() => {
+    if (abstractViewMode !== "review") return;
+
+    const handleKeyDown = (e) => {
+      if (showRejectionModal) return;
+
+      if (e.key === "ArrowLeft" && reviewIndex > 0) {
+        setReviewIndex((i) => i - 1);
+      } else if (
+        e.key === "ArrowRight" &&
+        reviewIndex < pendingReviewAbstracts.length - 1
+      ) {
+        setReviewIndex((i) => i + 1);
+      } else if (e.key === "a" && currentReviewAbstract && !reviewUpdating) {
+        updateAbstractStatus(currentReviewAbstract.id, "accepted");
+      } else if (e.key === "r" && currentReviewAbstract && !reviewUpdating) {
+        setShowRejectionModal(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    abstractViewMode,
+    reviewIndex,
+    pendingReviewAbstracts.length,
+    currentReviewAbstract,
+    reviewUpdating,
+    showRejectionModal,
+  ]);
 
   const expandAll = () => {
     setExpandedAbstracts(new Set(filteredAbstracts.map((a) => a.id)));
@@ -308,25 +403,48 @@ export default function AdminTab() {
                 Review and manage submitted abstracts
               </p>
             </div>
-            <button
-              onClick={exportToCSV}
-              className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-2 font-medium"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <div className="flex gap-2">
+              {pendingReviewAbstracts.length > 0 && (
+                <button
+                  onClick={startReviewMode}
+                  className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2 font-medium"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                    />
+                  </svg>
+                  Review ({pendingReviewAbstracts.length})
+                </button>
+              )}
+              <button
+                onClick={exportToCSV}
+                className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-2 font-medium"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              Export CSV
-            </button>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                Export CSV
+              </button>
+            </div>
           </div>
 
           {/* Stats Cards */}
@@ -602,7 +720,471 @@ export default function AdminTab() {
             </div>
           </div>
 
-          {filteredAbstracts.length === 0 ? (
+          {/* Review Mode UI */}
+          {abstractViewMode === "review" ? (
+            <div className="space-y-6">
+              {/* Review Mode Header */}
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-bold">Review Mode</h3>
+                    <p className="text-blue-100 mt-1">
+                      {pendingReviewAbstracts.length === 0
+                        ? "All abstracts have been reviewed!"
+                        : `${reviewIndex + 1} of ${pendingReviewAbstracts.length} pending abstracts`}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setAbstractViewMode("cards")}
+                    className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                    Exit Review
+                  </button>
+                </div>
+                {pendingReviewAbstracts.length > 0 && (
+                  <div className="mt-4">
+                    <div className="bg-white/20 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-white h-full transition-all duration-300"
+                        style={{
+                          width: `${((abstracts.length - pendingReviewAbstracts.length) / abstracts.length) * 100}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="text-blue-100 text-sm mt-2">
+                      {abstracts.length - pendingReviewAbstracts.length} of{" "}
+                      {abstracts.length} abstracts reviewed
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Keyboard Shortcuts Hint */}
+              {pendingReviewAbstracts.length > 0 && (
+                <div className="bg-gray-50 rounded-lg px-4 py-3 flex items-center justify-center gap-6 text-sm text-gray-600">
+                  <span>
+                    <kbd className="px-2 py-1 bg-white rounded border border-gray-200 font-mono text-xs">
+                      A
+                    </kbd>{" "}
+                    Accept
+                  </span>
+                  <span>
+                    <kbd className="px-2 py-1 bg-white rounded border border-gray-200 font-mono text-xs">
+                      R
+                    </kbd>{" "}
+                    Reject
+                  </span>
+                  <span>
+                    <kbd className="px-2 py-1 bg-white rounded border border-gray-200 font-mono text-xs">
+                      &larr;
+                    </kbd>{" "}
+                    <kbd className="px-2 py-1 bg-white rounded border border-gray-200 font-mono text-xs">
+                      &rarr;
+                    </kbd>{" "}
+                    Navigate
+                  </span>
+                </div>
+              )}
+
+              {/* Current Abstract Card */}
+              {currentReviewAbstract ? (
+                <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                  {/* Abstract Header */}
+                  <div className="p-6 border-b border-gray-100">
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                        {currentReviewAbstract.category}
+                      </span>
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                          currentReviewAbstract.presentation_preference ===
+                          "oral"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-violet-100 text-violet-700"
+                        }`}
+                      >
+                        {currentReviewAbstract.presentation_preference}{" "}
+                        preference
+                      </span>
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                        {currentReviewAbstract.word_count} words
+                      </span>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 leading-tight">
+                      {currentReviewAbstract.title}
+                    </h2>
+                  </div>
+
+                  {/* Abstract Content */}
+                  <div className="p-6 space-y-6">
+                    {/* Abstract Text */}
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                        Abstract
+                      </h4>
+                      <p className="text-gray-700 whitespace-pre-wrap leading-relaxed bg-gray-50 p-4 rounded-lg">
+                        {currentReviewAbstract.abstract}
+                      </p>
+                    </div>
+
+                    {/* Keywords */}
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                        Keywords
+                      </h4>
+                      <p className="text-gray-600">
+                        {currentReviewAbstract.keywords}
+                      </p>
+                    </div>
+
+                    {/* Authors & Contact */}
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                          Authors
+                        </h4>
+                        <div className="space-y-2">
+                          {(currentReviewAbstract.authors || []).map(
+                            (author, idx) => (
+                              <div
+                                key={author.id || idx}
+                                className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded-lg"
+                              >
+                                <span className="font-medium text-gray-800">
+                                  {author.first_name}{" "}
+                                  {author.middle_name
+                                    ? `${author.middle_name} `
+                                    : ""}
+                                  {author.last_name}
+                                </span>
+                                {author.is_presenter === 1 && (
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                    Presenter
+                                  </span>
+                                )}
+                                {author.is_corresponding === 1 && (
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                                    Corresponding
+                                  </span>
+                                )}
+                              </div>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                          Contact
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          <p className="text-gray-600">
+                            <span className="font-semibold text-gray-700">
+                              Presenter:
+                            </span>{" "}
+                            {currentReviewAbstract.presenter_name}
+                            <span className="text-gray-400 block">
+                              {currentReviewAbstract.presenter_email}
+                            </span>
+                          </p>
+                          <p className="text-gray-600">
+                            <span className="font-semibold text-gray-700">
+                              Corresponding:
+                            </span>{" "}
+                            {currentReviewAbstract.corresponding_name}
+                            <span className="text-gray-400 block">
+                              {currentReviewAbstract.corresponding_email}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Affiliations */}
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                        Affiliations
+                      </h4>
+                      <div className="space-y-2">
+                        {(currentReviewAbstract.affiliations || []).map(
+                          (aff, idx) => (
+                            <div
+                              key={aff.id || idx}
+                              className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-lg"
+                            >
+                              <span className="font-medium text-gray-800">
+                                {aff.author_name}
+                              </span>
+                              {aff.department && (
+                                <span className="text-gray-500">
+                                  {" "}
+                                  - {aff.department}
+                                </span>
+                              )}
+                              {aff.institution && (
+                                <span className="text-gray-500">
+                                  , {aff.institution}
+                                </span>
+                              )}
+                              {aff.city && aff.country && (
+                                <span className="text-gray-400">
+                                  {" "}
+                                  - {aff.city}, {aff.country}
+                                </span>
+                              )}
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="p-6 bg-gray-50 border-t border-gray-100">
+                    <div className="flex items-center justify-between">
+                      {/* Navigation */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() =>
+                            setReviewIndex((i) => Math.max(0, i - 1))
+                          }
+                          disabled={reviewIndex === 0}
+                          className="px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15 19l-7-7 7-7"
+                            />
+                          </svg>
+                          Previous
+                        </button>
+                        <button
+                          onClick={() =>
+                            setReviewIndex((i) =>
+                              Math.min(
+                                pendingReviewAbstracts.length - 1,
+                                i + 1,
+                              ),
+                            )
+                          }
+                          disabled={
+                            reviewIndex >= pendingReviewAbstracts.length - 1
+                          }
+                          className="px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          Next
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 5l7 7-7 7"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* Accept/Reject */}
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setShowRejectionModal(true)}
+                          disabled={reviewUpdating}
+                          className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium"
+                        >
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                          Reject
+                        </button>
+                        <button
+                          onClick={() =>
+                            updateAbstractStatus(
+                              currentReviewAbstract.id,
+                              "accepted",
+                            )
+                          }
+                          disabled={reviewUpdating}
+                          className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium"
+                        >
+                          {reviewUpdating ? (
+                            <svg
+                              className="w-5 h-5 animate-spin"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
+                            </svg>
+                          ) : (
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                          )}
+                          Accept
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* All reviewed state */
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-16 text-center">
+                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <svg
+                      className="w-10 h-10 text-emerald-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                    All Done!
+                  </h3>
+                  <p className="text-gray-500 mb-6">
+                    All abstracts have been reviewed.
+                  </p>
+                  <button
+                    onClick={() => setAbstractViewMode("cards")}
+                    className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    Back to All Abstracts
+                  </button>
+                </div>
+              )}
+
+              {/* Rejection Modal */}
+              {showRejectionModal && currentReviewAbstract && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full">
+                    <div className="p-6 border-b border-gray-100">
+                      <h3 className="text-xl font-bold text-gray-900">
+                        Reject Abstract
+                      </h3>
+                      <p className="text-gray-500 mt-1">
+                        Provide a reason for rejection (optional)
+                      </p>
+                    </div>
+                    <div className="p-6">
+                      <textarea
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                        placeholder="Enter rejection reason..."
+                        className="w-full h-32 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none"
+                      />
+                    </div>
+                    <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+                      <button
+                        onClick={() => {
+                          setShowRejectionModal(false);
+                          setRejectionReason("");
+                        }}
+                        className="px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 font-medium"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() =>
+                          updateAbstractStatus(
+                            currentReviewAbstract.id,
+                            "rejected",
+                            rejectionReason,
+                          )
+                        }
+                        disabled={reviewUpdating}
+                        className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium flex items-center gap-2"
+                      >
+                        {reviewUpdating && (
+                          <svg
+                            className="w-4 h-4 animate-spin"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            />
+                          </svg>
+                        )}
+                        Confirm Rejection
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : filteredAbstracts.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center">
               <svg
                 className="w-16 h-16 text-gray-300 mx-auto mb-4"

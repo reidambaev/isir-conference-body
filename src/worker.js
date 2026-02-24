@@ -126,6 +126,19 @@ async function handleApiRequest(request, env, url) {
     return handleGetAbstracts(env, corsHeaders);
   }
 
+  // PATCH /api/admin/abstracts/:id/status - Update abstract status
+  const abstractStatusMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/(\d+)\/status$/,
+  );
+  if (abstractStatusMatch && request.method === "PATCH") {
+    return handleUpdateAbstractStatus(
+      request,
+      env,
+      corsHeaders,
+      abstractStatusMatch[1],
+    );
+  }
+
   // GET /api/admin/visa-requests
   if (url.pathname === "/api/admin/visa-requests" && request.method === "GET") {
     return handleGetVisaRequests(env, corsHeaders);
@@ -1069,6 +1082,57 @@ async function handleGetAbstracts(env, corsHeaders) {
         status: 500,
         headers: corsHeaders,
       },
+    );
+  }
+}
+
+// Admin endpoint: Update abstract status
+async function handleUpdateAbstractStatus(
+  request,
+  env,
+  corsHeaders,
+  abstractId,
+) {
+  try {
+    const data = await request.json();
+    const { status, rejection_reason } = data;
+
+    if (
+      !status ||
+      !["submitted", "accepted", "rejected", "revision"].includes(status)
+    ) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            "Invalid status. Must be: submitted, accepted, rejected, or revision",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    // Update the abstract status
+    await env.ISIR_DB.prepare(
+      `UPDATE abstractions SET status = ?, rejection_reason = ?, reviewed_at = ? WHERE id = ?`,
+    )
+      .bind(status, rejection_reason || null, Date.now(), abstractId)
+      .run();
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Abstract ${abstractId} status updated to ${status}`,
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Update abstract status error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+      }),
+      { status: 500, headers: corsHeaders },
     );
   }
 }
