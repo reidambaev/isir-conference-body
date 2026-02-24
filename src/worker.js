@@ -81,6 +81,16 @@ async function handleApiRequest(request, env, url) {
     return handleStripeWebhook(request, env);
   }
 
+  // GET /api/admin/abstracts
+  if (url.pathname === "/api/admin/abstracts" && request.method === "GET") {
+    return handleGetAbstracts(env, corsHeaders);
+  }
+
+  // GET /api/admin/visa-requests
+  if (url.pathname === "/api/admin/visa-requests" && request.method === "GET") {
+    return handleGetVisaRequests(env, corsHeaders);
+  }
+
   return new Response(JSON.stringify({ error: "Not Found" }), {
     status: 404,
     headers: corsHeaders,
@@ -941,5 +951,69 @@ async function handleStripeWebhook(request, env) {
   } catch (error) {
     console.error("Webhook error:", error);
     return new Response(`Webhook Error: ${error.message}`, { status: 500 });
+  }
+}
+
+// Admin endpoint: Get all abstracts
+async function handleGetAbstracts(env, corsHeaders) {
+  try {
+    const result = await env.ISIR_DB.prepare(
+      `SELECT * FROM abstractions ORDER BY submission_date DESC LIMIT 500`,
+    ).all();
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: result.results,
+      }),
+      {
+        status: 200,
+        headers: corsHeaders,
+      },
+    );
+  } catch (error) {
+    console.error("Get abstracts error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+      }),
+      {
+        status: 500,
+        headers: corsHeaders,
+      },
+    );
+  }
+}
+
+// Admin endpoint: Get all visa requests
+async function handleGetVisaRequests(env, corsHeaders) {
+  try {
+    const result = await env.ISIR_DB.prepare(
+      `SELECT * FROM visa_requests ORDER BY created_at DESC LIMIT 500`,
+    ).all();
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: result.results,
+      }),
+      {
+        status: 200,
+        headers: corsHeaders,
+      },
+    );
+  } catch (error) {
+    console.error("Get visa requests error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+      }),
+      {
+        status: 500,
+        headers: corsHeaders,
+      },
+    );
   }
 }
