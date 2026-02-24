@@ -13,7 +13,17 @@ export default {
     }
 
     // Serve static assets for everything else
-    return env.ASSETS.fetch(request);
+    // For SPA routing: if asset not found, serve index.html
+    const response = await env.ASSETS.fetch(request);
+
+    // If the asset was not found and it's a navigation request (not a file with extension),
+    // serve index.html for client-side routing
+    if (response.status === 404 && !url.pathname.includes(".")) {
+      const indexRequest = new Request(new URL("/", url.origin), request);
+      return env.ASSETS.fetch(indexRequest);
+    }
+
+    return response;
   },
 };
 
