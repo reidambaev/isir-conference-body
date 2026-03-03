@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-const RATING_SCALE_HELP = "1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent";
+const RATING_SCALE_HELP =
+  "1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent";
 
 const SCORE_FIELDS = [
   {
@@ -36,6 +37,21 @@ const ABSTRACT_SECTION_LABELS = [
   { key: "results", label: "results:" },
   { key: "conclusions", label: "conclusions:" },
 ];
+
+function getDefaultReview() {
+  return {
+    coi_mentor_pi: false,
+    coi_same_lab: false,
+    coi_other: false,
+    coi_other_details: "",
+    previous_study_notes: "",
+    originality: 3,
+    clarity: 3,
+    study_design: 3,
+    data_analysis: 3,
+    significance: 3,
+  };
+}
 
 function parseAbstractSections(text) {
   if (!text) return null;
@@ -136,20 +152,9 @@ export default function ReviewerTab() {
 
   const currentReview = useMemo(() => {
     if (!selectedAbstractId) return null;
-    return (
-      reviewsByAbstract[selectedAbstractId] || {
-        coi_mentor_pi: false,
-        coi_same_lab: false,
-        coi_other: false,
-        coi_other_details: "",
-        previous_study_notes: "",
-        originality: 3,
-        clarity: 3,
-        study_design: 3,
-        data_analysis: 3,
-        significance: 3,
-      }
-    );
+    const base = getDefaultReview();
+    const existing = reviewsByAbstract[selectedAbstractId];
+    return existing ? { ...base, ...existing } : base;
   }, [reviewsByAbstract, selectedAbstractId]);
 
   const abstractSections = useMemo(() => {
@@ -159,7 +164,10 @@ export default function ReviewerTab() {
 
   const totalScore = useMemo(() => {
     if (!currentReview) return 0;
-    return SCORE_FIELDS.reduce((sum, f) => sum + (Number(currentReview[f.key]) || 0), 0);
+    return SCORE_FIELDS.reduce(
+      (sum, f) => sum + (Number(currentReview[f.key]) || 0),
+      0,
+    );
   }, [currentReview]);
 
   const loadAssignments = async (tkn) => {
@@ -226,13 +234,17 @@ export default function ReviewerTab() {
 
   const updateReviewField = (field, value) => {
     if (!selectedAbstractId) return;
-    setReviewsByAbstract((prev) => ({
-      ...prev,
-      [selectedAbstractId]: {
-        ...(prev[selectedAbstractId] || {}),
-        [field]: value,
-      },
-    }));
+    setReviewsByAbstract((prev) => {
+      const existing = prev[selectedAbstractId];
+      const base = existing || getDefaultReview();
+      return {
+        ...prev,
+        [selectedAbstractId]: {
+          ...base,
+          [field]: value,
+        },
+      };
+    });
   };
 
   const submitReview = async () => {
@@ -269,7 +281,7 @@ export default function ReviewerTab() {
               Reviewer Portal
             </h1>
             <p className="text-slate-600 mt-1">
-              Log in to review your assigned abstracts (exactly 5).
+              Log in to review your assigned abstracts.
             </p>
           </div>
           {token && (
@@ -336,7 +348,9 @@ export default function ReviewerTab() {
             <div className="lg:col-span-4">
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-semibold text-slate-900">Assigned abstracts</h2>
+                  <h2 className="font-semibold text-slate-900">
+                    Assigned abstracts
+                  </h2>
                   <button
                     onClick={() => loadAssignments(token)}
                     className="text-sm px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
@@ -362,7 +376,10 @@ export default function ReviewerTab() {
                   <div className="mt-4 space-y-2">
                     {abstracts.map((a) => {
                       const selected = a.id === selectedAbstractId;
-                      const hasReview = Boolean(reviewsByAbstract[a.id]?.updated_at || reviewsByAbstract[a.id]?.created_at);
+                      const hasReview = Boolean(
+                        reviewsByAbstract[a.id]?.updated_at ||
+                        reviewsByAbstract[a.id]?.created_at,
+                      );
                       return (
                         <button
                           key={a.id}
@@ -382,7 +399,9 @@ export default function ReviewerTab() {
                                 {a.category} • {a.word_count} words
                               </div>
                             </div>
-                            <div className={`text-xs font-semibold px-2 py-1 rounded-full ${hasReview ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
+                            <div
+                              className={`text-xs font-semibold px-2 py-1 rounded-full ${hasReview ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}
+                            >
                               {hasReview ? "Saved" : "Not saved"}
                             </div>
                           </div>
@@ -410,7 +429,8 @@ export default function ReviewerTab() {
                         {selectedAbstract.word_count} words
                       </span>
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                        Submitted: {formatDate(selectedAbstract.submission_date)}
+                        Submitted:{" "}
+                        {formatDate(selectedAbstract.submission_date)}
                       </span>
                     </div>
                     <h2 className="text-2xl font-bold text-slate-900 leading-tight">
@@ -472,22 +492,28 @@ export default function ReviewerTab() {
                           Affiliations
                         </div>
                         <div className="space-y-2">
-                          {(selectedAbstract.affiliations || []).map((af, idx) => (
-                            <div
-                              key={af.id || idx}
-                              className="text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2"
-                            >
-                              <div className="font-medium text-slate-800">
-                                {af.author_name}
+                          {(selectedAbstract.affiliations || []).map(
+                            (af, idx) => (
+                              <div
+                                key={af.id || idx}
+                                className="text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2"
+                              >
+                                <div className="font-medium text-slate-800">
+                                  {af.author_name}
+                                </div>
+                                <div className="text-xs text-slate-600">
+                                  {[af.department, af.institution]
+                                    .filter(Boolean)
+                                    .join(", ")}
+                                </div>
+                                <div className="text-xs text-slate-500">
+                                  {[af.city, af.country]
+                                    .filter(Boolean)
+                                    .join(", ")}
+                                </div>
                               </div>
-                              <div className="text-xs text-slate-600">
-                                {[af.department, af.institution].filter(Boolean).join(", ")}
-                              </div>
-                              <div className="text-xs text-slate-500">
-                                {[af.city, af.country].filter(Boolean).join(", ")}
-                              </div>
-                            </div>
-                          ))}
+                            ),
+                          )}
                         </div>
                       </div>
                     </div>
@@ -500,7 +526,8 @@ export default function ReviewerTab() {
                           Gusdon Award evaluation
                         </h3>
                         <p className="text-sm text-slate-600">
-                          Score each category (1–5). Total updates automatically.
+                          Score each category (1–5). Total updates
+                          automatically.
                         </p>
                       </div>
                       <div className="text-right">
@@ -525,10 +552,15 @@ export default function ReviewerTab() {
                               className="mt-1"
                               checked={Boolean(currentReview.coi_mentor_pi)}
                               onChange={(e) =>
-                                updateReviewField("coi_mentor_pi", e.target.checked)
+                                updateReviewField(
+                                  "coi_mentor_pi",
+                                  e.target.checked,
+                                )
                               }
                             />
-                            <span>Are you a mentor, PI or Co-PI of the study?</span>
+                            <span>
+                              Are you a mentor, PI or Co-PI of the study?
+                            </span>
                           </label>
                           <label className="flex items-start gap-3">
                             <input
@@ -536,11 +568,15 @@ export default function ReviewerTab() {
                               className="mt-1"
                               checked={Boolean(currentReview.coi_same_lab)}
                               onChange={(e) =>
-                                updateReviewField("coi_same_lab", e.target.checked)
+                                updateReviewField(
+                                  "coi_same_lab",
+                                  e.target.checked,
+                                )
                               }
                             />
                             <span>
-                              Are you working at the same lab or department with a candidate?
+                              Are you working at the same lab or department with
+                              a candidate?
                             </span>
                           </label>
                           <label className="flex items-start gap-3">
@@ -552,7 +588,9 @@ export default function ReviewerTab() {
                                 updateReviewField("coi_other", e.target.checked)
                               }
                             />
-                            <span>Do you have any other conflict of interest?</span>
+                            <span>
+                              Do you have any other conflict of interest?
+                            </span>
                           </label>
                           <div>
                             <label className="block text-xs font-semibold text-slate-600 mb-1">
@@ -561,7 +599,10 @@ export default function ReviewerTab() {
                             <textarea
                               value={currentReview.coi_other_details || ""}
                               onChange={(e) =>
-                                updateReviewField("coi_other_details", e.target.value)
+                                updateReviewField(
+                                  "coi_other_details",
+                                  e.target.value,
+                                )
                               }
                               rows={3}
                               className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -579,10 +620,15 @@ export default function ReviewerTab() {
                         const helpNoteText = hasNotes
                           ? f.help.replace(` • ${RATING_SCALE_HELP}`, "")
                           : null;
-                        const helpRatingText = hasNotes ? RATING_SCALE_HELP : f.help;
+                        const helpRatingText = hasNotes
+                          ? RATING_SCALE_HELP
+                          : f.help;
 
                         return (
-                          <div key={f.key} className="rounded-xl border border-slate-200 p-4">
+                          <div
+                            key={f.key}
+                            className="rounded-xl border border-slate-200 p-4"
+                          >
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div>
                                 <div className="font-semibold text-slate-900">
@@ -598,7 +644,7 @@ export default function ReviewerTab() {
                                   Score
                                 </div>
                                 <div className="text-2xl font-bold text-slate-900">
-                                  {Number(currentReview[f.key]) || 0}
+                                  {Number(currentReview[f.key]) || 3}
                                 </div>
                               </div>
                             </div>
@@ -607,7 +653,7 @@ export default function ReviewerTab() {
                               min={1}
                               max={5}
                               step={1}
-                              value={Number(currentReview[f.key]) || 1}
+                              value={Number(currentReview[f.key]) || 3}
                               onChange={(e) =>
                                 updateReviewField(f.key, Number(e.target.value))
                               }
@@ -626,12 +672,17 @@ export default function ReviewerTab() {
                           Previous study
                         </div>
                         <div className="text-xs text-slate-500 mt-1">
-                          Do you know if the same report or the same presentation has been made before? Is this the first finding of its kind from the same lab?
+                          Do you know if the same report or the same
+                          presentation has been made before? Is this the first
+                          finding of its kind from the same lab?
                         </div>
                         <textarea
                           value={currentReview.previous_study_notes || ""}
                           onChange={(e) =>
-                            updateReviewField("previous_study_notes", e.target.value)
+                            updateReviewField(
+                              "previous_study_notes",
+                              e.target.value,
+                            )
                           }
                           rows={4}
                           className="w-full mt-3 px-3 py-2 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -671,4 +722,3 @@ export default function ReviewerTab() {
     </div>
   );
 }
-

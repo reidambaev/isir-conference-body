@@ -28,6 +28,40 @@ export default function AdminTab() {
   const [reviewerOverviewLoading, setReviewerOverviewLoading] = useState(false);
   const [reviewerOverviewError, setReviewerOverviewError] = useState("");
 
+  const reviewerStats = useMemo(() => {
+    const base = {
+      completedReviewers: 0,
+      reviewersWithPending: 0,
+      completedAssignments: 0,
+    };
+    if (
+      !reviewerOverview ||
+      !Array.isArray(reviewerOverview.reviewers) ||
+      reviewerOverview.reviewers.length === 0
+    ) {
+      return base;
+    }
+
+    let completedReviewers = 0;
+    let reviewersWithPending = 0;
+    let completedAssignments = 0;
+
+    reviewerOverview.reviewers.forEach((rev) => {
+      const assigned = Number(rev.assigned_count || 0);
+      const reviewed = Number(rev.reviewed_count || 0);
+      if (assigned > 0 && reviewed >= assigned) {
+        completedReviewers += 1;
+      } else if (assigned > 0 && reviewed < assigned) {
+        reviewersWithPending += 1;
+      }
+      if (assigned > 0 && reviewed > 0) {
+        completedAssignments += Math.min(assigned, reviewed);
+      }
+    });
+
+    return { completedReviewers, reviewersWithPending, completedAssignments };
+  }, [reviewerOverview]);
+
   // Reviewer password generator state
   const [emailFileName, setEmailFileName] = useState("");
   const [emailCount, setEmailCount] = useState(0);
@@ -2020,12 +2054,12 @@ export default function AdminTab() {
           ) : (
             <>
               {/* Summary cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        Total Reviews
+                        Completed Reviews
                       </p>
                       <p className="mt-2 text-3xl font-bold text-gray-900">
                         {reviewerOverview.totals?.total_reviews ?? 0}
@@ -2103,6 +2137,36 @@ export default function AdminTab() {
                     </div>
                   </div>
                 </div>
+                <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Completed Reviewers
+                      </p>
+                      <p className="mt-2 text-3xl font-bold text-gray-900">
+                        {reviewerStats.completedReviewers}
+                      </p>
+                      <p className="mt-1 text-[11px] text-gray-500">
+                        {reviewerStats.reviewersWithPending} with pending reviews
+                      </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-lime-100 flex items-center justify-center">
+                      <svg
+                        className="w-6 h-6 text-lime-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Per-reviewer table */}
@@ -2121,10 +2185,18 @@ export default function AdminTab() {
                     {reviewerOverview.reviewers.map((rev) => {
                       const pending =
                         (rev.assigned_count || 0) - (rev.reviewed_count || 0);
+                      const isComplete =
+                        (rev.assigned_count || 0) > 0 && pending <= 0;
                       return (
                         <details
                           key={rev.reviewer_email}
-                          className="group"
+                          className={`group border-l-4 ${
+                            isComplete
+                              ? "border-emerald-500"
+                              : pending > 0
+                              ? "border-amber-400"
+                              : "border-gray-200"
+                          }`}
                         >
                           <summary className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
@@ -2137,6 +2209,21 @@ export default function AdminTab() {
                                   Reviewed {rev.reviewed_count || 0} • Pending{" "}
                                   {pending < 0 ? 0 : pending}
                                 </p>
+                                <div className="mt-1 flex flex-wrap gap-2 text-[11px]">
+                                  {isComplete ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold">
+                                      All reviews complete
+                                    </span>
+                                  ) : (rev.assigned_count || 0) === 0 ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                                      No assignments
+                                    </span>
+                                  ) : pending > 0 ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold">
+                                      Pending reviews
+                                    </span>
+                                  ) : null}
+                                </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-4">
