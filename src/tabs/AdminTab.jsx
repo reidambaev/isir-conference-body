@@ -66,6 +66,7 @@ export default function AdminTab() {
   const [emailFileName, setEmailFileName] = useState("");
   const [emailCount, setEmailCount] = useState(0);
   const [passwordError, setPasswordError] = useState("");
+  const [adminToken, setAdminToken] = useState("");
 
   useEffect(() => {
     fetchAllData();
@@ -130,6 +131,13 @@ export default function AdminTab() {
 
     setEmailFileName(file.name);
 
+    if (!adminToken.trim()) {
+      setPasswordError(
+        "Admin token is required. Please enter the X-Admin-Token value before uploading.",
+      );
+      return;
+    }
+
     try {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: "array" });
@@ -167,7 +175,7 @@ export default function AdminTab() {
         if (!raw) continue;
         const email = String(raw).trim();
         if (!email) continue;
-        emails.push(email);
+        emails.push(email.toLowerCase());
       }
 
       if (emails.length === 0) {
@@ -177,12 +185,52 @@ export default function AdminTab() {
         return;
       }
 
-      setEmailCount(emails.length);
+      const outputRows = [];
 
-      const outputRows = emails.map((email) => ({
-        Email: email,
-        Password: generateRandomPassword(),
-      }));
+      for (const email of emails) {
+        try {
+          const res = await fetch("/api/admin/reviewers/create", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Admin-Token": adminToken.trim(),
+            },
+            body: JSON.stringify({ email }),
+          });
+
+          if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            outputRows.push({
+              Email: email,
+              Password: `ERROR (${res.status}): ${text || "create failed"}`,
+            });
+            continue;
+          }
+
+          const json = await res.json().catch(() => null);
+          if (!json || json.success !== true || !json.password) {
+            outputRows.push({
+              Email: email,
+              Password:
+                "ERROR: unexpected response while creating reviewer account",
+            });
+            continue;
+          }
+
+          outputRows.push({
+            Email: email,
+            Password: json.password,
+          });
+        } catch (err) {
+          console.error("Error creating reviewer for email:", email, err);
+          outputRows.push({
+            Email: email,
+            Password: "ERROR: network or server error",
+          });
+        }
+      }
+
+      setEmailCount(outputRows.length);
 
       const outSheet = XLSX.utils.json_to_sheet(outputRows);
       const outWb = XLSX.utils.book_new();
@@ -2346,13 +2394,34 @@ export default function AdminTab() {
             </h2>
             <p className="text-gray-600 text-sm mt-1 max-w-2xl">
               Upload an Excel file that contains a column of email addresses.
-              The tool will generate a new Excel file with each email and a
-              randomly generated password, which you can use for reviewer
-              accounts.
+              The tool will create or update reviewer accounts on the server and
+              generate a new Excel file with each email and the corresponding
+              password that is stored in the database.
             </p>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Admin token (X-Admin-Token)
+              </label>
+              <input
+                type="password"
+                value={adminToken}
+                onChange={(e) => setAdminToken(e.target.value)}
+                placeholder="Enter admin token"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50 focus:bg-white transition-colors"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                This token must match the <code>ADMIN_TOKEN</code> configured in
+                the backend. It is sent as the{" "}
+                <code className="px-1 rounded bg-gray-100 text-[11px]">
+                  X-Admin-Token
+                </code>{" "}
+                header when creating reviewer accounts.
+              </p>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Upload email list (Excel)
