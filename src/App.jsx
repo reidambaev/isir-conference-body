@@ -21,6 +21,7 @@ import {
   SponsorsTab,
   WelcomeTab,
   AdminTab,
+  ReviewerTab,
 } from "./tabs";
 
 export default function App() {
@@ -49,6 +50,16 @@ export default function App() {
     return isAdmin;
   });
 
+  // Check if we're on the reviewer page - separate from main and admin
+  const [isReviewerPage, setIsReviewerPage] = useState(() => {
+    const pathname = window.location.pathname || document.location.pathname;
+    return (
+      pathname === "/reviewer" ||
+      pathname === "/reviewer/" ||
+      pathname.startsWith("/reviewer")
+    );
+  });
+
   // Update admin page state when pathname changes
   useEffect(() => {
     const checkPath = () => {
@@ -67,6 +78,11 @@ export default function App() {
           isAdmin,
         });
         setIsAdminPage(isAdmin);
+        const isReviewer =
+          pathname === "/reviewer" ||
+          pathname === "/reviewer/" ||
+          pathname.startsWith("/reviewer");
+        setIsReviewerPage(isReviewer);
       }, 0);
     };
 
@@ -185,6 +201,12 @@ export default function App() {
         </main>
       </div>
     );
+  }
+
+  // Render reviewer page if on /reviewer route
+  if (isReviewerPage) {
+    console.log("Rendering reviewer page");
+    return <ReviewerTab />;
   }
 
   console.log("Rendering main app, pathname:", window.location.pathname);

@@ -60,8 +60,8 @@ async function handleTraineeLetterGet(request, env, url) {
 async function handleApiRequest(request, env, url) {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "POST, GET, PATCH, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Token",
     "Content-Type": "application/json",
   };
 
@@ -144,10 +144,399 @@ async function handleApiRequest(request, env, url) {
     return handleGetVisaRequests(env, corsHeaders);
   }
 
+  // POST /api/reviewers/login
+  if (url.pathname === "/api/reviewers/login" && request.method === "POST") {
+    return handleReviewerLogin(request, env, corsHeaders);
+  }
+
+  // GET /api/reviewers/abstracts
+  if (url.pathname === "/api/reviewers/abstracts" && request.method === "GET") {
+    return handleGetReviewerAbstracts(request, env, corsHeaders);
+  }
+
+  // POST /api/reviewers/reviews
+  if (url.pathname === "/api/reviewers/reviews" && request.method === "POST") {
+    return handleSubmitReviewerReview(request, env, corsHeaders);
+  }
+
+  // POST /api/admin/reviewers/create (generate password + create/update reviewer)
+  if (
+    url.pathname === "/api/admin/reviewers/create" &&
+    request.method === "POST"
+  ) {
+    return handleAdminCreateReviewer(request, env, corsHeaders);
+  }
+
   return new Response(JSON.stringify({ error: "Not Found" }), {
     status: 404,
     headers: corsHeaders,
   });
+}
+
+function getBearerToken(request) {
+  const auth = request.headers.get("Authorization") || "";
+  const m = auth.match(/^Bearer\s+(.+)$/i);
+  return m ? m[1].trim() : null;
+}
+
+async function sha256Hex(input) {
+  const enc = new TextEncoder();
+  const digest = await crypto.subtle.digest("SHA-256", enc.encode(input));
+  const bytes = new Uint8Array(digest);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function randomPassword(length = 12) {
+  const alphabet =
+    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  let out = "";
+  for (let i = 0; i < length; i++) out += alphabet[bytes[i] % alphabet.length];
+  return out;
+}
+
+function jsonResponse(obj, status, corsHeaders) {
+  return new Response(JSON.stringify(obj), { status, headers: corsHeaders });
+}
+
+async function requireReviewer(request, env) {
+  const token = getBearerToken(request);
+  if (!token) return null;
+
+  const now = Date.now();
+  const session = await env.ISIR_DB.prepare(
+    `SELECT token, reviewer_email, expires_at FROM reviewer_sessions WHERE token = ?`,
+  )
+    .bind(token)
+    .first();
+
+  if (!session || !session.reviewer_email) return null;
+  if (Number(session.expires_at) <= now) return null;
+  return { email: session.reviewer_email, token };
+}
+
+function requireAdmin(request, env) {
+  const expected = env.ADMIN_TOKEN;
+  if (!expected) return false;
+  const headerToken = request.headers.get("X-Admin-Token");
+  return Boolean(headerToken && headerToken === expected);
+}
+
+async function handleAdminCreateReviewer(request, env, corsHeaders) {
+  try {
+    if (!requireAdmin(request, env)) {
+      return jsonResponse({ success: false, error: "Unauthorized" }, 401, corsHeaders);
+    }
+    const data = await request.json();
+    const email = (data?.email || "").trim().toLowerCase();
+    if (!email) {
+      return jsonResponse({ success: false, error: "Email is required" }, 400, corsHeaders);
+    }
+    const password = randomPassword(14);
+    const password_hash = await sha256Hex(password);
+    const now = Date.now();
+    await env.ISIR_DB.prepare(
+      `INSERT INTO reviewers (email, password_hash, active, created_at, updated_at)
+       VALUES (?, ?, 1, ?, ?)
+       ON CONFLICT(email) DO UPDATE SET password_hash = excluded.password_hash, active = 1, updated_at = excluded.updated_at`,
+    )
+      .bind(email, password_hash, now, now)
+      .run();
+    return jsonResponse(
+      { success: true, email, password },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Create reviewer error:", error);
+    return jsonResponse({ success: false, error: error.message }, 500, corsHeaders);
+  }
+}
+
+async function handleReviewerLogin(request, env, corsHeaders) {
+  try {
+    const data = await request.json();
+    const email = (data?.email || "").trim().toLowerCase();
+    const password = String(data?.password || "");
+    if (!email || !password) {
+      return jsonResponse(
+        { success: false, error: "Email and password are required" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const row = await env.ISIR_DB.prepare(
+      `SELECT email, password_hash, active FROM reviewers WHERE email = ?`,
+    )
+      .bind(email)
+      .first();
+
+    if (!row || !row.password_hash || Number(row.active) !== 1) {
+      return jsonResponse({ success: false, error: "Invalid credentials" }, 401, corsHeaders);
+    }
+
+    const hashed = await sha256Hex(password);
+    if (hashed !== row.password_hash) {
+      return jsonResponse({ success: false, error: "Invalid credentials" }, 401, corsHeaders);
+    }
+
+    const token = crypto.randomUUID();
+    const now = Date.now();
+    const expiresAt = now + 1000 * 60 * 60 * 24 * 14; // 14 days
+    await env.ISIR_DB.prepare(
+      `INSERT INTO reviewer_sessions (token, reviewer_email, created_at, expires_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind(token, email, now, expiresAt)
+      .run();
+
+    return jsonResponse(
+      { success: true, token, expires_at: expiresAt },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Reviewer login error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Login failed" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+function shuffleInPlace(arr) {
+  const a = arr;
+  for (let i = a.length - 1; i > 0; i--) {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    const j = buf[0] % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+async function handleGetReviewerAbstracts(request, env, corsHeaders) {
+  try {
+    const reviewer = await requireReviewer(request, env);
+    if (!reviewer) {
+      return jsonResponse({ success: false, error: "Unauthorized" }, 401, corsHeaders);
+    }
+
+    // Ensure exactly 5 assigned abstracts (persisted)
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT abstract_id FROM reviewer_assignments WHERE reviewer_email = ?`,
+    )
+      .bind(reviewer.email)
+      .all();
+
+    let assignedIds = (existing.results || []).map((r) => r.abstract_id);
+
+    if (assignedIds.length < 5) {
+      const allAbstracts = await env.ISIR_DB.prepare(
+        `SELECT id FROM abstractions WHERE status = 'submitted' ORDER BY submission_date DESC LIMIT 1000`,
+      ).all();
+
+      const pool = (allAbstracts.results || [])
+        .map((r) => r.id)
+        .filter((id) => !assignedIds.includes(id));
+
+      shuffleInPlace(pool);
+      const toAdd = pool.slice(0, 5 - assignedIds.length);
+
+      if (toAdd.length > 0) {
+        const now = Date.now();
+        const stmt = env.ISIR_DB.prepare(
+          `INSERT OR IGNORE INTO reviewer_assignments (reviewer_email, abstract_id, assigned_at) VALUES (?, ?, ?)`,
+        );
+        for (const absId of toAdd) {
+          await stmt.bind(reviewer.email, absId, now).run();
+        }
+        assignedIds = [...assignedIds, ...toAdd];
+      }
+    }
+
+    // If there are more than 5 (legacy/manual), only return first 5 by assigned time
+    if (assignedIds.length > 5) {
+      const five = await env.ISIR_DB.prepare(
+        `SELECT abstract_id FROM reviewer_assignments WHERE reviewer_email = ? ORDER BY assigned_at ASC LIMIT 5`,
+      )
+        .bind(reviewer.email)
+        .all();
+      assignedIds = (five.results || []).map((r) => r.abstract_id);
+    }
+
+    if (assignedIds.length === 0) {
+      return jsonResponse({ success: true, data: [], existingReviews: [] }, 200, corsHeaders);
+    }
+
+    const placeholders = assignedIds.map(() => "?").join(",");
+    const abstractsResult = await env.ISIR_DB.prepare(
+      `SELECT * FROM abstractions WHERE id IN (${placeholders})`,
+    )
+      .bind(...assignedIds)
+      .all();
+
+    const abstracts = abstractsResult.results || [];
+
+    // Attach authors/affiliations
+    const authorsResult = await env.ISIR_DB.prepare(
+      `SELECT * FROM authors WHERE abstract_id IN (${placeholders})`,
+    )
+      .bind(...assignedIds)
+      .all();
+    const affiliationsResult = await env.ISIR_DB.prepare(
+      `SELECT * FROM affiliations WHERE abstract_id IN (${placeholders})`,
+    )
+      .bind(...assignedIds)
+      .all();
+
+    const authorsBy = {};
+    (authorsResult.results || []).forEach((au) => {
+      if (!authorsBy[au.abstract_id]) authorsBy[au.abstract_id] = [];
+      authorsBy[au.abstract_id].push(au);
+    });
+
+    const affBy = {};
+    (affiliationsResult.results || []).forEach((af) => {
+      if (!affBy[af.abstract_id]) affBy[af.abstract_id] = [];
+      affBy[af.abstract_id].push(af);
+    });
+
+    abstracts.forEach((a) => {
+      a.authors = authorsBy[a.id] || [];
+      a.affiliations = affBy[a.id] || [];
+    });
+
+    // Keep ordering stable to assignments
+    const mapById = Object.fromEntries(abstracts.map((a) => [a.id, a]));
+    const ordered = assignedIds.map((id) => mapById[id]).filter(Boolean);
+
+    const existingReviews = await env.ISIR_DB.prepare(
+      `SELECT * FROM reviews WHERE reviewer_email = ? AND abstract_id IN (${placeholders})`,
+    )
+      .bind(reviewer.email, ...assignedIds)
+      .all();
+
+    return jsonResponse(
+      { success: true, data: ordered, existingReviews: existingReviews.results || [] },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Get reviewer abstracts error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to load abstracts" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+function clampInt(n, min, max) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return min;
+  return Math.max(min, Math.min(max, Math.trunc(x)));
+}
+
+async function handleSubmitReviewerReview(request, env, corsHeaders) {
+  try {
+    const reviewer = await requireReviewer(request, env);
+    if (!reviewer) {
+      return jsonResponse({ success: false, error: "Unauthorized" }, 401, corsHeaders);
+    }
+
+    const data = await request.json();
+    const abstractId = (data?.abstract_id || "").trim();
+    if (!abstractId) {
+      return jsonResponse({ success: false, error: "abstract_id is required" }, 400, corsHeaders);
+    }
+
+    // Ensure this abstract is assigned to reviewer
+    const assignment = await env.ISIR_DB.prepare(
+      `SELECT 1 FROM reviewer_assignments WHERE reviewer_email = ? AND abstract_id = ?`,
+    )
+      .bind(reviewer.email, abstractId)
+      .first();
+    if (!assignment) {
+      return jsonResponse({ success: false, error: "Abstract not assigned to reviewer" }, 403, corsHeaders);
+    }
+
+    const originality = clampInt(data?.originality, 0, 10);
+    const clarity = clampInt(data?.clarity, 0, 10);
+    const powerpoint = clampInt(data?.powerpoint, 0, 10);
+    const study_design = clampInt(data?.study_design, 0, 10);
+    const data_analysis = clampInt(data?.data_analysis, 0, 10);
+    const significance = clampInt(data?.significance, 0, 10);
+    const total =
+      originality + clarity + powerpoint + study_design + data_analysis + significance;
+
+    const coi_mentor_pi = data?.coi_mentor_pi ? 1 : 0;
+    const coi_same_lab = data?.coi_same_lab ? 1 : 0;
+    const coi_other = data?.coi_other ? 1 : 0;
+    const coi_other_details = (data?.coi_other_details || "").trim() || null;
+    const previous_study_notes = (data?.previous_study_notes || "").trim() || null;
+    const now = Date.now();
+
+    await env.ISIR_DB.prepare(
+      `INSERT INTO reviews (
+        reviewer_email, abstract_id,
+        coi_mentor_pi, coi_same_lab, coi_other, coi_other_details,
+        originality, clarity, powerpoint, study_design, data_analysis, significance,
+        total, previous_study_notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(reviewer_email, abstract_id) DO UPDATE SET
+        coi_mentor_pi = excluded.coi_mentor_pi,
+        coi_same_lab = excluded.coi_same_lab,
+        coi_other = excluded.coi_other,
+        coi_other_details = excluded.coi_other_details,
+        originality = excluded.originality,
+        clarity = excluded.clarity,
+        powerpoint = excluded.powerpoint,
+        study_design = excluded.study_design,
+        data_analysis = excluded.data_analysis,
+        significance = excluded.significance,
+        total = excluded.total,
+        previous_study_notes = excluded.previous_study_notes,
+        updated_at = excluded.updated_at`,
+    )
+      .bind(
+        reviewer.email,
+        abstractId,
+        coi_mentor_pi,
+        coi_same_lab,
+        coi_other,
+        coi_other_details,
+        originality,
+        clarity,
+        powerpoint,
+        study_design,
+        data_analysis,
+        significance,
+        total,
+        previous_study_notes,
+        now,
+        now,
+      )
+      .run();
+
+    return jsonResponse(
+      { success: true, message: "Review saved", total },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Submit review error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to submit review" },
+      500,
+      corsHeaders,
+    );
+  }
 }
 
 async function handleRegistration(request, env, corsHeaders) {

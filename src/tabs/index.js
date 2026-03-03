@@ -10,6 +10,7 @@ export { default as TravelTab } from "./TravelTab";
 export { default as SponsorsTab } from "./SponsorsTab";
 export { default as WelcomeTab } from "./WelcomeTab";
 export { default as AdminTab } from "./AdminTab";
+export { default as ReviewerTab } from "./ReviewerTab";
 
 // Form exports
 export { default as VisaRequestForm } from "../forms/VisaRequestForm";
