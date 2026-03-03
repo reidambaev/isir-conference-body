@@ -263,6 +263,20 @@ export default function ReviewerTab() {
         token,
         body: JSON.stringify(payload),
       });
+      setReviewsByAbstract((prev) => {
+        const existing = prev[selectedAbstractId] || getDefaultReview();
+        const serverTotal =
+          typeof data?.total === "number" ? data.total : totalScore;
+        return {
+          ...prev,
+          [selectedAbstractId]: {
+            ...existing,
+            ...currentReview,
+            total: serverTotal,
+            updated_at: Date.now(),
+          },
+        };
+      });
       setSaveMessage(data?.message || "Saved");
     } catch (e) {
       setError(e.message || "Failed to save review");
