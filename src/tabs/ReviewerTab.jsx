@@ -4,34 +4,74 @@ const SCORE_FIELDS = [
   {
     key: "originality",
     label: "Originality",
-    help: "0-2 None • 3-4 Similar to many others • 5-6 Modest number of other similar studies • 7-8 Very few similar studies • 9-10 Unique",
+    help: "1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent",
   },
   {
     key: "clarity",
     label: "Clarity of presentation",
-    help: "0-2 Unintelligible • 3-4 Difficult to understand • 5-7 Can follow most of the content • 8-10 Clear presentation",
+    help: "Do you clearly understand a candidate's presentation? • 1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent",
   },
   {
     key: "powerpoint",
     label: "PowerPoint presentation",
-    help: "0-2 Unintelligible • 3-4 Difficult to understand • 5-7 Can follow most of the content • 8-10 Clear presentation of content",
+    help: "1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent",
   },
   {
     key: "study_design",
     label: "Study design",
-    help: "0-3 Poorly designed • 4-6 Some deficiencies but with merit • 7-10 Well designed",
+    help: "Is study design proper? Is statistical analysis correct? • 1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent",
   },
   {
     key: "data_analysis",
     label: "Data analysis and conclusion",
-    help: "0-3 Inadequate analysis • 4-6 Deficient analysis; conclusions partially related to data • 7-10 Appropriate analysis; conclusions supported by data",
+    help: "1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent",
   },
   {
     key: "significance",
     label: "Study outcome (Significance)",
-    help: "0-3 Little, if any significance; does not advance the field • 4-6 Modest contribution to the field; advances the field modestly • 7-10 Important contribution to the field",
+    help: "Does the study contribute important finding(s) to the field of reproductive immunology? • 1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent",
   },
 ];
+
+const ABSTRACT_SECTION_LABELS = [
+  { key: "objectives", label: "objectives:" },
+  { key: "methods", label: "methods:" },
+  { key: "results", label: "results:" },
+  { key: "conclusions", label: "conclusions:" },
+];
+
+function parseAbstractSections(text) {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+
+  const found = [];
+  ABSTRACT_SECTION_LABELS.forEach((section) => {
+    const idx = lower.indexOf(section.label);
+    if (idx !== -1) {
+      found.push({
+        key: section.key,
+        label: section.label,
+        start: idx,
+      });
+    }
+  });
+
+  if (found.length === 0) return null;
+
+  found.sort((a, b) => a.start - b.start);
+
+  const sections = {};
+  for (let i = 0; i < found.length; i += 1) {
+    const { key, label, start } = found[i];
+    const nextStart = i + 1 < found.length ? found[i + 1].start : text.length;
+    const sectionText = text.slice(start + label.length, nextStart).trim();
+    if (sectionText) {
+      sections[key] = sectionText;
+    }
+  }
+
+  return Object.keys(sections).length > 0 ? sections : null;
+}
 
 function formatDate(ts) {
   if (!ts) return "N/A";
@@ -106,15 +146,20 @@ export default function ReviewerTab() {
         coi_other: false,
         coi_other_details: "",
         previous_study_notes: "",
-        originality: 0,
-        clarity: 0,
-        powerpoint: 0,
-        study_design: 0,
-        data_analysis: 0,
-        significance: 0,
+        originality: 3,
+        clarity: 3,
+        powerpoint: 3,
+        study_design: 3,
+        data_analysis: 3,
+        significance: 3,
       }
     );
   }, [reviewsByAbstract, selectedAbstractId]);
+
+  const abstractSections = useMemo(() => {
+    if (!selectedAbstract?.abstract) return null;
+    return parseAbstractSections(selectedAbstract.abstract);
+  }, [selectedAbstract?.abstract]);
 
   const totalScore = useMemo(() => {
     if (!currentReview) return 0;
@@ -380,7 +425,27 @@ export default function ReviewerTab() {
                         Abstract
                       </div>
                       <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-slate-800 whitespace-pre-wrap leading-relaxed">
-                        {selectedAbstract.abstract}
+                        {abstractSections ? (
+                          <div className="space-y-3">
+                            {ABSTRACT_SECTION_LABELS.map((section) => {
+                              const content = abstractSections[section.key];
+                              if (!content) return null;
+                              const heading =
+                                section.label.charAt(0).toUpperCase() +
+                                section.label.slice(1, -1);
+                              return (
+                                <div key={section.key}>
+                                  <div className="font-semibold text-slate-900 mb-1">
+                                    {heading}
+                                  </div>
+                                  <div>{content}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          selectedAbstract.abstract
+                        )}
                       </div>
                     </div>
                     <div className="mt-4 grid md:grid-cols-2 gap-4">
@@ -439,7 +504,7 @@ export default function ReviewerTab() {
                           Gusdon Award evaluation
                         </h3>
                         <p className="text-sm text-slate-600">
-                          Score each category (0–10). Total updates automatically.
+                          Score each category (1–5). Total updates automatically.
                         </p>
                       </div>
                       <div className="text-right">
@@ -532,16 +597,16 @@ export default function ReviewerTab() {
                           </div>
                           <input
                             type="range"
-                            min={0}
-                            max={10}
+                            min={1}
+                            max={5}
                             step={1}
-                            value={Number(currentReview[f.key]) || 0}
+                            value={Number(currentReview[f.key]) || 1}
                             onChange={(e) => updateReviewField(f.key, Number(e.target.value))}
                             className="w-full mt-4"
                           />
                           <div className="flex justify-between text-xs text-slate-500 mt-1">
-                            <span>0</span>
-                            <span>10</span>
+                            <span>1</span>
+                            <span>5</span>
                           </div>
                         </div>
                       ))}
@@ -551,7 +616,7 @@ export default function ReviewerTab() {
                           Previous study
                         </div>
                         <div className="text-xs text-slate-500 mt-1">
-                          Feel free to write down if you have any concerns (e.g., has this been presented before?).
+                          Do you know if the same report or the same presentation has been made before? Is this the first finding of its kind from the same lab?
                         </div>
                         <textarea
                           value={currentReview.previous_study_notes || ""}
