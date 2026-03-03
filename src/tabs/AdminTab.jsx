@@ -69,19 +69,38 @@ export default function AdminTab() {
   const [adminToken, setAdminToken] = useState("");
 
   useEffect(() => {
-    fetchAllData();
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlAdminToken = params.get("admin");
+      if (!urlAdminToken) {
+        setLoading(false);
+        setError(
+          "Admin access token is required. Open this page with ?admin=YOUR_TOKEN in the URL.",
+        );
+        return;
+      }
+      setAdminToken(urlAdminToken);
+      fetchAllData(urlAdminToken);
+    } catch {
+      setLoading(false);
+      setError("Failed to read admin access token from URL.");
+    }
   }, []);
 
-  const fetchAllData = async () => {
+  const fetchAllData = async (token) => {
     setLoading(true);
     setError(null);
     try {
+      const authHeaders = {
+        "X-Admin-Token": token,
+      };
+
       const [abstractsRes, visaRes, registrationsRes, reviewersRes] =
         await Promise.all([
-        fetch("/api/admin/abstracts"),
-        fetch("/api/admin/visa-requests"),
-        fetch("/api/registrations"),
-          fetch("/api/admin/reviewers/overview"),
+          fetch("/api/admin/abstracts", { headers: authHeaders }),
+          fetch("/api/admin/visa-requests", { headers: authHeaders }),
+          fetch("/api/registrations", { headers: authHeaders }),
+          fetch("/api/admin/reviewers/overview", { headers: authHeaders }),
         ]);
 
       if (
@@ -417,13 +436,20 @@ export default function AdminTab() {
 
   // Update abstract status
   const updateAbstractStatus = async (abstractId, status, reason = null) => {
+    if (!adminToken) {
+      alert("Admin access token is missing.");
+      return;
+    }
     setReviewUpdating(true);
     try {
       const response = await fetch(
         `/api/admin/abstracts/${abstractId}/status`,
         {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Token": adminToken,
+          },
           body: JSON.stringify({ status, rejection_reason: reason }),
         },
       );
@@ -2469,7 +2495,7 @@ export default function AdminTab() {
       {/* Refresh Button */}
       <div className="pt-4 border-t border-gray-200">
         <button
-          onClick={fetchAllData}
+          onClick={() => fetchAllData(adminToken)}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
         >
           Refresh Data

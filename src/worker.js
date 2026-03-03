@@ -77,7 +77,7 @@ async function handleApiRequest(request, env, url) {
 
   // GET /api/registrations (admin endpoint)
   if (url.pathname === "/api/registrations" && request.method === "GET") {
-    return handleGetRegistrations(env, corsHeaders);
+    return handleGetRegistrations(request, env, corsHeaders);
   }
 
   // POST /api/abstract-submission
@@ -123,7 +123,7 @@ async function handleApiRequest(request, env, url) {
 
   // GET /api/admin/abstracts
   if (url.pathname === "/api/admin/abstracts" && request.method === "GET") {
-    return handleGetAbstracts(env, corsHeaders);
+    return handleGetAbstracts(request, env, corsHeaders);
   }
 
   // PATCH /api/admin/abstracts/:id/status - Update abstract status
@@ -141,7 +141,7 @@ async function handleApiRequest(request, env, url) {
 
   // GET /api/admin/visa-requests
   if (url.pathname === "/api/admin/visa-requests" && request.method === "GET") {
-    return handleGetVisaRequests(env, corsHeaders);
+    return handleGetVisaRequests(request, env, corsHeaders);
   }
 
   // POST /api/reviewers/login
@@ -172,7 +172,7 @@ async function handleApiRequest(request, env, url) {
     url.pathname === "/api/admin/reviewers/overview" &&
     request.method === "GET"
   ) {
-    return handleAdminReviewerOverview(env, corsHeaders);
+    return handleAdminReviewerOverview(request, env, corsHeaders);
   }
 
   return new Response(JSON.stringify({ error: "Not Found" }), {
@@ -548,8 +548,16 @@ async function handleSubmitReviewerReview(request, env, corsHeaders) {
 }
 
 // Admin endpoint: reviewer stats and assignments
-async function handleAdminReviewerOverview(env, corsHeaders) {
+async function handleAdminReviewerOverview(request, env, corsHeaders) {
   try {
+    if (!requireAdmin(request, env)) {
+      return jsonResponse(
+        { success: false, error: "Unauthorized" },
+        401,
+        corsHeaders,
+      );
+    }
+
     // Overall totals
     const totalsRow = await env.ISIR_DB.prepare(
       `SELECT
@@ -792,8 +800,16 @@ async function handleRegistration(request, env, corsHeaders) {
   }
 }
 
-async function handleGetRegistrations(env, corsHeaders) {
+async function handleGetRegistrations(request, env, corsHeaders) {
   try {
+    if (!requireAdmin(request, env)) {
+      return jsonResponse(
+        { success: false, error: "Unauthorized" },
+        401,
+        corsHeaders,
+      );
+    }
+
     const result = await env.ISIR_DB.prepare(
       "SELECT * FROM registrations ORDER BY registration_date DESC LIMIT 100",
     ).all();
@@ -1521,8 +1537,16 @@ async function handleStripeWebhook(request, env) {
 }
 
 // Admin endpoint: Get all abstracts
-async function handleGetAbstracts(env, corsHeaders) {
+async function handleGetAbstracts(request, env, corsHeaders) {
   try {
+    if (!requireAdmin(request, env)) {
+      return jsonResponse(
+        { success: false, error: "Unauthorized" },
+        401,
+        corsHeaders,
+      );
+    }
+
     // Get all abstracts
     const abstractsResult = await env.ISIR_DB.prepare(
       `SELECT * FROM abstractions ORDER BY submission_date DESC LIMIT 500`,
@@ -1651,8 +1675,16 @@ async function handleUpdateAbstractStatus(
 }
 
 // Admin endpoint: Get all visa requests
-async function handleGetVisaRequests(env, corsHeaders) {
+async function handleGetVisaRequests(request, env, corsHeaders) {
   try {
+    if (!requireAdmin(request, env)) {
+      return jsonResponse(
+        { success: false, error: "Unauthorized" },
+        401,
+        corsHeaders,
+      );
+    }
+
     const result = await env.ISIR_DB.prepare(
       `SELECT * FROM visa_requests ORDER BY created_at DESC LIMIT 500`,
     ).all();
