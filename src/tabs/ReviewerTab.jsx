@@ -1,35 +1,32 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+const RATING_SCALE_HELP = "1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent";
+
 const SCORE_FIELDS = [
   {
     key: "originality",
     label: "Originality",
-    help: "1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent",
+    help: RATING_SCALE_HELP,
   },
   {
     key: "clarity",
     label: "Clarity of presentation",
-    help: "Do you clearly understand a candidate's presentation? • 1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent",
-  },
-  {
-    key: "powerpoint",
-    label: "PowerPoint presentation",
-    help: "1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent",
+    help: `Do you clearly understand a candidate's presentation? • ${RATING_SCALE_HELP}`,
   },
   {
     key: "study_design",
     label: "Study design",
-    help: "Is study design proper? Is statistical analysis correct? • 1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent",
+    help: `Is study design proper? Is statistical analysis correct? • ${RATING_SCALE_HELP}`,
   },
   {
     key: "data_analysis",
     label: "Data analysis and conclusion",
-    help: "1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent",
+    help: RATING_SCALE_HELP,
   },
   {
     key: "significance",
     label: "Study outcome (Significance)",
-    help: "Does the study contribute important finding(s) to the field of reproductive immunology? • 1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent",
+    help: `Does the study contribute important finding(s) to the field of reproductive immunology? • ${RATING_SCALE_HELP}`,
   },
 ];
 
@@ -148,7 +145,6 @@ export default function ReviewerTab() {
         previous_study_notes: "",
         originality: 3,
         clarity: 3,
-        powerpoint: 3,
         study_design: 3,
         data_analysis: 3,
         significance: 3,
@@ -575,41 +571,55 @@ export default function ReviewerTab() {
                         </div>
                       </div>
 
-                      {SCORE_FIELDS.map((f) => (
-                        <div key={f.key} className="rounded-xl border border-slate-200 p-4">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                              <div className="font-semibold text-slate-900">
-                                {f.label}
+                      {SCORE_FIELDS.map((f) => {
+                        const hasNotes =
+                          f.help &&
+                          f.help !== RATING_SCALE_HELP &&
+                          f.help.includes(RATING_SCALE_HELP);
+                        const helpNoteText = hasNotes
+                          ? f.help.replace(` • ${RATING_SCALE_HELP}`, "")
+                          : null;
+                        const helpRatingText = hasNotes ? RATING_SCALE_HELP : f.help;
+
+                        return (
+                          <div key={f.key} className="rounded-xl border border-slate-200 p-4">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <div className="font-semibold text-slate-900">
+                                  {f.label}
+                                </div>
+                                <div className="text-xs text-slate-500 mt-1">
+                                  {helpNoteText && <div>{helpNoteText}</div>}
+                                  <div>{helpRatingText}</div>
+                                </div>
                               </div>
-                              <div className="text-xs text-slate-500 mt-1">
-                                {f.help}
+                              <div className="text-right">
+                                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                  Score
+                                </div>
+                                <div className="text-2xl font-bold text-slate-900">
+                                  {Number(currentReview[f.key]) || 0}
+                                </div>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                Score
-                              </div>
-                              <div className="text-2xl font-bold text-slate-900">
-                                {Number(currentReview[f.key]) || 0}
-                              </div>
+                            <input
+                              type="range"
+                              min={1}
+                              max={5}
+                              step={1}
+                              value={Number(currentReview[f.key]) || 1}
+                              onChange={(e) =>
+                                updateReviewField(f.key, Number(e.target.value))
+                              }
+                              className="w-full mt-4"
+                            />
+                            <div className="flex justify-between text-xs text-slate-500 mt-1">
+                              <span>1</span>
+                              <span>5</span>
                             </div>
                           </div>
-                          <input
-                            type="range"
-                            min={1}
-                            max={5}
-                            step={1}
-                            value={Number(currentReview[f.key]) || 1}
-                            onChange={(e) => updateReviewField(f.key, Number(e.target.value))}
-                            className="w-full mt-4"
-                          />
-                          <div className="flex justify-between text-xs text-slate-500 mt-1">
-                            <span>1</span>
-                            <span>5</span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
 
                       <div className="rounded-xl border border-slate-200 p-4">
                         <div className="font-semibold text-slate-900">

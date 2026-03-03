@@ -666,10 +666,10 @@ export default function AdminTab() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">
-                    Submitted
+                    Either
                   </p>
                   <p className="text-3xl font-bold text-emerald-600 mt-1">
-                    {abstractStats.byStatus?.submitted || 0}
+                    {abstractStats.byPreference?.either || 0}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
