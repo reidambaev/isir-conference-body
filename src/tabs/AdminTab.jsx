@@ -60,6 +60,61 @@ export default function AdminTab() {
     return new Date(timestamp).toLocaleString();
   };
 
+  // Format abstract text with highlighted sections
+  const formatAbstractText = (text) => {
+    if (!text) return null;
+
+    // Define the sections to look for
+    const sections = ["Objectives", "Methods", "Results", "Conclusions"];
+    const sectionColors = {
+      Objectives: "text-blue-700 bg-blue-50",
+      Methods: "text-emerald-700 bg-emerald-50",
+      Results: "text-amber-700 bg-amber-50",
+      Conclusions: "text-violet-700 bg-violet-50",
+    };
+
+    // Split text by section headers (case-insensitive)
+    const regex = /(Objectives|Methods|Results|Conclusions)\s*:/gi;
+    const parts = text.split(regex);
+
+    if (parts.length <= 1) {
+      // No sections found, return plain text
+      return <span className="text-gray-700">{text}</span>;
+    }
+
+    const elements = [];
+    let currentSection = null;
+
+    parts.forEach((part, index) => {
+      const trimmedPart = part.trim();
+      const sectionMatch = sections.find(
+        (s) => s.toLowerCase() === trimmedPart.toLowerCase(),
+      );
+
+      if (sectionMatch) {
+        currentSection = sectionMatch;
+      } else if (trimmedPart) {
+        elements.push(
+          <div key={index} className="mb-3 last:mb-0">
+            {currentSection && (
+              <span
+                className={`inline-block px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide mb-1 ${sectionColors[currentSection]}`}
+              >
+                {currentSection}
+              </span>
+            )}
+            <p className="text-gray-700 leading-relaxed pl-0.5">
+              {trimmedPart}
+            </p>
+          </div>,
+        );
+        currentSection = null;
+      }
+    });
+
+    return <div className="space-y-2">{elements}</div>;
+  };
+
   const toggleAbstract = (abstractId) => {
     setExpandedAbstracts((prev) => {
       const newSet = new Set(prev);
@@ -835,9 +890,9 @@ export default function AdminTab() {
                       <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
                         Abstract
                       </h4>
-                      <p className="text-gray-700 whitespace-pre-wrap leading-relaxed bg-gray-50 p-4 rounded-lg">
-                        {currentReviewAbstract.abstract}
-                      </p>
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        {formatAbstractText(currentReviewAbstract.abstract)}
+                      </div>
                     </div>
 
                     {/* Keywords */}
@@ -1388,9 +1443,9 @@ export default function AdminTab() {
                             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
                               Abstract
                             </h4>
-                            <p className="text-gray-700 whitespace-pre-wrap leading-relaxed bg-white p-4 rounded-lg border border-gray-100">
-                              {abstract.abstract}
-                            </p>
+                            <div className="bg-white p-4 rounded-lg border border-gray-100">
+                              {formatAbstractText(abstract.abstract)}
+                            </div>
                           </div>
 
                           {/* Keywords */}

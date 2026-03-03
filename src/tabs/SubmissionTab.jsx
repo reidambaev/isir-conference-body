@@ -131,6 +131,22 @@ const SubmissionTab = () => {
     if (!formData.keywords.trim()) return "Keywords are required";
     if (!formData.abstract.trim()) return "Abstract text is required";
 
+    // Check for required sections
+    const abstractText = formData.abstract.toLowerCase();
+    const requiredSections = [
+      "objectives:",
+      "methods:",
+      "results:",
+      "conclusions:",
+    ];
+    const missingSections = requiredSections.filter(
+      (section) => !abstractText.includes(section),
+    );
+    if (missingSections.length > 0) {
+      const missing = missingSections.map((s) => s.replace(":", "")).join(", ");
+      return `Abstract must include all sections: ${missing} ${missingSections.length === 1 ? "is" : "are"} missing`;
+    }
+
     // Check word count
     const wordCount = formData.abstract.split(/\s+/).filter((w) => w).length;
     if (wordCount > 300) {

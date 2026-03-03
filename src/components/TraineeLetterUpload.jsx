@@ -359,16 +359,6 @@ const TraineeLetterUpload = ({
               student/trainee status
             </span>
           </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 mt-1">•</span>
-            <span>Current student ID card (both sides)</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-500 mt-1">•</span>
-            <span>
-              Enrollment verification letter dated within the last 3 months
-            </span>
-          </li>
         </ul>
       </div>
     </div>
