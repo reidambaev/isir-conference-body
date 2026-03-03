@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import * as XLSX from "xlsx";
 
 export default function AdminTab() {
   const [abstracts, setAbstracts] = useState([]);
@@ -22,6 +23,16 @@ export default function AdminTab() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectionModal, setShowRejectionModal] = useState(false);
 
+  // Reviewer overview state
+  const [reviewerOverview, setReviewerOverview] = useState(null);
+  const [reviewerOverviewLoading, setReviewerOverviewLoading] = useState(false);
+  const [reviewerOverviewError, setReviewerOverviewError] = useState("");
+
+  // Reviewer password generator state
+  const [emailFileName, setEmailFileName] = useState("");
+  const [emailCount, setEmailCount] = useState(0);
+  const [passwordError, setPasswordError] = useState("");
+
   useEffect(() => {
     fetchAllData();
   }, []);
@@ -30,28 +41,128 @@ export default function AdminTab() {
     setLoading(true);
     setError(null);
     try {
-      const [abstractsRes, visaRes, registrationsRes] = await Promise.all([
+      const [abstractsRes, visaRes, registrationsRes, reviewersRes] =
+        await Promise.all([
         fetch("/api/admin/abstracts"),
         fetch("/api/admin/visa-requests"),
         fetch("/api/registrations"),
-      ]);
+          fetch("/api/admin/reviewers/overview"),
+        ]);
 
-      if (!abstractsRes.ok || !visaRes.ok || !registrationsRes.ok) {
+      if (
+        !abstractsRes.ok ||
+        !visaRes.ok ||
+        !registrationsRes.ok ||
+        !reviewersRes.ok
+      ) {
         throw new Error("Failed to fetch data");
       }
 
       const abstractsData = await abstractsRes.json();
       const visaData = await visaRes.json();
       const registrationsData = await registrationsRes.json();
+      const reviewersData = await reviewersRes.json();
 
       setAbstracts(abstractsData.data || []);
       setVisaRequests(visaData.data || []);
       setRegistrations(registrationsData.data || []);
+      setReviewerOverview(reviewersData || null);
+      setReviewerOverviewError("");
     } catch (err) {
       console.error("Error fetching admin data:", err);
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateRandomPassword = () => {
+    const length = 12;
+    const charset =
+      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
+    let pwd = "";
+    for (let i = 0; i < length; i += 1) {
+      const idx = Math.floor(Math.random() * charset.length);
+      pwd += charset.charAt(idx);
+    }
+    return pwd;
+  };
+
+  const handleEmailFileChange = async (event) => {
+    setPasswordError("");
+    setEmailCount(0);
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setEmailFileName(file.name);
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      if (!sheet) {
+        setPasswordError("Could not read first sheet from file.");
+        return;
+      }
+
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      if (!rows || rows.length === 0) {
+        setPasswordError("Sheet is empty.");
+        return;
+      }
+
+      let emailColumnIndex = 0;
+      const headerRow = rows[0];
+      if (Array.isArray(headerRow)) {
+        const idx = headerRow.findIndex((cell) => {
+          if (typeof cell !== "string") return false;
+          const val = cell.trim().toLowerCase();
+          return val === "email" || val === "emails";
+        });
+        if (idx >= 0) {
+          emailColumnIndex = idx;
+        }
+      }
+
+      const emails = [];
+      for (let i = 1; i < rows.length; i += 1) {
+        const row = rows[i];
+        if (!Array.isArray(row)) continue;
+        const raw = row[emailColumnIndex];
+        if (!raw) continue;
+        const email = String(raw).trim();
+        if (!email) continue;
+        emails.push(email);
+      }
+
+      if (emails.length === 0) {
+        setPasswordError(
+          "No emails found. Make sure there is a column with email addresses.",
+        );
+        return;
+      }
+
+      setEmailCount(emails.length);
+
+      const outputRows = emails.map((email) => ({
+        Email: email,
+        Password: generateRandomPassword(),
+      }));
+
+      const outSheet = XLSX.utils.json_to_sheet(outputRows);
+      const outWb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(outWb, outSheet, "ReviewerPasswords");
+      const downloadName =
+        "reviewer-passwords-" +
+        new Date().toISOString().slice(0, 10) +
+        ".xlsx";
+      XLSX.writeFile(outWb, downloadName);
+    } catch (e) {
+      console.error("Error processing email Excel:", e);
+      setPasswordError(
+        e?.message || "Failed to process file. Please try a different file.",
+      );
     }
   };
 
@@ -443,6 +554,26 @@ export default function AdminTab() {
           }`}
         >
           Trainee Applications
+        </button>
+        <button
+          onClick={() => setActiveSection("reviewers")}
+          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+            activeSection === "reviewers"
+              ? "bg-indigo-600 text-white shadow-md"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Reviewers
+        </button>
+        <button
+          onClick={() => setActiveSection("reviewerPasswords")}
+          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+            activeSection === "reviewerPasswords"
+              ? "bg-purple-600 text-white shadow-md"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Reviewer Passwords
         </button>
       </div>
 
@@ -1856,6 +1987,326 @@ export default function AdminTab() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Reviewers Section */}
+      {activeSection === "reviewers" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-semibold text-gray-800">
+                Reviewer Overview
+              </h2>
+              <p className="text-gray-600 text-sm mt-1 max-w-2xl">
+                See total reviews and assignments, plus each reviewer&apos;s
+                workload and progress.
+              </p>
+            </div>
+            <button
+              onClick={fetchAllData}
+              className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {!reviewerOverview ? (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 text-gray-500 text-sm">
+              {error
+                ? "Could not load reviewer overview."
+                : "Loading reviewer overview..."}
+            </div>
+          ) : (
+            <>
+              {/* Summary cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Total Reviews
+                      </p>
+                      <p className="mt-2 text-3xl font-bold text-gray-900">
+                        {reviewerOverview.totals?.total_reviews ?? 0}
+                      </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                      <svg
+                        className="w-6 h-6 text-blue-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Reviewers with Assignments
+                      </p>
+                      <p className="mt-2 text-3xl font-bold text-gray-900">
+                        {reviewerOverview.totals
+                          ?.total_reviewers_with_assignments ?? 0}
+                      </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                      <svg
+                        className="w-6 h-6 text-indigo-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m0-4a4 4 0 110-8 4 4 0 010 8zm8 0a4 4 0 100-8 4 4 0 000 8z"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Total Assignments
+                      </p>
+                      <p className="mt-2 text-3xl font-bold text-gray-900">
+                        {reviewerOverview.totals?.total_assignments ?? 0}
+                      </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                      <svg
+                        className="w-6 h-6 text-emerald-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6M9 8h6m2 11H7a2 2 0 01-2-2V7a2 2 0 012-2h7l5 5v9a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Per-reviewer table */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-gray-800">
+                    Reviewers and assignments
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    {reviewerOverview.reviewers?.length || 0} reviewers
+                  </p>
+                </div>
+                {reviewerOverview.reviewers &&
+                reviewerOverview.reviewers.length > 0 ? (
+                  <div className="divide-y divide-gray-100">
+                    {reviewerOverview.reviewers.map((rev) => {
+                      const pending =
+                        (rev.assigned_count || 0) - (rev.reviewed_count || 0);
+                      return (
+                        <details
+                          key={rev.reviewer_email}
+                          className="group"
+                        >
+                          <summary className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
+                              <div>
+                                <p className="font-semibold text-gray-900">
+                                  {rev.reviewer_email}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  Assigned {rev.assigned_count || 0} •
+                                  Reviewed {rev.reviewed_count || 0} • Pending{" "}
+                                  {pending < 0 ? 0 : pending}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <p className="text-xs text-gray-500">
+                                  Avg. score
+                                </p>
+                                <p className="font-semibold text-gray-900">
+                                  {rev.avg_score != null
+                                    ? rev.avg_score.toFixed(1)
+                                    : "—"}
+                                </p>
+                              </div>
+                              <div className="hidden sm:block text-right">
+                                <p className="text-xs text-gray-500">
+                                  Last review
+                                </p>
+                                <p className="text-xs text-gray-700">
+                                  {rev.last_review_at
+                                    ? formatDate(rev.last_review_at)
+                                    : "–"}
+                                </p>
+                              </div>
+                              <svg
+                                className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 9l-7 7-7-7"
+                                />
+                              </svg>
+                            </div>
+                          </summary>
+                          <div className="bg-gray-50 px-5 pb-4 pt-2 text-sm">
+                            {rev.assignments && rev.assignments.length > 0 ? (
+                              <div className="overflow-x-auto">
+                                <table className="min-w-full text-xs">
+                                  <thead>
+                                    <tr className="text-left text-gray-500 border-b border-gray-200">
+                                      <th className="py-2 pr-4">
+                                        Abstract ID
+                                      </th>
+                                      <th className="py-2 pr-4">Title</th>
+                                      <th className="py-2 pr-4">Status</th>
+                                      <th className="py-2 pr-4">Score</th>
+                                      <th className="py-2 pr-4">
+                                        Assigned
+                                      </th>
+                                      <th className="py-2 pr-2">
+                                        Last updated
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {rev.assignments.map((a) => (
+                                      <tr key={a.abstract_id}>
+                                        <td className="py-1.5 pr-4 font-mono text-[11px] text-gray-700">
+                                          {a.abstract_id}
+                                        </td>
+                                        <td className="py-1.5 pr-4 text-gray-800 max-w-xs truncate">
+                                          {a.title}
+                                        </td>
+                                        <td className="py-1.5 pr-4">
+                                          <span className="inline-flex px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                                            {a.status || "submitted"}
+                                          </span>
+                                        </td>
+                                        <td className="py-1.5 pr-4">
+                                          {a.review_total != null
+                                            ? a.review_total
+                                            : "—"}
+                                        </td>
+                                        <td className="py-1.5 pr-4 text-gray-600">
+                                          {a.assigned_at
+                                            ? formatDate(a.assigned_at)
+                                            : "–"}
+                                        </td>
+                                        <td className="py-1.5 pr-2 text-gray-600">
+                                          {a.review_updated_at
+                                            ? formatDate(a.review_updated_at)
+                                            : "–"}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <p className="text-gray-500">
+                                No assignments found for this reviewer.
+                              </p>
+                            )}
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="px-5 py-6 text-sm text-gray-500">
+                    No reviewer assignments found.
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Reviewer Passwords Section */}
+      {activeSection === "reviewerPasswords" && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-800">
+              Reviewer Password Generator
+            </h2>
+            <p className="text-gray-600 text-sm mt-1 max-w-2xl">
+              Upload an Excel file that contains a column of email addresses.
+              The tool will generate a new Excel file with each email and a
+              randomly generated password, which you can use for reviewer
+              accounts.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Upload email list (Excel)
+              </label>
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleEmailFileChange}
+                className="block w-full text-sm text-gray-900 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+              />
+              <p className="mt-2 text-xs text-gray-500">
+                Supported formats: .xlsx, .xls, .csv. The first sheet will be
+                used. If there is a header row with a column named{" "}
+                <code className="px-1 rounded bg-gray-100 text-[11px]">
+                  email
+                </code>
+                , that column will be used; otherwise the first column will be
+                treated as the email column.
+              </p>
+            </div>
+
+            {emailFileName && (
+              <div className="text-sm text-gray-700">
+                <span className="font-medium">Selected file:</span>{" "}
+                <span className="text-gray-600">{emailFileName}</span>
+              </div>
+            )}
+
+            {emailCount > 0 && (
+              <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                Generated passwords for <strong>{emailCount}</strong> email
+                addresses and downloaded an Excel file with the results.
+              </div>
+            )}
+
+            {passwordError && (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {passwordError}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -167,6 +167,14 @@ async function handleApiRequest(request, env, url) {
     return handleAdminCreateReviewer(request, env, corsHeaders);
   }
 
+  // GET /api/admin/reviewers/overview
+  if (
+    url.pathname === "/api/admin/reviewers/overview" &&
+    request.method === "GET"
+  ) {
+    return handleAdminReviewerOverview(env, corsHeaders);
+  }
+
   return new Response(JSON.stringify({ error: "Not Found" }), {
     status: 404,
     headers: corsHeaders,
@@ -533,6 +541,122 @@ async function handleSubmitReviewerReview(request, env, corsHeaders) {
     console.error("Submit review error:", error);
     return jsonResponse(
       { success: false, error: error.message || "Failed to submit review" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+// Admin endpoint: reviewer stats and assignments
+async function handleAdminReviewerOverview(env, corsHeaders) {
+  try {
+    // Overall totals
+    const totalsRow = await env.ISIR_DB.prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM reviews) AS total_reviews,
+         (SELECT COUNT(DISTINCT reviewer_email) FROM reviewer_assignments) AS total_reviewers_with_assignments,
+         (SELECT COUNT(*) FROM reviewer_assignments) AS total_assignments`,
+    ).first();
+
+    // Per-reviewer aggregate stats
+    const perReviewer = await env.ISIR_DB.prepare(
+      `SELECT
+         ra.reviewer_email,
+         COUNT(*) AS assigned_count,
+         SUM(CASE WHEN r.total IS NOT NULL THEN 1 ELSE 0 END) AS reviewed_count,
+         AVG(r.total) AS avg_score,
+         MAX(r.updated_at) AS last_review_at
+       FROM reviewer_assignments ra
+       LEFT JOIN reviews r
+         ON r.reviewer_email = ra.reviewer_email
+        AND r.abstract_id = ra.abstract_id
+       GROUP BY ra.reviewer_email
+       ORDER BY ra.reviewer_email ASC`,
+    ).all();
+
+    // Detailed assignments with abstracts and scores
+    const assignmentDetails = await env.ISIR_DB.prepare(
+      `SELECT
+         ra.reviewer_email,
+         ra.abstract_id,
+         ra.assigned_at,
+         a.title,
+         a.status,
+         r.total AS review_total,
+         r.updated_at AS review_updated_at
+       FROM reviewer_assignments ra
+       JOIN abstractions a
+         ON a.id = ra.abstract_id
+       LEFT JOIN reviews r
+         ON r.reviewer_email = ra.reviewer_email
+        AND r.abstract_id = ra.abstract_id
+       ORDER BY ra.reviewer_email ASC, ra.assigned_at ASC`,
+    ).all();
+
+    const reviewersMap = {};
+
+    (perReviewer.results || []).forEach((row) => {
+      reviewersMap[row.reviewer_email] = {
+        reviewer_email: row.reviewer_email,
+        assigned_count: Number(row.assigned_count || 0),
+        reviewed_count: Number(row.reviewed_count || 0),
+        avg_score:
+          row.avg_score != null && !Number.isNaN(Number(row.avg_score))
+            ? Number(row.avg_score)
+            : null,
+        last_review_at: row.last_review_at || null,
+        assignments: [],
+      };
+    });
+
+    (assignmentDetails.results || []).forEach((row) => {
+      if (!reviewersMap[row.reviewer_email]) {
+        reviewersMap[row.reviewer_email] = {
+          reviewer_email: row.reviewer_email,
+          assigned_count: 0,
+          reviewed_count: 0,
+          avg_score: null,
+          last_review_at: null,
+          assignments: [],
+        };
+      }
+      reviewersMap[row.reviewer_email].assignments.push({
+        abstract_id: row.abstract_id,
+        assigned_at: row.assigned_at || null,
+        title: row.title || "",
+        status: row.status || "",
+        review_total:
+          row.review_total != null && !Number.isNaN(Number(row.review_total))
+            ? Number(row.review_total)
+            : null,
+        review_updated_at: row.review_updated_at || null,
+      });
+    });
+
+    const reviewers = Object.values(reviewersMap);
+
+    return jsonResponse(
+      {
+        success: true,
+        totals: {
+          total_reviews: Number(totalsRow?.total_reviews || 0),
+          total_reviewers_with_assignments: Number(
+            totalsRow?.total_reviewers_with_assignments || 0,
+          ),
+          total_assignments: Number(totalsRow?.total_assignments || 0),
+        },
+        reviewers,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Admin reviewer overview error:", error);
+    return jsonResponse(
+      {
+        success: false,
+        error: error.message || "Failed to load reviewer overview",
+      },
       500,
       corsHeaders,
     );
