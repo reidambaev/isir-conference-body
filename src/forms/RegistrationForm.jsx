@@ -615,19 +615,8 @@ const RegistrationForm = ({ onClose }) => {
                 )
               : null
           }
-          galaLabel={
-            formData.galaDinnerCount > 0
-              ? `Gala Dinner × ${formData.galaDinnerCount}`
-              : null
-          }
-          galaPrice={
-            formData.galaDinnerCount > 0
-              ? formatCurrency(
-                  getGalaDinnerPrice() * formData.galaDinnerCount,
-                  currency,
-                )
-              : null
-          }
+          galaLabel={null}
+          galaPrice={null}
           totalLabel="Total Amount Paid"
           totalAmount={formatCurrency(getTotalPrice(), currency)}
           taxNote={isKoreanCustomer ? "* Includes 10% Korean tax" : null}
@@ -713,19 +702,11 @@ const RegistrationForm = ({ onClose }) => {
     return getFinalPrice(basePrice, formData.country);
   };
 
-  const getGalaDinnerPrice = (inBaseCurrency = false) => {
-    const basePrice = 100;
-    if (inBaseCurrency) return basePrice;
-    return getFinalPrice(basePrice, formData.country);
-  };
-
   const getTotalPrice = (inBaseCurrency = false) => {
     const ticketPrice = getTicketPrice(formData.ticketType, inBaseCurrency);
     const accompanyingPrice =
       getAccompanyingPrice(inBaseCurrency) * formData.accompanyingPersonCount;
-    const galaDinnerPrice =
-      getGalaDinnerPrice(inBaseCurrency) * formData.galaDinnerCount;
-    return ticketPrice + accompanyingPrice + galaDinnerPrice;
+    return ticketPrice + accompanyingPrice;
   };
 
   // Get price for Stripe (in smallest currency unit)
@@ -1361,14 +1342,10 @@ const RegistrationForm = ({ onClose }) => {
                   <FormLabel className="!text-base mb-3">
                     Accompanying Person Tickets
                   </FormLabel>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Accompanying person fee includes breakfast, lunch, and
-                    welcome reception.
-                  </p>
-                  <p className="text-sm text-amber-600 font-medium mb-5">
-                    Note: Accompanying person tickets do NOT include gala
-                    dinner. Gala dinner tickets must be purchased separately
-                    below.
+                  <p className="text-sm text-gray-600 mb-5">
+                    Accompanying person fee includes Welcome Reception and the
+                    complimentary Gala evening (dinner and live performances at
+                    Busan Cinema Center).
                   </p>
 
                   <div className="bg-gradient-to-br from-amber-50 to-white rounded-xl p-5 border-2 border-amber-200">
@@ -1427,72 +1404,6 @@ const RegistrationForm = ({ onClose }) => {
                         >
                           +
                         </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Gala Dinner Tickets */}
-                  <div className="border-t-2 border-gray-100 pt-8 mt-8">
-                    <FormLabel className="!text-base mb-3">
-                      Gala Dinner Tickets (Optional)
-                    </FormLabel>
-                    <p className="text-sm text-gray-600 mb-5">
-                      Join us for an elegant evening celebration. You can
-                      purchase multiple gala dinner tickets.
-                    </p>
-
-                    <div className="bg-gradient-to-br from-yellow-50 to-white rounded-xl p-5 border-2 border-yellow-200">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                          <p className="font-semibold text-gray-800">
-                            Gala Dinner Ticket
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {formatCurrency(
-                              getGalaDinnerPrice(),
-                              getCurrency(formData.country),
-                            )}{" "}
-                            each
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                galaDinnerCount: Math.max(
-                                  0,
-                                  prev.galaDinnerCount - 1,
-                                ),
-                              }))
-                            }
-                            className="w-10 h-10 border-2 border-gray-300 rounded-xl bg-white hover:bg-gray-100 font-bold text-xl shadow-sm transition-all"
-                          >
-                            −
-                          </button>
-                          <span
-                            className="w-14 text-center font-bold text-2xl"
-                            style={{ color: "var(--color-primary)" }}
-                          >
-                            {formData.galaDinnerCount}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                galaDinnerCount: Math.min(
-                                  20,
-                                  prev.galaDinnerCount + 1,
-                                ),
-                              }))
-                            }
-                            className="w-10 h-10 border-2 border-gray-300 rounded-xl bg-white hover:bg-gray-100 font-bold text-xl shadow-sm transition-all"
-                          >
-                            +
-                          </button>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -2029,19 +1940,6 @@ const RegistrationForm = ({ onClose }) => {
                       </span>
                     </div>
                   )}
-                  {formData.galaDinnerCount > 0 && (
-                    <div className="flex justify-between text-base py-3 border-b border-gray-200">
-                      <span className="text-gray-700">
-                        Gala Dinner × {formData.galaDinnerCount}
-                      </span>
-                      <span className="font-bold text-lg">
-                        {formatCurrency(
-                          getGalaDinnerPrice() * formData.galaDinnerCount,
-                          currency,
-                        )}
-                      </span>
-                    </div>
-                  )}
                   {isKoreanCustomer && (
                     <div className="text-xs text-gray-500 italic pt-2">
                       * Prices include 10% Korean tax
@@ -2237,19 +2135,6 @@ const RegistrationForm = ({ onClose }) => {
                             {formatCurrency(
                               getAccompanyingPrice() *
                                 formData.accompanyingPersonCount,
-                              currency,
-                            )}
-                          </span>
-                        </div>
-                      )}
-                      {formData.galaDinnerCount > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-700">
-                            Gala Dinner × {formData.galaDinnerCount}
-                          </span>
-                          <span className="font-bold">
-                            {formatCurrency(
-                              getGalaDinnerPrice() * formData.galaDinnerCount,
                               currency,
                             )}
                           </span>

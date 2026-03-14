@@ -383,7 +383,7 @@ const RegistrationTab = () => {
                 <div className="p-3 text-sm text-gray-700">
                   <strong>Complimentary Gala Evening:</strong> All meeting
                   participants are invited to a complimentary Gala evening at the
-                  iconic Busan Cinema Center, featuring a tour, dinner, and live
+                  iconic Busan Cinema Center, featuring dinner and live
                   performances by renowned Korean musicians and artists. Join us
                   for an unforgettable cultural evening in Busan!
                 </div>
