@@ -1,5 +1,25 @@
 import React from "react";
 
+const plenarySpeakers = [
+  {
+    name: "Melinda Mills",
+    affiliation:
+      "Professor of Demography and Population Health, University of Oxford; Nuffield College; Director, Leverhulme Centre for Demographic Science",
+    image: null,
+  },
+  {
+    name: "Cheong-Seok Kim",
+    affiliation: "Professor, Department of Sociology, Dongguk University, Korea",
+    image: null,
+  },
+  {
+    name: "Sam Richards",
+    affiliation:
+      "Teaching Professor of Sociology, Pennsylvania State University; Distinguished Professor, Konkuk University, Seoul",
+    image: null,
+  },
+];
+
 const speakers = [
   {
     name: "Aihua Liao",
@@ -135,7 +155,76 @@ function SpeakersTab() {
         </div>
       </div>
 
-      {/* Speaker Grid - 16 speakers */}
+      {/* Plenary Speakers - separate section */}
+      <div className="mb-12">
+        <h4
+          className="text-xl font-semibold mb-2 flex items-center"
+          style={{ color: "var(--color-primary)" }}
+        >
+          <svg
+            className="w-6 h-6 mr-2"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+            />
+          </svg>
+          Plenary Speakers
+        </h4>
+        <p className="text-gray-600 text-sm mb-6">
+          Our distinguished plenary speakers will present keynotes at the
+          congress.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {plenarySpeakers.map((speaker, index) => (
+            <div
+              key={`plenary-${index}`}
+              className="bg-gradient-to-br from-blue-50 to-white rounded-xl border-2 p-6 hover:shadow-lg transition-shadow flex flex-col items-center text-center"
+              style={{ borderColor: "var(--color-primary)" }}
+            >
+              {speaker.image ? (
+                <img
+                  src={`/speakers/${speaker.image}`}
+                  alt={speaker.name}
+                  className="w-28 h-28 rounded-full object-cover mb-3 border-2 flex-shrink-0"
+                  style={{
+                    borderColor: "var(--color-secondary)",
+                    ...(speaker.imagePosition && {
+                      objectPosition: speaker.imagePosition,
+                    }),
+                  }}
+                />
+              ) : (
+                <div
+                  className="w-28 h-28 rounded-full flex items-center justify-center mb-3 border-2 text-2xl font-bold text-white flex-shrink-0"
+                  style={{
+                    backgroundColor: "var(--color-primary)",
+                    borderColor: "var(--color-secondary)",
+                  }}
+                >
+                  {getInitials(speaker.name)}
+                </div>
+              )}
+              <h5
+                className="text-lg font-bold mb-2 leading-tight"
+                style={{ color: "var(--color-primary)" }}
+              >
+                {speaker.name}
+              </h5>
+              <p className="text-gray-600 text-sm leading-snug">
+                {speaker.affiliation}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Speakers */}
       <div className="mb-10">
         <h4
           className="text-xl font-semibold mb-6 flex items-center"
