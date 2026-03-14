@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import RegistrationForm from "../forms/RegistrationForm";
 import { REGISTRATION_OPEN, isPreviewMode } from "../config/constants";
+import galaImage from "../assets/gala.jpg";
 
 const RegistrationTab = () => {
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
@@ -39,9 +40,15 @@ const RegistrationTab = () => {
             />
           </svg>
           <div>
-            <strong>Registration is currently closed.</strong> All details below
-            are for your information. Please check back later when registration
-            opens.
+            <p className="font-semibold">
+              Registration is currently closed and the opening has been delayed
+              due to technical issues.
+            </p>
+            <p>
+              All details below are for your information. We are working to
+              resolve the issue as quickly as possible—please check back later
+              for updates on when registration will open.
+            </p>
           </div>
         </div>
       )}
@@ -366,7 +373,21 @@ const RegistrationTab = () => {
                 What's Included
               </h4>
             </div>
-            <div className="p-5">
+            <div className="p-5 space-y-4">
+              <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                <img
+                  src={galaImage}
+                  alt="Gala evening at the Busan Cinema Center"
+                  className="w-full h-40 md:h-48 object-cover"
+                />
+                <div className="p-3 text-sm text-gray-700">
+                  <strong>Complimentary Gala Evening:</strong> All meeting
+                  participants are invited to a complimentary Gala evening at the
+                  iconic Busan Cinema Center, featuring a tour, dinner, and live
+                  performances by renowned Korean musicians and artists. Join us
+                  for an unforgettable cultural evening in Busan!
+                </div>
+              </div>
               <div className="grid grid-cols-1 gap-3">
                 {[
                   { text: "All Scientific Sessions", icon: "🎓" },
