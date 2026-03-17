@@ -244,9 +244,8 @@ function normalizeEmail(value) {
 
 async function handleAdminCreateSpeakerInvite(request, env, corsHeaders) {
   try {
-    if (!requireAdmin(request, env)) {
-      return jsonResponse({ success: false, error: "Unauthorized" }, 401, corsHeaders);
-    }
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
     if (!env.ISIR_DB) {
       return jsonResponse({ success: false, error: "Database not configured" }, 500, corsHeaders);
     }
@@ -430,11 +429,37 @@ function requireAdmin(request, env) {
   return Boolean(headerToken && headerToken === expected);
 }
 
+function ensureAdmin(request, env, corsHeaders) {
+  const expected = env.ADMIN_TOKEN;
+  if (!expected) {
+    return jsonResponse(
+      {
+        success: false,
+        error:
+          "Admin token is not configured on the server (missing ADMIN_TOKEN).",
+      },
+      500,
+      corsHeaders,
+    );
+  }
+  const headerToken = request.headers.get("X-Admin-Token");
+  if (!headerToken) {
+    return jsonResponse(
+      { success: false, error: "Unauthorized (missing X-Admin-Token header)" },
+      401,
+      corsHeaders,
+    );
+  }
+  if (headerToken !== expected) {
+    return jsonResponse({ success: false, error: "Unauthorized" }, 401, corsHeaders);
+  }
+  return null;
+}
+
 async function handleAdminCreateReviewer(request, env, corsHeaders) {
   try {
-    if (!requireAdmin(request, env)) {
-      return jsonResponse({ success: false, error: "Unauthorized" }, 401, corsHeaders);
-    }
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
     const data = await request.json();
     const email = (data?.email || "").trim().toLowerCase();
     if (!email) {
@@ -771,13 +796,8 @@ async function handleSubmitReviewerReview(request, env, corsHeaders) {
 // Admin endpoint: reviewer stats and assignments
 async function handleAdminReviewerOverview(request, env, corsHeaders) {
   try {
-    if (!requireAdmin(request, env)) {
-      return jsonResponse(
-        { success: false, error: "Unauthorized" },
-        401,
-        corsHeaders,
-      );
-    }
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
 
     // Overall totals
     const totalsRow = await env.ISIR_DB.prepare(
@@ -1124,13 +1144,8 @@ async function handleRegistration(request, env, corsHeaders) {
 
 async function handleGetRegistrations(request, env, corsHeaders) {
   try {
-    if (!requireAdmin(request, env)) {
-      return jsonResponse(
-        { success: false, error: "Unauthorized" },
-        401,
-        corsHeaders,
-      );
-    }
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
 
     const result = await env.ISIR_DB.prepare(
       "SELECT * FROM registrations ORDER BY registration_date DESC LIMIT 100",
@@ -1861,13 +1876,8 @@ async function handleStripeWebhook(request, env) {
 // Admin endpoint: Get all abstracts
 async function handleGetAbstracts(request, env, corsHeaders) {
   try {
-    if (!requireAdmin(request, env)) {
-      return jsonResponse(
-        { success: false, error: "Unauthorized" },
-        401,
-        corsHeaders,
-      );
-    }
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
 
     // Get all abstracts
     const abstractsResult = await env.ISIR_DB.prepare(
@@ -1999,13 +2009,8 @@ async function handleUpdateAbstractStatus(
 // Admin endpoint: Get all visa requests
 async function handleGetVisaRequests(request, env, corsHeaders) {
   try {
-    if (!requireAdmin(request, env)) {
-      return jsonResponse(
-        { success: false, error: "Unauthorized" },
-        401,
-        corsHeaders,
-      );
-    }
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
 
     const result = await env.ISIR_DB.prepare(
       `SELECT * FROM visa_requests ORDER BY created_at DESC LIMIT 500`,
