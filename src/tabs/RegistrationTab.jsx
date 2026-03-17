@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import RegistrationForm from "../forms/RegistrationForm";
 import { REGISTRATION_OPEN, isPreviewMode } from "../config/constants";
 import galaImage from "../assets/gala.jpg";
@@ -13,6 +13,11 @@ const RegistrationTab = () => {
   const hasInviteLink = Boolean(params?.get("invite"));
   const registrationOpen = REGISTRATION_OPEN || isPreviewMode() || hasInviteLink;
   const inPreviewMode = isPreviewMode();
+
+  // Auto-open form when coming from an invite link
+  useEffect(() => {
+    if (hasInviteLink) setShowRegistrationForm(true);
+  }, [hasInviteLink]);
 
   if (showRegistrationForm && registrationOpen) {
     return <RegistrationForm onClose={() => setShowRegistrationForm(false)} />;

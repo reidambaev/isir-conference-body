@@ -323,8 +323,8 @@ const RegistrationForm = ({ onClose }) => {
           ticketType: "invited-speaker",
         }));
 
-        // Jump to details step (skip member verification + ticket selection)
-        setStep(4);
+        // Jump to ticket selection (step 2) when opening an invite link
+        setStep(2);
       } catch (e) {
         console.error("Invite verification failed:", e);
         if (cancelled) return;
