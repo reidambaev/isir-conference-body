@@ -6,7 +6,7 @@ const plenarySpeakers = [
     affiliation:
       "Professor of Demography and Population Health, University of Oxford; Nuffield College; Director, Leverhulme Centre for Demographic Science",
     image: "melinda-mills.png",
-    imagePosition: "center 20%",
+    imagePosition: "center 0%",
   },
   {
     name: "Cheong-Seok Kim",
@@ -20,7 +20,7 @@ const plenarySpeakers = [
     affiliation:
       "Teaching Professor of Sociology, Pennsylvania State University; Distinguished Professor, Konkuk University, Seoul",
     image: "sam-richards.png",
-    imagePosition: "center 15%",
+    imagePosition: "center 25%",
   },
 ];
 
