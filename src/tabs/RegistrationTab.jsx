@@ -635,6 +635,7 @@ const RegistrationTab = () => {
                   Admission to the main scientific programme and the exhibition
                 </li>
                 <li>Access to the sponsored sessions or booth onsite</li>
+                <li>Gala dinner</li>
                 <li>
                   A certificate of attendance after completion of an evaluation
                 </li>

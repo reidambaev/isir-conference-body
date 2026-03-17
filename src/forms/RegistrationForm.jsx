@@ -559,11 +559,11 @@ const RegistrationForm = ({ onClose }) => {
       return;
     }
     console.log("Registration Info:", formData);
-    // Invited speakers: skip payment and complete registration for free
-    if (
-      speakerInvite.status === "valid" &&
-      formData.ticketType === "invited-speaker"
-    ) {
+    const invitedSpeakerFlow = formData.ticketType === "invited-speaker";
+    const totalNow = getTotalPrice();
+
+    // Invited speakers: skip payment only if total is truly free ($0)
+    if (invitedSpeakerFlow && totalNow === 0) {
       (async () => {
         try {
           setIsProcessingPayment(true);
@@ -572,9 +572,7 @@ const RegistrationForm = ({ onClose }) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               ...formData,
-              accompanyingPersonCount: 0,
-              galaDinnerCount: 0,
-              inviteToken: speakerInvite.token,
+              inviteToken: speakerInvite.status === "valid" ? speakerInvite.token : undefined,
               membershipLevel: membershipData?.membership_level || null,
               membershipStatus: membershipData?.membership_status || null,
               traineeLetterUrl: formData.traineeLetterUrl || null,
@@ -651,6 +649,11 @@ const RegistrationForm = ({ onClose }) => {
         },
         body: JSON.stringify({
           ...formData,
+          inviteToken:
+            formData.ticketType === "invited-speaker" &&
+            speakerInvite.status === "valid"
+              ? speakerInvite.token
+              : undefined,
           membershipLevel: membershipData?.membership_level || null,
           membershipStatus: membershipData?.membership_status || null,
           traineeLetterUrl: formData.traineeLetterUrl || null,
@@ -813,6 +816,11 @@ const RegistrationForm = ({ onClose }) => {
     },
     "invited-speaker": { early: 0, standard: 0, label: "Invited Speaker" },
   };
+
+  const isInvitedSpeakerMode =
+    formData.ticketType === "invited-speaker" ||
+    speakerInvite.status === "valid" ||
+    speakerEligible.status === "eligible";
 
   // Get currency based on country
   const currency = getCurrency(formData.country);
@@ -1276,7 +1284,41 @@ const RegistrationForm = ({ onClose }) => {
                         STANDARD
                       </div>
                     </div>
-                    {membershipData?.ticket_options?.available_tickets
+                    {isInvitedSpeakerMode ? (
+                      <div className="grid grid-cols-3 bg-blue-100 ring-2 ring-blue-500 ring-inset">
+                        <div className="p-5 flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="ticketType"
+                            value="invited-speaker"
+                            checked
+                            readOnly
+                            className="w-5 h-5 text-blue-600"
+                          />
+                          <div className="flex-1">
+                            <span className="font-semibold text-gray-800">
+                              Invited Speaker
+                            </span>
+                            <div className="mt-1 text-xs text-gray-600">
+                              Speaker registration is complimentary.
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-5 text-center flex items-center justify-center">
+                          <span
+                            className="text-xl font-bold"
+                            style={{ color: "var(--color-primary)" }}
+                          >
+                            {formatCurrency(0, getCurrency(formData.country))}
+                          </span>
+                        </div>
+                        <div className="p-5 text-center flex items-center justify-center">
+                          <span className="text-xl font-bold text-gray-500">
+                            {formatCurrency(0, getCurrency(formData.country))}
+                          </span>
+                        </div>
+                      </div>
+                    ) : membershipData?.ticket_options?.available_tickets
                       ? // Use ticket options from API
                         membershipData.ticket_options.available_tickets
                           .filter((ticket) => {

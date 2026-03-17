@@ -970,8 +970,8 @@ async function handleRegistration(request, env, corsHeaders) {
     const isEarlyBird = registrationDate < earlyBirdDeadline;
     const ticketPrice =
       ticketPrices[data.ticketType]?.[isEarlyBird ? "early" : "standard"] || 0;
-    let accompanyingPrice =
-      (isEarlyBird ? 250 : 350) * (data.accompanyingPersonCount || 0);
+    const accompanyingCount = Number(data.accompanyingPersonCount || 0);
+    let accompanyingPrice = (isEarlyBird ? 250 : 350) * accompanyingCount;
     let totalPrice = ticketPrice + accompanyingPrice;
 
     // Speaker invite override: enforce free base ticket and validate token
@@ -1014,9 +1014,8 @@ async function handleRegistration(request, env, corsHeaders) {
       // Enforce free ticket price; accompanying is still paid (if any)
       isInvitedSpeaker = 1;
       invitedSpeakerToken = String(invite.token);
-      // Speakers register for free; accompanying is not included in invite flow
-      accompanyingPrice = 0;
-      totalPrice = 0;
+      // Speakers register for free; accompanying persons are still paid
+      totalPrice = accompanyingPrice;
     }
 
     // Extract primitive values from objects (react-country-state-city returns objects)
@@ -1086,7 +1085,7 @@ async function handleRegistration(request, env, corsHeaders) {
         data.privacyMarketing ? 1 : 0,
         data.privacyApp ? 1 : 0,
         data.optOutMailing ? 1 : 0,
-        isInvitedSpeaker ? "completed" : "pending",
+        isInvitedSpeaker && totalPrice === 0 ? "completed" : "pending",
         isInvitedSpeaker,
         invitedSpeakerToken,
         data.membershipLevel || null,
@@ -1097,7 +1096,7 @@ async function handleRegistration(request, env, corsHeaders) {
       )
       .run();
 
-    if (isInvitedSpeaker && env.ISIR_DB) {
+    if (isInvitedSpeaker && totalPrice === 0 && env.ISIR_DB) {
       try {
         await env.ISIR_DB.prepare(
           `UPDATE speaker_invites SET used_at = ?, used_registration_id = ? WHERE token = ?`,
@@ -1752,6 +1751,29 @@ async function handleStripeWebhook(request, env) {
             console.log(
               `Payment confirmed for registration: ${registrationId}`,
             );
+
+            // If this was an invited speaker registration, mark invite token as used
+            try {
+              const inv = await env.ISIR_DB.prepare(
+                `SELECT is_invited_speaker, invited_speaker_token FROM registrations WHERE id = ?`,
+              )
+                .bind(registrationId)
+                .first();
+              if (
+                Number(inv?.is_invited_speaker || 0) === 1 &&
+                inv?.invited_speaker_token
+              ) {
+                await env.ISIR_DB.prepare(
+                  `UPDATE speaker_invites
+                   SET used_at = ?, used_registration_id = ?
+                   WHERE token = ? AND (used_at IS NULL OR used_at = 0)`,
+                )
+                  .bind(Date.now(), registrationId, inv.invited_speaker_token)
+                  .run();
+              }
+            } catch (e) {
+              console.error("Failed to mark speaker invite used:", e);
+            }
 
             // Send confirmation email if Resend is configured
             if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
