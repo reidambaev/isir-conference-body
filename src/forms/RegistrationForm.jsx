@@ -205,6 +205,10 @@ const RegistrationForm = ({ onClose }) => {
     status: "idle", // idle | verifying | valid | invalid
     error: "",
   });
+  const [speakerEligible, setSpeakerEligible] = useState({
+    status: "idle", // idle | checking | eligible | ineligible | error
+    error: "",
+  });
   const isVerifiedMember = React.useMemo(() => {
     if (!membershipData) return false;
     // Only consider verified if is_member is true AND membership_level is not "Non-Member"
@@ -381,8 +385,20 @@ const RegistrationForm = ({ onClose }) => {
 
     setIsVerifying(true);
     setVerificationError(null);
+    setSpeakerEligible({ status: "checking", error: "" });
 
     try {
+      // Check invited-speaker eligibility by email (works without invite link)
+      const emailCheck = await fetch(
+        `/api/speaker-invites/check?email=${encodeURIComponent(formData.email)}`,
+      );
+      const emailCheckJson = await emailCheck.json().catch(() => ({}));
+      const eligibleByEmail = Boolean(emailCheckJson?.success && emailCheckJson?.eligible);
+      setSpeakerEligible({
+        status: eligibleByEmail ? "eligible" : "ineligible",
+        error: "",
+      });
+
       const response = await fetch(ISIR_API_CONFIG.endpoint, {
         method: "POST",
         headers: {
@@ -412,18 +428,47 @@ const RegistrationForm = ({ onClose }) => {
       // Allow both members and non-members to proceed to ticket selection
       // Non-members will see member pricing but won't be able to select member tickets
       if (!data.data.email_registered) {
-        setVerificationError(
-          "No account found with this email address. Please check your email or register at theisir.org first.",
-        );
+        if (eligibleByEmail) {
+          // Invited speaker can proceed even without ISIR membership account
+          setMembershipData({
+            email_registered: true,
+            has_membership: false,
+            is_member: false,
+            membership_level: "Invited Speaker",
+            membership_status: "N/A",
+            api_message: "Invited speaker email verified",
+          });
+          setFormData((prev) => ({ ...prev, ticketType: "invited-speaker" }));
+          setStep(4);
+        } else {
+          setVerificationError(
+            "No account found with this email address. Please check your email or register at theisir.org first.",
+          );
+        }
       } else {
         // Proceed to ticket selection for both members and non-members
         setStep(2);
       }
     } catch (error) {
       console.error("Verification error:", error);
-      setVerificationError(
-        "Unable to verify membership. Please try again or contact support@isir2026.org",
-      );
+      // If membership API is down but invite-by-email is eligible, allow speaker flow
+      if (speakerEligible.status === "eligible") {
+        setMembershipData({
+          email_registered: true,
+          has_membership: false,
+          is_member: false,
+          membership_level: "Invited Speaker",
+          membership_status: "N/A",
+          api_message: "Invited speaker email verified",
+        });
+        setFormData((prev) => ({ ...prev, ticketType: "invited-speaker" }));
+        setStep(4);
+      } else {
+        setVerificationError(
+          "Unable to verify membership. Please try again or contact support@isir2026.org",
+        );
+        setSpeakerEligible({ status: "error", error: error?.message || "" });
+      }
     } finally {
       setIsVerifying(false);
     }
@@ -956,6 +1001,13 @@ const RegistrationForm = ({ onClose }) => {
                       Invited speaker link verified. Email is locked.
                     </p>
                   )}
+                  {speakerInvite.status !== "valid" &&
+                    speakerEligible.status === "eligible" && (
+                      <p className="mt-1 text-xs text-emerald-700">
+                        This email is on the invited speaker list. You can register
+                        for free.
+                      </p>
+                    )}
                   {speakerInvite.status === "invalid" && speakerInvite.error && (
                     <p className="mt-1 text-xs text-red-700">
                       Invite link error: {speakerInvite.error}

@@ -83,6 +83,14 @@ async function handleApiRequest(request, env, url) {
     return handleVerifySpeakerInvite(request, env, url, corsHeaders);
   }
 
+  // GET /api/speaker-invites/check?email=...
+  if (
+    url.pathname === "/api/speaker-invites/check" &&
+    request.method === "GET"
+  ) {
+    return handleCheckSpeakerInviteByEmail(request, env, url, corsHeaders);
+  }
+
   // GET /api/registrations (admin endpoint)
   if (url.pathname === "/api/registrations" && request.method === "GET") {
     return handleGetRegistrations(request, env, corsHeaders);
@@ -347,6 +355,52 @@ async function handleVerifySpeakerInvite(request, env, url, corsHeaders) {
     console.error("Verify speaker invite error:", error);
     return jsonResponse(
       { success: false, error: error.message || "Failed to verify invite" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleCheckSpeakerInviteByEmail(request, env, url, corsHeaders) {
+  try {
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+    const email = normalizeEmail(url.searchParams.get("email") || "");
+    if (!email) {
+      return jsonResponse({ success: false, error: "email is required" }, 400, corsHeaders);
+    }
+
+    const now = Date.now();
+    const row = await env.ISIR_DB.prepare(
+      `SELECT token, email, expires_at, used_at FROM speaker_invites WHERE email = ?`,
+    )
+      .bind(email)
+      .first();
+
+    const eligible =
+      Boolean(row?.token) &&
+      Number(row.expires_at || 0) > now &&
+      (row.used_at == null || Number(row.used_at) === 0);
+
+    return jsonResponse(
+      {
+        success: true,
+        eligible,
+        email,
+        expires_at: row?.expires_at != null ? Number(row.expires_at) : null,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Check speaker invite error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to check invite" },
       500,
       corsHeaders,
     );
@@ -873,21 +927,26 @@ async function handleRegistration(request, env, corsHeaders) {
       if (!env.ISIR_DB) {
         return jsonResponse({ success: false, error: "Database not configured" }, 500, corsHeaders);
       }
-      const token = (data.inviteToken || data.invitedSpeakerToken || "").trim();
-      if (!token) {
-        return jsonResponse(
-          { success: false, error: "Invite token is required for speaker registration" },
-          400,
-          corsHeaders,
-        );
-      }
       const email = normalizeEmail(data.email);
       const now = Date.now();
-      const invite = await env.ISIR_DB.prepare(
-        `SELECT token, email, expires_at, used_at FROM speaker_invites WHERE token = ?`,
-      )
-        .bind(token)
-        .first();
+      const token = (data.inviteToken || data.invitedSpeakerToken || "").trim();
+
+      let invite = null;
+      if (token) {
+        invite = await env.ISIR_DB.prepare(
+          `SELECT token, email, expires_at, used_at FROM speaker_invites WHERE token = ?`,
+        )
+          .bind(token)
+          .first();
+      } else {
+        // Email-only flow (no link): look up invite by email
+        invite = await env.ISIR_DB.prepare(
+          `SELECT token, email, expires_at, used_at FROM speaker_invites WHERE email = ?`,
+        )
+          .bind(email)
+          .first();
+      }
+
       if (!invite?.email) {
         return jsonResponse({ success: false, error: "Invalid invite token" }, 400, corsHeaders);
       }
@@ -903,7 +962,7 @@ async function handleRegistration(request, env, corsHeaders) {
 
       // Enforce free ticket price; accompanying is still paid (if any)
       isInvitedSpeaker = 1;
-      invitedSpeakerToken = token;
+      invitedSpeakerToken = String(invite.token);
       // Speakers register for free; accompanying is not included in invite flow
       accompanyingPrice = 0;
       totalPrice = 0;
