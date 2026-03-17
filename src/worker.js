@@ -75,6 +75,14 @@ async function handleApiRequest(request, env, url) {
     return handleRegistration(request, env, corsHeaders);
   }
 
+  // GET /api/speaker-invites/verify?token=...
+  if (
+    url.pathname === "/api/speaker-invites/verify" &&
+    request.method === "GET"
+  ) {
+    return handleVerifySpeakerInvite(request, env, url, corsHeaders);
+  }
+
   // GET /api/registrations (admin endpoint)
   if (url.pathname === "/api/registrations" && request.method === "GET") {
     return handleGetRegistrations(request, env, corsHeaders);
@@ -167,6 +175,14 @@ async function handleApiRequest(request, env, url) {
     return handleAdminCreateReviewer(request, env, corsHeaders);
   }
 
+  // POST /api/admin/speaker-invites/create (create or return token for email)
+  if (
+    url.pathname === "/api/admin/speaker-invites/create" &&
+    request.method === "POST"
+  ) {
+    return handleAdminCreateSpeakerInvite(request, env, corsHeaders);
+  }
+
   // GET /api/admin/reviewers/overview
   if (
     url.pathname === "/api/admin/reviewers/overview" &&
@@ -208,6 +224,133 @@ function randomPassword(length = 12) {
 
 function jsonResponse(obj, status, corsHeaders) {
   return new Response(JSON.stringify(obj), { status, headers: corsHeaders });
+}
+
+function normalizeEmail(value) {
+  if (!value) return "";
+  const s = String(value).trim();
+  if (!s) return "";
+  const m = s.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return (m ? m[0] : s).trim().toLowerCase();
+}
+
+async function handleAdminCreateSpeakerInvite(request, env, corsHeaders) {
+  try {
+    if (!requireAdmin(request, env)) {
+      return jsonResponse({ success: false, error: "Unauthorized" }, 401, corsHeaders);
+    }
+    if (!env.ISIR_DB) {
+      return jsonResponse({ success: false, error: "Database not configured" }, 500, corsHeaders);
+    }
+
+    const data = await request.json();
+    const email = normalizeEmail(data?.email);
+    if (!email) {
+      return jsonResponse({ success: false, error: "Email is required" }, 400, corsHeaders);
+    }
+
+    const now = Date.now();
+    const expiresInDaysRaw = Number(data?.expires_in_days);
+    const expiresInDays =
+      Number.isFinite(expiresInDaysRaw) && expiresInDaysRaw > 0
+        ? Math.min(365, Math.floor(expiresInDaysRaw))
+        : 120;
+    const expiresAt = now + expiresInDays * 24 * 60 * 60 * 1000;
+
+    // Return existing active token if present
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT token, expires_at, used_at FROM speaker_invites WHERE email = ?`,
+    )
+      .bind(email)
+      .first();
+
+    if (
+      existing?.token &&
+      Number(existing.used_at || 0) === 0 &&
+      Number(existing.expires_at || 0) > now
+    ) {
+      return jsonResponse(
+        {
+          success: true,
+          token: existing.token,
+          email,
+          expires_at: Number(existing.expires_at),
+          reused: true,
+        },
+        200,
+        corsHeaders,
+      );
+    }
+
+    const token = crypto.randomUUID();
+    await env.ISIR_DB.prepare(
+      `INSERT INTO speaker_invites (token, email, created_at, expires_at, used_at, used_registration_id)
+       VALUES (?, ?, ?, ?, NULL, NULL)
+       ON CONFLICT(email) DO UPDATE SET
+         token = excluded.token,
+         created_at = excluded.created_at,
+         expires_at = excluded.expires_at,
+         used_at = NULL,
+         used_registration_id = NULL`,
+    )
+      .bind(token, email, now, expiresAt)
+      .run();
+
+    return jsonResponse(
+      { success: true, token, email, expires_at: expiresAt, reused: false },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Create speaker invite error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to create invite" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleVerifySpeakerInvite(request, env, url, corsHeaders) {
+  try {
+    if (!env.ISIR_DB) {
+      return jsonResponse({ success: false, error: "Database not configured" }, 500, corsHeaders);
+    }
+    const token = (url.searchParams.get("token") || "").trim();
+    if (!token) {
+      return jsonResponse({ success: false, error: "token is required" }, 400, corsHeaders);
+    }
+
+    const now = Date.now();
+    const row = await env.ISIR_DB.prepare(
+      `SELECT token, email, expires_at, used_at FROM speaker_invites WHERE token = ?`,
+    )
+      .bind(token)
+      .first();
+
+    if (!row?.email) {
+      return jsonResponse({ success: false, error: "Invalid invite token" }, 404, corsHeaders);
+    }
+    if (Number(row.expires_at || 0) <= now) {
+      return jsonResponse({ success: false, error: "Invite token expired" }, 410, corsHeaders);
+    }
+    if (row.used_at != null && Number(row.used_at) > 0) {
+      return jsonResponse({ success: false, error: "Invite token already used" }, 409, corsHeaders);
+    }
+
+    return jsonResponse(
+      { success: true, email: row.email, expires_at: Number(row.expires_at) },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Verify speaker invite error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to verify invite" },
+      500,
+      corsHeaders,
+    );
+  }
 }
 
 async function requireReviewer(request, env) {
@@ -688,15 +831,59 @@ async function handleRegistration(request, env, corsHeaders) {
       "non-member": { early: 650, standard: 750 },
       "trainee-member": { early: 150, standard: 200 },
       "trainee-non-member": { early: 250, standard: 300 },
+      "invited-speaker": { early: 0, standard: 0 },
     };
 
     const earlyBirdDeadline = new Date("2026-07-10").getTime();
     const isEarlyBird = registrationDate < earlyBirdDeadline;
     const ticketPrice =
       ticketPrices[data.ticketType]?.[isEarlyBird ? "early" : "standard"] || 0;
-    const accompanyingPrice =
+    let accompanyingPrice =
       (isEarlyBird ? 250 : 350) * (data.accompanyingPersonCount || 0);
-    const totalPrice = ticketPrice + accompanyingPrice;
+    let totalPrice = ticketPrice + accompanyingPrice;
+
+    // Speaker invite override: enforce free base ticket and validate token
+    let isInvitedSpeaker = 0;
+    let invitedSpeakerToken = null;
+    if (data.ticketType === "invited-speaker") {
+      if (!env.ISIR_DB) {
+        return jsonResponse({ success: false, error: "Database not configured" }, 500, corsHeaders);
+      }
+      const token = (data.inviteToken || data.invitedSpeakerToken || "").trim();
+      if (!token) {
+        return jsonResponse(
+          { success: false, error: "Invite token is required for speaker registration" },
+          400,
+          corsHeaders,
+        );
+      }
+      const email = normalizeEmail(data.email);
+      const now = Date.now();
+      const invite = await env.ISIR_DB.prepare(
+        `SELECT token, email, expires_at, used_at FROM speaker_invites WHERE token = ?`,
+      )
+        .bind(token)
+        .first();
+      if (!invite?.email) {
+        return jsonResponse({ success: false, error: "Invalid invite token" }, 400, corsHeaders);
+      }
+      if (normalizeEmail(invite.email) !== email) {
+        return jsonResponse({ success: false, error: "Invite token does not match email" }, 400, corsHeaders);
+      }
+      if (Number(invite.expires_at || 0) <= now) {
+        return jsonResponse({ success: false, error: "Invite token expired" }, 410, corsHeaders);
+      }
+      if (invite.used_at != null && Number(invite.used_at) > 0) {
+        return jsonResponse({ success: false, error: "Invite token already used" }, 409, corsHeaders);
+      }
+
+      // Enforce free ticket price; accompanying is still paid (if any)
+      isInvitedSpeaker = 1;
+      invitedSpeakerToken = token;
+      // Speakers register for free; accompanying is not included in invite flow
+      accompanyingPrice = 0;
+      totalPrice = 0;
+    }
 
     // Extract primitive values from objects (react-country-state-city returns objects)
     const city =
@@ -723,8 +910,9 @@ async function handleRegistration(request, env, corsHeaders) {
         is_early_bird, dietary_vegan, dietary_vegetarian, dietary_gluten_free,
         dietary_kosher, dietary_other, special_assistance, policy_agreed,
         privacy_marketing, privacy_app, opt_out_mailing, payment_status,
+        is_invited_speaker, invited_speaker_token,
         membership_level, membership_status, trainee_letter_url, trainee_letter_status, trainee_letter_uploaded_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     )
       .bind(
@@ -764,7 +952,9 @@ async function handleRegistration(request, env, corsHeaders) {
         data.privacyMarketing ? 1 : 0,
         data.privacyApp ? 1 : 0,
         data.optOutMailing ? 1 : 0,
-        "pending",
+        isInvitedSpeaker ? "completed" : "pending",
+        isInvitedSpeaker,
+        invitedSpeakerToken,
         data.membershipLevel || null,
         data.membershipStatus || null,
         data.traineeLetterUrl || null,
@@ -772,6 +962,24 @@ async function handleRegistration(request, env, corsHeaders) {
         data.traineeLetterUrl ? Date.now() : null,
       )
       .run();
+
+    if (isInvitedSpeaker && env.ISIR_DB) {
+      try {
+        await env.ISIR_DB.prepare(
+          `UPDATE speaker_invites SET used_at = ?, used_registration_id = ? WHERE token = ?`,
+        )
+          .bind(Date.now(), registrationId, invitedSpeakerToken)
+          .run();
+        // Mark payment date for free registrations (helps reporting/email logic)
+        await env.ISIR_DB.prepare(
+          `UPDATE registrations SET payment_date = ? WHERE id = ?`,
+        )
+          .bind(Date.now(), registrationId)
+          .run();
+      } catch (e) {
+        console.error("Failed to mark invite used:", e);
+      }
+    }
 
     return new Response(
       JSON.stringify({

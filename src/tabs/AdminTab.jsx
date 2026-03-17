@@ -68,6 +68,12 @@ export default function AdminTab() {
   const [passwordError, setPasswordError] = useState("");
   const [adminToken, setAdminToken] = useState("");
 
+  // Speaker invite link generator state
+  const [inviteFileName, setInviteFileName] = useState("");
+  const [inviteCount, setInviteCount] = useState(0);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteBaseUrl, setInviteBaseUrl] = useState("");
+
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -264,6 +270,131 @@ export default function AdminTab() {
       setPasswordError(
         e?.message || "Failed to process file. Please try a different file.",
       );
+    }
+  };
+
+  const normalizeEmail = (value) => {
+    if (!value) return "";
+    const str = String(value).trim();
+    if (!str) return "";
+    const match = str.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+    return (match ? match[0] : str).trim().toLowerCase();
+  };
+
+  const resolveInviteBaseUrl = () => {
+    const base = inviteBaseUrl.trim();
+    if (base) return base.replace(/\/+$/, "");
+    return window.location.origin.replace(/\/+$/, "");
+  };
+
+  const handleInviteFileChange = async (event) => {
+    setInviteError("");
+    setInviteCount(0);
+
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setInviteFileName(file.name);
+
+    try {
+      if (!adminToken.trim()) {
+        setInviteError(
+          "Admin token is required to generate speaker invites (stored + validated on the server).",
+        );
+        return;
+      }
+
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      if (!sheet) {
+        setInviteError("Could not read first sheet from file.");
+        return;
+      }
+
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      if (!Array.isArray(rows) || rows.length === 0) {
+        setInviteError("Sheet is empty.");
+        return;
+      }
+
+      const headerRow = Array.isArray(rows[0]) ? rows[0] : [];
+      const findEmailColIdx = () => {
+        const idx = headerRow.findIndex((cell) => {
+          if (typeof cell !== "string") return false;
+          return cell.trim().toLowerCase().includes("email");
+        });
+        return idx >= 0 ? idx : 0;
+      };
+      const emailColIdx = findEmailColIdx();
+
+      let inviteColIdx = headerRow.findIndex((cell) => {
+        if (typeof cell !== "string") return false;
+        const val = cell.trim().toLowerCase();
+        return val === "invite_link" || val === "invite link" || val === "invitelink";
+      });
+      if (inviteColIdx < 0) {
+        inviteColIdx = headerRow.length;
+        headerRow.push("invite_link");
+      } else {
+        headerRow[inviteColIdx] = "invite_link";
+      }
+
+      const emailToToken = new Map();
+      const base = resolveInviteBaseUrl();
+
+      let generated = 0;
+      for (let i = 1; i < rows.length; i += 1) {
+        const row = Array.isArray(rows[i]) ? rows[i] : [];
+        const email = normalizeEmail(row[emailColIdx]);
+        if (!email) continue;
+
+        let token = emailToToken.get(email);
+        if (!token) {
+          const res = await fetch("/api/admin/speaker-invites/create", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Admin-Token": adminToken.trim(),
+            },
+            body: JSON.stringify({ email }),
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok || !json?.success || !json?.token) {
+            throw new Error(
+              json?.error ||
+                `Failed to create invite for ${email} (HTTP ${res.status})`,
+            );
+          }
+          token = String(json.token);
+          emailToToken.set(email, token);
+        }
+
+        row[inviteColIdx] = `${base}/registration?invite=${encodeURIComponent(token)}`;
+        rows[i] = row;
+        generated += 1;
+      }
+
+      if (generated === 0) {
+        setInviteError(
+          "No emails found. Make sure there is a column containing 'Email' (or put emails in the first column).",
+        );
+        return;
+      }
+
+      const outWb = XLSX.utils.book_new();
+      const outWs = XLSX.utils.aoa_to_sheet(rows);
+      XLSX.utils.book_append_sheet(outWb, outWs, sheetName || "Sheet1");
+      XLSX.writeFile(
+        outWb,
+        `speaker-invite-links-${new Date().toISOString().split("T")[0]}.xlsx`,
+      );
+
+      setInviteCount(generated);
+    } catch (err) {
+      console.error("Failed to generate invite links:", err);
+      setInviteError(err?.message || "Failed to process file.");
     }
   };
 
@@ -682,6 +813,16 @@ export default function AdminTab() {
           }`}
         >
           Reviewer Passwords
+        </button>
+        <button
+          onClick={() => setActiveSection("speakerInvites")}
+          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+            activeSection === "speakerInvites"
+              ? "bg-fuchsia-600 text-white shadow-md"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Speaker Invite Links
         </button>
       </div>
 
@@ -2486,6 +2627,90 @@ export default function AdminTab() {
             {passwordError && (
               <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {passwordError}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Speaker Invite Links Section */}
+      {activeSection === "speakerInvites" && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-800">
+              Speaker Invite Link Generator
+            </h2>
+            <p className="text-gray-600 text-sm mt-1 max-w-2xl">
+              Upload your speaker list as an Excel/CSV file. The tool will add an{" "}
+              <code className="px-1 rounded bg-gray-100 text-[11px]">
+                invite_link
+              </code>{" "}
+              column (generated per unique email) and download a new Excel file.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Base URL (optional)
+              </label>
+              <input
+                type="text"
+                value={inviteBaseUrl}
+                onChange={(e) => setInviteBaseUrl(e.target.value)}
+                placeholder="Leave empty to use current site (recommended). Or paste https://your-domain.com"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-fuchsia-500 focus:border-fuchsia-500 bg-gray-50 focus:bg-white transition-colors"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Links will be generated as{" "}
+                <code className="px-1 rounded bg-gray-100 text-[11px]">
+                  /registration?invite=TOKEN
+                </code>{" "}
+                under this base URL.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Upload speaker file (Excel/CSV)
+              </label>
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleInviteFileChange}
+                className="block w-full text-sm text-gray-900 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-fuchsia-50 file:text-fuchsia-700 hover:file:bg-fuchsia-100 cursor-pointer"
+              />
+              <p className="mt-2 text-xs text-gray-500">
+                The first sheet will be used. The email column is detected by a
+                header containing{" "}
+                <code className="px-1 rounded bg-gray-100 text-[11px]">
+                  email
+                </code>
+                ; otherwise the first column is used. Email values like{" "}
+                <code className="px-1 rounded bg-gray-100 text-[11px]">
+                  Name &lt;email@domain.com&gt;
+                </code>{" "}
+                are supported.
+              </p>
+            </div>
+
+            {inviteFileName && (
+              <div className="text-sm text-gray-700">
+                <span className="font-medium">Selected file:</span>{" "}
+                <span className="text-gray-600">{inviteFileName}</span>
+              </div>
+            )}
+
+            {inviteCount > 0 && (
+              <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                Generated <strong>{inviteCount}</strong> invite links and
+                downloaded an Excel file with the results.
+              </div>
+            )}
+
+            {inviteError && (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {inviteError}
               </div>
             )}
           </div>

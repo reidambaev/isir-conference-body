@@ -51,6 +51,9 @@ CREATE TABLE
         payment_status TEXT DEFAULT 'pending',
         payment_id TEXT,
         payment_date INTEGER,
+        -- Speaker invite (free registration)
+        is_invited_speaker INTEGER DEFAULT 0,
+        invited_speaker_token TEXT,
         -- Membership Info (from ISIR verification)
         membership_level TEXT,
         membership_status TEXT,
@@ -58,6 +61,19 @@ CREATE TABLE
         created_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000),
         updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)
     );
+
+-- Speaker invite tokens (free registration)
+CREATE TABLE
+    IF NOT EXISTS speaker_invites (
+        token TEXT PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        used_at INTEGER,
+        used_registration_id TEXT
+    );
+
+CREATE INDEX IF NOT EXISTS idx_speaker_invites_email ON speaker_invites (email);
 
 -- Accompanying Persons table (optional - for detailed accompanying person info)
 CREATE TABLE

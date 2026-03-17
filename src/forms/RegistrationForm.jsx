@@ -199,6 +199,12 @@ const RegistrationForm = ({ onClose }) => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [verificationError, setVerificationError] = useState(null);
   const [membershipData, setMembershipData] = useState(null);
+  const [speakerInvite, setSpeakerInvite] = useState({
+    token: "",
+    email: "",
+    status: "idle", // idle | verifying | valid | invalid
+    error: "",
+  });
   const isVerifiedMember = React.useMemo(() => {
     if (!membershipData) return false;
     // Only consider verified if is_member is true AND membership_level is not "Non-Member"
@@ -272,6 +278,64 @@ const RegistrationForm = ({ onClose }) => {
     traineeLetterFile: null,
     traineeLetterUrl: null,
   });
+
+  // Speaker invite: if ?invite=TOKEN is present, verify and enable free speaker flow
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = (params.get("invite") || "").trim();
+    if (!token) return;
+
+    let cancelled = false;
+    (async () => {
+      setSpeakerInvite((prev) => ({
+        ...prev,
+        token,
+        status: "verifying",
+        error: "",
+      }));
+      try {
+        const res = await fetch(
+          `/api/speaker-invites/verify?token=${encodeURIComponent(token)}`,
+        );
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json?.success || !json?.email) {
+          throw new Error(json?.error || "Invalid invite link");
+        }
+        const email = String(json.email).trim().toLowerCase();
+        if (cancelled) return;
+
+        setSpeakerInvite({ token, email, status: "valid", error: "" });
+        setMembershipData({
+          email_registered: true,
+          has_membership: false,
+          is_member: false,
+          membership_level: "Invited Speaker",
+          membership_status: "N/A",
+          api_message: "Invited speaker link verified",
+        });
+        setFormData((prev) => ({
+          ...prev,
+          email,
+          ticketType: "invited-speaker",
+        }));
+
+        // Jump to details step (skip member verification + ticket selection)
+        setStep(4);
+      } catch (e) {
+        console.error("Invite verification failed:", e);
+        if (cancelled) return;
+        setSpeakerInvite((prev) => ({
+          ...prev,
+          status: "invalid",
+          error: e?.message || "Invite verification failed",
+        }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Check if selected ticket is a trainee/student type
   const isTraineeTicket = React.useMemo(() => {
@@ -450,6 +514,50 @@ const RegistrationForm = ({ onClose }) => {
       return;
     }
     console.log("Registration Info:", formData);
+    // Invited speakers: skip payment and complete registration for free
+    if (
+      speakerInvite.status === "valid" &&
+      formData.ticketType === "invited-speaker"
+    ) {
+      (async () => {
+        try {
+          setIsProcessingPayment(true);
+          const registerResponse = await fetch("/api/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...formData,
+              accompanyingPersonCount: 0,
+              galaDinnerCount: 0,
+              inviteToken: speakerInvite.token,
+              membershipLevel: membershipData?.membership_level || null,
+              membershipStatus: membershipData?.membership_status || null,
+              traineeLetterUrl: formData.traineeLetterUrl || null,
+            }),
+          });
+          const registerResult = await registerResponse.json();
+          if (!registerResponse.ok || !registerResult.success) {
+            throw new Error(registerResult.error || "Failed to save registration");
+          }
+          setRegistrationId(registerResult.registrationId);
+          setFormData((prev) => ({
+            ...prev,
+            registrationId: registerResult.registrationId,
+          }));
+          setStep(6);
+        } catch (err) {
+          console.error("Speaker registration error:", err);
+          alert(
+            err?.message ||
+              "There was an error completing registration. Please try again or contact support@isir2026.org",
+          );
+        } finally {
+          setIsProcessingPayment(false);
+        }
+      })();
+      return;
+    }
+
     setStep(5); // Go to payment step
   };
 
@@ -653,6 +761,7 @@ const RegistrationForm = ({ onClose }) => {
       standard: 300,
       label: "Trainee / Student Non-Member",
     },
+    "invited-speaker": { early: 0, standard: 0, label: "Invited Speaker" },
   };
 
   // Get currency based on country
@@ -661,6 +770,7 @@ const RegistrationForm = ({ onClose }) => {
 
   const getTicketPrice = (type, inBaseCurrency = false) => {
     if (!type) return 0;
+    if (type === "invited-speaker") return 0;
 
     // Try to get price from API data first
     if (membershipData?.ticket_options?.available_tickets) {
@@ -685,6 +795,7 @@ const RegistrationForm = ({ onClose }) => {
   };
 
   const getAccompanyingPrice = (inBaseCurrency = false) => {
+    // Speakers can still add accompanying persons; those are paid
     // Try to get price from API data first
     if (membershipData?.ticket_options?.accompanying) {
       const basePrice =
@@ -837,8 +948,19 @@ const RegistrationForm = ({ onClose }) => {
                     type="email"
                     value={formData.email}
                     onChange={handleChange}
+                    readOnly={speakerInvite.status === "valid"}
                     required
                   />
+                  {speakerInvite.status === "valid" && (
+                    <p className="mt-1 text-xs text-emerald-700">
+                      Invited speaker link verified. Email is locked.
+                    </p>
+                  )}
+                  {speakerInvite.status === "invalid" && speakerInvite.error && (
+                    <p className="mt-1 text-xs text-red-700">
+                      Invite link error: {speakerInvite.error}
+                    </p>
+                  )}
                 </div>
 
                 {/* Verification Error Message */}
