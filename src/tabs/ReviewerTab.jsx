@@ -365,12 +365,6 @@ export default function ReviewerTab() {
                   <h2 className="font-semibold text-slate-900">
                     Assigned abstracts
                   </h2>
-                  <button
-                    onClick={() => loadAssignments(token)}
-                    className="text-sm px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
-                  >
-                    Refresh
-                  </button>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
                   You can only review these abstracts.
