@@ -72,21 +72,46 @@ export default function AdminTab() {
   const [inviteFileName, setInviteFileName] = useState("");
   const [inviteCount, setInviteCount] = useState(0);
   const [inviteError, setInviteError] = useState("");
-  const [inviteBaseUrl, setInviteBaseUrl] = useState("");
 
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const urlAdminToken = params.get("admin");
-      if (!urlAdminToken) {
+      let token =
+        (urlAdminToken && String(urlAdminToken).trim()) ||
+        (typeof window !== "undefined"
+          ? String(localStorage.getItem("isir_admin_token") || "").trim()
+          : "");
+
+      if (!token) {
         setLoading(false);
         setError(
           "Admin access token is required. Open this page with ?admin=YOUR_TOKEN in the URL.",
         );
         return;
       }
-      setAdminToken(urlAdminToken);
-      fetchAllData(urlAdminToken);
+
+      // Persist the token so refreshing /admin/* doesn't require re-adding ?admin=
+      try {
+        localStorage.setItem("isir_admin_token", token);
+      } catch {
+        // ignore
+      }
+
+      // If we're on /admin/* without the query param, repair the URL so reloads/bookmarks work.
+      if (!urlAdminToken) {
+        try {
+          const nextParams = new URLSearchParams(window.location.search);
+          nextParams.set("admin", token);
+          const nextUrl = `${window.location.pathname}?${nextParams.toString()}${window.location.hash || ""}`;
+          window.history.replaceState({}, "", nextUrl);
+        } catch {
+          // ignore
+        }
+      }
+
+      setAdminToken(token);
+      fetchAllData(token);
     } catch {
       setLoading(false);
       setError("Failed to read admin access token from URL.");
@@ -157,9 +182,7 @@ export default function AdminTab() {
     setEmailFileName(file.name);
 
     if (!adminToken.trim()) {
-      setPasswordError(
-        "Admin token is required. Please enter the X-Admin-Token value before uploading.",
-      );
+      setPasswordError("Admin access token missing. Open /admin with ?admin=YOUR_TOKEN.");
       return;
     }
 
@@ -233,11 +256,27 @@ export default function AdminTab() {
           }
 
           const json = await res.json().catch(() => null);
-          if (!json || json.success !== true || !json.password) {
+          if (!json || json.success !== true) {
             outputRows.push({
               Email: email,
               Password:
                 "ERROR: unexpected response while creating reviewer account",
+            });
+            continue;
+          }
+
+          if (json.existing === true && !json.password) {
+            outputRows.push({
+              Email: email,
+              Password: "EXISTS (password unchanged)",
+            });
+            continue;
+          }
+
+          if (!json.password) {
+            outputRows.push({
+              Email: email,
+              Password: "ERROR: no password returned",
             });
             continue;
           }
@@ -279,12 +318,6 @@ export default function AdminTab() {
     if (!str) return "";
     const match = str.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
     return (match ? match[0] : str).trim().toLowerCase();
-  };
-
-  const resolveInviteBaseUrl = () => {
-    const base = inviteBaseUrl.trim();
-    if (base) return base.replace(/\/+$/, "");
-    return window.location.origin.replace(/\/+$/, "");
   };
 
   const handleInviteFileChange = async (event) => {
@@ -342,7 +375,7 @@ export default function AdminTab() {
       }
 
       const emailToToken = new Map();
-      const base = resolveInviteBaseUrl();
+      const base = "https://isir2026.org";
 
       let generated = 0;
       for (let i = 1; i < rows.length; i += 1) {
@@ -2569,27 +2602,6 @@ export default function AdminTab() {
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Admin token (X-Admin-Token)
-              </label>
-              <input
-                type="password"
-                value={adminToken}
-                onChange={(e) => setAdminToken(e.target.value)}
-                placeholder="Enter admin token"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50 focus:bg-white transition-colors"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                This token must match the <code>ADMIN_TOKEN</code> configured in
-                the backend. It is sent as the{" "}
-                <code className="px-1 rounded bg-gray-100 text-[11px]">
-                  X-Admin-Token
-                </code>{" "}
-                header when creating reviewer accounts.
-              </p>
-            </div>
-
-            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Upload email list (Excel)
               </label>
@@ -2650,26 +2662,6 @@ export default function AdminTab() {
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Base URL (optional)
-              </label>
-              <input
-                type="text"
-                value={inviteBaseUrl}
-                onChange={(e) => setInviteBaseUrl(e.target.value)}
-                placeholder="Leave empty to use current site (recommended). Or paste https://your-domain.com"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-fuchsia-500 focus:border-fuchsia-500 bg-gray-50 focus:bg-white transition-colors"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Links will be generated as{" "}
-                <code className="px-1 rounded bg-gray-100 text-[11px]">
-                  /registration?invite=TOKEN
-                </code>{" "}
-                under this base URL.
-              </p>
-            </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Upload speaker file (Excel/CSV)

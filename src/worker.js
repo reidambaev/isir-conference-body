@@ -386,21 +386,45 @@ async function handleAdminCreateReviewer(request, env, corsHeaders) {
     if (!email) {
       return jsonResponse({ success: false, error: "Email is required" }, 400, corsHeaders);
     }
+    const now = Date.now();
+
+    // If reviewer already has a password, do NOT overwrite it.
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT email, password_hash FROM reviewers WHERE email = ?`,
+    )
+      .bind(email)
+      .first();
+
+    if (existing?.email && existing?.password_hash) {
+      return jsonResponse(
+        { success: true, email, existing: true },
+        200,
+        corsHeaders,
+      );
+    }
+
+    // Create or set password (only if missing)
     const password = randomPassword(14);
     const password_hash = await sha256Hex(password);
-    const now = Date.now();
-    await env.ISIR_DB.prepare(
-      `INSERT INTO reviewers (email, password_hash, active, created_at, updated_at)
-       VALUES (?, ?, 1, ?, ?)
-       ON CONFLICT(email) DO UPDATE SET password_hash = excluded.password_hash, active = 1, updated_at = excluded.updated_at`,
-    )
-      .bind(email, password_hash, now, now)
-      .run();
-    return jsonResponse(
-      { success: true, email, password },
-      200,
-      corsHeaders,
-    );
+
+    if (existing?.email) {
+      await env.ISIR_DB.prepare(
+        `UPDATE reviewers
+         SET password_hash = ?, active = 1, updated_at = ?
+         WHERE email = ?`,
+      )
+        .bind(password_hash, now, email)
+        .run();
+    } else {
+      await env.ISIR_DB.prepare(
+        `INSERT INTO reviewers (email, password_hash, active, created_at, updated_at)
+         VALUES (?, ?, 1, ?, ?)`,
+      )
+        .bind(email, password_hash, now, now)
+        .run();
+    }
+
+    return jsonResponse({ success: true, email, password, existing: false }, 200, corsHeaders);
   } catch (error) {
     console.error("Create reviewer error:", error);
     return jsonResponse({ success: false, error: error.message }, 500, corsHeaders);
