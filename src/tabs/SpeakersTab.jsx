@@ -5,18 +5,22 @@ const plenarySpeakers = [
     name: "Melinda Mills",
     affiliation:
       "Professor of Demography and Population Health, University of Oxford; Nuffield College; Director, Leverhulme Centre for Demographic Science",
-    image: null,
+    image: "melinda-mills.png",
+    imagePosition: "center 20%",
   },
   {
     name: "Cheong-Seok Kim",
-    affiliation: "Professor, Department of Sociology, Dongguk University, Korea",
-    image: null,
+    affiliation:
+      "Professor of Sociology and Director of the Center for Collaborative Research on Population and Society at Dongguk University, Seoul. President of the Population Association of Korea (2024–2025)",
+    image: "cheong-seok-kim.png",
+    imagePosition: "center 10%",
   },
   {
     name: "Sam Richards",
     affiliation:
       "Teaching Professor of Sociology, Pennsylvania State University; Distinguished Professor, Konkuk University, Seoul",
-    image: null,
+    image: "sam-richards.png",
+    imagePosition: "center 15%",
   },
 ];
 
