@@ -683,12 +683,11 @@ export default function ReviewerTab() {
 
                       <div className="rounded-xl border border-slate-200 p-4">
                         <div className="font-semibold text-slate-900">
-                          Previous study
+                          Additional notes
                         </div>
                         <div className="text-xs text-slate-500 mt-1">
-                          Do you know if the same report or the same
-                          presentation has been made before? Is this the first
-                          finding of its kind from the same lab?
+                          Any additional comments to help the selection committee
+                          interpret your scores (optional).
                         </div>
                         <textarea
                           value={currentReview.previous_study_notes || ""}
@@ -700,7 +699,7 @@ export default function ReviewerTab() {
                           }
                           rows={4}
                           className="w-full mt-3 px-3 py-2 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Notes (optional)"
+                          placeholder="Additional notes (optional)"
                         />
                       </div>
 
