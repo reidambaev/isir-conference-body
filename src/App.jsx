@@ -103,6 +103,32 @@ export default function App() {
     };
   }, []);
 
+  // Auto-jump to Registration tab for invite links / direct registration URLs
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const hasInvite = Boolean(url.searchParams.get("invite"));
+      const wantsRegistration =
+        hasInvite ||
+        url.pathname === "/registration" ||
+        url.pathname === "/registration/";
+
+      if (!wantsRegistration) return;
+
+      setActiveTab("registration");
+
+      // Scroll to navigation so the registration panel is visible
+      setTimeout(() => {
+        const navElement = document.getElementById("navigation");
+        if (navElement) {
+          navElement.scrollIntoView({ behavior: "smooth" });
+        }
+      }, 100);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const renderTabContent = () => {
     switch (activeTab) {
       case "about":
