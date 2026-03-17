@@ -697,6 +697,11 @@ const RegistrationForm = ({ onClose }) => {
       setClientSecret(paymentResult.clientSecret);
     } catch (error) {
       console.error("Payment setup error:", error);
+      const msg = String(error?.message || "");
+      if (msg.toLowerCase().includes("already exists")) {
+        alert(msg);
+        return;
+      }
       alert(
         "There was an error setting up payment. Please try again or contact support@isir2026.org",
       );

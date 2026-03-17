@@ -134,13 +134,30 @@ export default function AdminTab() {
           fetch("/api/admin/reviewers/overview", { headers: authHeaders }),
         ]);
 
-      if (
-        !abstractsRes.ok ||
-        !visaRes.ok ||
-        !registrationsRes.ok ||
-        !reviewersRes.ok
-      ) {
-        throw new Error("Failed to fetch data");
+      const failureDetails = [];
+      const addFailure = async (name, res) => {
+        if (res.ok) return;
+        let bodyText = "";
+        try {
+          bodyText = await res.text();
+        } catch {
+          bodyText = "";
+        }
+        const snippet = String(bodyText || "").trim().slice(0, 500);
+        failureDetails.push(
+          `${name}: HTTP ${res.status}${snippet ? ` — ${snippet}` : ""}`,
+        );
+      };
+
+      await Promise.all([
+        addFailure("GET /api/admin/abstracts", abstractsRes),
+        addFailure("GET /api/admin/visa-requests", visaRes),
+        addFailure("GET /api/registrations", registrationsRes),
+        addFailure("GET /api/admin/reviewers/overview", reviewersRes),
+      ]);
+
+      if (failureDetails.length > 0) {
+        throw new Error(`Failed to fetch admin data.\n${failureDetails.join("\n")}`);
       }
 
       const abstractsData = await abstractsRes.json();

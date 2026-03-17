@@ -895,6 +895,40 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
 async function handleRegistration(request, env, corsHeaders) {
   try {
     const data = await request.json();
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    const normalizedEmail = normalizeEmail(data?.email);
+    if (!normalizedEmail) {
+      return jsonResponse(
+        { success: false, error: "Email is required" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    // Prevent duplicate registrations by email (authoritative server-side check)
+    const existingRegistration = await env.ISIR_DB.prepare(
+      `SELECT id FROM registrations WHERE lower(trim(email)) = ? LIMIT 1`,
+    )
+      .bind(normalizedEmail)
+      .first();
+    if (existingRegistration?.id) {
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "A registration with this email already exists. If you already registered, please check your email for confirmation.",
+        },
+        409,
+        corsHeaders,
+      );
+    }
 
     // Generate unique registration ID
     const registrationId = `REG-${Date.now()}-${Math.random()
@@ -924,10 +958,7 @@ async function handleRegistration(request, env, corsHeaders) {
     let isInvitedSpeaker = 0;
     let invitedSpeakerToken = null;
     if (data.ticketType === "invited-speaker") {
-      if (!env.ISIR_DB) {
-        return jsonResponse({ success: false, error: "Database not configured" }, 500, corsHeaders);
-      }
-      const email = normalizeEmail(data.email);
+      const email = normalizedEmail;
       const now = Date.now();
       const token = (data.inviteToken || data.invitedSpeakerToken || "").trim();
 
@@ -1001,7 +1032,7 @@ async function handleRegistration(request, env, corsHeaders) {
       .bind(
         registrationId,
         registrationDate,
-        data.email,
+        normalizedEmail,
         data.firstName,
         data.middleName || null,
         data.lastName,

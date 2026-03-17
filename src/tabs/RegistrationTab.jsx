@@ -6,7 +6,12 @@ import galaImage from "../assets/gala.jpg";
 const RegistrationTab = () => {
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
   // Check on every render to catch URL parameter changes
-  const registrationOpen = REGISTRATION_OPEN || isPreviewMode();
+  const params =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search)
+      : null;
+  const hasInviteLink = Boolean(params?.get("invite"));
+  const registrationOpen = REGISTRATION_OPEN || isPreviewMode() || hasInviteLink;
   const inPreviewMode = isPreviewMode();
 
   if (showRegistrationForm && registrationOpen) {
@@ -48,6 +53,32 @@ const RegistrationTab = () => {
               All details below are for your information. We are working to
               resolve the issue as quickly as possible—please check back later
               for updates on when registration will open.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Invite link override banner */}
+      {!REGISTRATION_OPEN && !inPreviewMode && registrationOpen && (
+        <div className="mb-6 p-4 rounded-xl bg-emerald-50 border-2 border-emerald-300 text-emerald-800 flex items-center gap-3">
+          <svg
+            className="w-8 h-8 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <div>
+            <p className="font-semibold">Invited speaker access enabled.</p>
+            <p>
+              Registration is closed for the public, but this invite link allows
+              you to register.
             </p>
           </div>
         </div>

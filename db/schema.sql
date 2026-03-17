@@ -62,6 +62,9 @@ CREATE TABLE
         updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)
     );
 
+-- Enforce one registration per email (case/whitespace normalized at write-time)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_registrations_email ON registrations (email);
+
 -- Speaker invite tokens (free registration)
 CREATE TABLE
     IF NOT EXISTS speaker_invites (
@@ -182,6 +185,9 @@ CREATE INDEX IF NOT EXISTS idx_abstractions_date ON abstractions (submission_dat
 
 -- Index for common queries
 CREATE INDEX IF NOT EXISTS idx_registrations_email ON registrations (email);
+
+-- Enforce one registration per email (normalize to lowercase/trim in API)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_registrations_email ON registrations (email);
 
 CREATE INDEX IF NOT EXISTS idx_registrations_date ON registrations (registration_date);
 
