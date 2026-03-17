@@ -2302,12 +2302,6 @@ export default function AdminTab() {
                 workload and progress.
               </p>
             </div>
-            <button
-              onClick={fetchAllData}
-              className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-            >
-              Refresh
-            </button>
           </div>
 
           {!reviewerOverview ? (
