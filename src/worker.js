@@ -942,20 +942,31 @@ async function handleRegistration(request, env, corsHeaders) {
 
     // Prevent duplicate registrations by email (authoritative server-side check)
     const existingRegistration = await env.ISIR_DB.prepare(
-      `SELECT id FROM registrations WHERE lower(trim(email)) = ? LIMIT 1`,
+      `SELECT id, payment_status FROM registrations WHERE lower(trim(email)) = ? LIMIT 1`,
     )
       .bind(normalizedEmail)
       .first();
     if (existingRegistration?.id) {
-      return jsonResponse(
-        {
-          success: false,
-          error:
-            "A registration with this email already exists. If you already registered, please check your email for confirmation.",
-        },
-        409,
-        corsHeaders,
-      );
+      const existingPaymentStatus = String(
+        existingRegistration.payment_status || "",
+      ).toLowerCase();
+
+      // Allow retries for failed payments: remove stale failed record, then create a fresh one.
+      if (existingPaymentStatus === "failed") {
+        await env.ISIR_DB.prepare(`DELETE FROM registrations WHERE id = ?`)
+          .bind(existingRegistration.id)
+          .run();
+      } else {
+        return jsonResponse(
+          {
+            success: false,
+            error:
+              "A registration with this email already exists. If you already registered, please check your email for confirmation.",
+          },
+          409,
+          corsHeaders,
+        );
+      }
     }
 
     // Generate unique registration ID
