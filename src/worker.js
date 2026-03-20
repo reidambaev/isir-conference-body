@@ -191,6 +191,14 @@ async function handleApiRequest(request, env, url) {
     return handleAdminCreateSpeakerInvite(request, env, corsHeaders);
   }
 
+  // POST /api/admin/test-payment-intent (admin-only $1 live test payment)
+  if (
+    url.pathname === "/api/admin/test-payment-intent" &&
+    request.method === "POST"
+  ) {
+    return handleAdminTestPaymentIntent(request, env, corsHeaders);
+  }
+
   // GET /api/admin/reviewers/overview
   if (
     url.pathname === "/api/admin/reviewers/overview" &&
@@ -1610,6 +1618,58 @@ async function handleTraineeLetterUpload(request, env, corsHeaders) {
   }
 }
 
+async function handleAdminTestPaymentIntent(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!env.STRIPE_SECRET_KEY) {
+      return jsonResponse(
+        { success: false, error: "Stripe secret key not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+      apiVersion: "2024-11-20.acacia",
+    });
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: 100, // $1.00 USD
+      currency: "usd",
+      metadata: {
+        type: "admin_test_payment",
+        createdAt: String(Date.now()),
+      },
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    return jsonResponse(
+      {
+        success: true,
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Admin test payment intent error:", error);
+    return jsonResponse(
+      {
+        success: false,
+        error: error.message || "Failed to create admin test payment intent",
+      },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
 // Handle Stripe payment intent creation
 async function handleCreatePaymentIntent(request, env, corsHeaders) {
   try {
@@ -1619,23 +1679,91 @@ async function handleCreatePaymentIntent(request, env, corsHeaders) {
     }
 
     const data = await request.json();
-    const { amount, currency, registrationId, metadata } = data;
+    const { registrationId, metadata } = data;
 
-    if (!amount || !currency || !registrationId) {
+    if (!registrationId) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Missing required fields: amount, currency, registrationId",
+          error: "Missing required field: registrationId",
         }),
         { status: 400, headers: corsHeaders },
       );
     }
+
+    if (!env.ISIR_DB) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Database not configured",
+        }),
+        { status: 500, headers: corsHeaders },
+      );
+    }
+
+    const registration = await env.ISIR_DB.prepare(
+      `SELECT id, total_price, country, currency, payment_status, payment_intent_id
+       FROM registrations
+       WHERE id = ?
+       LIMIT 1`,
+    )
+      .bind(registrationId)
+      .first();
+
+    if (!registration?.id) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Registration not found",
+        }),
+        { status: 404, headers: corsHeaders },
+      );
+    }
+
+    const baseAmountUsd = Number(registration.total_price || 0);
+    if (!Number.isFinite(baseAmountUsd) || baseAmountUsd < 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid registration amount",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const countryValue = String(registration.country || "").toLowerCase();
+    const isKoreanCustomer = countryValue.includes("korea");
+    const currency = isKoreanCustomer ? "krw" : "usd";
+    const amount = isKoreanCustomer
+      ? Math.round(baseAmountUsd * 1350 * 1.1) // KRW + 10% Korean VAT
+      : Math.round(baseAmountUsd * 100); // USD cents
 
     // Import Stripe (using dynamic import for Cloudflare Workers)
     const Stripe = (await import("stripe")).default;
     const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
       apiVersion: "2024-11-20.acacia",
     });
+
+    // Reuse existing intent when clients retry setup.
+    if (registration.payment_intent_id) {
+      try {
+        const existingIntent = await stripe.paymentIntents.retrieve(
+          registration.payment_intent_id,
+        );
+        if (existingIntent?.client_secret) {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              clientSecret: existingIntent.client_secret,
+              paymentIntentId: existingIntent.id,
+            }),
+            { status: 200, headers: corsHeaders },
+          );
+        }
+      } catch (retrieveError) {
+        console.error("Failed to retrieve existing payment intent:", retrieveError);
+      }
+    }
 
     // Create payment intent
     const paymentIntent = await stripe.paymentIntents.create({
@@ -1648,7 +1776,17 @@ async function handleCreatePaymentIntent(request, env, corsHeaders) {
       automatic_payment_methods: {
         enabled: true,
       },
+    }, {
+      idempotencyKey: `registration-${registrationId}`,
     });
+
+    await env.ISIR_DB.prepare(
+      `UPDATE registrations
+       SET payment_intent_id = ?, currency = ?
+       WHERE id = ?`,
+    )
+      .bind(paymentIntent.id, currency.toUpperCase(), registrationId)
+      .run();
 
     return new Response(
       JSON.stringify({

@@ -439,7 +439,8 @@ const RegistrationForm = ({ onClose }) => {
             api_message: "Invited speaker email verified",
           });
           setFormData((prev) => ({ ...prev, ticketType: "invited-speaker" }));
-          setStep(4);
+          // Go to ticket selection so they can confirm accompanying persons
+          setStep(2);
         } else {
           setVerificationError(
             "No account found with this email address. Please check your email or register at theisir.org first.",
@@ -462,7 +463,8 @@ const RegistrationForm = ({ onClose }) => {
           api_message: "Invited speaker email verified",
         });
         setFormData((prev) => ({ ...prev, ticketType: "invited-speaker" }));
-        setStep(4);
+        // Go to ticket selection even if membership API failed
+        setStep(2);
       } else {
         setVerificationError(
           "Unable to verify membership. Please try again or contact support@isir2026.org",

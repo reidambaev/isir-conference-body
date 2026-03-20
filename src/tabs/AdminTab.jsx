@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import * as XLSX from "xlsx";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements } from "@stripe/react-stripe-js";
+import PaymentForm from "../components/PaymentForm";
+
+const stripePromise = loadStripe(
+  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "",
+);
 
 export default function AdminTab() {
   const [abstracts, setAbstracts] = useState([]);
@@ -72,6 +79,12 @@ export default function AdminTab() {
   const [inviteFileName, setInviteFileName] = useState("");
   const [inviteCount, setInviteCount] = useState(0);
   const [inviteError, setInviteError] = useState("");
+  const [showTestPaymentModal, setShowTestPaymentModal] = useState(false);
+  const [testPaymentClientSecret, setTestPaymentClientSecret] = useState("");
+  const [testPaymentLoading, setTestPaymentLoading] = useState(false);
+  const [testPaymentProcessing, setTestPaymentProcessing] = useState(false);
+  const [testPaymentError, setTestPaymentError] = useState("");
+  const [testPaymentSuccessId, setTestPaymentSuccessId] = useState("");
 
   useEffect(() => {
     try {
@@ -175,6 +188,43 @@ export default function AdminTab() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openTestPaymentModal = async () => {
+    if (!adminToken.trim()) {
+      setTestPaymentError(
+        "Admin access token missing. Open /admin with ?admin=YOUR_TOKEN.",
+      );
+      return;
+    }
+
+    setShowTestPaymentModal(true);
+    setTestPaymentLoading(true);
+    setTestPaymentProcessing(false);
+    setTestPaymentError("");
+    setTestPaymentSuccessId("");
+    setTestPaymentClientSecret("");
+
+    try {
+      const res = await fetch("/api/admin/test-payment-intent", {
+        method: "POST",
+        headers: {
+          "X-Admin-Token": adminToken,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success || !data?.clientSecret) {
+        throw new Error(data?.error || "Failed to create $1 test payment.");
+      }
+      setTestPaymentClientSecret(data.clientSecret);
+    } catch (err) {
+      setTestPaymentError(
+        err?.message || "Failed to start $1 test payment. Please try again.",
+      );
+    } finally {
+      setTestPaymentLoading(false);
     }
   };
 
@@ -2075,9 +2125,18 @@ export default function AdminTab() {
       {/* Registrations Section */}
       {activeSection === "registrations" && (
         <div className="space-y-4">
-          <h2 className="text-2xl font-semibold text-gray-800">
-            Registrations
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-2xl font-semibold text-gray-800">
+              Registrations
+            </h2>
+            <button
+              onClick={openTestPaymentModal}
+              disabled={testPaymentLoading}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors text-sm font-medium"
+            >
+              {testPaymentLoading ? "Preparing..." : "Make $1 Test Payment"}
+            </button>
+          </div>
           {registrations.length === 0 ? (
             <p className="text-gray-500">No registrations yet.</p>
           ) : (
@@ -2716,6 +2775,82 @@ export default function AdminTab() {
                 {inviteError}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {showTestPaymentModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  $1 Stripe Test Payment
+                </h3>
+                <p className="text-gray-500 mt-1 text-sm">
+                  Run a real USD 1.00 payment using your admin session.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowTestPaymentModal(false);
+                  setTestPaymentError("");
+                  setTestPaymentSuccessId("");
+                  setTestPaymentClientSecret("");
+                }}
+                className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {testPaymentLoading && (
+                <div className="text-sm text-gray-600">
+                  Creating payment intent...
+                </div>
+              )}
+
+              {testPaymentError && (
+                <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {testPaymentError}
+                </div>
+              )}
+
+              {testPaymentSuccessId && (
+                <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                  Payment succeeded. PaymentIntent:{" "}
+                  <code className="px-1 rounded bg-emerald-100">
+                    {testPaymentSuccessId}
+                  </code>
+                </div>
+              )}
+
+              {!testPaymentLoading &&
+                testPaymentClientSecret &&
+                !testPaymentSuccessId && (
+                  <Elements stripe={stripePromise}>
+                    <PaymentForm
+                      clientSecret={testPaymentClientSecret}
+                      amount={100}
+                      currency="USD"
+                      isProcessing={testPaymentProcessing}
+                      setIsProcessing={setTestPaymentProcessing}
+                      onSuccess={(intent) => {
+                        setTestPaymentSuccessId(intent?.id || "unknown");
+                        setTestPaymentError("");
+                        setTestPaymentProcessing(false);
+                      }}
+                      onError={(err) => {
+                        setTestPaymentError(
+                          err?.message || "Payment failed. Please try again.",
+                        );
+                        setTestPaymentProcessing(false);
+                      }}
+                    />
+                  </Elements>
+                )}
+            </div>
           </div>
         </div>
       )}
