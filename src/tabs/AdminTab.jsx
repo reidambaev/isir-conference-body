@@ -75,6 +75,10 @@ export default function AdminTab() {
   const [inviteFileName, setInviteFileName] = useState("");
   const [inviteCount, setInviteCount] = useState(0);
   const [inviteError, setInviteError] = useState("");
+  const [envVarsLoading, setEnvVarsLoading] = useState(false);
+  const [envVarsError, setEnvVarsError] = useState("");
+  const [envBindingNames, setEnvBindingNames] = useState([]);
+  const [envConfiguredVars, setEnvConfiguredVars] = useState([]);
   const [showTestPaymentModal, setShowTestPaymentModal] = useState(false);
   const [testPaymentClientSecret, setTestPaymentClientSecret] = useState("");
   const [testPaymentLoading, setTestPaymentLoading] = useState(false);
@@ -240,6 +244,36 @@ export default function AdminTab() {
       setTestPaymentLoading(false);
     }
   };
+
+  const fetchEnvVars = useCallback(async () => {
+    if (!adminToken.trim()) return;
+    setEnvVarsLoading(true);
+    setEnvVarsError("");
+    try {
+      const res = await fetch("/api/admin/env-vars", {
+        method: "GET",
+        headers: {
+          "X-Admin-Token": adminToken,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to load environment variables.");
+      }
+      setEnvBindingNames(Array.isArray(data.availableBindings) ? data.availableBindings : []);
+      setEnvConfiguredVars(Array.isArray(data.configured) ? data.configured : []);
+    } catch (err) {
+      setEnvVarsError(err?.message || "Failed to load environment variables.");
+    } finally {
+      setEnvVarsLoading(false);
+    }
+  }, [adminToken]);
+
+  useEffect(() => {
+    if (activeSection === "environment") {
+      fetchEnvVars();
+    }
+  }, [activeSection, fetchEnvVars]);
 
   const generateRandomPassword = () => {
     const length = 12;
@@ -936,6 +970,16 @@ export default function AdminTab() {
           }`}
         >
           Speaker Invite Links
+        </button>
+        <button
+          onClick={() => setActiveSection("environment")}
+          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+            activeSection === "environment"
+              ? "bg-slate-700 text-white shadow-md"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Environment
         </button>
       </div>
 
@@ -2786,6 +2830,98 @@ export default function AdminTab() {
             {inviteError && (
               <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {inviteError}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Environment Section */}
+      {activeSection === "environment" && (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold text-gray-800">
+                Environment Variables
+              </h2>
+              <p className="text-gray-600 text-sm mt-1 max-w-2xl">
+                Admin-only view of available Worker bindings and masked status
+                of important keys.
+              </p>
+            </div>
+            <button
+              onClick={fetchEnvVars}
+              disabled={envVarsLoading}
+              className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors text-sm font-medium"
+            >
+              {envVarsLoading ? "Loading..." : "Refresh Environment"}
+            </button>
+          </div>
+
+          {envVarsError && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {envVarsError}
+            </div>
+          )}
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Key configuration status
+            </h3>
+            {envConfiguredVars.length === 0 ? (
+              <p className="text-sm text-gray-500">No configuration data yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-500 border-b border-gray-200">
+                      <th className="py-2 pr-4">Variable</th>
+                      <th className="py-2 pr-4">Configured</th>
+                      <th className="py-2 pr-2">Preview</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {envConfiguredVars.map((item) => (
+                      <tr key={item.name} className="border-b border-gray-100">
+                        <td className="py-2 pr-4 font-mono text-xs">{item.name}</td>
+                        <td className="py-2 pr-4">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                              item.configured
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {item.configured ? "Yes" : "No"}
+                          </span>
+                        </td>
+                        <td className="py-2 pr-2 font-mono text-xs text-gray-600">
+                          {item.preview || "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-3">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Available bindings
+            </h3>
+            {envBindingNames.length === 0 ? (
+              <p className="text-sm text-gray-500">No bindings loaded yet.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {envBindingNames.map((name) => (
+                  <span
+                    key={name}
+                    className="inline-flex px-2.5 py-1 rounded-md text-xs font-mono bg-gray-100 text-gray-700"
+                  >
+                    {name}
+                  </span>
+                ))}
               </div>
             )}
           </div>

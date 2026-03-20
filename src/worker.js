@@ -199,6 +199,11 @@ async function handleApiRequest(request, env, url) {
     return handleAdminTestPaymentIntent(request, env, corsHeaders);
   }
 
+  // GET /api/admin/env-vars (admin-only env visibility)
+  if (url.pathname === "/api/admin/env-vars" && request.method === "GET") {
+    return handleAdminEnvVars(request, env, corsHeaders);
+  }
+
   // GET /api/admin/reviewers/overview
   if (
     url.pathname === "/api/admin/reviewers/overview" &&
@@ -1696,6 +1701,61 @@ async function handleAdminTestPaymentIntent(request, env, corsHeaders) {
         success: false,
         error: error.message || "Failed to create admin test payment intent",
       },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleAdminEnvVars(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    const bindingNames = Object.keys(env || {})
+      .filter((name) => typeof name === "string")
+      .sort((a, b) => a.localeCompare(b));
+
+    const getString = (name) => String(env?.[name] || "").trim();
+    const maskValue = (value) => {
+      if (!value) return "";
+      if (value.length <= 8) return `${value.slice(0, 2)}***`;
+      return `${value.slice(0, 4)}...${value.slice(-4)}`;
+    };
+
+    const sensitiveVars = [
+      "VITE_STRIPE_PUBLISHABLE_KEY",
+      "STRIPE_PUBLISHABLE_KEY",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "RESEND_API_KEY",
+      "ADMIN_ACCESS_TOKEN",
+      "ISIR_API_KEY",
+      "CONFIRMATION_FROM_EMAIL",
+    ];
+
+    const configured = sensitiveVars.map((name) => {
+      const value = getString(name);
+      return {
+        name,
+        configured: Boolean(value),
+        preview: value ? maskValue(value) : "",
+      };
+    });
+
+    return jsonResponse(
+      {
+        success: true,
+        availableBindings: bindingNames,
+        configured,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Admin env vars error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to read env vars" },
       500,
       corsHeaders,
     );
