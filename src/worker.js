@@ -1641,6 +1641,20 @@ async function handleAdminTestPaymentIntent(request, env, corsHeaders) {
         corsHeaders,
       );
     }
+    const publishableKey =
+      String(env.STRIPE_PUBLISHABLE_KEY || "").trim() ||
+      String(env.VITE_STRIPE_PUBLISHABLE_KEY || "").trim();
+    if (!publishableKey) {
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "Stripe publishable key not configured in worker env (STRIPE_PUBLISHABLE_KEY or VITE_STRIPE_PUBLISHABLE_KEY).",
+        },
+        500,
+        corsHeaders,
+      );
+    }
 
     const Stripe = (await import("stripe")).default;
     const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
@@ -1664,6 +1678,13 @@ async function handleAdminTestPaymentIntent(request, env, corsHeaders) {
         success: true,
         clientSecret: paymentIntent.client_secret,
         paymentIntentId: paymentIntent.id,
+        publishableKey,
+        secretKeyMode: String(env.STRIPE_SECRET_KEY).startsWith("sk_live_")
+          ? "live"
+          : "test",
+        publishableKeyMode: publishableKey.startsWith("pk_live_")
+          ? "live"
+          : "test",
       },
       200,
       corsHeaders,

@@ -4,10 +4,6 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import PaymentForm from "../components/PaymentForm";
 
-const stripePromise = loadStripe(
-  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "",
-);
-
 export default function AdminTab() {
   const [abstracts, setAbstracts] = useState([]);
   const [visaRequests, setVisaRequests] = useState([]);
@@ -85,6 +81,13 @@ export default function AdminTab() {
   const [testPaymentProcessing, setTestPaymentProcessing] = useState(false);
   const [testPaymentError, setTestPaymentError] = useState("");
   const [testPaymentSuccessId, setTestPaymentSuccessId] = useState("");
+  const [testPublishableKey, setTestPublishableKey] = useState("");
+  const [testStripeModeInfo, setTestStripeModeInfo] = useState(null);
+
+  const testStripePromise = useMemo(() => {
+    if (!testPublishableKey) return null;
+    return loadStripe(testPublishableKey);
+  }, [testPublishableKey]);
 
   useEffect(() => {
     try {
@@ -205,6 +208,8 @@ export default function AdminTab() {
     setTestPaymentError("");
     setTestPaymentSuccessId("");
     setTestPaymentClientSecret("");
+    setTestPublishableKey("");
+    setTestStripeModeInfo(null);
 
     try {
       const res = await fetch("/api/admin/test-payment-intent", {
@@ -218,7 +223,15 @@ export default function AdminTab() {
       if (!res.ok || !data?.success || !data?.clientSecret) {
         throw new Error(data?.error || "Failed to create $1 test payment.");
       }
+      if (!data?.publishableKey) {
+        throw new Error("Server did not return a publishable key.");
+      }
       setTestPaymentClientSecret(data.clientSecret);
+      setTestPublishableKey(data.publishableKey);
+      setTestStripeModeInfo({
+        secretKeyMode: data.secretKeyMode || "unknown",
+        publishableKeyMode: data.publishableKeyMode || "unknown",
+      });
     } catch (err) {
       setTestPaymentError(
         err?.message || "Failed to start $1 test payment. Please try again.",
@@ -2797,6 +2810,8 @@ export default function AdminTab() {
                   setTestPaymentError("");
                   setTestPaymentSuccessId("");
                   setTestPaymentClientSecret("");
+                  setTestPublishableKey("");
+                  setTestStripeModeInfo(null);
                 }}
                 className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
               >
@@ -2826,10 +2841,19 @@ export default function AdminTab() {
                 </div>
               )}
 
+              {testStripeModeInfo && (
+                <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                  Stripe key modes: publishable ={" "}
+                  <strong>{testStripeModeInfo.publishableKeyMode}</strong>, secret ={" "}
+                  <strong>{testStripeModeInfo.secretKeyMode}</strong>
+                </div>
+              )}
+
               {!testPaymentLoading &&
                 testPaymentClientSecret &&
-                !testPaymentSuccessId && (
-                  <Elements stripe={stripePromise}>
+                !testPaymentSuccessId &&
+                testStripePromise && (
+                  <Elements stripe={testStripePromise}>
                     <PaymentForm
                       clientSecret={testPaymentClientSecret}
                       amount={100}
