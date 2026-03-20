@@ -947,7 +947,7 @@ async function handleRegistration(request, env, corsHeaders) {
 
     // Prevent duplicate registrations by email (authoritative server-side check)
     const existingRegistration = await env.ISIR_DB.prepare(
-      `SELECT id, payment_status FROM registrations WHERE lower(trim(email)) = ? LIMIT 1`,
+      `SELECT id, payment_status, payment_date FROM registrations WHERE lower(trim(email)) = ? LIMIT 1`,
     )
       .bind(normalizedEmail)
       .first();
@@ -955,9 +955,18 @@ async function handleRegistration(request, env, corsHeaders) {
       const existingPaymentStatus = String(
         existingRegistration.payment_status || "",
       ).toLowerCase();
+      const hasCompletedPayment =
+        existingRegistration.payment_date != null &&
+        Number(existingRegistration.payment_date) > 0;
 
-      // Allow retries for failed payments: remove stale failed record, then create a fresh one.
-      if (existingPaymentStatus === "failed") {
+      // Allow retries:
+      // - failed: payment did not succeed
+      // - pending with no payment_date: abandoned / incomplete checkout (never completed in DB)
+      const canReplaceExisting =
+        existingPaymentStatus === "failed" ||
+        (existingPaymentStatus === "pending" && !hasCompletedPayment);
+
+      if (canReplaceExisting) {
         await env.ISIR_DB.prepare(`DELETE FROM registrations WHERE id = ?`)
           .bind(existingRegistration.id)
           .run();
