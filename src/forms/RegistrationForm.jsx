@@ -14,7 +14,12 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
-import { ISIR_API_CONFIG } from "../config/constants";
+import {
+  ISIR_API_CONFIG,
+  isPreviewMode,
+  PREVIEW_KEY,
+  PREVIEW_REGISTRATION_TEST_USD,
+} from "../config/constants";
 import {
   isKorea,
   getCurrency,
@@ -574,6 +579,7 @@ const RegistrationForm = ({ onClose }) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               ...formData,
+              ...previewRegisterPayload,
               inviteToken: speakerInvite.status === "valid" ? speakerInvite.token : undefined,
               membershipLevel: membershipData?.membership_level || null,
               membershipStatus: membershipData?.membership_status || null,
@@ -651,6 +657,7 @@ const RegistrationForm = ({ onClose }) => {
         },
         body: JSON.stringify({
           ...formData,
+          ...previewRegisterPayload,
           inviteToken:
             formData.ticketType === "invited-speaker" &&
             speakerInvite.status === "valid"
@@ -828,6 +835,13 @@ const RegistrationForm = ({ onClose }) => {
   const currency = getCurrency(formData.country);
   const isKoreanCustomer = isKorea(formData.country);
 
+  /** Matches server: flat test charge when URL has ?preview=PREVIEW_KEY */
+  const isPreviewRegistrationTest = isPreviewMode();
+
+  const previewRegisterPayload = isPreviewRegistrationTest
+    ? { previewKey: PREVIEW_KEY }
+    : {};
+
   const getTicketPrice = (type, inBaseCurrency = false) => {
     if (!type) return 0;
     if (type === "invited-speaker") return 0;
@@ -874,6 +888,10 @@ const RegistrationForm = ({ onClose }) => {
   };
 
   const getTotalPrice = (inBaseCurrency = false) => {
+    if (isPreviewRegistrationTest) {
+      if (inBaseCurrency) return PREVIEW_REGISTRATION_TEST_USD;
+      return getFinalPrice(PREVIEW_REGISTRATION_TEST_USD, formData.country);
+    }
     const ticketPrice = getTicketPrice(formData.ticketType, inBaseCurrency);
     const accompanyingPrice =
       getAccompanyingPrice(inBaseCurrency) * formData.accompanyingPersonCount;
@@ -950,6 +968,20 @@ const RegistrationForm = ({ onClose }) => {
             </button>
           )}
         </div>
+
+        {isPreviewRegistrationTest && (
+          <div
+            className="mb-4 p-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-950 text-sm leading-relaxed"
+            role="status"
+          >
+            <strong className="font-semibold">Preview mode:</strong> checkout
+            uses a test charge of {formatCurrency(PREVIEW_REGISTRATION_TEST_USD, "USD")}
+            {" "}
+            (Korean addresses use the usual KRW conversion + tax on that base).
+            Ticket lines elsewhere may still show list prices; Stripe will only
+            charge the test total.
+          </div>
+        )}
 
         {/* Step Progress */}
         <StepIndicator currentStep={step} isTraineeFlow={isTraineeTicket} />
@@ -2127,46 +2159,63 @@ const RegistrationForm = ({ onClose }) => {
               </FormSectionHeader>
               <div className="p-6">
                 <div className="space-y-4">
-                  <div className="flex justify-between text-base py-3 border-b border-gray-200">
-                    <span className="text-gray-700">
-                      {ticketPrices[formData.ticketType]?.label}{" "}
-                      <span
-                        className="text-xs px-2 py-0.5 rounded-full"
-                        style={{
-                          backgroundColor: isEarlyBirdPeriod
-                            ? "#dcfce7"
-                            : "#fef3c7",
-                          color: isEarlyBirdPeriod ? "#166534" : "#92400e",
-                        }}
-                      >
-                        {isEarlyBirdPeriod ? "Early Bird" : "Standard"}
-                      </span>
-                    </span>
-                    <span className="font-bold text-lg">
-                      {formatCurrency(
-                        getTicketPrice(formData.ticketType),
-                        currency,
+                  {isPreviewRegistrationTest ? (
+                    <div className="text-base py-2 text-gray-700">
+                      <p className="mb-2">
+                        Preview test charge (flat amount — not your selected list
+                        prices):
+                      </p>
+                      {isKoreanCustomer && (
+                        <p className="text-xs text-gray-500 italic mb-3">
+                          * Includes 10% Korean tax on the converted test base
+                        </p>
                       )}
-                    </span>
-                  </div>
-                  {formData.accompanyingPersonCount > 0 && (
-                    <div className="flex justify-between text-base py-3 border-b border-gray-200">
-                      <span className="text-gray-700">
-                        Accompanying Person × {formData.accompanyingPersonCount}
-                      </span>
-                      <span className="font-bold text-lg">
-                        {formatCurrency(
-                          getAccompanyingPrice() *
-                            formData.accompanyingPersonCount,
-                          currency,
-                        )}
-                      </span>
                     </div>
-                  )}
-                  {isKoreanCustomer && (
-                    <div className="text-xs text-gray-500 italic pt-2">
-                      * Prices include 10% Korean tax
-                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between text-base py-3 border-b border-gray-200">
+                        <span className="text-gray-700">
+                          {ticketPrices[formData.ticketType]?.label}{" "}
+                          <span
+                            className="text-xs px-2 py-0.5 rounded-full"
+                            style={{
+                              backgroundColor: isEarlyBirdPeriod
+                                ? "#dcfce7"
+                                : "#fef3c7",
+                              color: isEarlyBirdPeriod ? "#166534" : "#92400e",
+                            }}
+                          >
+                            {isEarlyBirdPeriod ? "Early Bird" : "Standard"}
+                          </span>
+                        </span>
+                        <span className="font-bold text-lg">
+                          {formatCurrency(
+                            getTicketPrice(formData.ticketType),
+                            currency,
+                          )}
+                        </span>
+                      </div>
+                      {formData.accompanyingPersonCount > 0 && (
+                        <div className="flex justify-between text-base py-3 border-b border-gray-200">
+                          <span className="text-gray-700">
+                            Accompanying Person ×{" "}
+                            {formData.accompanyingPersonCount}
+                          </span>
+                          <span className="font-bold text-lg">
+                            {formatCurrency(
+                              getAccompanyingPrice() *
+                                formData.accompanyingPersonCount,
+                              currency,
+                            )}
+                          </span>
+                        </div>
+                      )}
+                      {isKoreanCustomer && (
+                        <div className="text-xs text-gray-500 italic pt-2">
+                          * Prices include 10% Korean tax
+                        </div>
+                      )}
+                    </>
                   )}
                   <div className="border-t-2 border-gray-300 pt-4 mt-3">
                     <div className="flex justify-between items-center">

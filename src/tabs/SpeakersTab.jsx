@@ -2,6 +2,13 @@ import React from "react";
 
 const plenarySpeakers = [
   {
+    name: "Cheong-Seok Kim",
+    affiliation:
+      "Center for Collaborative Research on Population and Society at Dongguk University, Seoul.",
+    image: "cheong-seok-kim.png",
+    imagePosition: "center 10%",
+  },
+  {
     name: "Melinda Mills",
     affiliation:
       "Professor of Demography and Population Health, University of Oxford; Nuffield College; Director, Leverhulme Centre for Demographic Science",
@@ -9,63 +16,20 @@ const plenarySpeakers = [
     imagePosition: "center 0%",
   },
   {
-    name: "Cheong-Seok Kim",
-    affiliation:
-      "Professor of Sociology and Director of the Center for Collaborative Research on Population and Society at Dongguk University, Seoul. President of the Population Association of Korea (2024–2025)",
-    image: "cheong-seok-kim.png",
-    imagePosition: "center 10%",
-  },
-  {
     name: "Sam Richards",
     affiliation:
-      "Teaching Professor of Sociology, Pennsylvania State University; Distinguished Professor, Konkuk University, Seoul",
+      "Professor at Penn State University and a Distinguished Professor at Konkuk University in Seoul, Korea",
     image: "sam-richards.png",
-    imagePosition: "center 25%",
+    imagePosition: "center 22%",
   },
 ];
 
 const speakers = [
   {
-    name: "Aihua Liao",
-    affiliation: "Huazhong University of Science and Technology",
-    image: "aihua-liao.png",
-  },
-  {
-    name: "Ananth Kumar Kammala",
-    affiliation: "The University of Texas Medical Branch at Galveston",
-    image: "ananth-kammala.jpeg",
-  },
-  {
-    name: "Anna Stanhewicz",
-    affiliation: "Associate Professor, University of Iowa",
-    image: "anna-stanhewicz.jpg",
-    imagePosition: "center 0%",
-  },
-  {
-    name: "Brice Gauilliere",
-    affiliation: "Professor, Stanford University School of Medicine",
-    image: "brice-gauilliere.jpg",
-  },
-  {
-    name: "Eun-Ju Lee",
-    affiliation: "Professor, Chung-Ang University School of Medicine",
-    image: "eun-ju-lee.jpg",
-  },
-  {
-    name: "Ja Young Kwon",
-    affiliation: "Professor, Yonsei University College of Medicine, Seoul",
-    image: "ja-young-kwon.jpeg",
-  },
-  {
-    name: "Jung Ryeol Lee",
-    affiliation: "Professor, Seoul National University College of Medicine",
-    image: "jung-ryeol-lee.jpg",
-  },
-  {
-    name: "Shihoko Komine-Aizawa",
-    affiliation: "Professor, Nihon University School of Medicine, Tokyo",
-    image: "komine-aizawa.jpg",
-    imagePosition: "center 30%",
+    name: "Ricardo Barini",
+    affiliation:
+      "Collaborating Professor, University of Campinas (UNICAMP), Brazil",
+    image: null,
   },
   {
     name: "Lina Bergman",
@@ -79,9 +43,9 @@ const speakers = [
     imagePosition: "center 20%",
   },
   {
-    name: "Marie-Pierre Piccinni",
-    affiliation: "Professor, University of Florence, Italy",
-    image: null,
+    name: "Brice Gauilliere",
+    affiliation: "Professor, Stanford University School of Medicine",
+    image: "brice-gauilliere.jpg",
   },
   {
     name: "Nardhy Gomez-Lopez",
@@ -90,16 +54,69 @@ const speakers = [
     image: "nardhy-gomez-lopez.jpg",
   },
   {
+    name: "Ananth Kumar Kammala",
+    affiliation: "The University of Texas Medical Branch at Galveston",
+    image: "ananth-kammala.jpeg",
+  },
+  {
+    name: "Shihoko Komine-Aizawa",
+    affiliation: "Professor, Nihon University School of Medicine, Tokyo",
+    image: "komine-aizawa.jpg",
+    imagePosition: "center 30%",
+  },
+  {
+    name: "Maciej Kurpisz",
+    affiliation:
+      "Institute of Human Genetics Pol. Acad. Sci., Poznan, Poland. Collegium Medicum, President Stanislaw Wojciechowski Calisia University, Kalisz, Poland",
+    image: "maciej-kurpisz.jpg",
+    imagePosition: "center 15%",
+  },
+  {
+    name: "Ja Young Kwon",
+    affiliation: "Professor, Yonsei University College of Medicine, Seoul",
+    image: "ja-young-kwon.jpeg",
+  },
+  {
+    name: "Gendie E Lash",
+    affiliation:
+      "Guangzhou Women and Children's Medical Center, Guangzhou, China",
+    image: "gendie-lash.jpg",
+    imagePosition: "center 25%",
+  },
+  {
+    name: "Eun-Ju Lee",
+    affiliation: "Professor, Chung-Ang University School of Medicine",
+    image: "eun-ju-lee.jpg",
+  },
+  {
+    name: "Jae Ho Lee",
+    affiliation:
+      "Division of Cell Gene & Regenerative medicine, CHA University",
+    image: "jae-ho-lee.jpg",
+    imagePosition: "center 20%",
+  },
+  {
+    name: "Jung Ryeol Lee",
+    affiliation: "Professor, Seoul National University College of Medicine",
+    image: "jung-ryeol-lee.jpg",
+  },
+  {
+    name: "Sung Ki Lee",
+    affiliation:
+      "Konyang University College of Medicine, Myung-Gok Medical Research Institute",
+    image: "sung-ki-lee.jpg",
+    imagePosition: "center 20%",
+  },
+  {
+    name: "Aihua Liao",
+    affiliation: "Huazhong University of Science and Technology",
+    image: "aihua-liao.png",
+  },
+  {
     name: "Ramkumar Menon",
     affiliation: "Professor, University of Texas Medical Branch, Galveston",
     image: "ramkumar-menon.jpg",
     imagePosition: "center 40%",
-  },
-  {
-    name: "Ricardo Barini",
-    affiliation:
-      "Collaborating Professor, University of Campinas (UNICAMP), Brazil",
-    image: null,
   },
   {
     name: "Takeshi Nagamatsu",
@@ -107,9 +124,31 @@ const speakers = [
     image: null,
   },
   {
+    name: "Joon Cheol Park",
+    affiliation: "School of Medicine, Kyungpook National University",
+    image: "joon-cheol-park.jpg",
+    imagePosition: "center 25%",
+  },
+  {
+    name: "Marie-Pierre Piccinni",
+    affiliation: "Professor, University of Florence, Italy",
+    image: null,
+  },
+  {
     name: "Trishia Sinha",
     affiliation:
       "Postdoctoral Researcher, University Medical Center Groningen, the Netherlands",
+    image: null,
+  },
+  {
+    name: "Anna Stanhewicz",
+    affiliation: "Associate Professor, University of Iowa",
+    image: "anna-stanhewicz.jpg",
+    imagePosition: "center 0%",
+  },
+  {
+    name: "Sayaka Tsuda",
+    affiliation: "University of Toyama, Toyama, Japan",
     image: null,
   },
 ];

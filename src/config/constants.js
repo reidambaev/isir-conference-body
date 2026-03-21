@@ -3,7 +3,11 @@ export const REGISTRATION_OPEN = true;
 export const SUBMISSION_OPEN = true;
 
 // Secret preview key for testing (add ?preview=YOUR_SECRET_KEY to URL)
-const PREVIEW_KEY = "isir2026test"; // Change this to your own secret
+// Keep in sync with worker: `env.PREVIEW_KEY` or default in handleRegistration.
+export const PREVIEW_KEY = "isir2026test"; // Change this to your own secret
+
+/** When `?preview=PREVIEW_KEY` is active, registration can charge this flat USD test amount (see worker + RegistrationForm). */
+export const PREVIEW_REGISTRATION_TEST_USD = 1;
 
 // Check if preview mode is enabled via URL parameter
 export const isPreviewMode = () => {

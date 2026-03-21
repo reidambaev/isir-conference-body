@@ -1051,6 +1051,14 @@ async function handleRegistration(request, env, corsHeaders) {
       totalPrice = accompanyingPrice;
     }
 
+    // Preview test pricing: flat $1 USD total when client sends valid preview key (same secret as ?preview= URL)
+    const previewKeyRaw =
+      typeof data.previewKey === "string" ? data.previewKey.trim() : "";
+    const expectedPreviewKey = env.PREVIEW_KEY || "isir2026test";
+    if (previewKeyRaw && previewKeyRaw === expectedPreviewKey) {
+      totalPrice = 1;
+    }
+
     // Extract primitive values from objects (react-country-state-city returns objects)
     const city =
       typeof data.city === "object"
