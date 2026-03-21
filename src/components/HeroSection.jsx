@@ -35,15 +35,15 @@ const HeroSection = ({ onRegisterClick }) => {
           Global Dialogue on
           <br className="hidden md:block" /> Women's Health
         </h2>
-        <p className="text-2xl text-blue-200 mb-8 max-w-2xl mx-auto">
+        <p className="text-2xl text-blue-200 mb-6 max-w-2xl mx-auto">
           Join leading researchers and clinicians from around the world
         </p>
 
-        {/* Register Now - hidden for now, restore when needed
-        <div className="flex flex-wrap justify-center gap-4 mb-12">
+        <div className="flex flex-wrap justify-center gap-4 mb-10">
           <button
+            type="button"
             onClick={onRegisterClick}
-            className="px-8 py-2 text-2xl; font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer"
+            className="px-8 py-3 text-xl font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer"
             style={{
               backgroundColor: "var(--color-secondary)",
               color: "var(--color-primary)",
@@ -52,7 +52,6 @@ const HeroSection = ({ onRegisterClick }) => {
             Register Now
           </button>
         </div>
-        */}
 
         <button
           onClick={scrollToNav}

@@ -1,6 +1,6 @@
 // Feature flags: set to true when registration/submission are open
-export const REGISTRATION_OPEN = false;
-export const SUBMISSION_OPEN = false;
+export const REGISTRATION_OPEN = true;
+export const SUBMISSION_OPEN = true;
 
 // Secret preview key for testing (add ?preview=YOUR_SECRET_KEY to URL)
 const PREVIEW_KEY = "isir2026test"; // Change this to your own secret
