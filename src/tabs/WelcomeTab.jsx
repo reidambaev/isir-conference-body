@@ -127,7 +127,67 @@ const CHAIRMEN_DATA = [
       </>
     ),
   },
+  {
+    name: "Babbette LaMarca",
+    title: "Meeting Co-Chair, ISIR 2026 World Congress",
+    credentials: "Ph.D.",
+    footer: (
+      <>
+        Professor and Chair, Department of Pharmacology
+        <br />
+        Director, MS Preeclampsia Collaborative Center
+        <br />
+        University of Mississippi Medical Center
+      </>
+    ),
+    message: (
+      <>
+        <strong>Dear friends and colleagues of ISIR,</strong>
+        <br />
+        <br />
+        It has been a great honor to serve as co-Chair of the{" "}
+        <strong>
+          16th International Society for Immunology of Reproduction (ISIR) World
+          Congress
+        </strong>
+        . ISIR is an outstanding opportunity to share ideas and advances in our
+        field with international colleagues. Moreover, it creates collaboration
+        opportunities between researchers and treating physicians. It is through
+        ISIR that I have had the opportunity to interact with outstanding
+        scientists that over the years have become close friends and colleagues.
+        I encourage you to take ISIR as an opportunity to meet new friends,
+        learn new science, and create new collaborations.
+        <br />
+        <br />
+        My translational research focus is to investigate inflammatory factors
+        leading to hypertensive disorders of pregnancy and their long-lasting
+        consequences for mothers and their children. We have focused on
+        autoantibodies and T and B lymphocytes as mediators of preeclampsia and
+        its postpartum consequences. Though joining ISIR more recently than
+        others, I was quickly impressed with the depth of immunological
+        expertise at this meeting and in this society. It has truly become one
+        of my societal homes that I cherish and look forward to attending.
+        <br />
+        <br />
+        I am very enthusiastic about the congress being held in Busan, Korea,
+        and am very much looking forward to this experience and learning more
+        about the culture as well as sharing our scientific advances. I look
+        forward to seeing you all in Busan in November 2026.
+        <br />
+        <br />
+        Warm regards,
+      </>
+    ),
+  },
 ];
+
+const getInitials = (name) =>
+  name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 
 const WelcomeTab = () => {
   return (
@@ -152,16 +212,22 @@ const WelcomeTab = () => {
               <div className="sticky top-8">
                 <div className="relative mb-6">
                   <div className="w-48 h-48 mx-auto rounded-2xl overflow-hidden shadow-2xl ring-4 ring-[#1a3a6c]/10">
-                    <img
-                      src={chair.image}
-                      alt={chair.name}
-                      className="w-full h-full object-cover"
-                      style={
-                        chair.imagePosition
-                          ? { objectPosition: chair.imagePosition }
-                          : undefined
-                      }
-                    />
+                    {chair.image ? (
+                      <img
+                        src={chair.image}
+                        alt={chair.name}
+                        className="w-full h-full object-cover"
+                        style={
+                          chair.imagePosition
+                            ? { objectPosition: chair.imagePosition }
+                            : undefined
+                        }
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#1a3a6c] to-[#2d5a9e] text-white text-5xl font-semibold tracking-wide">
+                        {getInitials(chair.name)}
+                      </div>
+                    )}
                   </div>
                   <div className="absolute -bottom-3 -right-3 w-16 h-16 bg-[#f3b72c] rounded-full opacity-20"></div>
                 </div>

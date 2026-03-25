@@ -131,6 +131,12 @@ const PaymentForm = ({
               MasterCard, American Express, and Discover. Processing{" "}
               {formatCurrency(amount / (currency === "KRW" ? 1 : 100), currency)}.
             </p>
+            <a
+              href="/commercial-disclosure"
+              className="inline-block mt-2 text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline"
+            >
+              View Commercial Disclosure (特定商取引法に基づく表記)
+            </a>
           </div>
         </div>
       </div>

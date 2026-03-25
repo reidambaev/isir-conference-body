@@ -20,6 +20,10 @@ import {
   TravelTab,
   SponsorsTab,
   WelcomeTab,
+  CommerceDisclosureTab,
+  PrivacyPolicyTab,
+  TermsOfServiceTab,
+  AccessibilityTab,
   AdminTab,
   ReviewerTab,
 } from "./tabs";
@@ -112,10 +116,30 @@ export default function App() {
         hasInvite ||
         url.pathname === "/registration" ||
         url.pathname === "/registration/";
+      const wantsDisclosure =
+        url.pathname === "/commercial-disclosure" ||
+        url.pathname === "/commercial-disclosure/";
+      const wantsPrivacyPolicy =
+        url.pathname === "/privacy-policy" || url.pathname === "/privacy-policy/";
+      const wantsTermsOfService =
+        url.pathname === "/terms-of-service" ||
+        url.pathname === "/terms-of-service/";
+      const wantsAccessibility =
+        url.pathname === "/accessibility" || url.pathname === "/accessibility/";
 
-      if (!wantsRegistration) return;
-
-      setActiveTab("registration");
+      if (wantsDisclosure) {
+        setActiveTab("commerce-disclosure");
+      } else if (wantsPrivacyPolicy) {
+        setActiveTab("privacy-policy");
+      } else if (wantsTermsOfService) {
+        setActiveTab("terms-of-service");
+      } else if (wantsAccessibility) {
+        setActiveTab("accessibility");
+      } else if (wantsRegistration) {
+        setActiveTab("registration");
+      } else {
+        return;
+      }
 
       // Scroll to navigation so the registration panel is visible
       setTimeout(() => {
@@ -144,6 +168,14 @@ export default function App() {
         return <SubmissionTab />;
       case "registration":
         return <RegistrationTab />;
+      case "commerce-disclosure":
+        return <CommerceDisclosureTab />;
+      case "privacy-policy":
+        return <PrivacyPolicyTab />;
+      case "terms-of-service":
+        return <TermsOfServiceTab />;
+      case "accessibility":
+        return <AccessibilityTab />;
       case "deadlines":
         return <DeadlinesTab onTabChange={setActiveTab} />;
       case "travel":
@@ -276,7 +308,17 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <Footer />
+      <Footer
+        onNavigateTab={(tabId) => {
+          setActiveTab(tabId);
+          setTimeout(() => {
+            const navElement = document.getElementById("navigation");
+            if (navElement) {
+              navElement.scrollIntoView({ behavior: "smooth" });
+            }
+          }, 100);
+        }}
+      />
     </div>
   );
 }

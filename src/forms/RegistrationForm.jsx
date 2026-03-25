@@ -561,10 +561,6 @@ const RegistrationForm = ({ onClose }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.policyAgreed) {
-      alert("You must agree to the ISIR Event Policies to proceed.");
-      return;
-    }
     console.log("Registration Info:", formData);
     const invitedSpeakerFlow = formData.ticketType === "invited-speaker";
     const totalNow = getTotalPrice();
@@ -2072,39 +2068,16 @@ const RegistrationForm = ({ onClose }) => {
                   </div>
                 </div>
 
-                {/* Policies Section */}
+                {/* Preferences Section */}
                 <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-6 border-2 border-blue-200 mt-8">
                   <h5 className="font-bold text-gray-800 mb-4">
-                    ISIR Event Policies
+                    Communication Preferences
                   </h5>
-                  <FormCheckbox
-                    name="policyAgreed"
-                    checked={formData.policyAgreed}
-                    onChange={handleChange}
-                    required
-                    label={
-                      <span>
-                        I have reviewed and agree to the{" "}
-                        <a
-                          href="#"
-                          className="text-blue-600 underline font-semibold hover:text-blue-800"
-                        >
-                          ISIR Event Policies
-                        </a>
-                      </span>
-                    }
-                  />
                   <FormCheckbox
                     name="privacyMarketing"
                     checked={formData.privacyMarketing}
                     onChange={handleChange}
                     label="I agree to share my contact information with ISIR for marketing and promotions."
-                  />
-                  <FormCheckbox
-                    name="privacyApp"
-                    checked={formData.privacyApp}
-                    onChange={handleChange}
-                    label="I would like to appear on the 2026 attendee list on the event website and app."
                   />
                 </div>
               </div>

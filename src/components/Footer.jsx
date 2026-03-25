@@ -1,6 +1,6 @@
 import React from "react";
 
-const Footer = () => (
+const Footer = ({ onNavigateTab }) => (
   <footer className="bg-gray-900 text-white">
     {/* Main Footer Content */}
     <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
@@ -238,15 +238,36 @@ const Footer = () => (
             All rights reserved.
           </p>
           <div className="flex space-x-6 mt-4 md:mt-0">
-            <a href="#" className="hover:text-white transition-colors">
+            <button
+              type="button"
+              onClick={() => onNavigateTab && onNavigateTab("privacy-policy")}
+              className="hover:text-white transition-colors"
+            >
               Privacy Policy
-            </a>
-            <a href="#" className="hover:text-white transition-colors">
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                onNavigateTab && onNavigateTab("commerce-disclosure")
+              }
+              className="hover:text-white transition-colors"
+            >
+              Commercial Disclosure
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateTab && onNavigateTab("terms-of-service")}
+              className="hover:text-white transition-colors"
+            >
               Terms of Service
-            </a>
-            <a href="#" className="hover:text-white transition-colors">
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateTab && onNavigateTab("accessibility")}
+              className="hover:text-white transition-colors"
+            >
               Accessibility
-            </a>
+            </button>
           </div>
         </div>
       </div>
