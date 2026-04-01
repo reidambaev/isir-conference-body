@@ -10,7 +10,6 @@ const Navigation = ({ activeTab, onTabClick }) => {
     // { id: "schedule", label: "Schedule" },   // hidden for now
     { id: "submission", label: "Submission" },
     { id: "registration", label: "Registration" },
-    { id: "commerce-disclosure", label: "Disclosure" },
     { id: "deadlines", label: "Deadlines" },
     { id: "travel", label: "Travel" },
     { id: "sponsors", label: "Sponsors" },

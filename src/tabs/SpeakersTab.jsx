@@ -43,6 +43,13 @@ const speakers = [
     imagePosition: "center 20%",
   },
   {
+    name: "Anke Diemert",
+    affiliation:
+      "University Professorship for Midwifery Science / Obstetrics and Prenatal Medicine, Department of Obstetrics and Prenatal Medicine, University Medical Center Hamburg-Eppendorf, Hamburg, Germany",
+    image: "anke-diemert.png",
+    imagePosition: "center 20%",
+  },
+  {
     name: "Brice Gauilliere",
     affiliation: "Professor, Stanford University School of Medicine",
     image: "brice-gauilliere.jpg",
@@ -101,6 +108,13 @@ const speakers = [
     image: "jung-ryeol-lee.jpg",
   },
   {
+    name: "Keun-Young Lee",
+    affiliation:
+      "Kangnam Sacred Heart Hospital, Hallym University College of Medicine, Seoul, Korea",
+    image: "keun-young-lee.png",
+    imagePosition: "center 20%",
+  },
+  {
     name: "Sung Ki Lee",
     affiliation:
       "Konyang University College of Medicine, Myung-Gok Medical Research Institute",
@@ -151,6 +165,13 @@ const speakers = [
     affiliation: "University of Toyama, Toyama, Japan",
     image: null,
   },
+  {
+    name: "Li Wu",
+    affiliation:
+      "Reproductive and Genetic Center, The First Affiliated Hospital of University of Science and Technology of China",
+    image: "li-wu.png",
+    imagePosition: "center 20%",
+  },
 ];
 
 function getInitials(name) {
@@ -198,68 +219,72 @@ function SpeakersTab() {
         </div>
       </div>
 
-      {/* Plenary Speakers - separate section */}
-      <div className="mb-12">
-        <h4
-          className="text-xl font-semibold mb-2 flex items-center"
-          style={{ color: "var(--color-primary)" }}
-        >
-          <svg
-            className="w-6 h-6 mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-            />
-          </svg>
-          Plenary Speakers
-        </h4>
-        <p className="text-gray-600 text-sm mb-6">
-          Our distinguished plenary speakers will present keynotes at the
-          congress.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Plenary Speakers - featured section */}
+      <div
+        className="mb-14 -mx-6 sm:-mx-8 px-6 sm:px-8 py-10 rounded-2xl"
+        style={{
+          background:
+            "linear-gradient(135deg, var(--color-primary) 0%, #1e3a5f 100%)",
+        }}
+      >
+        <div className="text-center mb-8">
+          <span className="inline-block px-4 py-1 rounded-full text-xs font-semibold tracking-widest uppercase mb-3 bg-white/20 text-white">
+            Keynote Presentations
+          </span>
+          <h4 className="text-3xl sm:text-4xl font-extrabold text-white mb-3 tracking-tight">
+            Plenary Speakers
+          </h4>
+          <p className="text-blue-200 text-base max-w-xl mx-auto">
+            Our distinguished plenary speakers will present keynotes at the
+            congress.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {plenarySpeakers.map((speaker, index) => (
             <div
               key={`plenary-${index}`}
-              className="bg-gradient-to-br from-blue-50 to-white rounded-xl border-2 p-6 hover:shadow-lg transition-shadow flex flex-col items-center text-center"
-              style={{ borderColor: "var(--color-primary)" }}
+              className="bg-white rounded-2xl p-8 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center text-center relative overflow-hidden"
             >
-              {speaker.image ? (
-                <img
-                  src={`/speakers/${speaker.image}`}
-                  alt={speaker.name}
-                  className="w-28 h-28 rounded-full object-cover mb-3 border-2 flex-shrink-0"
-                  style={{
-                    borderColor: "var(--color-secondary)",
-                    ...(speaker.imagePosition && {
-                      objectPosition: speaker.imagePosition,
-                    }),
-                  }}
-                />
-              ) : (
-                <div
-                  className="w-28 h-28 rounded-full flex items-center justify-center mb-3 border-2 text-2xl font-bold text-white flex-shrink-0"
-                  style={{
-                    backgroundColor: "var(--color-primary)",
-                    borderColor: "var(--color-secondary)",
-                  }}
-                >
-                  {getInitials(speaker.name)}
-                </div>
-              )}
+              <div
+                className="absolute top-0 left-0 right-0 h-1.5"
+                style={{ backgroundColor: "var(--color-secondary)" }}
+              />
+              <div
+                className="rounded-full p-1 mb-5"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--color-primary), var(--color-secondary))",
+                }}
+              >
+                {speaker.image ? (
+                  <img
+                    src={`/speakers/${speaker.image}`}
+                    alt={speaker.name}
+                    className="w-36 h-36 rounded-full object-cover border-4 border-white flex-shrink-0"
+                    style={{
+                      ...(speaker.imagePosition && {
+                        objectPosition: speaker.imagePosition,
+                      }),
+                    }}
+                  />
+                ) : (
+                  <div
+                    className="w-36 h-36 rounded-full flex items-center justify-center border-4 border-white text-3xl font-bold text-white flex-shrink-0"
+                    style={{
+                      backgroundColor: "var(--color-primary)",
+                    }}
+                  >
+                    {getInitials(speaker.name)}
+                  </div>
+                )}
+              </div>
               <h5
-                className="text-lg font-bold mb-2 leading-tight"
+                className="text-xl font-extrabold mb-2 leading-tight"
                 style={{ color: "var(--color-primary)" }}
               >
                 {speaker.name}
               </h5>
-              <p className="text-gray-600 text-sm leading-snug">
+              <p className="text-gray-500 text-sm leading-relaxed">
                 {speaker.affiliation}
               </p>
             </div>
