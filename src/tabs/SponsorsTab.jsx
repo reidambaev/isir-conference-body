@@ -25,10 +25,13 @@ const SponsorsTab = () => (
     <div className="mb-10">
       <div className="bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-100 p-8 rounded-2xl border-4 border-amber-400 shadow-2xl">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Name Section */}
-          <div className="w-full bg-white rounded-xl p-8 shadow-inner border border-amber-200 flex flex-col items-center justify-center min-h-[300px]">
-            <h4 className="text-3xl font-bold text-gray-800 mb-1">강화 (주)</h4>
-            <p className="text-xl text-gray-600">Kang Wha, Inc</p>
+          {/* Logo Section */}
+          <div className="w-full bg-white rounded-xl p-8 shadow-inner border border-amber-200 flex items-center justify-center min-h-[300px]">
+            <img
+              src="/main sponsor.png"
+              alt="Kang Wha, Inc"
+              className="max-h-60 max-w-full object-contain"
+            />
           </div>
 
           {/* Text Section */}
