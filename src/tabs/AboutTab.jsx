@@ -1,6 +1,5 @@
 import React from "react";
 import headshots from "../assets/congress_chairs.png";
-import map from "../assets/map.png";
 import beach2 from "../assets/beach2.jpg";
 import village from "../assets/village.jpg";
 import temple2 from "../assets/temple2.jpg";
@@ -90,15 +89,18 @@ const AboutTab = () => (
           outstanding natural beauty.
         </p>
 
-        {/* Location Map Placeholder */}
+        {/* Interactive Google Map */}
         <div className="bg-gray-100 rounded-xl overflow-hidden shadow-md mb-4">
           <div className="aspect-video relative">
-            <img
-              src={map}
-              alt="Busan City Map View"
-              className="w-full h-full object-cover"
+            <iframe
+              title="The Westin Josun Busan Location"
+              src="https://maps.google.com/maps?q=The+Westin+Josun+Busan,+67+Dongbaek-ro,+Haeundae-gu,+Busan,+Korea&t=&z=15&ie=UTF8&iwloc=&output=embed"
+              className="w-full h-full border-0"
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end p-6">
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6 pointer-events-none">
               <div className="text-white">
                 <p className="font-semibold text-lg">The Westin Josun Busan</p>
                 <p className="text-sm opacity-90">
