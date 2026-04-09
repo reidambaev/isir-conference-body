@@ -218,6 +218,14 @@ async function handleApiRequest(request, env, url) {
     return handleAdminReviewerOverview(request, env, corsHeaders);
   }
 
+  // GET /api/admin/reviewers/abstract-scores
+  if (
+    url.pathname === "/api/admin/reviewers/abstract-scores" &&
+    request.method === "GET"
+  ) {
+    return handleAdminReviewerAbstractScores(request, env, corsHeaders);
+  }
+
   return new Response(JSON.stringify({ error: "Not Found" }), {
     status: 404,
     headers: corsHeaders,
@@ -1064,6 +1072,151 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
       {
         success: false,
         error: error.message || "Failed to load reviewer overview",
+      },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+// Admin endpoint: abstract-level review averages + reviewer notes/details
+async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    const abstractsResult = await env.ISIR_DB.prepare(
+      `SELECT
+         a.id,
+         a.title,
+         a.category,
+         a.status,
+         a.submission_date
+       FROM abstractions a
+       ORDER BY a.submission_date DESC`,
+    ).all();
+
+    const reviewAveragesResult = await env.ISIR_DB.prepare(
+      `SELECT
+         r.abstract_id,
+         COUNT(*) AS review_count,
+         AVG(r.originality) AS avg_originality,
+         AVG(r.clarity) AS avg_clarity,
+         AVG(r.study_design) AS avg_study_design,
+         AVG(r.data_analysis) AS avg_data_analysis,
+         AVG(r.significance) AS avg_significance,
+         AVG(r.total) AS avg_total
+       FROM reviews r
+       GROUP BY r.abstract_id`,
+    ).all();
+
+    const reviewDetailsResult = await env.ISIR_DB.prepare(
+      `SELECT
+         r.abstract_id,
+         r.reviewer_email,
+         r.originality,
+         r.clarity,
+         r.study_design,
+         r.data_analysis,
+         r.significance,
+         r.total,
+         r.previous_study_notes,
+         r.coi_mentor_pi,
+         r.coi_same_lab,
+         r.coi_other,
+         r.coi_other_details,
+         r.updated_at
+       FROM reviews r
+       ORDER BY r.updated_at DESC`,
+    ).all();
+
+    const avgByAbstract = {};
+    (reviewAveragesResult.results || []).forEach((row) => {
+      avgByAbstract[row.abstract_id] = {
+        review_count: Number(row.review_count || 0),
+        avg_originality:
+          row.avg_originality != null ? Number(row.avg_originality) : null,
+        avg_clarity: row.avg_clarity != null ? Number(row.avg_clarity) : null,
+        avg_study_design:
+          row.avg_study_design != null ? Number(row.avg_study_design) : null,
+        avg_data_analysis:
+          row.avg_data_analysis != null ? Number(row.avg_data_analysis) : null,
+        avg_significance:
+          row.avg_significance != null ? Number(row.avg_significance) : null,
+        avg_total: row.avg_total != null ? Number(row.avg_total) : null,
+      };
+    });
+
+    const detailsByAbstract = {};
+    (reviewDetailsResult.results || []).forEach((row) => {
+      if (!detailsByAbstract[row.abstract_id]) detailsByAbstract[row.abstract_id] = [];
+      detailsByAbstract[row.abstract_id].push({
+        reviewer_email: row.reviewer_email,
+        originality:
+          row.originality != null && !Number.isNaN(Number(row.originality))
+            ? Number(row.originality)
+            : null,
+        clarity:
+          row.clarity != null && !Number.isNaN(Number(row.clarity))
+            ? Number(row.clarity)
+            : null,
+        study_design:
+          row.study_design != null && !Number.isNaN(Number(row.study_design))
+            ? Number(row.study_design)
+            : null,
+        data_analysis:
+          row.data_analysis != null && !Number.isNaN(Number(row.data_analysis))
+            ? Number(row.data_analysis)
+            : null,
+        significance:
+          row.significance != null && !Number.isNaN(Number(row.significance))
+            ? Number(row.significance)
+            : null,
+        total:
+          row.total != null && !Number.isNaN(Number(row.total))
+            ? Number(row.total)
+            : null,
+        previous_study_notes: row.previous_study_notes || "",
+        coi_mentor_pi: Number(row.coi_mentor_pi || 0) === 1,
+        coi_same_lab: Number(row.coi_same_lab || 0) === 1,
+        coi_other: Number(row.coi_other || 0) === 1,
+        coi_other_details: row.coi_other_details || "",
+        updated_at: row.updated_at || null,
+      });
+    });
+
+    const abstracts = (abstractsResult.results || []).map((a) => ({
+      id: a.id,
+      title: a.title || "",
+      category: a.category || "",
+      status: a.status || "",
+      submission_date: a.submission_date || null,
+      review_summary: avgByAbstract[a.id] || {
+        review_count: 0,
+        avg_originality: null,
+        avg_clarity: null,
+        avg_study_design: null,
+        avg_data_analysis: null,
+        avg_significance: null,
+        avg_total: null,
+      },
+      reviewer_reviews: detailsByAbstract[a.id] || [],
+    }));
+
+    return jsonResponse(
+      {
+        success: true,
+        data: abstracts,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Admin reviewer abstract scores error:", error);
+    return jsonResponse(
+      {
+        success: false,
+        error: error.message || "Failed to load abstract review scores",
       },
       500,
       corsHeaders,
