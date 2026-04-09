@@ -1,6 +1,7 @@
 import React from "react";
 import presidentHeadshot from "../assets/welcome/welcome-headshot1.jpg";
 import dambaevaHeadshot from "../assets/welcome/welcome-headshot2.jpg";
+import babbetteHeadshot from "../assets/welcome/welcome-headshot3.jpg";
 import presidentSignature from "../assets/welcome/signature1.png";
 import dambaevaSignature from "../assets/welcome/signature2.png";
 
@@ -131,6 +132,8 @@ const CHAIRMEN_DATA = [
     name: "Babbette LaMarca",
     title: "Meeting Co-Chair, ISIR 2026 World Congress",
     credentials: "Ph.D.",
+    image: babbetteHeadshot,
+    imageAlt: "Headshot of Babbette LaMarca smiling in an office setting.",
     footer: (
       <>
         Professor and Chair, Department of Pharmacology
@@ -215,7 +218,7 @@ const WelcomeTab = () => {
                     {chair.image ? (
                       <img
                         src={chair.image}
-                        alt={chair.name}
+                        alt={chair.imageAlt ?? chair.name}
                         className="w-full h-full object-cover"
                         style={
                           chair.imagePosition
