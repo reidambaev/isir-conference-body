@@ -419,13 +419,18 @@ const RegistrationForm = ({ onClose }) => {
     setVerificationError(null);
     setSpeakerEligible({ status: "checking", error: "" });
 
+    // Declared outside `try` so `catch` can read it (block-scoped `const` in `try` is not visible in `catch`).
+    let eligibleByEmail = false;
+
     try {
       // Check invited-speaker eligibility by email (works without invite link)
       const emailCheck = await fetch(
         `/api/speaker-invites/check?email=${encodeURIComponent(formData.email)}`,
       );
       const emailCheckJson = await emailCheck.json().catch(() => ({}));
-      const eligibleByEmail = Boolean(emailCheckJson?.success && emailCheckJson?.eligible);
+      eligibleByEmail = Boolean(
+        emailCheckJson?.success && emailCheckJson?.eligible,
+      );
       setSpeakerEligible({
         status: eligibleByEmail ? "eligible" : "ineligible",
         error: "",
@@ -485,7 +490,7 @@ const RegistrationForm = ({ onClose }) => {
     } catch (error) {
       console.error("Verification error:", error);
       // If membership API is down but invite-by-email is eligible, allow speaker flow
-      if (speakerEligible.status === "eligible") {
+      if (eligibleByEmail) {
         setMembershipData({
           email_registered: true,
           has_membership: false,
@@ -603,7 +608,10 @@ const RegistrationForm = ({ onClose }) => {
             body: JSON.stringify({
               ...formData,
               ...previewRegisterPayload,
-              inviteToken: speakerInvite.status === "valid" ? speakerInvite.token : undefined,
+              inviteToken:
+                speakerInvite.status === "valid"
+                  ? speakerInvite.token
+                  : undefined,
               membershipLevel: membershipData?.membership_level || null,
               membershipStatus: membershipData?.membership_status || null,
               traineeLetterUrl: formData.traineeLetterUrl || null,
@@ -611,7 +619,9 @@ const RegistrationForm = ({ onClose }) => {
           });
           const registerResult = await registerResponse.json();
           if (!registerResponse.ok || !registerResult.success) {
-            throw new Error(registerResult.error || "Failed to save registration");
+            throw new Error(
+              registerResult.error || "Failed to save registration",
+            );
           }
           setRegistrationId(registerResult.registrationId);
           setFormData((prev) => ({
@@ -999,11 +1009,11 @@ const RegistrationForm = ({ onClose }) => {
             role="status"
           >
             <strong className="font-semibold">Preview mode:</strong> checkout
-            uses a test charge of {formatCurrency(PREVIEW_REGISTRATION_TEST_USD, "USD")}
-            {" "}
-            (Korean addresses use the usual KRW conversion + tax on that base).
-            Ticket lines elsewhere may still show list prices; Stripe will only
-            charge the test total.
+            uses a test charge of{" "}
+            {formatCurrency(PREVIEW_REGISTRATION_TEST_USD, "USD")} (Korean
+            addresses use the usual KRW conversion + tax on that base). Ticket
+            lines elsewhere may still show list prices; Stripe will only charge
+            the test total.
           </div>
         )}
 
@@ -1075,15 +1085,16 @@ const RegistrationForm = ({ onClose }) => {
                   {speakerInvite.status !== "valid" &&
                     speakerEligible.status === "eligible" && (
                       <p className="mt-1 text-xs text-emerald-700">
-                        This email is on the invited speaker list. You can register
-                        for free.
+                        This email is on the invited speaker list. You can
+                        register for free.
                       </p>
                     )}
-                  {speakerInvite.status === "invalid" && speakerInvite.error && (
-                    <p className="mt-1 text-xs text-red-700">
-                      Invite link error: {speakerInvite.error}
-                    </p>
-                  )}
+                  {speakerInvite.status === "invalid" &&
+                    speakerInvite.error && (
+                      <p className="mt-1 text-xs text-red-700">
+                        Invite link error: {speakerInvite.error}
+                      </p>
+                    )}
                 </div>
 
                 {/* Verification Error Message */}
@@ -1376,240 +1387,234 @@ const RegistrationForm = ({ onClose }) => {
                           </span>
                         </div>
                       </div>
-                    ) : membershipData?.ticket_options?.available_tickets
-                      ? // Use ticket options from API
-                        membershipData.ticket_options.available_tickets
-                          .filter((ticket) => {
-                            // Only trainees should see trainee-member tickets
-                            if (ticket.id === "trainee-member" && !isTrainee) {
-                              return false;
-                            }
-                            // For verified members, hide non‑member / trainee‑non‑member rows
-                            if (
-                              isVerifiedMember &&
-                              (ticket.id === "non-member" ||
-                                ticket.id === "trainee-non-member")
-                            ) {
-                              return false;
-                            }
-                            // Otherwise keep; we'll disable radios as needed below.
-                            return true;
-                          })
-                          .map((ticket, index) => {
-                            const verifiedMember = isVerifiedMember;
-                            const requiresMembership =
-                              ticket.requires_membership === true;
-                            const apiAvailable = ticket.available !== false;
-                            const isAvailable =
-                              apiAvailable &&
-                              (!requiresMembership || verifiedMember);
-                            const isSelected =
-                              formData.ticketType === ticket.id;
+                    ) : membershipData?.ticket_options?.available_tickets ? (
+                      // Use ticket options from API
+                      membershipData.ticket_options.available_tickets
+                        .filter((ticket) => {
+                          // Only trainees should see trainee-member tickets
+                          if (ticket.id === "trainee-member" && !isTrainee) {
+                            return false;
+                          }
+                          // For verified members, hide non‑member / trainee‑non‑member rows
+                          if (
+                            isVerifiedMember &&
+                            (ticket.id === "non-member" ||
+                              ticket.id === "trainee-non-member")
+                          ) {
+                            return false;
+                          }
+                          // Otherwise keep; we'll disable radios as needed below.
+                          return true;
+                        })
+                        .map((ticket, index) => {
+                          const verifiedMember = isVerifiedMember;
+                          const requiresMembership =
+                            ticket.requires_membership === true;
+                          const apiAvailable = ticket.available !== false;
+                          const isAvailable =
+                            apiAvailable &&
+                            (!requiresMembership || verifiedMember);
+                          const isSelected = formData.ticketType === ticket.id;
 
-                            return (
-                              <div
-                                key={ticket.id}
-                                className={`grid grid-cols-3 transition-all duration-200 ${
-                                  isAvailable
-                                    ? "cursor-pointer hover:bg-blue-50"
-                                    : "cursor-not-allowed opacity-60"
-                                } ${
-                                  isSelected && isAvailable
-                                    ? "bg-blue-100 ring-2 ring-blue-500 ring-inset"
-                                    : ""
-                                } ${
-                                  index !==
-                                  membershipData.ticket_options
-                                    .available_tickets.length -
-                                    1
-                                    ? "border-b border-gray-200"
-                                    : ""
-                                }`}
-                                onClick={() => {
-                                  if (!isAvailable) return;
-                                  setFormData((prev) => ({
-                                    ...prev,
-                                    ticketType: ticket.id,
-                                  }));
-                                }}
-                              >
-                                <div className="p-5 flex items-center gap-3">
-                                  <input
-                                    type="radio"
-                                    name="ticketType"
-                                    value={ticket.id}
-                                    checked={isSelected}
-                                    onChange={handleChange}
-                                    disabled={!isAvailable}
-                                    className="w-5 h-5 text-blue-600 disabled:cursor-not-allowed"
-                                  />
-                                  <div className="flex-1">
-                                    <span
-                                      className={`font-semibold ${
-                                        isAvailable
-                                          ? "text-gray-800"
-                                          : "text-gray-500"
-                                      }`}
-                                    >
-                                      {ticket.label}
-                                    </span>
-                                    {!isAvailable && (
-                                      <div className="mt-1 text-xs text-amber-600">
-                                        <p>
-                                          {ticket.unavailable_reason ||
-                                            (requiresMembership &&
-                                            !verifiedMember
-                                              ? "ISIR membership verification required to select this ticket."
-                                              : "This ticket is not available for your membership status.")}
-                                        </p>
-                                        <a
-                                          href="https://theisir.org/membership-account/membership-levels/"
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-blue-600 hover:text-blue-800 underline font-semibold mt-1 inline-block"
-                                          onClick={(e) => e.stopPropagation()}
-                                        >
-                                          Join ISIR →
-                                        </a>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="p-5 text-center flex items-center justify-center">
+                          return (
+                            <div
+                              key={ticket.id}
+                              className={`grid grid-cols-3 transition-all duration-200 ${
+                                isAvailable
+                                  ? "cursor-pointer hover:bg-blue-50"
+                                  : "cursor-not-allowed opacity-60"
+                              } ${
+                                isSelected && isAvailable
+                                  ? "bg-blue-100 ring-2 ring-blue-500 ring-inset"
+                                  : ""
+                              } ${
+                                index !==
+                                membershipData.ticket_options.available_tickets
+                                  .length -
+                                  1
+                                  ? "border-b border-gray-200"
+                                  : ""
+                              }`}
+                              onClick={() => {
+                                if (!isAvailable) return;
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  ticketType: ticket.id,
+                                }));
+                              }}
+                            >
+                              <div className="p-5 flex items-center gap-3">
+                                <input
+                                  type="radio"
+                                  name="ticketType"
+                                  value={ticket.id}
+                                  checked={isSelected}
+                                  onChange={handleChange}
+                                  disabled={!isAvailable}
+                                  className="w-5 h-5 text-blue-600 disabled:cursor-not-allowed"
+                                />
+                                <div className="flex-1">
                                   <span
-                                    className={`text-xl font-bold ${
-                                      isAvailable ? "" : "text-gray-400"
-                                    }`}
-                                    style={
+                                    className={`font-semibold ${
                                       isAvailable
-                                        ? { color: "var(--color-primary)" }
-                                        : {}
-                                    }
-                                  >
-                                    {formatCurrency(
-                                      getFinalPrice(
-                                        ticket.current_price ||
-                                          ticket.early_price,
-                                        formData.country,
-                                      ),
-                                      getCurrency(formData.country),
-                                    )}
-                                  </span>
-                                </div>
-                                <div className="p-5 text-center flex items-center justify-center">
-                                  <span
-                                    className={`text-xl font-bold ${
-                                      isAvailable
-                                        ? "text-gray-500"
-                                        : "text-gray-300"
+                                        ? "text-gray-800"
+                                        : "text-gray-500"
                                     }`}
                                   >
-                                    {formatCurrency(
-                                      getFinalPrice(
-                                        ticket.standard_price,
-                                        formData.country,
-                                      ),
-                                      getCurrency(formData.country),
-                                    )}
+                                    {ticket.label}
                                   </span>
+                                  {!isAvailable && (
+                                    <div className="mt-1 text-xs text-amber-600">
+                                      <p>
+                                        {ticket.unavailable_reason ||
+                                          (requiresMembership && !verifiedMember
+                                            ? "ISIR membership verification required to select this ticket."
+                                            : "This ticket is not available for your membership status.")}
+                                      </p>
+                                      <a
+                                        href="https://theisir.org/membership-account/membership-levels/"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 underline font-semibold mt-1 inline-block"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        Join ISIR →
+                                      </a>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                            );
-                          })
-                      : // Fallback to hardcoded prices if API data not available
-                        Object.entries(ticketPrices)
-                          .filter(([value]) => {
-                            if (value === "trainee-member" && !isTrainee) {
-                              return false;
-                            }
-                            return true;
-                          })
-                          .map(
-                            (
-                              [value, { early, standard, label }],
-                              index,
-                              arr,
-                            ) => (
-                              <label
-                                key={value}
-                                className={`grid grid-cols-3 cursor-pointer transition-all duration-200 hover:bg-blue-50 ${
-                                  formData.ticketType === value
-                                    ? "bg-blue-100 ring-2 ring-blue-500 ring-inset"
-                                    : ""
-                                } ${
-                                  index !== arr.length - 1
-                                    ? "border-b border-gray-200"
-                                    : ""
-                                }`}
-                              >
-                                <div className="p-5 flex items-center gap-3">
-                                  {(() => {
-                                    const isMemberTicket =
-                                      value === "isir-member" ||
-                                      value === "trainee-member";
-                                    const isAvailable =
-                                      !isMemberTicket || isVerifiedMember;
-                                    return (
-                                      <>
-                                        <input
-                                          type="radio"
-                                          name="ticketType"
-                                          value={value}
-                                          checked={
-                                            formData.ticketType === value
-                                          }
-                                          onChange={handleChange}
-                                          disabled={!isAvailable}
-                                          className="w-5 h-5 text-blue-600 disabled:cursor-not-allowed"
-                                        />
-                                        <span
-                                          className={`font-semibold ${
-                                            isAvailable
-                                              ? "text-gray-800"
-                                              : "text-gray-500"
-                                          }`}
-                                        >
-                                          {label}
+                              <div className="p-5 text-center flex items-center justify-center">
+                                <span
+                                  className={`text-xl font-bold ${
+                                    isAvailable ? "" : "text-gray-400"
+                                  }`}
+                                  style={
+                                    isAvailable
+                                      ? { color: "var(--color-primary)" }
+                                      : {}
+                                  }
+                                >
+                                  {formatCurrency(
+                                    getFinalPrice(
+                                      ticket.current_price ||
+                                        ticket.early_price,
+                                      formData.country,
+                                    ),
+                                    getCurrency(formData.country),
+                                  )}
+                                </span>
+                              </div>
+                              <div className="p-5 text-center flex items-center justify-center">
+                                <span
+                                  className={`text-xl font-bold ${
+                                    isAvailable
+                                      ? "text-gray-500"
+                                      : "text-gray-300"
+                                  }`}
+                                >
+                                  {formatCurrency(
+                                    getFinalPrice(
+                                      ticket.standard_price,
+                                      formData.country,
+                                    ),
+                                    getCurrency(formData.country),
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })
+                    ) : (
+                      // Fallback to hardcoded prices if API data not available
+                      Object.entries(ticketPrices)
+                        .filter(([value]) => {
+                          if (value === "trainee-member" && !isTrainee) {
+                            return false;
+                          }
+                          return true;
+                        })
+                        .map(
+                          ([value, { early, standard, label }], index, arr) => (
+                            <label
+                              key={value}
+                              className={`grid grid-cols-3 cursor-pointer transition-all duration-200 hover:bg-blue-50 ${
+                                formData.ticketType === value
+                                  ? "bg-blue-100 ring-2 ring-blue-500 ring-inset"
+                                  : ""
+                              } ${
+                                index !== arr.length - 1
+                                  ? "border-b border-gray-200"
+                                  : ""
+                              }`}
+                            >
+                              <div className="p-5 flex items-center gap-3">
+                                {(() => {
+                                  const isMemberTicket =
+                                    value === "isir-member" ||
+                                    value === "trainee-member";
+                                  const isAvailable =
+                                    !isMemberTicket || isVerifiedMember;
+                                  return (
+                                    <>
+                                      <input
+                                        type="radio"
+                                        name="ticketType"
+                                        value={value}
+                                        checked={formData.ticketType === value}
+                                        onChange={handleChange}
+                                        disabled={!isAvailable}
+                                        className="w-5 h-5 text-blue-600 disabled:cursor-not-allowed"
+                                      />
+                                      <span
+                                        className={`font-semibold ${
+                                          isAvailable
+                                            ? "text-gray-800"
+                                            : "text-gray-500"
+                                        }`}
+                                      >
+                                        {label}
+                                      </span>
+                                      {!isAvailable && (
+                                        <span className="ml-2 text-xs text-amber-600">
+                                          ISIR membership required.{" "}
+                                          <a
+                                            href="https://theisir.org/membership-account/membership-levels/"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:text-blue-800 underline font-semibold"
+                                          >
+                                            Join ISIR →
+                                          </a>
                                         </span>
-                                        {!isAvailable && (
-                                          <span className="ml-2 text-xs text-amber-600">
-                                            ISIR membership required.{" "}
-                                            <a
-                                              href="https://theisir.org/membership-account/membership-levels/"
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="text-blue-600 hover:text-blue-800 underline font-semibold"
-                                            >
-                                              Join ISIR →
-                                            </a>
-                                          </span>
-                                        )}
-                                      </>
-                                    );
-                                  })()}
-                                </div>
-                                <div className="p-5 text-center flex items-center justify-center">
-                                  <span
-                                    className="text-xl font-bold"
-                                    style={{ color: "var(--color-primary)" }}
-                                  >
-                                    {formatCurrency(
-                                      getFinalPrice(early, formData.country),
-                                      getCurrency(formData.country),
-                                    )}
-                                  </span>
-                                </div>
-                                <div className="p-5 text-center flex items-center justify-center">
-                                  <span className="text-xl font-bold text-gray-500">
-                                    {formatCurrency(
-                                      getFinalPrice(standard, formData.country),
-                                      getCurrency(formData.country),
-                                    )}
-                                  </span>
-                                </div>
-                              </label>
-                            ),
-                          )}
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                              <div className="p-5 text-center flex items-center justify-center">
+                                <span
+                                  className="text-xl font-bold"
+                                  style={{ color: "var(--color-primary)" }}
+                                >
+                                  {formatCurrency(
+                                    getFinalPrice(early, formData.country),
+                                    getCurrency(formData.country),
+                                  )}
+                                </span>
+                              </div>
+                              <div className="p-5 text-center flex items-center justify-center">
+                                <span className="text-xl font-bold text-gray-500">
+                                  {formatCurrency(
+                                    getFinalPrice(standard, formData.country),
+                                    getCurrency(formData.country),
+                                  )}
+                                </span>
+                              </div>
+                            </label>
+                          ),
+                        )
+                    )}
                   </div>
                   <p className="text-xs text-gray-500 mt-3 italic">
                     *Trainee/Student rate requires proof of status.
@@ -2097,16 +2102,23 @@ const RegistrationForm = ({ onClose }) => {
                 </div>
 
                 <div className="bg-gradient-to-br from-emerald-50 to-white rounded-xl p-6 border-2 border-emerald-200 mt-8">
-                  <h5 className="font-bold text-gray-800 mb-4">Meal Attendance</h5>
+                  <h5 className="font-bold text-gray-800 mb-4">
+                    Meal Attendance
+                  </h5>
                   <p className="text-sm text-gray-600 mb-5">
                     Select which congress days you will attend lunch and dinner.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
-                      <p className="text-sm font-semibold text-gray-700 mb-3">Lunch</p>
+                      <p className="text-sm font-semibold text-gray-700 mb-3">
+                        Lunch
+                      </p>
                       <div className="space-y-2">
                         {conferenceDays.map((day) => (
-                          <label key={`lunch-${day}`} className="flex items-center gap-2">
+                          <label
+                            key={`lunch-${day}`}
+                            className="flex items-center gap-2"
+                          >
                             <input
                               type="checkbox"
                               name={`meal_lunch_${day}`}
@@ -2120,10 +2132,15 @@ const RegistrationForm = ({ onClose }) => {
                       </div>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-700 mb-3">Dinner</p>
+                      <p className="text-sm font-semibold text-gray-700 mb-3">
+                        Dinner
+                      </p>
                       <div className="space-y-2">
                         {conferenceDays.map((day) => (
-                          <label key={`dinner-${day}`} className="flex items-center gap-2">
+                          <label
+                            key={`dinner-${day}`}
+                            className="flex items-center gap-2"
+                          >
                             <input
                               type="checkbox"
                               name={`meal_dinner_${day}`}
@@ -2225,8 +2242,8 @@ const RegistrationForm = ({ onClose }) => {
                   {isPreviewRegistrationTest ? (
                     <div className="text-base py-2 text-gray-700">
                       <p className="mb-2">
-                        Preview test charge (flat amount — not your selected list
-                        prices):
+                        Preview test charge (flat amount — not your selected
+                        list prices):
                       </p>
                       {isKoreanCustomer && (
                         <p className="text-xs text-gray-500 italic mb-3">
@@ -2504,25 +2521,33 @@ const RegistrationForm = ({ onClose }) => {
                     <div className="space-y-1 text-sm text-gray-700">
                       <p>
                         Lunch days:{" "}
-                        {conferenceDays.filter((day) => formData.mealAttendance.lunch[day]).length >
-                        0
+                        {conferenceDays.filter(
+                          (day) => formData.mealAttendance.lunch[day],
+                        ).length > 0
                           ? conferenceDays
-                              .filter((day) => formData.mealAttendance.lunch[day])
+                              .filter(
+                                (day) => formData.mealAttendance.lunch[day],
+                              )
                               .join(", ")
                           : "None selected"}
                       </p>
                       <p>
                         Dinner days:{" "}
-                        {conferenceDays.filter((day) => formData.mealAttendance.dinner[day]).length >
-                        0
+                        {conferenceDays.filter(
+                          (day) => formData.mealAttendance.dinner[day],
+                        ).length > 0
                           ? conferenceDays
-                              .filter((day) => formData.mealAttendance.dinner[day])
+                              .filter(
+                                (day) => formData.mealAttendance.dinner[day],
+                              )
                               .join(", ")
                           : "None selected"}
                       </p>
                       <p>
                         Gala dinner:{" "}
-                        {formData.galaDinnerAttending ? "Attending" : "Not attending"}
+                        {formData.galaDinnerAttending
+                          ? "Attending"
+                          : "Not attending"}
                       </p>
                     </div>
                   </div>

@@ -62,7 +62,7 @@ async function handleApiRequest(request, env, url) {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, GET, PATCH, OPTIONS",
     "Access-Control-Allow-Headers":
-      "Content-Type, Authorization, X-Admin-Token",
+      "Content-Type, Authorization, X-Admin-Token, X-ISIR-API-Key",
     "Content-Type": "application/json",
   };
 
@@ -76,8 +76,12 @@ async function handleApiRequest(request, env, url) {
     return handleRegistration(request, env, corsHeaders);
   }
 
-  // POST /api/check-member
-  if (url.pathname === "/api/check-member" && request.method === "POST") {
+  // POST /api/check-member (alias: underscore — avoids 404/403 from typos in env)
+  if (
+    (url.pathname === "/api/check-member" ||
+      url.pathname === "/api/check_member") &&
+    request.method === "POST"
+  ) {
     return handleCheckMemberProxy(request, env, corsHeaders);
   }
 
@@ -241,11 +245,17 @@ async function handleCheckMemberProxy(request, env, corsHeaders) {
     const requestBody = await request.text();
     const upstreamHeaders = {
       "Content-Type": "application/json",
+      Accept: "application/json",
+      // Some WordPress/WAF stacks block non-browser fetch; avoid 403 from bot rules.
+      "User-Agent":
+        "Mozilla/5.0 (compatible; ISIR-Conference-Worker/1.0; +https://www.isir2026.org)",
     };
 
     // Keep the API key server-side when configured.
     const serverApiKey = String(env.ISIR_API_KEY || "").trim();
-    const clientApiKey = String(request.headers.get("X-ISIR-API-Key") || "").trim();
+    const clientApiKey = String(
+      request.headers.get("X-ISIR-API-Key") || "",
+    ).trim();
     const effectiveApiKey = serverApiKey || clientApiKey;
     if (effectiveApiKey) {
       upstreamHeaders["X-ISIR-API-Key"] = effectiveApiKey;
@@ -1149,7 +1159,8 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
 
     const detailsByAbstract = {};
     (reviewDetailsResult.results || []).forEach((row) => {
-      if (!detailsByAbstract[row.abstract_id]) detailsByAbstract[row.abstract_id] = [];
+      if (!detailsByAbstract[row.abstract_id])
+        detailsByAbstract[row.abstract_id] = [];
       detailsByAbstract[row.abstract_id].push({
         reviewer_email: row.reviewer_email,
         originality:
