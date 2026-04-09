@@ -278,6 +278,21 @@ const RegistrationForm = ({ onClose }) => {
       kosher: false,
       other: false,
     },
+    mealAttendance: {
+      lunch: {
+        "Nov 5": false,
+        "Nov 6": false,
+        "Nov 7": false,
+        "Nov 8": false,
+      },
+      dinner: {
+        "Nov 5": false,
+        "Nov 6": false,
+        "Nov 7": false,
+        "Nov 8": false,
+      },
+    },
+    galaDinnerAttending: false,
     specialAssistance: false,
     policyAgreed: false,
     privacyMarketing: false,
@@ -373,6 +388,18 @@ const RegistrationForm = ({ onClose }) => {
       setFormData((prev) => ({
         ...prev,
         dietary: { ...prev.dietary, [key]: checked },
+      }));
+    } else if (name.startsWith("meal_")) {
+      const [, mealType, day] = name.split("_");
+      setFormData((prev) => ({
+        ...prev,
+        mealAttendance: {
+          ...prev.mealAttendance,
+          [mealType]: {
+            ...prev.mealAttendance[mealType],
+            [day]: checked,
+          },
+        },
       }));
     } else if (type === "checkbox") {
       setFormData((prev) => ({ ...prev, [name]: checked }));
@@ -821,6 +848,7 @@ const RegistrationForm = ({ onClose }) => {
     },
     "invited-speaker": { early: 0, standard: 0, label: "Invited Speaker" },
   };
+  const conferenceDays = ["Nov 5", "Nov 6", "Nov 7", "Nov 8"];
 
   const isInvitedSpeakerMode =
     formData.ticketType === "invited-speaker" ||
@@ -2068,6 +2096,68 @@ const RegistrationForm = ({ onClose }) => {
                   </div>
                 </div>
 
+                <div className="bg-gradient-to-br from-emerald-50 to-white rounded-xl p-6 border-2 border-emerald-200 mt-8">
+                  <h5 className="font-bold text-gray-800 mb-4">Meal Attendance</h5>
+                  <p className="text-sm text-gray-600 mb-5">
+                    Select which congress days you will attend lunch and dinner.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-3">Lunch</p>
+                      <div className="space-y-2">
+                        {conferenceDays.map((day) => (
+                          <label key={`lunch-${day}`} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              name={`meal_lunch_${day}`}
+                              checked={formData.mealAttendance.lunch[day]}
+                              onChange={handleChange}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">{day}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-3">Dinner</p>
+                      <div className="space-y-2">
+                        {conferenceDays.map((day) => (
+                          <label key={`dinner-${day}`} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              name={`meal_dinner_${day}`}
+                              checked={formData.mealAttendance.dinner[day]}
+                              onChange={handleChange}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">{day}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-5">
+                    <p className="text-sm font-semibold text-gray-700 mb-2">
+                      Gala Dinner
+                    </p>
+                    <select
+                      name="galaDinnerAttending"
+                      value={formData.galaDinnerAttending ? "yes" : "no"}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          galaDinnerAttending: e.target.value === "yes",
+                        }))
+                      }
+                      className="w-full md:w-72 border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                    >
+                      <option value="no">No, I will not attend</option>
+                      <option value="yes">Yes, I will attend</option>
+                    </select>
+                  </div>
+                </div>
+
                 {/* Preferences Section */}
                 <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-6 border-2 border-blue-200 mt-8">
                   <h5 className="font-bold text-gray-800 mb-4">
@@ -2405,6 +2495,36 @@ const RegistrationForm = ({ onClose }) => {
                         * Includes 10% Korean tax
                       </p>
                     )}
+                  </div>
+
+                  <div className="border-t border-gray-200 pt-4">
+                    <p className="text-sm font-semibold text-gray-500 mb-3">
+                      Meal Attendance
+                    </p>
+                    <div className="space-y-1 text-sm text-gray-700">
+                      <p>
+                        Lunch days:{" "}
+                        {conferenceDays.filter((day) => formData.mealAttendance.lunch[day]).length >
+                        0
+                          ? conferenceDays
+                              .filter((day) => formData.mealAttendance.lunch[day])
+                              .join(", ")
+                          : "None selected"}
+                      </p>
+                      <p>
+                        Dinner days:{" "}
+                        {conferenceDays.filter((day) => formData.mealAttendance.dinner[day]).length >
+                        0
+                          ? conferenceDays
+                              .filter((day) => formData.mealAttendance.dinner[day])
+                              .join(", ")
+                          : "None selected"}
+                      </p>
+                      <p>
+                        Gala dinner:{" "}
+                        {formData.galaDinnerAttending ? "Attending" : "Not attending"}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
