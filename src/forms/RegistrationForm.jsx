@@ -597,9 +597,10 @@ const RegistrationForm = ({ onClose }) => {
     console.log("Registration Info:", formData);
     const invitedSpeakerFlow = formData.ticketType === "invited-speaker";
     const totalNow = getTotalPrice();
+    const previewFreeRegistration = isPreviewMode() && totalNow === 0;
 
-    // Invited speakers: skip payment only if total is truly free ($0)
-    if (invitedSpeakerFlow && totalNow === 0) {
+    // Invited speakers and $0 preview: skip Stripe
+    if ((invitedSpeakerFlow && totalNow === 0) || previewFreeRegistration) {
       (async () => {
         try {
           setIsProcessingPayment(true);
@@ -631,7 +632,7 @@ const RegistrationForm = ({ onClose }) => {
           }));
           setStep(6);
         } catch (err) {
-          console.error("Speaker registration error:", err);
+          console.error("Registration completion error:", err);
           alert(
             err?.message ||
               "There was an error completing registration. Please try again or contact support@isir2026.org",
@@ -1009,12 +1010,22 @@ const RegistrationForm = ({ onClose }) => {
             className="mb-4 p-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-950 text-sm leading-relaxed"
             role="status"
           >
-            <strong className="font-semibold">Preview mode:</strong> checkout
-            uses a test charge of{" "}
-            {formatCurrency(PREVIEW_REGISTRATION_TEST_USD, "USD")} (Korean
-            addresses use the usual KRW conversion + tax on that base). Ticket
-            lines elsewhere may still show list prices; Stripe will only charge
-            the test total.
+            <strong className="font-semibold">Preview mode:</strong>{" "}
+            {PREVIEW_REGISTRATION_TEST_USD <= 0 ? (
+              <>
+                registration completes with no payment. Ticket lines may still
+                show list prices for display; your saved registration total is
+                $0.
+              </>
+            ) : (
+              <>
+                checkout uses a test charge of{" "}
+                {formatCurrency(PREVIEW_REGISTRATION_TEST_USD, "USD")} (Korean
+                addresses use the usual KRW conversion + tax on that base).
+                Ticket lines elsewhere may still show list prices; Stripe will
+                only charge the test total.
+              </>
+            )}
           </div>
         )}
 
@@ -2263,10 +2274,11 @@ const RegistrationForm = ({ onClose }) => {
                   {isPreviewRegistrationTest ? (
                     <div className="text-base py-2 text-gray-700">
                       <p className="mb-2">
-                        Preview test charge (flat amount — not your selected
-                        list prices):
+                        {PREVIEW_REGISTRATION_TEST_USD <= 0
+                          ? "Preview registration: no charge (not your selected list prices)."
+                          : "Preview test charge (flat amount — not your selected list prices):"}
                       </p>
-                      {isKoreanCustomer && (
+                      {PREVIEW_REGISTRATION_TEST_USD > 0 && isKoreanCustomer && (
                         <p className="text-xs text-gray-500 italic mb-3">
                           * Includes 10% Korean tax on the converted test base
                         </p>

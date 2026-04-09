@@ -1400,12 +1400,14 @@ async function handleRegistration(request, env, corsHeaders) {
       totalPrice = accompanyingPrice;
     }
 
-    // Preview test pricing: flat $1 USD total when client sends valid preview key (same secret as ?preview= URL)
+    // Preview pricing: flat total when client sends valid preview key (same secret as ?preview= URL; 0 = free)
+    let isPreviewModeRequest = false;
     const previewKeyRaw =
       typeof data.previewKey === "string" ? data.previewKey.trim() : "";
     const expectedPreviewKey = env.PREVIEW_KEY || "isir2026test";
     if (previewKeyRaw && previewKeyRaw === expectedPreviewKey) {
-      totalPrice = 1;
+      isPreviewModeRequest = true;
+      totalPrice = 0;
     }
 
     // Extract primitive values from objects (react-country-state-city returns objects)
@@ -1481,7 +1483,10 @@ async function handleRegistration(request, env, corsHeaders) {
         data.privacyMarketing ? 1 : 0,
         data.privacyApp ? 1 : 0,
         data.optOutMailing ? 1 : 0,
-        isInvitedSpeaker && totalPrice === 0 ? "completed" : "pending",
+        (isInvitedSpeaker && totalPrice === 0) ||
+        (isPreviewModeRequest && totalPrice === 0)
+          ? "completed"
+          : "pending",
         isInvitedSpeaker,
         invitedSpeakerToken,
         data.membershipLevel || null,
@@ -1507,6 +1512,16 @@ async function handleRegistration(request, env, corsHeaders) {
           .run();
       } catch (e) {
         console.error("Failed to mark invite used:", e);
+      }
+    } else if (isPreviewModeRequest && totalPrice === 0 && env.ISIR_DB) {
+      try {
+        await env.ISIR_DB.prepare(
+          `UPDATE registrations SET payment_date = ? WHERE id = ?`,
+        )
+          .bind(Date.now(), registrationId)
+          .run();
+      } catch (e) {
+        console.error("Failed to set preview registration payment date:", e);
       }
     }
 
@@ -2190,6 +2205,15 @@ async function handleCreatePaymentIntent(request, env, corsHeaders) {
         JSON.stringify({
           success: false,
           error: "Invalid registration amount",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (baseAmountUsd === 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "No payment amount for this registration",
         }),
         { status: 400, headers: corsHeaders },
       );
