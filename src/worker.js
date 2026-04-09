@@ -240,11 +240,26 @@ async function handleCheckMemberProxy(request, env, corsHeaders) {
   try {
     const upstreamUrl =
       String(env.ISIR_MEMBER_CHECK_ENDPOINT || "").trim() ||
-      "https://theisir.org/wp-json/isir/v1/check-member";
+      "https://theisir.org/wp-admin/admin-ajax.php";
 
     const requestBody = await request.text();
+    let email = "";
+    let name = "";
+    try {
+      const bodyJson = JSON.parse(requestBody || "{}");
+      email = String(bodyJson?.email ?? "").trim();
+      name = String(bodyJson?.name ?? "").trim();
+    } catch {
+      // ignore
+    }
+
+    const formBody = new URLSearchParams();
+    formBody.set("action", "isir_check_member");
+    formBody.set("email", email);
+    formBody.set("name", name);
+
     const upstreamHeaders = {
-      "Content-Type": "application/json",
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
       Accept: "application/json",
       // Some WordPress/WAF stacks block non-browser fetch; avoid 403 from bot rules.
       "User-Agent":
@@ -264,7 +279,7 @@ async function handleCheckMemberProxy(request, env, corsHeaders) {
     const upstreamResponse = await fetch(upstreamUrl, {
       method: "POST",
       headers: upstreamHeaders,
-      body: requestBody,
+      body: formBody.toString(),
     });
 
     const responseText = await upstreamResponse.text();

@@ -235,133 +235,38 @@ require_once NECTAR_THEME_DIRECTORY . '/nectar/helpers/woocommerce.php';
 
 
 // =============================================================================
-// ISIR Member Verification API (conference registration)
-// Endpoint: POST /wp-json/isir/v1/check-member
+// ISIR Member check via admin-ajax (NOT /wp-json — avoids REST API lock plugins).
+// POST {site}/wp-admin/admin-ajax.php
+// Form body: action=isir_check_member & email=... & name=... (optional name)
+// Header optional: X-ISIR-API-Key (required when isir_member_api_key option is set)
 // =============================================================================
 
+if ( ! defined( 'ISIR_CHECK_MEMBER_ACTION' ) ) {
+	define( 'ISIR_CHECK_MEMBER_ACTION', 'isir_check_member' );
+}
+
 /**
- * ISIR Member Verification API - FIXED VERSION
+ * API key from request (Apache/nginx pass HTTP_X_ISIR_API_KEY).
  *
- * Handles "Non-Member" PMPro levels; exposes member status only for real tiers.
+ * @return string
  */
-
-// Add CORS headers for the REST API
-add_action(
-	'rest_api_init',
-	function () {
-		remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
-		add_filter(
-			'rest_pre_serve_request',
-			function ( $value ) {
-				$origin = get_http_origin();
-
-				$allowed_origins = array(
-					'http://localhost:5173',
-					'http://localhost:3000',
-					'https://isir2026.org',
-					'https://www.isir2026.org',
-					'https://conference.theisir.org',
-					'https://isir-conference.pages.dev',
-				);
-
-				if ( $origin && in_array( $origin, $allowed_origins, true ) ) {
-					header( 'Access-Control-Allow-Origin: ' . esc_url_raw( $origin ) );
-				}
-
-				header( 'Access-Control-Allow-Methods: POST, GET, OPTIONS' );
-				header( 'Access-Control-Allow-Headers: Content-Type, X-ISIR-API-Key' );
-				header( 'Access-Control-Allow-Credentials: true' );
-
-				return $value;
-			}
-		);
-	},
-	15
-);
-
-// Handle preflight OPTIONS requests
-add_action(
-	'init',
-	function () {
-		if ( ! isset( $_SERVER['REQUEST_METHOD'] ) || 'OPTIONS' !== $_SERVER['REQUEST_METHOD'] ) {
-			return;
-		}
-		$origin = get_http_origin();
-
-		$allowed_origins = array(
-			'http://localhost:5173',
-			'http://localhost:3000',
-			'https://isir2026.org',
-			'https://www.isir2026.org',
-			'https://conference.theisir.org',
-			'https://isir-conference.pages.dev',
-		);
-
-		if ( $origin && in_array( $origin, $allowed_origins, true ) ) {
-			header( 'Access-Control-Allow-Origin: ' . esc_url_raw( $origin ) );
-		}
-
-		header( 'Access-Control-Allow-Methods: POST, GET, OPTIONS' );
-		header( 'Access-Control-Allow-Headers: Content-Type, X-ISIR-API-Key' );
-		header( 'Access-Control-Allow-Credentials: true' );
-		header( 'Access-Control-Max-Age: 86400' );
-		status_header( 200 );
-		exit();
+function isir_member_get_request_api_key() {
+	if ( ! empty( $_SERVER['HTTP_X_ISIR_API_KEY'] ) ) {
+		return sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_ISIR_API_KEY'] ) );
 	}
-);
-
-// Register the REST API endpoint
-add_action(
-	'rest_api_init',
-	function () {
-		register_rest_route(
-			'isir/v1',
-			'/check-member',
-			array(
-				'methods'             => 'POST',
-				'callback'            => 'isir_check_member_registration',
-				'permission_callback' => 'isir_check_member_permission',
-				'args'                => array(
-					'email' => array(
-						'required'          => true,
-						'type'              => 'string',
-						'sanitize_callback' => 'sanitize_email',
-						'validate_callback' => function ( $param ) {
-							return is_email( $param );
-						},
-						'description'       => 'The email address to check',
-					),
-					'name'  => array(
-						'required'          => false,
-						'type'              => 'string',
-						'sanitize_callback' => 'sanitize_text_field',
-						'description'       => 'The name to verify (first name, last name, or full name)',
-					),
-				),
-			)
-		);
-	}
-);
+	return '';
+}
 
 /**
- * Permission callback - can be modified for API key authentication
- *
- * @param WP_REST_Request $request Request.
  * @return bool
  */
-function isir_check_member_permission( $request ) {
-	return true;
-
-	/*
-	$api_key = $request->get_header( 'X-ISIR-API-Key' );
-	$valid_api_key = get_option( 'isir_member_api_key', '' );
-
-	if ( empty( $valid_api_key ) ) {
+function isir_member_check_api_key_allows() {
+	$valid = get_option( 'isir_member_api_key', '' );
+	if ( '' === $valid || ! is_string( $valid ) ) {
 		return true;
 	}
-
-	return hash_equals( $valid_api_key, $api_key );
-	*/
+	$got = isir_member_get_request_api_key();
+	return is_string( $got ) && hash_equals( $valid, $got );
 }
 
 /**
@@ -386,30 +291,27 @@ function isir_is_non_member_level( $level_name ) {
 }
 
 /**
- * @param WP_REST_Request $request Request.
- * @return WP_REST_Response
+ * Build JSON payload for member check (same shape the conference app expects).
+ *
+ * @param string $email Email.
+ * @param string $name  Optional display name for verification.
+ * @return array
  */
-function isir_check_member_registration( $request ) {
-	$email = $request->get_param( 'email' );
-	$name  = $request->get_param( 'name' );
-
+function isir_build_check_member_response( $email, $name ) {
 	$user = get_user_by( 'email', $email );
 
 	if ( ! $user ) {
-		return new WP_REST_Response(
-			array(
-				'success'   => true,
-				'is_member' => false,
-				'message'   => 'No user found with this email address',
-				'data'      => array(
-					'email_registered' => false,
-					'name_matches'     => false,
-					'has_membership'   => false,
-					'user_info'        => null,
-					'ticket_options'   => isir_get_ticket_options( null ),
-				),
+		return array(
+			'success'   => true,
+			'is_member' => false,
+			'message'   => 'No user found with this email address',
+			'data'      => array(
+				'email_registered' => false,
+				'name_matches'       => false,
+				'has_membership'     => false,
+				'user_info'          => null,
+				'ticket_options'     => isir_get_ticket_options( null ),
 			),
-			200
 		);
 	}
 
@@ -447,27 +349,55 @@ function isir_check_member_registration( $request ) {
 		$membership_level_display = $membership_data['level_name'];
 	}
 
-	return new WP_REST_Response(
-		array(
-			'success'   => true,
-			'is_member' => $is_member,
-			'message'   => isir_get_status_message( $membership_data, $name_matches, $name, $is_actual_member ),
-			'data'      => array(
-				'email_registered'    => true,
-				'name_matches'        => $name_matches,
-				'has_membership'      => $is_actual_member,
-				'membership_level'    => $membership_level_display,
-				'membership_level_id' => $is_actual_member ? $membership_data['level_id'] : null,
-				'membership_status'   => $membership_data['status'],
-				'expiration_date'     => $membership_data['expiration_date'],
-				'is_trainee'          => $membership_data['is_trainee'],
-				'user_info'           => $user_info,
-				'ticket_options'      => $ticket_options,
-			),
+	return array(
+		'success'   => true,
+		'is_member' => $is_member,
+		'message'   => isir_get_status_message( $membership_data, $name_matches, $name, $is_actual_member ),
+		'data'      => array(
+			'email_registered'    => true,
+			'name_matches'        => $name_matches,
+			'has_membership'      => $is_actual_member,
+			'membership_level'    => $membership_level_display,
+			'membership_level_id' => $is_actual_member ? $membership_data['level_id'] : null,
+			'membership_status'   => $membership_data['status'],
+			'expiration_date'     => $membership_data['expiration_date'],
+			'is_trainee'          => $membership_data['is_trainee'],
+			'user_info'           => $user_info,
+			'ticket_options'      => $ticket_options,
 		),
-		200
 	);
 }
+
+/**
+ * admin-ajax handler (logged-in and logged-out).
+ */
+function isir_ajax_check_member() {
+	nocache_headers();
+	if ( ! isir_member_check_api_key_allows() ) {
+		wp_send_json(
+			array(
+				'success' => false,
+				'message' => 'Unauthorized',
+			),
+			403
+		);
+	}
+	$email = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+	$name  = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
+	if ( ! is_email( $email ) ) {
+		wp_send_json(
+			array(
+				'success' => false,
+				'message' => 'Valid email required',
+			),
+			400
+		);
+	}
+	wp_send_json( isir_build_check_member_response( $email, $name ), 200 );
+}
+
+add_action( 'wp_ajax_' . ISIR_CHECK_MEMBER_ACTION, 'isir_ajax_check_member' );
+add_action( 'wp_ajax_nopriv_' . ISIR_CHECK_MEMBER_ACTION, 'isir_ajax_check_member' );
 
 /**
  * @param array|null $membership_data Membership array or null.
@@ -760,8 +690,9 @@ function isir_member_api_settings_page() {
 	?>
 	<div class="wrap">
 		<h1>ISIR Member API Settings</h1>
-		<h2>API Endpoint</h2>
-		<p><code><?php echo esc_html( home_url( '/wp-json/isir/v1/check-member' ) ); ?></code></p>
+		<h2>Endpoint (admin-ajax, not REST)</h2>
+		<p><code><?php echo esc_html( admin_url( 'admin-ajax.php' ) ); ?></code></p>
+		<p>POST form fields: <code>action=<?php echo esc_html( ISIR_CHECK_MEMBER_ACTION ); ?></code>, <code>email</code>, optional <code>name</code>. Header <code>X-ISIR-API-Key</code> if an API key is configured below.</p>
 
 		<h2>API Key</h2>
 		<p>Current API Key: <code><?php echo esc_html( $current_key ? $current_key : 'Not set (API is open)' ); ?></code></p>
