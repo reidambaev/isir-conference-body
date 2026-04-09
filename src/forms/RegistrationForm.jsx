@@ -292,6 +292,7 @@ const RegistrationForm = ({ onClose }) => {
         "Nov 8": false,
       },
     },
+    openingReceptionAttending: false,
     galaDinnerAttending: false,
     specialAssistance: false,
     policyAgreed: false,
@@ -2106,8 +2107,28 @@ const RegistrationForm = ({ onClose }) => {
                     Meal Attendance
                   </h5>
                   <p className="text-sm text-gray-600 mb-5">
-                    Select which congress days you will attend lunch and dinner.
+                    Indicate welcome events and which congress days you will attend
+                    lunch and dinner.
                   </p>
+                  <div className="mb-5">
+                    <p className="text-sm font-semibold text-gray-700 mb-2">
+                      Opening / Welcome Reception
+                    </p>
+                    <select
+                      name="openingReceptionAttending"
+                      value={formData.openingReceptionAttending ? "yes" : "no"}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          openingReceptionAttending: e.target.value === "yes",
+                        }))
+                      }
+                      className="w-full md:w-72 border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                    >
+                      <option value="no">No, I will not attend</option>
+                      <option value="yes">Yes, I will attend</option>
+                    </select>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
                       <p className="text-sm font-semibold text-gray-700 mb-3">
@@ -2542,6 +2563,12 @@ const RegistrationForm = ({ onClose }) => {
                               )
                               .join(", ")
                           : "None selected"}
+                      </p>
+                      <p>
+                        Opening reception:{" "}
+                        {formData.openingReceptionAttending
+                          ? "Attending"
+                          : "Not attending"}
                       </p>
                       <p>
                         Gala dinner:{" "}

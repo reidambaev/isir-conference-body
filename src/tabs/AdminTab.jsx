@@ -99,6 +99,14 @@ export default function AdminTab() {
     reviewerAbstractCategoryFilter,
   ]);
 
+  const abstractReviewRollupStats = useMemo(() => {
+    const list = reviewerAbstractScores || [];
+    const withReviews = list.filter(
+      (a) => Number(a.review_summary?.review_count || 0) > 0,
+    ).length;
+    return { total: list.length, withReviews };
+  }, [reviewerAbstractScores]);
+
   // Reviewer password generator state
   const [emailFileName, setEmailFileName] = useState("");
   const [emailCount, setEmailCount] = useState(0);
@@ -916,7 +924,7 @@ export default function AdminTab() {
           Admin Dashboard
         </h1>
         <p className="mt-2 text-slate-300">
-          Manage abstract submissions, visa requests, and registrations
+          Manage submissions, reviewer scores, visa requests, and registrations
         </p>
         <div className="flex flex-wrap gap-3 mt-6">
           <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
@@ -951,6 +959,16 @@ export default function AdminTab() {
           }`}
         >
           Abstract Submissions
+        </button>
+        <button
+          onClick={() => setActiveSection("abstractReviewScores")}
+          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+            activeSection === "abstractReviewScores"
+              ? "bg-teal-600 text-white shadow-md"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Abstract review scores
         </button>
         <button
           onClick={() => setActiveSection("visa")}
@@ -1032,11 +1050,42 @@ export default function AdminTab() {
               <h2 className="text-2xl font-bold text-gray-900">
                 Abstract Submissions
               </h2>
-              <p className="text-gray-500 text-sm mt-1">
-                Review and manage submitted abstracts
+              <p className="text-gray-500 text-sm mt-1 max-w-2xl">
+                Browse full text, keywords, and author details; update acceptance
+                status; export a list. For Gusdon reviewer scores, category
+                averages, notes, and COI details, open{" "}
+                <button
+                  type="button"
+                  onClick={() => setActiveSection("abstractReviewScores")}
+                  className="text-teal-700 font-semibold hover:underline"
+                >
+                  Abstract review scores
+                </button>
+                .
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveSection("abstractReviewScores")}
+                className="px-4 py-2.5 bg-white border border-teal-200 text-teal-800 rounded-lg hover:bg-teal-50 transition-colors shadow-sm flex items-center gap-2 font-medium"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                  />
+                </svg>
+                Reviewer scores ({abstractReviewRollupStats.withReviews}/
+                {abstractReviewRollupStats.total})
+              </button>
               {pendingReviewAbstracts.length > 0 && (
                 <button
                   onClick={startReviewMode}
@@ -2147,6 +2196,284 @@ export default function AdminTab() {
         </div>
       )}
 
+      {/* Abstract review scores (Gusdon reviewer averages & notes) */}
+      {activeSection === "abstractReviewScores" && (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Abstract review scores
+              </h2>
+              <p className="text-gray-500 text-sm mt-1 max-w-2xl">
+                Average scores by category across reviewers, per-abstract totals,
+                reviewer notes, and conflict-of-interest flags. Submissions
+                (accept/reject, full text) stay under{" "}
+                <button
+                  type="button"
+                  onClick={() => setActiveSection("abstracts")}
+                  className="text-blue-700 font-semibold hover:underline"
+                >
+                  Abstract Submissions
+                </button>
+                ; reviewer workload lives under{" "}
+                <button
+                  type="button"
+                  onClick={() => setActiveSection("reviewers")}
+                  className="text-indigo-700 font-semibold hover:underline"
+                >
+                  Reviewers
+                </button>
+                .
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveSection("abstracts")}
+              className="px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50"
+            >
+              Back to submissions
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Abstracts listed
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {abstractReviewRollupStats.total}
+              </p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                With at least one review
+              </p>
+              <p className="text-2xl font-bold text-teal-700 mt-1">
+                {abstractReviewRollupStats.withReviews}
+              </p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Pending reviewer data
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {Math.max(
+                  0,
+                  abstractReviewRollupStats.total -
+                    abstractReviewRollupStats.withReviews,
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-800">
+                Scoring summary by abstract
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Expand a row for category averages and each reviewer&apos;s scores,
+                notes, and COI details.
+              </p>
+            </div>
+
+            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50">
+              <div className="flex flex-wrap gap-3">
+                <input
+                  type="text"
+                  value={reviewerAbstractSearch}
+                  onChange={(e) => setReviewerAbstractSearch(e.target.value)}
+                  placeholder="Search abstract title, ID, or category..."
+                  className="flex-1 min-w-[220px] px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+                <select
+                  value={reviewerAbstractCategoryFilter}
+                  onChange={(e) =>
+                    setReviewerAbstractCategoryFilter(e.target.value)
+                  }
+                  className="min-w-[180px] px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="all">All categories</option>
+                  {reviewerAbstractCategories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {filteredReviewerAbstractScores.length > 0 ? (
+              <div className="divide-y divide-gray-100">
+                {filteredReviewerAbstractScores.map((item) => {
+                  const summary = item.review_summary || {};
+                  const reviewCount = Number(summary.review_count || 0);
+                  const hasReviews = reviewCount > 0;
+                  const avgValue = (v) =>
+                    v != null && !Number.isNaN(Number(v))
+                      ? Number(v).toFixed(2)
+                      : "—";
+                  return (
+                    <details key={item.id} className="group">
+                      <summary className="px-5 py-4 cursor-pointer hover:bg-gray-50 flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-gray-900">
+                            {item.title || "Untitled abstract"}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            <span className="font-mono">{item.id}</span> •{" "}
+                            {item.category || "Uncategorized"} •{" "}
+                            {item.status || "submitted"}
+                          </p>
+                        </div>
+                        <div className="text-right flex items-center gap-3">
+                          <div>
+                            <p className="text-xs text-gray-500">Reviews</p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {reviewCount}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Avg total</p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {avgValue(summary.avg_total)}
+                            </p>
+                          </div>
+                          <svg
+                            className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        </div>
+                      </summary>
+
+                      <div className="px-5 pb-5 bg-gray-50 space-y-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+                          <div className="bg-white rounded-lg border border-gray-200 p-3">
+                            <p className="text-gray-500">Originality</p>
+                            <p className="text-base font-semibold text-gray-900 mt-1">
+                              {avgValue(summary.avg_originality)}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-lg border border-gray-200 p-3">
+                            <p className="text-gray-500">Clarity</p>
+                            <p className="text-base font-semibold text-gray-900 mt-1">
+                              {avgValue(summary.avg_clarity)}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-lg border border-gray-200 p-3">
+                            <p className="text-gray-500">Study design</p>
+                            <p className="text-base font-semibold text-gray-900 mt-1">
+                              {avgValue(summary.avg_study_design)}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-lg border border-gray-200 p-3">
+                            <p className="text-gray-500">Data analysis</p>
+                            <p className="text-base font-semibold text-gray-900 mt-1">
+                              {avgValue(summary.avg_data_analysis)}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-lg border border-gray-200 p-3">
+                            <p className="text-gray-500">Significance</p>
+                            <p className="text-base font-semibold text-gray-900 mt-1">
+                              {avgValue(summary.avg_significance)}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-lg border border-gray-200 p-3">
+                            <p className="text-gray-500">Total</p>
+                            <p className="text-base font-semibold text-gray-900 mt-1">
+                              {avgValue(summary.avg_total)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {!hasReviews ? (
+                          <p className="text-sm text-gray-500">
+                            No reviews submitted for this abstract yet.
+                          </p>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full text-xs bg-white border border-gray-200 rounded-lg overflow-hidden">
+                              <thead className="bg-gray-100 text-gray-600">
+                                <tr>
+                                  <th className="text-left px-3 py-2">Reviewer</th>
+                                  <th className="text-left px-3 py-2">Scores</th>
+                                  <th className="text-left px-3 py-2">
+                                    Additional notes
+                                  </th>
+                                  <th className="text-left px-3 py-2">
+                                    COI / flags
+                                  </th>
+                                  <th className="text-left px-3 py-2">Updated</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(item.reviewer_reviews || []).map((rev, idx) => {
+                                  const coiFlags = [];
+                                  if (rev.coi_mentor_pi) coiFlags.push("Mentor/PI");
+                                  if (rev.coi_same_lab) coiFlags.push("Same lab");
+                                  if (rev.coi_other) coiFlags.push("Other COI");
+                                  return (
+                                    <tr
+                                      key={`${item.id}-${rev.reviewer_email}-${idx}`}
+                                      className="border-t border-gray-100 align-top"
+                                    >
+                                      <td className="px-3 py-2 text-gray-800">
+                                        {rev.reviewer_email}
+                                      </td>
+                                      <td className="px-3 py-2 text-gray-700">
+                                        O:{rev.originality ?? "—"} C:
+                                        {rev.clarity ?? "—"} SD:
+                                        {rev.study_design ?? "—"} DA:
+                                        {rev.data_analysis ?? "—"} S:
+                                        {rev.significance ?? "—"} T:
+                                        {rev.total ?? "—"}
+                                      </td>
+                                      <td className="px-3 py-2 text-gray-700 max-w-md whitespace-pre-wrap">
+                                        {rev.previous_study_notes || "—"}
+                                      </td>
+                                      <td className="px-3 py-2 text-gray-700 max-w-xs whitespace-pre-wrap">
+                                        {coiFlags.length > 0
+                                          ? coiFlags.join(", ")
+                                          : "None"}
+                                        {rev.coi_other_details
+                                          ? `\n${rev.coi_other_details}`
+                                          : ""}
+                                      </td>
+                                      <td className="px-3 py-2 text-gray-600">
+                                        {rev.updated_at
+                                          ? formatDate(rev.updated_at)
+                                          : "—"}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="px-5 py-6 text-sm text-gray-500">
+                No abstracts match this filter.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Visa Requests Section */}
       {activeSection === "visa" && (
         <div className="space-y-4">
@@ -2456,7 +2783,16 @@ export default function AdminTab() {
               </h2>
               <p className="text-gray-600 text-sm mt-1 max-w-2xl">
                 See total reviews and assignments, plus each reviewer&apos;s
-                workload and progress.
+                workload and progress. For average scores and notes{" "}
+                <em>per abstract</em>, open{" "}
+                <button
+                  type="button"
+                  onClick={() => setActiveSection("abstractReviewScores")}
+                  className="text-teal-700 font-semibold hover:underline"
+                >
+                  Abstract review scores
+                </button>
+                .
               </p>
             </div>
           </div>
@@ -2745,223 +3081,6 @@ export default function AdminTab() {
                 ) : (
                   <div className="px-5 py-6 text-sm text-gray-500">
                     No reviewer assignments found.
-                  </div>
-                )}
-              </div>
-
-              {/* Abstract-level review scores */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100">
-                  <h3 className="text-sm font-semibold text-gray-800">
-                    Abstract scoring summary
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-1">
-                    View average score by category for each abstract, plus reviewer
-                    notes and conflict details.
-                  </p>
-                </div>
-
-                <div className="px-5 py-4 border-b border-gray-100 bg-gray-50">
-                  <div className="flex flex-wrap gap-3">
-                    <input
-                      type="text"
-                      value={reviewerAbstractSearch}
-                      onChange={(e) => setReviewerAbstractSearch(e.target.value)}
-                      placeholder="Search abstract title, ID, or category..."
-                      className="flex-1 min-w-[220px] px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                    <select
-                      value={reviewerAbstractCategoryFilter}
-                      onChange={(e) =>
-                        setReviewerAbstractCategoryFilter(e.target.value)
-                      }
-                      className="min-w-[180px] px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value="all">All categories</option>
-                      {reviewerAbstractCategories.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {filteredReviewerAbstractScores.length > 0 ? (
-                  <div className="divide-y divide-gray-100">
-                    {filteredReviewerAbstractScores.map((item) => {
-                      const summary = item.review_summary || {};
-                      const reviewCount = Number(summary.review_count || 0);
-                      const hasReviews = reviewCount > 0;
-                      const avgValue = (v) =>
-                        v != null && !Number.isNaN(Number(v))
-                          ? Number(v).toFixed(2)
-                          : "—";
-                      return (
-                        <details key={item.id} className="group">
-                          <summary className="px-5 py-4 cursor-pointer hover:bg-gray-50 flex items-start justify-between gap-3">
-                            <div>
-                              <p className="font-semibold text-gray-900">
-                                {item.title || "Untitled abstract"}
-                              </p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                <span className="font-mono">{item.id}</span> •{" "}
-                                {item.category || "Uncategorized"} •{" "}
-                                {item.status || "submitted"}
-                              </p>
-                            </div>
-                            <div className="text-right flex items-center gap-3">
-                              <div>
-                                <p className="text-xs text-gray-500">
-                                  Reviews
-                                </p>
-                                <p className="text-sm font-semibold text-gray-900">
-                                  {reviewCount}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-gray-500">
-                                  Avg total
-                                </p>
-                                <p className="text-sm font-semibold text-gray-900">
-                                  {avgValue(summary.avg_total)}
-                                </p>
-                              </div>
-                              <svg
-                                className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M19 9l-7 7-7-7"
-                                />
-                              </svg>
-                            </div>
-                          </summary>
-
-                          <div className="px-5 pb-5 bg-gray-50 space-y-4">
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
-                              <div className="bg-white rounded-lg border border-gray-200 p-3">
-                                <p className="text-gray-500">Originality</p>
-                                <p className="text-base font-semibold text-gray-900 mt-1">
-                                  {avgValue(summary.avg_originality)}
-                                </p>
-                              </div>
-                              <div className="bg-white rounded-lg border border-gray-200 p-3">
-                                <p className="text-gray-500">Clarity</p>
-                                <p className="text-base font-semibold text-gray-900 mt-1">
-                                  {avgValue(summary.avg_clarity)}
-                                </p>
-                              </div>
-                              <div className="bg-white rounded-lg border border-gray-200 p-3">
-                                <p className="text-gray-500">Study design</p>
-                                <p className="text-base font-semibold text-gray-900 mt-1">
-                                  {avgValue(summary.avg_study_design)}
-                                </p>
-                              </div>
-                              <div className="bg-white rounded-lg border border-gray-200 p-3">
-                                <p className="text-gray-500">Data analysis</p>
-                                <p className="text-base font-semibold text-gray-900 mt-1">
-                                  {avgValue(summary.avg_data_analysis)}
-                                </p>
-                              </div>
-                              <div className="bg-white rounded-lg border border-gray-200 p-3">
-                                <p className="text-gray-500">Significance</p>
-                                <p className="text-base font-semibold text-gray-900 mt-1">
-                                  {avgValue(summary.avg_significance)}
-                                </p>
-                              </div>
-                              <div className="bg-white rounded-lg border border-gray-200 p-3">
-                                <p className="text-gray-500">Total</p>
-                                <p className="text-base font-semibold text-gray-900 mt-1">
-                                  {avgValue(summary.avg_total)}
-                                </p>
-                              </div>
-                            </div>
-
-                            {!hasReviews ? (
-                              <p className="text-sm text-gray-500">
-                                No reviews submitted for this abstract yet.
-                              </p>
-                            ) : (
-                              <div className="overflow-x-auto">
-                                <table className="min-w-full text-xs bg-white border border-gray-200 rounded-lg overflow-hidden">
-                                  <thead className="bg-gray-100 text-gray-600">
-                                    <tr>
-                                      <th className="text-left px-3 py-2">
-                                        Reviewer
-                                      </th>
-                                      <th className="text-left px-3 py-2">
-                                        Scores
-                                      </th>
-                                      <th className="text-left px-3 py-2">
-                                        Additional notes
-                                      </th>
-                                      <th className="text-left px-3 py-2">
-                                        COI / flags
-                                      </th>
-                                      <th className="text-left px-3 py-2">
-                                        Updated
-                                      </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {(item.reviewer_reviews || []).map((rev, idx) => {
-                                      const coiFlags = [];
-                                      if (rev.coi_mentor_pi) coiFlags.push("Mentor/PI");
-                                      if (rev.coi_same_lab) coiFlags.push("Same lab");
-                                      if (rev.coi_other) coiFlags.push("Other COI");
-                                      return (
-                                        <tr
-                                          key={`${item.id}-${rev.reviewer_email}-${idx}`}
-                                          className="border-t border-gray-100 align-top"
-                                        >
-                                          <td className="px-3 py-2 text-gray-800">
-                                            {rev.reviewer_email}
-                                          </td>
-                                          <td className="px-3 py-2 text-gray-700">
-                                            O:{rev.originality ?? "—"} C:
-                                            {rev.clarity ?? "—"} SD:
-                                            {rev.study_design ?? "—"} DA:
-                                            {rev.data_analysis ?? "—"} S:
-                                            {rev.significance ?? "—"} T:
-                                            {rev.total ?? "—"}
-                                          </td>
-                                          <td className="px-3 py-2 text-gray-700 max-w-md whitespace-pre-wrap">
-                                            {rev.previous_study_notes || "—"}
-                                          </td>
-                                          <td className="px-3 py-2 text-gray-700 max-w-xs whitespace-pre-wrap">
-                                            {coiFlags.length > 0
-                                              ? coiFlags.join(", ")
-                                              : "None"}
-                                            {rev.coi_other_details
-                                              ? `\n${rev.coi_other_details}`
-                                              : ""}
-                                          </td>
-                                          <td className="px-3 py-2 text-gray-600">
-                                            {rev.updated_at
-                                              ? formatDate(rev.updated_at)
-                                              : "—"}
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-                          </div>
-                        </details>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="px-5 py-6 text-sm text-gray-500">
-                    No abstracts match this filter.
                   </div>
                 )}
               </div>

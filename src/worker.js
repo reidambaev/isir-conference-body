@@ -1330,6 +1330,7 @@ async function handleRegistration(request, env, corsHeaders) {
       ticketPrices[data.ticketType]?.[isEarlyBird ? "early" : "standard"] || 0;
     const accompanyingCount = Number(data.accompanyingPersonCount || 0);
     const galaDinnerAttending = data.galaDinnerAttending ? 1 : 0;
+    const openingReceptionAttending = data.openingReceptionAttending ? 1 : 0;
     const lunchDays = Object.entries(data.mealAttendance?.lunch || {})
       .filter(([, attending]) => Boolean(attending))
       .map(([day]) => day);
@@ -1429,13 +1430,13 @@ async function handleRegistration(request, env, corsHeaders) {
         salutation, suffix, institution, credentials, badge_name, pronouns,
         address1, address2, city, state, zip, country, phone, cell_phone,
         is_physician, ticket_type, accompanying_count, gala_dinner, gala_dinner_attending,
-        lunch_days, dinner_days, ticket_price, total_price,
+        lunch_days, dinner_days, opening_reception_attending, ticket_price, total_price,
         is_early_bird, dietary_vegan, dietary_vegetarian, dietary_gluten_free,
         dietary_kosher, dietary_other, special_assistance, policy_agreed,
         privacy_marketing, privacy_app, opt_out_mailing, payment_status,
         is_invited_speaker, invited_speaker_token,
         membership_level, membership_status, trainee_letter_url, trainee_letter_status, trainee_letter_uploaded_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     )
       .bind(
@@ -1466,6 +1467,7 @@ async function handleRegistration(request, env, corsHeaders) {
         galaDinnerAttending,
         JSON.stringify(lunchDays),
         JSON.stringify(dinnerDays),
+        openingReceptionAttending,
         ticketPrice,
         totalPrice,
         isEarlyBird ? 1 : 0,
@@ -2385,7 +2387,7 @@ async function handleStripeWebhook(request, env) {
             if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
               const row = await env.ISIR_DB.prepare(
                 `SELECT email, first_name, middle_name, last_name, ticket_type, ticket_price, total_price, currency,
-                 accompanying_count, gala_dinner, gala_dinner_attending, lunch_days, dinner_days, institution, badge_name FROM registrations WHERE id = ?`,
+                 accompanying_count, gala_dinner, gala_dinner_attending, lunch_days, dinner_days, opening_reception_attending, institution, badge_name FROM registrations WHERE id = ?`,
               )
                 .bind(registrationId)
                 .first();
@@ -2403,6 +2405,7 @@ async function handleStripeWebhook(request, env) {
                 const acc = Number(row.accompanying_count) || 0;
                 const gala = Number(row.gala_dinner) || 0;
                 const galaAttending = Number(row.gala_dinner_attending) === 1;
+                const openingReception = Number(row.opening_reception_attending) === 1;
                 const lunchDays = (() => {
                   try {
                     const parsed = JSON.parse(row.lunch_days || "[]");
@@ -2438,6 +2441,7 @@ async function handleStripeWebhook(request, env) {
       <tr><td style="padding: 4px 0;">Ticket type</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(ticketLabel)}</td></tr>
       ${acc > 0 ? `<tr><td style="padding: 4px 0;">Accompanying persons</td><td style="padding: 4px 0; text-align: right;">${acc}</td></tr>` : ""}
       ${gala > 0 ? `<tr><td style="padding: 4px 0;">Gala dinner tickets</td><td style="padding: 4px 0; text-align: right;">${gala}</td></tr>` : ""}
+      <tr><td style="padding: 4px 0;">Opening reception</td><td style="padding: 4px 0; text-align: right;">${openingReception ? "Attending" : "Not attending"}</td></tr>
       <tr><td style="padding: 4px 0;">Gala dinner</td><td style="padding: 4px 0; text-align: right;">${galaAttending ? "Attending" : "Not attending"}</td></tr>
       ${lunchDays.length > 0 ? `<tr><td style="padding: 4px 0;">Lunch days</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(lunchDays.join(", "))}</td></tr>` : ""}
       ${dinnerDays.length > 0 ? `<tr><td style="padding: 4px 0;">Dinner days</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(dinnerDays.join(", "))}</td></tr>` : ""}
