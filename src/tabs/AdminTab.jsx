@@ -107,6 +107,100 @@ export default function AdminTab() {
     return { total: list.length, withReviews };
   }, [reviewerAbstractScores]);
 
+  const registrationTotals = useMemo(() => {
+    const list = Array.isArray(registrations) ? registrations : [];
+    const ticketLabels = {
+      "isir-member": "ISIR Member",
+      "non-member": "Non-Member",
+      "trainee-member": "Trainee / Student Member",
+      "trainee-non-member": "Trainee / Student Non-Member",
+      "invited-speaker": "Invited Speaker",
+    };
+    const conferenceDays = ["Nov 5", "Nov 6", "Nov 7", "Nov 8"];
+    const parseDayList = (raw) => {
+      if (raw == null || raw === "") return [];
+      try {
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    };
+    const isPaymentConfirmed = (status) => {
+      const s = String(status || "").toLowerCase();
+      return s === "completed" || s === "paid";
+    };
+
+    const byStatus = {};
+    const byTicket = {};
+    let accompanyingSum = 0;
+    let openingReceptionYes = 0;
+    let galaAttendingYes = 0;
+    let revenueAll = 0;
+    let revenueConfirmed = 0;
+    let confirmedCount = 0;
+    const lunchByDay = Object.fromEntries(conferenceDays.map((d) => [d, 0]));
+    const dinnerByDay = Object.fromEntries(conferenceDays.map((d) => [d, 0]));
+
+    for (const r of list) {
+      const status = String(r.payment_status || "unknown").toLowerCase();
+      byStatus[status] = (byStatus[status] || 0) + 1;
+      const tt = r.ticket_type || "unknown";
+      byTicket[tt] = (byTicket[tt] || 0) + 1;
+      accompanyingSum += Number(r.accompanying_count || 0);
+      if (Number(r.opening_reception_attending || 0) === 1) {
+        openingReceptionYes += 1;
+      }
+      if (Number(r.gala_dinner_attending || 0) === 1) {
+        galaAttendingYes += 1;
+      }
+      const tp = Number(r.total_price);
+      const amt = Number.isFinite(tp) ? tp : 0;
+      revenueAll += amt;
+      if (isPaymentConfirmed(r.payment_status)) {
+        revenueConfirmed += amt;
+        confirmedCount += 1;
+      }
+      for (const d of parseDayList(r.lunch_days)) {
+        if (d in lunchByDay) lunchByDay[d] += 1;
+      }
+      for (const d of parseDayList(r.dinner_days)) {
+        if (d in dinnerByDay) dinnerByDay[d] += 1;
+      }
+    }
+
+    const invitedSpeakers = list.filter(
+      (r) => Number(r.is_invited_speaker || 0) === 1,
+    ).length;
+
+    const ticketRows = Object.entries(byTicket)
+      .map(([id, count]) => ({
+        id,
+        label: ticketLabels[id] || id,
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    const statusRows = Object.entries(byStatus).sort((a, b) => b[1] - a[1]);
+
+    return {
+      total: list.length,
+      byStatus,
+      statusRows,
+      ticketRows,
+      accompanyingSum,
+      openingReceptionYes,
+      galaAttendingYes,
+      revenueAll,
+      revenueConfirmed,
+      confirmedCount,
+      lunchByDay,
+      dinnerByDay,
+      conferenceDays,
+      invitedSpeakers,
+    };
+  }, [registrations]);
+
   // Reviewer password generator state
   const [emailFileName, setEmailFileName] = useState("");
   const [emailCount, setEmailCount] = useState(0);
@@ -989,6 +1083,16 @@ export default function AdminTab() {
           }`}
         >
           Registrations
+        </button>
+        <button
+          onClick={() => setActiveSection("registrationTotals")}
+          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+            activeSection === "registrationTotals"
+              ? "bg-amber-600 text-white shadow-md"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Totals
         </button>
         <button
           onClick={() => setActiveSection("trainees")}
@@ -2632,6 +2736,222 @@ export default function AdminTab() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Registration totals / rollups */}
+      {activeSection === "registrationTotals" && (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold text-gray-800">
+                Registration totals
+              </h2>
+              <p className="text-gray-500 text-sm mt-1 max-w-3xl">
+                Rollups from the registration list loaded in this session (API
+                returns up to the 100 most recent). Revenue uses{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">total_price</code>{" "}
+                and counts payments with status{" "}
+                <span className="font-medium">completed</span> or{" "}
+                <span className="font-medium">paid</span>.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => fetchAllData(adminToken)}
+              className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium"
+            >
+              Refresh data
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <p className="text-sm font-medium text-gray-500">Registrations</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">
+                {registrationTotals.total}
+              </p>
+              <p className="text-xs text-gray-400 mt-2">
+                Confirmed payment: {registrationTotals.confirmedCount}
+              </p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <p className="text-sm font-medium text-gray-500">
+                Revenue (confirmed)
+              </p>
+              <p className="text-3xl font-bold text-amber-700 mt-1">
+                $
+                {registrationTotals.revenueConfirmed.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+              <p className="text-xs text-gray-400 mt-2">
+                All rows (any status): $
+                {registrationTotals.revenueAll.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <p className="text-sm font-medium text-gray-500">
+                Accompanying persons
+              </p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">
+                {registrationTotals.accompanyingSum}
+              </p>
+              <p className="text-xs text-gray-400 mt-2">
+                Sum of accompanying_count
+              </p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <p className="text-sm font-medium text-gray-500">Other admin data</p>
+              <p className="text-sm text-gray-700 mt-2 space-y-1">
+                <span className="block">
+                  Abstracts:{" "}
+                  <strong>{abstracts.length}</strong>
+                </span>
+                <span className="block">
+                  Visa requests:{" "}
+                  <strong>{visaRequests.length}</strong>
+                </span>
+                <span className="block">
+                  Invited speaker registrations:{" "}
+                  <strong>{registrationTotals.invitedSpeakers}</strong>
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-5">
+              <p className="text-sm font-medium text-emerald-800">
+                Opening / welcome reception
+              </p>
+              <p className="text-2xl font-bold text-emerald-900 mt-1">
+                {registrationTotals.openingReceptionYes}
+                <span className="text-base font-normal text-emerald-700">
+                  {" "}
+                  attending
+                </span>
+              </p>
+            </div>
+            <div className="bg-purple-50 rounded-xl border border-purple-200 p-5">
+              <p className="text-sm font-medium text-purple-800">Gala dinner</p>
+              <p className="text-2xl font-bold text-purple-900 mt-1">
+                {registrationTotals.galaAttendingYes}
+                <span className="text-base font-normal text-purple-700">
+                  {" "}
+                  attending
+                </span>
+              </p>
+            </div>
+            <div className="bg-slate-50 rounded-xl border border-slate-200 p-5">
+              <p className="text-sm font-medium text-slate-700">
+                Payment status (this batch)
+              </p>
+              <ul className="mt-2 text-sm text-slate-800 space-y-1">
+                {registrationTotals.statusRows.length === 0 ? (
+                  <li className="text-slate-500">No data</li>
+                ) : (
+                  registrationTotals.statusRows.map(([st, n]) => (
+                    <li key={st} className="flex justify-between gap-4">
+                      <span className="capitalize">{st}</span>
+                      <strong>{n}</strong>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+              <div className="px-5 py-3 bg-gray-50 border-b border-gray-200">
+                <h3 className="font-semibold text-gray-800">
+                  Ticket type breakdown
+                </h3>
+              </div>
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Type
+                    </th>
+                    <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                      Count
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {registrationTotals.ticketRows.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={2}
+                        className="px-5 py-4 text-sm text-gray-500"
+                      >
+                        No registrations in this batch.
+                      </td>
+                    </tr>
+                  ) : (
+                    registrationTotals.ticketRows.map((row) => (
+                      <tr key={row.id}>
+                        <td className="px-5 py-3 text-sm text-gray-800">
+                          {row.label}
+                        </td>
+                        <td className="px-5 py-3 text-sm text-right font-semibold text-gray-900">
+                          {row.count}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+              <div className="px-5 py-3 bg-gray-50 border-b border-gray-200">
+                <h3 className="font-semibold text-gray-800">
+                  Meal attendance by day
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Count of registrants who selected each congress day for lunch
+                  or dinner.
+                </p>
+              </div>
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-5 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Day
+                    </th>
+                    <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                      Lunch
+                    </th>
+                    <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                      Dinner
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {registrationTotals.conferenceDays.map((day) => (
+                    <tr key={day}>
+                      <td className="px-5 py-3 text-sm font-medium text-gray-800">
+                        {day}
+                      </td>
+                      <td className="px-5 py-3 text-sm text-right text-gray-900">
+                        {registrationTotals.lunchByDay[day] ?? 0}
+                      </td>
+                      <td className="px-5 py-3 text-sm text-right text-gray-900">
+                        {registrationTotals.dinnerByDay[day] ?? 0}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
