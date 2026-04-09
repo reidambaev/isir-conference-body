@@ -24,8 +24,7 @@ export const isSubmissionAccessible = () => SUBMISSION_OPEN || isPreviewMode();
 // API Configuration for ISIR Member Verification
 export const ISIR_API_CONFIG = {
   endpoint:
-    import.meta.env.VITE_ISIR_API_ENDPOINT ||
-    "https://theisir.org/wp-json/isir/v1/check-member",
+    import.meta.env.VITE_ISIR_API_ENDPOINT || "/api/check-member",
   apiKey: import.meta.env.VITE_ISIR_API_KEY || "",
 };
 

@@ -61,7 +61,8 @@ async function handleApiRequest(request, env, url) {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, GET, PATCH, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Token",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, X-Admin-Token",
     "Content-Type": "application/json",
   };
 
@@ -73,6 +74,11 @@ async function handleApiRequest(request, env, url) {
   // POST /api/register
   if (url.pathname === "/api/register" && request.method === "POST") {
     return handleRegistration(request, env, corsHeaders);
+  }
+
+  // POST /api/check-member
+  if (url.pathname === "/api/check-member" && request.method === "POST") {
+    return handleCheckMemberProxy(request, env, corsHeaders);
   }
 
   // GET /api/speaker-invites/verify?token=...
@@ -218,6 +224,60 @@ async function handleApiRequest(request, env, url) {
   });
 }
 
+async function handleCheckMemberProxy(request, env, corsHeaders) {
+  try {
+    const upstreamUrl =
+      String(env.ISIR_MEMBER_CHECK_ENDPOINT || "").trim() ||
+      "https://theisir.org/wp-json/isir/v1/check-member";
+
+    const requestBody = await request.text();
+    const upstreamHeaders = {
+      "Content-Type": "application/json",
+    };
+
+    // Keep the API key server-side when configured.
+    const serverApiKey = String(env.ISIR_API_KEY || "").trim();
+    const clientApiKey = String(request.headers.get("X-ISIR-API-Key") || "").trim();
+    const effectiveApiKey = serverApiKey || clientApiKey;
+    if (effectiveApiKey) {
+      upstreamHeaders["X-ISIR-API-Key"] = effectiveApiKey;
+    }
+
+    const upstreamResponse = await fetch(upstreamUrl, {
+      method: "POST",
+      headers: upstreamHeaders,
+      body: requestBody,
+    });
+
+    const responseText = await upstreamResponse.text();
+    let responsePayload;
+    try {
+      responsePayload = JSON.parse(responseText);
+    } catch {
+      responsePayload = {
+        success: false,
+        message: "Invalid response from membership service",
+        raw: responseText,
+      };
+    }
+
+    return new Response(JSON.stringify(responsePayload), {
+      status: upstreamResponse.status,
+      headers: corsHeaders,
+    });
+  } catch (error) {
+    console.error("Membership proxy error:", error);
+    return jsonResponse(
+      {
+        success: false,
+        message: error.message || "Failed to verify membership",
+      },
+      502,
+      corsHeaders,
+    );
+  }
+}
+
 function getBearerToken(request) {
   const auth = request.headers.get("Authorization") || "";
   const m = auth.match(/^Bearer\s+(.+)$/i);
@@ -260,13 +320,21 @@ async function handleAdminCreateSpeakerInvite(request, env, corsHeaders) {
     const auth = ensureAdmin(request, env, corsHeaders);
     if (auth) return auth;
     if (!env.ISIR_DB) {
-      return jsonResponse({ success: false, error: "Database not configured" }, 500, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
     }
 
     const data = await request.json();
     const email = normalizeEmail(data?.email);
     if (!email) {
-      return jsonResponse({ success: false, error: "Email is required" }, 400, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "Email is required" },
+        400,
+        corsHeaders,
+      );
     }
 
     const now = Date.now();
@@ -334,11 +402,19 @@ async function handleAdminCreateSpeakerInvite(request, env, corsHeaders) {
 async function handleVerifySpeakerInvite(request, env, url, corsHeaders) {
   try {
     if (!env.ISIR_DB) {
-      return jsonResponse({ success: false, error: "Database not configured" }, 500, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
     }
     const token = (url.searchParams.get("token") || "").trim();
     if (!token) {
-      return jsonResponse({ success: false, error: "token is required" }, 400, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "token is required" },
+        400,
+        corsHeaders,
+      );
     }
 
     const now = Date.now();
@@ -349,13 +425,25 @@ async function handleVerifySpeakerInvite(request, env, url, corsHeaders) {
       .first();
 
     if (!row?.email) {
-      return jsonResponse({ success: false, error: "Invalid invite token" }, 404, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "Invalid invite token" },
+        404,
+        corsHeaders,
+      );
     }
     if (Number(row.expires_at || 0) <= now) {
-      return jsonResponse({ success: false, error: "Invite token expired" }, 410, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "Invite token expired" },
+        410,
+        corsHeaders,
+      );
     }
     if (row.used_at != null && Number(row.used_at) > 0) {
-      return jsonResponse({ success: false, error: "Invite token already used" }, 409, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "Invite token already used" },
+        409,
+        corsHeaders,
+      );
     }
 
     return jsonResponse(
@@ -384,7 +472,11 @@ async function handleCheckSpeakerInviteByEmail(request, env, url, corsHeaders) {
     }
     const email = normalizeEmail(url.searchParams.get("email") || "");
     if (!email) {
-      return jsonResponse({ success: false, error: "email is required" }, 400, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "email is required" },
+        400,
+        corsHeaders,
+      );
     }
 
     const now = Date.now();
@@ -464,7 +556,11 @@ function ensureAdmin(request, env, corsHeaders) {
     );
   }
   if (headerToken !== expected) {
-    return jsonResponse({ success: false, error: "Unauthorized" }, 401, corsHeaders);
+    return jsonResponse(
+      { success: false, error: "Unauthorized" },
+      401,
+      corsHeaders,
+    );
   }
   return null;
 }
@@ -476,7 +572,11 @@ async function handleAdminCreateReviewer(request, env, corsHeaders) {
     const data = await request.json();
     const email = (data?.email || "").trim().toLowerCase();
     if (!email) {
-      return jsonResponse({ success: false, error: "Email is required" }, 400, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "Email is required" },
+        400,
+        corsHeaders,
+      );
     }
     const now = Date.now();
 
@@ -516,10 +616,18 @@ async function handleAdminCreateReviewer(request, env, corsHeaders) {
         .run();
     }
 
-    return jsonResponse({ success: true, email, password, existing: false }, 200, corsHeaders);
+    return jsonResponse(
+      { success: true, email, password, existing: false },
+      200,
+      corsHeaders,
+    );
   } catch (error) {
     console.error("Create reviewer error:", error);
-    return jsonResponse({ success: false, error: error.message }, 500, corsHeaders);
+    return jsonResponse(
+      { success: false, error: error.message },
+      500,
+      corsHeaders,
+    );
   }
 }
 
@@ -543,12 +651,20 @@ async function handleReviewerLogin(request, env, corsHeaders) {
       .first();
 
     if (!row || !row.password_hash || Number(row.active) !== 1) {
-      return jsonResponse({ success: false, error: "Invalid credentials" }, 401, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "Invalid credentials" },
+        401,
+        corsHeaders,
+      );
     }
 
     const hashed = await sha256Hex(password);
     if (hashed !== row.password_hash) {
-      return jsonResponse({ success: false, error: "Invalid credentials" }, 401, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "Invalid credentials" },
+        401,
+        corsHeaders,
+      );
     }
 
     const token = crypto.randomUUID();
@@ -591,7 +707,11 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
   try {
     const reviewer = await requireReviewer(request, env);
     if (!reviewer) {
-      return jsonResponse({ success: false, error: "Unauthorized" }, 401, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "Unauthorized" },
+        401,
+        corsHeaders,
+      );
     }
 
     // Ensure exactly 5 assigned abstracts (persisted)
@@ -638,7 +758,11 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
     }
 
     if (assignedIds.length === 0) {
-      return jsonResponse({ success: true, data: [], existingReviews: [] }, 200, corsHeaders);
+      return jsonResponse(
+        { success: true, data: [], existingReviews: [] },
+        200,
+        corsHeaders,
+      );
     }
 
     const placeholders = assignedIds.map(() => "?").join(",");
@@ -690,7 +814,11 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
       .all();
 
     return jsonResponse(
-      { success: true, data: ordered, existingReviews: existingReviews.results || [] },
+      {
+        success: true,
+        data: ordered,
+        existingReviews: existingReviews.results || [],
+      },
       200,
       corsHeaders,
     );
@@ -714,13 +842,21 @@ async function handleSubmitReviewerReview(request, env, corsHeaders) {
   try {
     const reviewer = await requireReviewer(request, env);
     if (!reviewer) {
-      return jsonResponse({ success: false, error: "Unauthorized" }, 401, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "Unauthorized" },
+        401,
+        corsHeaders,
+      );
     }
 
     const data = await request.json();
     const abstractId = (data?.abstract_id || "").trim();
     if (!abstractId) {
-      return jsonResponse({ success: false, error: "abstract_id is required" }, 400, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "abstract_id is required" },
+        400,
+        corsHeaders,
+      );
     }
 
     // Ensure this abstract is assigned to reviewer
@@ -730,7 +866,11 @@ async function handleSubmitReviewerReview(request, env, corsHeaders) {
       .bind(reviewer.email, abstractId)
       .first();
     if (!assignment) {
-      return jsonResponse({ success: false, error: "Abstract not assigned to reviewer" }, 403, corsHeaders);
+      return jsonResponse(
+        { success: false, error: "Abstract not assigned to reviewer" },
+        403,
+        corsHeaders,
+      );
     }
 
     const originality = clampInt(data?.originality, 0, 10);
@@ -740,13 +880,19 @@ async function handleSubmitReviewerReview(request, env, corsHeaders) {
     const data_analysis = clampInt(data?.data_analysis, 0, 10);
     const significance = clampInt(data?.significance, 0, 10);
     const total =
-      originality + clarity + powerpoint + study_design + data_analysis + significance;
+      originality +
+      clarity +
+      powerpoint +
+      study_design +
+      data_analysis +
+      significance;
 
     const coi_mentor_pi = data?.coi_mentor_pi ? 1 : 0;
     const coi_same_lab = data?.coi_same_lab ? 1 : 0;
     const coi_other = data?.coi_other ? 1 : 0;
     const coi_other_details = (data?.coi_other_details || "").trim() || null;
-    const previous_study_notes = (data?.previous_study_notes || "").trim() || null;
+    const previous_study_notes =
+      (data?.previous_study_notes || "").trim() || null;
     const now = Date.now();
 
     await env.ISIR_DB.prepare(
@@ -1039,16 +1185,32 @@ async function handleRegistration(request, env, corsHeaders) {
       }
 
       if (!invite?.email) {
-        return jsonResponse({ success: false, error: "Invalid invite token" }, 400, corsHeaders);
+        return jsonResponse(
+          { success: false, error: "Invalid invite token" },
+          400,
+          corsHeaders,
+        );
       }
       if (normalizeEmail(invite.email) !== email) {
-        return jsonResponse({ success: false, error: "Invite token does not match email" }, 400, corsHeaders);
+        return jsonResponse(
+          { success: false, error: "Invite token does not match email" },
+          400,
+          corsHeaders,
+        );
       }
       if (Number(invite.expires_at || 0) <= now) {
-        return jsonResponse({ success: false, error: "Invite token expired" }, 410, corsHeaders);
+        return jsonResponse(
+          { success: false, error: "Invite token expired" },
+          410,
+          corsHeaders,
+        );
       }
       if (invite.used_at != null && Number(invite.used_at) > 0) {
-        return jsonResponse({ success: false, error: "Invite token already used" }, 409, corsHeaders);
+        return jsonResponse(
+          { success: false, error: "Invite token already used" },
+          409,
+          corsHeaders,
+        );
       }
 
       // Enforce free ticket price; accompanying is still paid (if any)
@@ -1882,24 +2044,30 @@ async function handleCreatePaymentIntent(request, env, corsHeaders) {
           );
         }
       } catch (retrieveError) {
-        console.error("Failed to retrieve existing payment intent:", retrieveError);
+        console.error(
+          "Failed to retrieve existing payment intent:",
+          retrieveError,
+        );
       }
     }
 
     // Create payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount),
-      currency: currency.toLowerCase(),
-      metadata: {
-        registrationId: registrationId,
-        ...metadata,
+    const paymentIntent = await stripe.paymentIntents.create(
+      {
+        amount: Math.round(amount),
+        currency: currency.toLowerCase(),
+        metadata: {
+          registrationId: registrationId,
+          ...metadata,
+        },
+        automatic_payment_methods: {
+          enabled: true,
+        },
       },
-      automatic_payment_methods: {
-        enabled: true,
+      {
+        idempotencyKey: `registration-${registrationId}`,
       },
-    }, {
-      idempotencyKey: `registration-${registrationId}`,
-    });
+    );
 
     await env.ISIR_DB.prepare(
       `UPDATE registrations
