@@ -4,6 +4,35 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import PaymentForm from "../components/PaymentForm";
 
+const REGISTRATION_TICKET_LABELS = {
+  "isir-member": "ISIR Member",
+  "non-member": "Non-Member",
+  "trainee-member": "Trainee / Student Member",
+  "trainee-non-member": "Trainee / Student Non-Member",
+  "invited-speaker": "Invited Speaker",
+};
+
+function parseRegistrationDayList(raw) {
+  if (raw == null || raw === "") return [];
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function registrationPaymentBadgeClass(status) {
+  const s = String(status || "").toLowerCase();
+  if (s === "paid" || s === "completed") {
+    return "bg-green-100 text-green-800";
+  }
+  if (s === "pending") {
+    return "bg-yellow-100 text-yellow-800";
+  }
+  return "bg-red-100 text-red-800";
+}
+
 export default function AdminTab() {
   const [abstracts, setAbstracts] = useState([]);
   const [visaRequests, setVisaRequests] = useState([]);
@@ -19,6 +48,11 @@ export default function AdminTab() {
   const [abstractStatusFilter, setAbstractStatusFilter] = useState("all");
   const [abstractSortBy, setAbstractSortBy] = useState("date-desc");
   const [abstractViewMode, setAbstractViewMode] = useState("cards"); // "cards", "table", or "review"
+
+  const [registrationSearch, setRegistrationSearch] = useState("");
+  const [expandedRegistrationIds, setExpandedRegistrationIds] = useState(
+    new Set(),
+  );
 
   // Review mode state
   const [reviewIndex, setReviewIndex] = useState(0);
@@ -109,13 +143,6 @@ export default function AdminTab() {
 
   const registrationTotals = useMemo(() => {
     const list = Array.isArray(registrations) ? registrations : [];
-    const ticketLabels = {
-      "isir-member": "ISIR Member",
-      "non-member": "Non-Member",
-      "trainee-member": "Trainee / Student Member",
-      "trainee-non-member": "Trainee / Student Non-Member",
-      "invited-speaker": "Invited Speaker",
-    };
     const conferenceDays = ["Nov 5", "Nov 6", "Nov 7", "Nov 8"];
     const parseDayList = (raw) => {
       if (raw == null || raw === "") return [];
@@ -176,7 +203,7 @@ export default function AdminTab() {
     const ticketRows = Object.entries(byTicket)
       .map(([id, count]) => ({
         id,
-        label: ticketLabels[id] || id,
+        label: REGISTRATION_TICKET_LABELS[id] || id,
         count,
       }))
       .sort((a, b) => b.count - a.count);
@@ -200,6 +227,32 @@ export default function AdminTab() {
       invitedSpeakers,
     };
   }, [registrations]);
+
+  const filteredRegistrations = useMemo(() => {
+    const list = Array.isArray(registrations) ? registrations : [];
+    const q = registrationSearch.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((r) => {
+      const parts = [
+        r.id,
+        r.first_name,
+        r.middle_name,
+        r.last_name,
+        r.email,
+        r.institution,
+        r.badge_name,
+        r.ticket_type,
+        r.payment_status,
+        r.city,
+        r.country,
+        r.phone,
+        r.cell_phone,
+      ]
+        .filter((x) => x != null && String(x).trim() !== "")
+        .map((x) => String(x).toLowerCase());
+      return parts.some((p) => p.includes(q));
+    });
+  }, [registrations, registrationSearch]);
 
   // Reviewer password generator state
   const [emailFileName, setEmailFileName] = useState("");
@@ -757,6 +810,18 @@ export default function AdminTab() {
         newSet.add(abstractId);
       }
       return newSet;
+    });
+  };
+
+  const toggleRegistrationExpanded = (registrationId) => {
+    setExpandedRegistrationIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(registrationId)) {
+        next.delete(registrationId);
+      } else {
+        next.add(registrationId);
+      }
+      return next;
     });
   };
 
@@ -2669,72 +2734,443 @@ export default function AdminTab() {
           {registrations.length === 0 ? (
             <p className="text-gray-500">No registrations yet.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Institution
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ticket Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total Price
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Payment Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Registered
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {registrations.map((reg) => (
-                    <tr key={reg.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {reg.first_name} {reg.last_name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {reg.email}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {reg.institution || "N/A"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {reg.ticket_type}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        ${reg.total_price}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            reg.payment_status === "paid"
-                              ? "bg-green-100 text-green-800"
-                              : reg.payment_status === "pending"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-red-100 text-red-800"
-                          }`}
+            <>
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-between">
+                <label className="block flex-1 min-w-0 max-w-xl">
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Search
+                  </span>
+                  <input
+                    type="search"
+                    value={registrationSearch}
+                    onChange={(e) => setRegistrationSearch(e.target.value)}
+                    placeholder="Name, email, institution, ticket, phone, country…"
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  />
+                </label>
+                <p className="text-sm text-gray-500 pb-1">
+                  Showing {filteredRegistrations.length} of {registrations.length}
+                </p>
+              </div>
+              {filteredRegistrations.length === 0 ? (
+                <p className="text-gray-500">
+                  No registrations match your search.
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th
+                          scope="col"
+                          className="w-12 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
-                          {reg.payment_status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(reg.registration_date)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                          <span className="sr-only">Expand</span>
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Name
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Email
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Institution
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Ticket
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          +Guests
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Total
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Payment
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Registered
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredRegistrations.map((reg) => {
+                        const isOpen = expandedRegistrationIds.has(reg.id);
+                        const ticketLabel =
+                          REGISTRATION_TICKET_LABELS[reg.ticket_type] ||
+                          reg.ticket_type;
+                        const lunchDays = parseRegistrationDayList(
+                          reg.lunch_days,
+                        );
+                        const dinnerDays = parseRegistrationDayList(
+                          reg.dinner_days,
+                        );
+                        const dietaryBits = [];
+                        if (Number(reg.dietary_vegan) === 1) {
+                          dietaryBits.push("Vegan");
+                        }
+                        if (Number(reg.dietary_vegetarian) === 1) {
+                          dietaryBits.push("Vegetarian");
+                        }
+                        if (Number(reg.dietary_gluten_free) === 1) {
+                          dietaryBits.push("Gluten-free");
+                        }
+                        if (Number(reg.dietary_kosher) === 1) {
+                          dietaryBits.push("Kosher");
+                        }
+                        if (Number(reg.dietary_other) === 1) {
+                          dietaryBits.push("Other dietary");
+                        }
+                        const fullName = [
+                          reg.salutation,
+                          reg.first_name,
+                          reg.middle_name,
+                          reg.last_name,
+                          reg.suffix,
+                        ]
+                          .filter(Boolean)
+                          .join(" ");
+                        const cur = reg.currency || "USD";
+                        const fmtMoney = (n) =>
+                          `${cur} ${Number(n || 0).toFixed(2)}`;
+
+                        return (
+                          <React.Fragment key={reg.id}>
+                            <tr className="hover:bg-gray-50/80">
+                              <td className="px-3 py-3 whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    toggleRegistrationExpanded(reg.id)
+                                  }
+                                  aria-expanded={isOpen}
+                                  aria-label={
+                                    isOpen
+                                      ? "Hide registration details"
+                                      : "Show registration details"
+                                  }
+                                  className="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                                >
+                                  {isOpen ? (
+                                    <svg
+                                      className="w-5 h-5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M5 15l7-7 7 7"
+                                      />
+                                    </svg>
+                                  ) : (
+                                    <svg
+                                      className="w-5 h-5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M19 9l-7 7-7-7"
+                                      />
+                                    </svg>
+                                  )}
+                                </button>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {reg.first_name} {reg.last_name}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                {reg.email}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600 max-w-[14rem] truncate">
+                                {reg.institution || "—"}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600">
+                                <span className="font-medium text-gray-800">
+                                  {ticketLabel}
+                                </span>
+                                {reg.ticket_type &&
+                                  ticketLabel !== reg.ticket_type && (
+                                    <span className="block text-xs text-gray-400 mt-0.5">
+                                      {reg.ticket_type}
+                                    </span>
+                                  )}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 tabular-nums">
+                                {Number(reg.accompanying_count || 0)}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 tabular-nums">
+                                {fmtMoney(reg.total_price)}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <span
+                                  className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${registrationPaymentBadgeClass(
+                                    reg.payment_status,
+                                  )}`}
+                                >
+                                  {reg.payment_status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                {formatDate(reg.registration_date)}
+                              </td>
+                            </tr>
+                            {isOpen && (
+                              <tr className="bg-gray-50">
+                                <td
+                                  colSpan={9}
+                                  className="px-4 py-4 text-sm text-gray-700 border-t border-gray-100"
+                                >
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
+                                    <dl className="space-y-2">
+                                      <div className="grid grid-cols-[8.5rem_1fr] gap-x-2 gap-y-1">
+                                        <dt className="text-gray-500">
+                                          Registration ID
+                                        </dt>
+                                        <dd className="font-mono text-xs break-all">
+                                          {reg.id}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Full name
+                                        </dt>
+                                        <dd>{fullName || "—"}</dd>
+                                        <dt className="text-gray-500">
+                                          Badge name
+                                        </dt>
+                                        <dd>{reg.badge_name || "—"}</dd>
+                                        <dt className="text-gray-500">
+                                          Pronouns
+                                        </dt>
+                                        <dd>{reg.pronouns || "—"}</dd>
+                                        <dt className="text-gray-500">
+                                          Credentials
+                                        </dt>
+                                        <dd>{reg.credentials || "—"}</dd>
+                                        <dt className="text-gray-500">
+                                          Department
+                                        </dt>
+                                        <dd>{reg.department || "—"}</dd>
+                                        <dt className="text-gray-500">
+                                          Address
+                                        </dt>
+                                        <dd>
+                                          {[
+                                            reg.address1,
+                                            reg.address2,
+                                            [
+                                              reg.city,
+                                              reg.state,
+                                              reg.zip,
+                                            ]
+                                              .filter(Boolean)
+                                              .join(", "),
+                                            reg.country,
+                                          ]
+                                            .filter(
+                                              (line) =>
+                                                line &&
+                                                String(line).trim() !== "",
+                                            )
+                                            .join(", ") || "—"}
+                                        </dd>
+                                        <dt className="text-gray-500">Phone</dt>
+                                        <dd>{reg.phone || "—"}</dd>
+                                        <dt className="text-gray-500">
+                                          Cell phone
+                                        </dt>
+                                        <dd>{reg.cell_phone || "—"}</dd>
+                                        <dt className="text-gray-500">
+                                          Physician
+                                        </dt>
+                                        <dd>
+                                          {reg.is_physician
+                                            ? String(reg.is_physician)
+                                            : "—"}
+                                        </dd>
+                                      </div>
+                                    </dl>
+                                    <dl className="space-y-2">
+                                      <div className="grid grid-cols-[8.5rem_1fr] gap-x-2 gap-y-1">
+                                        <dt className="text-gray-500">
+                                          Ticket (detail)
+                                        </dt>
+                                        <dd>{ticketLabel}</dd>
+                                        <dt className="text-gray-500">
+                                          Ticket price
+                                        </dt>
+                                        <dd className="tabular-nums">
+                                          {fmtMoney(reg.ticket_price)}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Total
+                                        </dt>
+                                        <dd className="tabular-nums font-medium">
+                                          {fmtMoney(reg.total_price)}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Early bird
+                                        </dt>
+                                        <dd>
+                                          {Number(reg.is_early_bird) === 1
+                                            ? "Yes"
+                                            : "No"}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Accompanying (count)
+                                        </dt>
+                                        <dd className="tabular-nums">
+                                          {Number(reg.accompanying_count || 0)}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Opening reception
+                                        </dt>
+                                        <dd>
+                                          {Number(
+                                            reg.opening_reception_attending ||
+                                              0,
+                                          ) === 1
+                                            ? "Attending"
+                                            : "Not attending / N/A"}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Gala dinner
+                                        </dt>
+                                        <dd>
+                                          {Number(reg.gala_dinner || 0) === 1
+                                            ? "Selected in package"
+                                            : "—"}
+                                          {" · "}
+                                          {Number(
+                                            reg.gala_dinner_attending || 0,
+                                          ) === 1
+                                            ? "Attending"
+                                            : "Not attending"}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Lunch days
+                                        </dt>
+                                        <dd>
+                                          {lunchDays.length
+                                            ? lunchDays.join(", ")
+                                            : "—"}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Dinner days
+                                        </dt>
+                                        <dd>
+                                          {dinnerDays.length
+                                            ? dinnerDays.join(", ")
+                                            : "—"}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Dietary
+                                        </dt>
+                                        <dd>
+                                          {dietaryBits.length
+                                            ? dietaryBits.join(", ")
+                                            : "None noted"}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Special assistance
+                                        </dt>
+                                        <dd>
+                                          {Number(reg.special_assistance || 0) ===
+                                          1
+                                            ? "Yes"
+                                            : "No"}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Invited speaker
+                                        </dt>
+                                        <dd>
+                                          {Number(reg.is_invited_speaker || 0) ===
+                                          1
+                                            ? "Yes"
+                                            : "No"}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Membership
+                                        </dt>
+                                        <dd>
+                                          {reg.membership_level ||
+                                          reg.membership_status
+                                            ? `${reg.membership_level || "—"} (${reg.membership_status || "—"})`
+                                            : "—"}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Trainee letter
+                                        </dt>
+                                        <dd className="break-all text-xs">
+                                          {reg.trainee_letter_status ||
+                                            "not_required"}
+                                          {reg.trainee_letter_url
+                                            ? ` · ${reg.trainee_letter_url}`
+                                            : ""}
+                                          {reg.trainee_letter_uploaded_at
+                                            ? ` · ${formatDate(reg.trainee_letter_uploaded_at)}`
+                                            : ""}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Payment date
+                                        </dt>
+                                        <dd>
+                                          {formatDate(reg.payment_date)}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Payment ref.
+                                        </dt>
+                                        <dd className="font-mono text-xs break-all">
+                                          {reg.payment_id || "—"}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Payment intent
+                                        </dt>
+                                        <dd className="font-mono text-xs break-all">
+                                          {reg.payment_intent_id || "—"}
+                                        </dd>
+                                        <dt className="text-gray-500">
+                                          Privacy / policy
+                                        </dt>
+                                        <dd className="text-xs leading-relaxed">
+                                          Policy agreed:{" "}
+                                          {Number(reg.policy_agreed || 0) === 1
+                                            ? "Yes"
+                                            : "No"}
+                                          {" · "}Marketing:{" "}
+                                          {Number(reg.privacy_marketing || 0) ===
+                                          1
+                                            ? "Yes"
+                                            : "No"}
+                                          {" · "}App:{" "}
+                                          {Number(reg.privacy_app || 0) === 1
+                                            ? "Yes"
+                                            : "No"}
+                                          {" · "}Opt out mailing:{" "}
+                                          {Number(reg.opt_out_mailing || 0) ===
+                                          1
+                                            ? "Yes"
+                                            : "No"}
+                                        </dd>
+                                      </div>
+                                    </dl>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

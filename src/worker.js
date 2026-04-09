@@ -1484,7 +1484,7 @@ async function handleRegistration(request, env, corsHeaders) {
         data.privacyApp ? 1 : 0,
         data.optOutMailing ? 1 : 0,
         (isInvitedSpeaker && totalPrice === 0) ||
-        (isPreviewModeRequest && totalPrice === 0)
+          (isPreviewModeRequest && totalPrice === 0)
           ? "completed"
           : "pending",
         isInvitedSpeaker,
@@ -2429,7 +2429,8 @@ async function handleStripeWebhook(request, env) {
                 const acc = Number(row.accompanying_count) || 0;
                 const gala = Number(row.gala_dinner) || 0;
                 const galaAttending = Number(row.gala_dinner_attending) === 1;
-                const openingReception = Number(row.opening_reception_attending) === 1;
+                const openingReception =
+                  Number(row.opening_reception_attending) === 1;
                 const lunchDays = (() => {
                   try {
                     const parsed = JSON.parse(row.lunch_days || "[]");
