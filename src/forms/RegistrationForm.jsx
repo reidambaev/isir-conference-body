@@ -15,6 +15,8 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import {
+  CONGRESS_WEEKEND_MEALS,
+  formatCongressMealDayList,
   ISIR_API_CONFIG,
   isPreviewMode,
   PREVIEW_KEY,
@@ -280,16 +282,14 @@ const RegistrationForm = ({ onClose }) => {
     },
     mealAttendance: {
       lunch: {
-        "Nov 5": false,
-        "Nov 6": false,
-        "Nov 7": false,
-        "Nov 8": false,
+        Friday: false,
+        Saturday: false,
+        Sunday: false,
       },
-      dinner: {
-        "Nov 5": false,
-        "Nov 6": false,
-        "Nov 7": false,
-        "Nov 8": false,
+      breakfast: {
+        Friday: false,
+        Saturday: false,
+        Sunday: false,
       },
     },
     openingReceptionAttending: false,
@@ -860,8 +860,6 @@ const RegistrationForm = ({ onClose }) => {
     },
     "invited-speaker": { early: 0, standard: 0, label: "Invited Speaker" },
   };
-  const conferenceDays = ["Nov 5", "Nov 6", "Nov 7", "Nov 8"];
-
   const isInvitedSpeakerMode =
     formData.ticketType === "invited-speaker" ||
     speakerInvite.status === "valid" ||
@@ -2118,8 +2116,8 @@ const RegistrationForm = ({ onClose }) => {
                     Meal Attendance
                   </h5>
                   <p className="text-sm text-gray-600 mb-5">
-                    Indicate welcome events and which congress days you will attend
-                    lunch and dinner.
+                    Indicate welcome events and which days you will attend lunch and
+                    breakfast (Friday–Sunday, Nov 6–8, 2026).
                   </p>
                   <div className="mb-5">
                     <p className="text-sm font-semibold text-gray-700 mb-2">
@@ -2146,41 +2144,47 @@ const RegistrationForm = ({ onClose }) => {
                         Lunch
                       </p>
                       <div className="space-y-2">
-                        {conferenceDays.map((day) => (
+                        {CONGRESS_WEEKEND_MEALS.map(({ key, date }) => (
                           <label
-                            key={`lunch-${day}`}
+                            key={`lunch-${key}`}
                             className="flex items-center gap-2"
                           >
                             <input
                               type="checkbox"
-                              name={`meal_lunch_${day}`}
-                              checked={formData.mealAttendance.lunch[day]}
+                              name={`meal_lunch_${key}`}
+                              checked={formData.mealAttendance.lunch[key]}
                               onChange={handleChange}
                               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
-                            <span className="text-sm text-gray-700">{day}</span>
+                            <span className="text-sm text-gray-700">
+                              {key}{" "}
+                              <span className="text-gray-500">({date})</span>
+                            </span>
                           </label>
                         ))}
                       </div>
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-gray-700 mb-3">
-                        Dinner
+                        Breakfast
                       </p>
                       <div className="space-y-2">
-                        {conferenceDays.map((day) => (
+                        {CONGRESS_WEEKEND_MEALS.map(({ key, date }) => (
                           <label
-                            key={`dinner-${day}`}
+                            key={`breakfast-${key}`}
                             className="flex items-center gap-2"
                           >
                             <input
                               type="checkbox"
-                              name={`meal_dinner_${day}`}
-                              checked={formData.mealAttendance.dinner[day]}
+                              name={`meal_breakfast_${key}`}
+                              checked={formData.mealAttendance.breakfast[key]}
                               onChange={handleChange}
                               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
-                            <span className="text-sm text-gray-700">{day}</span>
+                            <span className="text-sm text-gray-700">
+                              {key}{" "}
+                              <span className="text-gray-500">({date})</span>
+                            </span>
                           </label>
                         ))}
                       </div>
@@ -2553,28 +2557,20 @@ const RegistrationForm = ({ onClose }) => {
                     </p>
                     <div className="space-y-1 text-sm text-gray-700">
                       <p>
-                        Lunch days:{" "}
-                        {conferenceDays.filter(
-                          (day) => formData.mealAttendance.lunch[day],
-                        ).length > 0
-                          ? conferenceDays
-                              .filter(
-                                (day) => formData.mealAttendance.lunch[day],
-                              )
-                              .join(", ")
-                          : "None selected"}
+                        Lunch (Fri–Sun, Nov 6–8):{" "}
+                        {formatCongressMealDayList(
+                          CONGRESS_WEEKEND_MEALS.map((m) => m.key).filter(
+                            (day) => formData.mealAttendance.lunch[day],
+                          ),
+                        ) || "None selected"}
                       </p>
                       <p>
-                        Dinner days:{" "}
-                        {conferenceDays.filter(
-                          (day) => formData.mealAttendance.dinner[day],
-                        ).length > 0
-                          ? conferenceDays
-                              .filter(
-                                (day) => formData.mealAttendance.dinner[day],
-                              )
-                              .join(", ")
-                          : "None selected"}
+                        Breakfast (Fri–Sun, Nov 6–8):{" "}
+                        {formatCongressMealDayList(
+                          CONGRESS_WEEKEND_MEALS.map((m) => m.key).filter(
+                            (day) => formData.mealAttendance.breakfast[day],
+                          ),
+                        ) || "None selected"}
                       </p>
                       <p>
                         Opening reception:{" "}

@@ -48,6 +48,25 @@ export const TICKET_PRICES = {
 export const EARLY_BIRD_DEADLINE = new Date("2026-07-31");
 export const GALA_DINNER_PRICE = 100;
 
+/** Fri–Sun of congress week (Nov 5–8, 2026); stored JSON uses `key` only. */
+export const CONGRESS_WEEKEND_MEALS = [
+  { key: "Friday", date: "Nov 6, 2026" },
+  { key: "Saturday", date: "Nov 7, 2026" },
+  { key: "Sunday", date: "Nov 8, 2026" },
+];
+
+export const CONGRESS_WEEKEND_MEAL_KEYS = CONGRESS_WEEKEND_MEALS.map((m) => m.key);
+
+export function formatCongressMealDayLabel(dayKey) {
+  const row = CONGRESS_WEEKEND_MEALS.find((m) => m.key === dayKey);
+  return row ? `${row.key} (${row.date})` : String(dayKey || "");
+}
+
+export function formatCongressMealDayList(dayKeys) {
+  if (!Array.isArray(dayKeys) || dayKeys.length === 0) return "";
+  return dayKeys.map((k) => formatCongressMealDayLabel(k)).join(", ");
+}
+
 // Utility Functions
 export const getAccompanyingPrice = (isEarlyBird) => (isEarlyBird ? 250 : 350);
 

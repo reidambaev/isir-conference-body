@@ -3,6 +3,11 @@ import * as XLSX from "xlsx";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import PaymentForm from "../components/PaymentForm";
+import {
+  CONGRESS_WEEKEND_MEALS,
+  CONGRESS_WEEKEND_MEAL_KEYS,
+  formatCongressMealDayList,
+} from "../config/constants";
 
 const REGISTRATION_TICKET_LABELS = {
   "isir-member": "ISIR Member",
@@ -20,6 +25,29 @@ function parseRegistrationDayList(raw) {
   } catch {
     return [];
   }
+}
+
+/** Map legacy calendar keys (Thu–Sun congress) to Fri–Sun labels for rollups. */
+const LEGACY_MEAL_DAY_TO_WEEKEND = {
+  "Nov 6": "Friday",
+  "Nov 7": "Saturday",
+  "Nov 8": "Sunday",
+};
+
+function normalizeWeekendMealDayList(raw) {
+  const arr = parseRegistrationDayList(raw);
+  const out = [];
+  for (const d of arr) {
+    if (CONGRESS_WEEKEND_MEAL_KEYS.includes(d)) out.push(d);
+    else if (LEGACY_MEAL_DAY_TO_WEEKEND[d]) out.push(LEGACY_MEAL_DAY_TO_WEEKEND[d]);
+  }
+  return out;
+}
+
+function registrationBreakfastDaysForDisplay(reg) {
+  const fromBreakfast = normalizeWeekendMealDayList(reg.breakfast_days);
+  if (fromBreakfast.length > 0) return fromBreakfast;
+  return normalizeWeekendMealDayList(reg.dinner_days);
 }
 
 function registrationPaymentBadgeClass(status) {
@@ -143,7 +171,7 @@ export default function AdminTab() {
 
   const registrationTotals = useMemo(() => {
     const list = Array.isArray(registrations) ? registrations : [];
-    const conferenceDays = ["Nov 5", "Nov 6", "Nov 7", "Nov 8"];
+    const weekendDays = CONGRESS_WEEKEND_MEAL_KEYS;
     const parseDayList = (raw) => {
       if (raw == null || raw === "") return [];
       try {
@@ -166,8 +194,8 @@ export default function AdminTab() {
     let revenueAll = 0;
     let revenueConfirmed = 0;
     let confirmedCount = 0;
-    const lunchByDay = Object.fromEntries(conferenceDays.map((d) => [d, 0]));
-    const dinnerByDay = Object.fromEntries(conferenceDays.map((d) => [d, 0]));
+    const lunchByDay = Object.fromEntries(weekendDays.map((d) => [d, 0]));
+    const breakfastByDay = Object.fromEntries(weekendDays.map((d) => [d, 0]));
 
     for (const r of list) {
       const status = String(r.payment_status || "unknown").toLowerCase();
@@ -188,11 +216,18 @@ export default function AdminTab() {
         revenueConfirmed += amt;
         confirmedCount += 1;
       }
-      for (const d of parseDayList(r.lunch_days)) {
+      for (const d of normalizeWeekendMealDayList(r.lunch_days)) {
         if (d in lunchByDay) lunchByDay[d] += 1;
       }
-      for (const d of parseDayList(r.dinner_days)) {
-        if (d in dinnerByDay) dinnerByDay[d] += 1;
+      const breakfastParsed = parseDayList(r.breakfast_days);
+      if (breakfastParsed.length > 0) {
+        for (const d of normalizeWeekendMealDayList(r.breakfast_days)) {
+          if (d in breakfastByDay) breakfastByDay[d] += 1;
+        }
+      } else {
+        for (const d of normalizeWeekendMealDayList(r.dinner_days)) {
+          if (d in breakfastByDay) breakfastByDay[d] += 1;
+        }
       }
     }
 
@@ -222,8 +257,7 @@ export default function AdminTab() {
       revenueConfirmed,
       confirmedCount,
       lunchByDay,
-      dinnerByDay,
-      conferenceDays,
+      breakfastByDay,
       invitedSpeakers,
     };
   }, [registrations]);
@@ -2799,11 +2833,11 @@ export default function AdminTab() {
                         const ticketLabel =
                           REGISTRATION_TICKET_LABELS[reg.ticket_type] ||
                           reg.ticket_type;
-                        const lunchDays = parseRegistrationDayList(
+                        const lunchDays = normalizeWeekendMealDayList(
                           reg.lunch_days,
                         );
-                        const dinnerDays = parseRegistrationDayList(
-                          reg.dinner_days,
+                        const breakfastDays = registrationBreakfastDaysForDisplay(
+                          reg,
                         );
                         const dietaryBits = [];
                         if (Number(reg.dietary_vegan) === 1) {
@@ -3053,19 +3087,19 @@ export default function AdminTab() {
                                             : "Not attending"}
                                         </dd>
                                         <dt className="text-gray-500">
-                                          Lunch days
+                                          Lunch (Fri–Sun, Nov 6–8)
                                         </dt>
                                         <dd>
                                           {lunchDays.length
-                                            ? lunchDays.join(", ")
+                                            ? formatCongressMealDayList(lunchDays)
                                             : "—"}
                                         </dd>
                                         <dt className="text-gray-500">
-                                          Dinner days
+                                          Breakfast (Fri–Sun, Nov 6–8)
                                         </dt>
                                         <dd>
-                                          {dinnerDays.length
-                                            ? dinnerDays.join(", ")
+                                          {breakfastDays.length
+                                            ? formatCongressMealDayList(breakfastDays)
                                             : "—"}
                                         </dd>
                                         <dt className="text-gray-500">
@@ -3352,8 +3386,8 @@ export default function AdminTab() {
                   Meal attendance by day
                 </h3>
                 <p className="text-xs text-gray-500 mt-1">
-                  Count of registrants who selected each congress day for lunch
-                  or dinner.
+                  Count of registrants who selected each day (Friday–Sunday, Nov
+                  6–8, 2026) for lunch or breakfast.
                 </p>
               </div>
               <table className="min-w-full divide-y divide-gray-200">
@@ -3366,21 +3400,24 @@ export default function AdminTab() {
                       Lunch
                     </th>
                     <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase">
-                      Dinner
+                      Breakfast
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
-                  {registrationTotals.conferenceDays.map((day) => (
-                    <tr key={day}>
-                      <td className="px-5 py-3 text-sm font-medium text-gray-800">
-                        {day}
+                  {CONGRESS_WEEKEND_MEALS.map(({ key, date }) => (
+                    <tr key={key}>
+                      <td className="px-5 py-3 text-sm text-gray-800">
+                        <span className="font-medium">{key}</span>
+                        <span className="block text-xs text-gray-500 font-normal mt-0.5">
+                          {date}
+                        </span>
                       </td>
                       <td className="px-5 py-3 text-sm text-right text-gray-900">
-                        {registrationTotals.lunchByDay[day] ?? 0}
+                        {registrationTotals.lunchByDay[key] ?? 0}
                       </td>
                       <td className="px-5 py-3 text-sm text-right text-gray-900">
-                        {registrationTotals.dinnerByDay[day] ?? 0}
+                        {registrationTotals.breakfastByDay[key] ?? 0}
                       </td>
                     </tr>
                   ))}

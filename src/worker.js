@@ -1334,7 +1334,7 @@ async function handleRegistration(request, env, corsHeaders) {
     const lunchDays = Object.entries(data.mealAttendance?.lunch || {})
       .filter(([, attending]) => Boolean(attending))
       .map(([day]) => day);
-    const dinnerDays = Object.entries(data.mealAttendance?.dinner || {})
+    const breakfastDays = Object.entries(data.mealAttendance?.breakfast || {})
       .filter(([, attending]) => Boolean(attending))
       .map(([day]) => day);
     let accompanyingPrice = (isEarlyBird ? 250 : 350) * accompanyingCount;
@@ -1432,7 +1432,7 @@ async function handleRegistration(request, env, corsHeaders) {
         salutation, suffix, institution, credentials, badge_name, pronouns,
         address1, address2, city, state, zip, country, phone, cell_phone,
         is_physician, ticket_type, accompanying_count, gala_dinner, gala_dinner_attending,
-        lunch_days, dinner_days, opening_reception_attending, ticket_price, total_price,
+        lunch_days, breakfast_days, opening_reception_attending, ticket_price, total_price,
         is_early_bird, dietary_vegan, dietary_vegetarian, dietary_gluten_free,
         dietary_kosher, dietary_other, special_assistance, policy_agreed,
         privacy_marketing, privacy_app, opt_out_mailing, payment_status,
@@ -1468,7 +1468,7 @@ async function handleRegistration(request, env, corsHeaders) {
         galaDinnerAttending,
         galaDinnerAttending,
         JSON.stringify(lunchDays),
-        JSON.stringify(dinnerDays),
+        JSON.stringify(breakfastDays),
         openingReceptionAttending,
         ticketPrice,
         totalPrice,
@@ -2327,6 +2327,22 @@ function formatTicketLabel(slug) {
   );
 }
 
+const CONGRESS_MEAL_DAY_EMAIL_LABELS = {
+  Friday: "Friday (Nov 6, 2026)",
+  Saturday: "Saturday (Nov 7, 2026)",
+  Sunday: "Sunday (Nov 8, 2026)",
+  "Nov 6": "Friday (Nov 6, 2026)",
+  "Nov 7": "Saturday (Nov 7, 2026)",
+  "Nov 8": "Sunday (Nov 8, 2026)",
+};
+
+function formatCongressMealDayListForEmail(arr) {
+  if (!Array.isArray(arr) || arr.length === 0) return "";
+  return arr
+    .map((d) => CONGRESS_MEAL_DAY_EMAIL_LABELS[d] || String(d))
+    .join(", ");
+}
+
 // Handle Stripe webhook
 async function handleStripeWebhook(request, env) {
   try {
@@ -2411,7 +2427,7 @@ async function handleStripeWebhook(request, env) {
             if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
               const row = await env.ISIR_DB.prepare(
                 `SELECT email, first_name, middle_name, last_name, ticket_type, ticket_price, total_price, currency,
-                 accompanying_count, gala_dinner, gala_dinner_attending, lunch_days, dinner_days, opening_reception_attending, institution, badge_name FROM registrations WHERE id = ?`,
+                 accompanying_count, gala_dinner, gala_dinner_attending, lunch_days, breakfast_days, dinner_days, opening_reception_attending, institution, badge_name FROM registrations WHERE id = ?`,
               )
                 .bind(registrationId)
                 .first();
@@ -2439,10 +2455,14 @@ async function handleStripeWebhook(request, env) {
                     return [];
                   }
                 })();
-                const dinnerDays = (() => {
+                const breakfastDays = (() => {
                   try {
-                    const parsed = JSON.parse(row.dinner_days || "[]");
-                    return Array.isArray(parsed) ? parsed : [];
+                    const fromBreakfast = JSON.parse(row.breakfast_days || "[]");
+                    if (Array.isArray(fromBreakfast) && fromBreakfast.length > 0) {
+                      return fromBreakfast;
+                    }
+                    const legacy = JSON.parse(row.dinner_days || "[]");
+                    return Array.isArray(legacy) ? legacy : [];
                   } catch {
                     return [];
                   }
@@ -2468,8 +2488,8 @@ async function handleStripeWebhook(request, env) {
       ${gala > 0 ? `<tr><td style="padding: 4px 0;">Gala dinner tickets</td><td style="padding: 4px 0; text-align: right;">${gala}</td></tr>` : ""}
       <tr><td style="padding: 4px 0;">Opening reception</td><td style="padding: 4px 0; text-align: right;">${openingReception ? "Attending" : "Not attending"}</td></tr>
       <tr><td style="padding: 4px 0;">Gala dinner</td><td style="padding: 4px 0; text-align: right;">${galaAttending ? "Attending" : "Not attending"}</td></tr>
-      ${lunchDays.length > 0 ? `<tr><td style="padding: 4px 0;">Lunch days</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(lunchDays.join(", "))}</td></tr>` : ""}
-      ${dinnerDays.length > 0 ? `<tr><td style="padding: 4px 0;">Dinner days</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(dinnerDays.join(", "))}</td></tr>` : ""}
+      ${lunchDays.length > 0 ? `<tr><td style="padding: 4px 0;">Lunch (Fri–Sun)</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(formatCongressMealDayListForEmail(lunchDays))}</td></tr>` : ""}
+      ${breakfastDays.length > 0 ? `<tr><td style="padding: 4px 0;">Breakfast (Fri–Sun)</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(formatCongressMealDayListForEmail(breakfastDays))}</td></tr>` : ""}
       ${row.badge_name ? `<tr><td style="padding: 4px 0;">Badge name</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(row.badge_name)}</td></tr>` : ""}
       ${amount ? `<tr><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd;">Amount paid</td><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd; text-align: right;"><strong>${escapeHtml(amount)}</strong></td></tr>` : ""}
     </table>
