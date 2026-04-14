@@ -485,6 +485,10 @@ const RegistrationForm = ({ onClose }) => {
           );
         }
       } else {
+        // Invite-eligible users with existing ISIR accounts should still enter invited-speaker flow.
+        if (eligibleByEmail) {
+          setFormData((prev) => ({ ...prev, ticketType: "invited-speaker" }));
+        }
         // Proceed to ticket selection for both members and non-members
         setStep(2);
       }
@@ -516,6 +520,11 @@ const RegistrationForm = ({ onClose }) => {
 
   const handleTicketSelection = (e) => {
     e.preventDefault();
+    if (isInvitedSpeakerMode && !formData.ticketType) {
+      setFormData((prev) => ({ ...prev, ticketType: "invited-speaker" }));
+      setStep(4); // Skip trainee letter step for invited speakers
+      return;
+    }
     if (!formData.ticketType) {
       alert("Please select a ticket type.");
       return;
