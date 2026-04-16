@@ -91,7 +91,7 @@ export default function CheckinTab() {
       setResolvedRegistration(null);
 
       if (!extractedId) {
-        setScannerError("Could not read a registration ID from that scan.");
+        setScannerError("No registration ID in that scan.");
         setLastAttemptedId("");
         return;
       }
@@ -126,7 +126,7 @@ export default function CheckinTab() {
 
     const el = document.getElementById(CHECKIN_READER_ID);
     if (!el) {
-      setScannerError("Scanner container not ready. Refresh and try again.");
+      setScannerError("Scanner not ready. Reload the page.");
       return;
     }
 
@@ -158,8 +158,7 @@ export default function CheckinTab() {
     } catch (err) {
       setScannerStatus("error");
       setScannerError(
-        err?.message ||
-          "Unable to start camera. Check permissions and try again.",
+        err?.message || "Camera failed to start. Allow camera access and retry.",
       );
       html5QrRef.current = null;
       setScannerStatus("idle");
@@ -169,21 +168,15 @@ export default function CheckinTab() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Badge QR Check-In</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Badge check-in</h1>
         <p className="text-gray-600 mt-1">
-          Scan a registration QR code and view attendee details on-screen. No
-          admin login required. This uses a live camera stream only and does not
-          save photos to the device.
+          Scan the QR on the confirmation PDF or type the registration ID below.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="font-semibold text-gray-800 mb-3">Live scanner</h3>
-          <p className="text-xs text-gray-500 mb-2">
-            Uses the html5-qrcode library (camera + robust QR decoding). Align
-            the code in the frame and hold steady.
-          </p>
+          <h3 className="font-semibold text-gray-800 mb-3">Camera</h3>
           <div
             id={CHECKIN_READER_ID}
             className="rounded-lg overflow-hidden bg-gray-900 min-h-[280px] w-full [&_video]:object-cover [&_video]:w-full [&_video]:h-full"
@@ -195,7 +188,7 @@ export default function CheckinTab() {
               disabled={scannerStatus === "running" || lookupLoading}
               className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-60"
             >
-              {scannerStatus === "running" ? "Scanning…" : "Start scanner"}
+              {scannerStatus === "running" ? "Scanning…" : "Start"}
             </button>
             <button
               type="button"
@@ -210,7 +203,7 @@ export default function CheckinTab() {
           ) : null}
           {scannedValue ? (
             <p className="mt-2 text-xs text-gray-500 break-words">
-              Last scan: {scannedValue}
+              Scanned: {scannedValue}
             </p>
           ) : null}
         </div>
@@ -238,7 +231,7 @@ export default function CheckinTab() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-5">
-        <h3 className="font-semibold text-gray-800 mb-3">Check-in result</h3>
+        <h3 className="font-semibold text-gray-800 mb-3">Result</h3>
         {lookupLoading ? (
           <p className="text-gray-600">Loading…</p>
         ) : resolvedRegistration ? (
@@ -313,7 +306,7 @@ export default function CheckinTab() {
             {scannerError || `Registration "${lastAttemptedId}" not found.`}
           </p>
         ) : (
-          <p className="text-gray-500">No registration scanned yet.</p>
+          <p className="text-gray-500">Nothing looked up yet.</p>
         )}
       </div>
     </div>
