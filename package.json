@@ -16,6 +16,7 @@
     "@tailwindcss/postcss": "^4.1.17",
     "@tailwindcss/vite": "^4.1.17",
     "html2canvas": "^1.4.1",
+    "html5-qrcode": "^2.3.8",
     "react": "^19.2.0",
     "react-country-state-city": "^1.1.12",
     "react-dom": "^19.2.0",

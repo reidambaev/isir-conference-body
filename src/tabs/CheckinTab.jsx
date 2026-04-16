@@ -1,5 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CONGRESS_WEEKEND_MEAL_KEYS, formatCongressMealDayList } from "../config/constants";
+
+const CHECKIN_READER_ID = "checkin-html5-qrcode";
 
 const REGISTRATION_TICKET_LABELS = {
   "isir-member": "ISIR Member",
@@ -33,76 +35,46 @@ function registrationBreakfastDaysForDisplay(reg) {
 }
 
 export default function CheckinTab() {
-  const [adminToken, setAdminToken] = useState("");
-  const [registrations, setRegistrations] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [lookupLoading, setLookupLoading] = useState(false);
   const [scannerStatus, setScannerStatus] = useState("idle");
   const [scannerError, setScannerError] = useState("");
   const [manualRegistrationId, setManualRegistrationId] = useState("");
-  const [lastResolvedRegistrationId, setLastResolvedRegistrationId] = useState("");
   const [scannedValue, setScannedValue] = useState("");
+  const [resolvedRegistration, setResolvedRegistration] = useState(null);
+  const [lastAttemptedId, setLastAttemptedId] = useState("");
 
-  const videoRef = useRef(null);
-  const cameraStreamRef = useRef(null);
-  const scanIntervalRef = useRef(null);
+  const html5QrRef = useRef(null);
+  const stoppingRef = useRef(false);
+  const decodeHandledRef = useRef(false);
 
-  const registrationsById = useMemo(() => {
-    const m = new Map();
-    (registrations || []).forEach((r) => {
-      if (r?.id) m.set(String(r.id).trim(), r);
-    });
-    return m;
-  }, [registrations]);
-
-  const resolvedRegistration = useMemo(() => {
-    const id = String(lastResolvedRegistrationId || "").trim();
-    if (!id) return null;
-    return registrationsById.get(id) || null;
-  }, [lastResolvedRegistrationId, registrationsById]);
-
-  const stopScanner = useCallback(() => {
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current);
-      scanIntervalRef.current = null;
-    }
-    if (cameraStreamRef.current) {
-      for (const track of cameraStreamRef.current.getTracks()) {
-        track.stop();
+  const stopScanner = useCallback(async () => {
+    if (stoppingRef.current) return;
+    stoppingRef.current = true;
+    const inst = html5QrRef.current;
+    html5QrRef.current = null;
+    if (inst) {
+      try {
+        if (inst.isScanning) {
+          await inst.stop();
+        }
+      } catch {
+        // ignore if already stopped
       }
-      cameraStreamRef.current = null;
+      try {
+        inst.clear();
+      } catch {
+        // ignore
+      }
     }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    stoppingRef.current = false;
     setScannerStatus("idle");
   }, []);
 
   useEffect(() => {
-    return () => stopScanner();
+    return () => {
+      void stopScanner();
+    };
   }, [stopScanner]);
-
-  const fetchRegistrations = async () => {
-    if (!adminToken.trim()) {
-      alert("Please enter the admin token first.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch("/api/registrations", {
-        headers: { "X-Admin-Token": adminToken.trim() },
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json?.success) {
-        throw new Error(json?.error || "Failed to load registrations");
-      }
-      setRegistrations(json.data || []);
-      setScannerError("");
-    } catch (err) {
-      setScannerError(err?.message || "Failed to load registrations");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const extractRegistrationIdFromScan = useCallback((text) => {
     const raw = String(text || "").trim();
@@ -112,129 +84,122 @@ export default function CheckinTab() {
     return raw;
   }, []);
 
-  const resolveAndShowRegistration = useCallback(
-    (rawText) => {
+  const fetchCheckinById = useCallback(
+    async (rawText) => {
       const extractedId = extractRegistrationIdFromScan(rawText);
       setScannedValue(String(rawText || ""));
-      setLastResolvedRegistrationId(extractedId);
+      setResolvedRegistration(null);
+
       if (!extractedId) {
         setScannerError("Could not read a registration ID from that scan.");
+        setLastAttemptedId("");
         return;
       }
-      if (!registrationsById.has(extractedId)) {
-        setScannerError(`Registration "${extractedId}" not found.`);
-      } else {
-        setScannerError("");
+
+      setLastAttemptedId(extractedId);
+      setLookupLoading(true);
+      setScannerError("");
+      try {
+        const res = await fetch(
+          `/api/checkin/registration/${encodeURIComponent(extractedId)}`,
+        );
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json?.success || !json?.data) {
+          setScannerError(json?.error || "Registration not found.");
+          return;
+        }
+        setResolvedRegistration(json.data);
+      } catch (err) {
+        setScannerError(err?.message || "Lookup failed.");
+      } finally {
+        setLookupLoading(false);
       }
     },
-    [extractRegistrationIdFromScan, registrationsById],
+    [extractRegistrationIdFromScan],
   );
 
   const startScanner = useCallback(async () => {
     setScannerError("");
     setScannedValue("");
 
-    if (!("BarcodeDetector" in window)) {
-      setScannerStatus("unsupported");
-      setScannerError("This browser does not support camera QR scanning.");
+    if (scannerStatus === "running") return;
+
+    const el = document.getElementById(CHECKIN_READER_ID);
+    if (!el) {
+      setScannerError("Scanner container not ready. Refresh and try again.");
       return;
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-        audio: false,
-      });
-      cameraStreamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+      decodeHandledRef.current = false;
+      await stopScanner();
+      const { Html5Qrcode } = await import("html5-qrcode");
+      const html5QrCode = new Html5Qrcode(CHECKIN_READER_ID);
+      html5QrRef.current = html5QrCode;
       setScannerStatus("running");
-      scanIntervalRef.current = setInterval(async () => {
-        try {
-          if (!videoRef.current || videoRef.current.readyState < 2) return;
-          const codes = await detector.detect(videoRef.current);
-          if (codes?.length && codes[0]?.rawValue) {
-            resolveAndShowRegistration(codes[0].rawValue);
-            stopScanner();
-          }
-        } catch {
-          // ignore transient frame-level errors
-        }
-      }, 450);
+
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: minQrBoxSize(), height: minQrBoxSize() },
+          aspectRatio: 1.777,
+        },
+        async (decodedText) => {
+          if (stoppingRef.current || decodeHandledRef.current) return;
+          decodeHandledRef.current = true;
+          await stopScanner();
+          await fetchCheckinById(decodedText);
+        },
+        () => {
+          /* per-frame scan errors — ignore */
+        },
+      );
     } catch (err) {
       setScannerStatus("error");
       setScannerError(
         err?.message ||
-          "Unable to access camera. Check permissions, then try again.",
+          "Unable to start camera. Check permissions and try again.",
       );
-      stopScanner();
+      html5QrRef.current = null;
+      setScannerStatus("idle");
     }
-  }, [resolveAndShowRegistration, stopScanner]);
+  }, [fetchCheckinById, scannerStatus, stopScanner]);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Badge QR Check-In</h1>
         <p className="text-gray-600 mt-1">
-          Scan a registration QR code and view attendee details on-screen. This
-          uses a live camera stream only and does not save photos to the device.
-        </p>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <div className="flex flex-wrap gap-2 items-end">
-          <div className="min-w-[20rem] flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Admin token
-            </label>
-            <input
-              type="password"
-              value={adminToken}
-              onChange={(e) => setAdminToken(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              placeholder="Enter admin token"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={fetchRegistrations}
-            disabled={loading}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-60"
-          >
-            {loading ? "Loading..." : "Load Registrations"}
-          </button>
-        </div>
-        <p className="mt-2 text-xs text-gray-500">
-          Loaded registrations: {registrations.length}
+          Scan a registration QR code and view attendee details on-screen. No
+          admin login required. This uses a live camera stream only and does not
+          save photos to the device.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <h3 className="font-semibold text-gray-800 mb-3">Live scanner</h3>
-          <div className="rounded-lg overflow-hidden bg-gray-900 aspect-video">
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              muted
-              playsInline
-            />
-          </div>
+          <p className="text-xs text-gray-500 mb-2">
+            Uses the html5-qrcode library (camera + robust QR decoding). Align
+            the code in the frame and hold steady.
+          </p>
+          <div
+            id={CHECKIN_READER_ID}
+            className="rounded-lg overflow-hidden bg-gray-900 min-h-[280px] w-full [&_video]:object-cover [&_video]:w-full [&_video]:h-full"
+          />
           <div className="flex flex-wrap gap-2 mt-3">
             <button
               type="button"
-              onClick={startScanner}
-              disabled={scannerStatus === "running" || registrations.length === 0}
+              onClick={() => void startScanner()}
+              disabled={scannerStatus === "running" || lookupLoading}
               className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-60"
             >
-              {scannerStatus === "running" ? "Scanning..." : "Start scanner"}
+              {scannerStatus === "running" ? "Scanning…" : "Start scanner"}
             </button>
             <button
               type="button"
-              onClick={stopScanner}
+              onClick={() => void stopScanner()}
               className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
             >
               Stop
@@ -262,8 +227,9 @@ export default function CheckinTab() {
             />
             <button
               type="button"
-              onClick={() => resolveAndShowRegistration(manualRegistrationId)}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              onClick={() => fetchCheckinById(manualRegistrationId)}
+              disabled={lookupLoading}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-60"
             >
               Find
             </button>
@@ -273,14 +239,9 @@ export default function CheckinTab() {
 
       <div className="bg-white border border-gray-200 rounded-xl p-5">
         <h3 className="font-semibold text-gray-800 mb-3">Check-in result</h3>
-        {!lastResolvedRegistrationId ? (
-          <p className="text-gray-500">No registration scanned yet.</p>
-        ) : !resolvedRegistration ? (
-          <p className="text-red-600">
-            Registration <span className="font-mono">{lastResolvedRegistrationId}</span>{" "}
-            not found.
-          </p>
-        ) : (
+        {lookupLoading ? (
+          <p className="text-gray-600">Loading…</p>
+        ) : resolvedRegistration ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
             <p>
               <span className="text-gray-500">Registration ID:</span>{" "}
@@ -311,13 +272,28 @@ export default function CheckinTab() {
                 ? "Yes"
                 : "No"}
             </p>
+            <p>
+              <span className="text-gray-500">Opening reception:</span>{" "}
+              {Number(resolvedRegistration.opening_reception_attending || 0) ===
+              1
+                ? "Attending"
+                : "Not attending"}
+            </p>
+            <p>
+              <span className="text-gray-500">Gala dinner:</span>{" "}
+              {Number(resolvedRegistration.gala_dinner_attending || 0) === 1
+                ? "Attending"
+                : "Not attending"}
+            </p>
             <p className="md:col-span-2">
               <span className="text-gray-500">Lunch:</span>{" "}
               {(() => {
                 const lunch = normalizeWeekendMealDayList(
                   resolvedRegistration.lunch_days,
                 );
-                return lunch.length ? formatCongressMealDayList(lunch) : "Not selected";
+                return lunch.length
+                  ? formatCongressMealDayList(lunch)
+                  : "Not selected";
               })()}
             </p>
             <p className="md:col-span-2">
@@ -332,8 +308,20 @@ export default function CheckinTab() {
               })()}
             </p>
           </div>
+        ) : scannerError || lastAttemptedId ? (
+          <p className="text-red-600">
+            {scannerError || `Registration "${lastAttemptedId}" not found.`}
+          </p>
+        ) : (
+          <p className="text-gray-500">No registration scanned yet.</p>
         )}
       </div>
     </div>
   );
+}
+
+function minQrBoxSize() {
+  if (typeof window === "undefined") return 250;
+  const w = Math.min(window.innerWidth - 64, 400);
+  return Math.max(200, Math.floor(w * 0.75));
 }

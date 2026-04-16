@@ -101,6 +101,18 @@ async function handleApiRequest(request, env, url) {
     return handleCheckSpeakerInviteByEmail(request, env, url, corsHeaders);
   }
 
+  // GET /api/checkin/registration/:id — public read for badge booth (no admin token)
+  const checkinRegistrationMatch = url.pathname.match(
+    /^\/api\/checkin\/registration\/([^/]+)$/,
+  );
+  if (checkinRegistrationMatch && request.method === "GET") {
+    return handleGetCheckinRegistration(
+      env,
+      corsHeaders,
+      checkinRegistrationMatch[1],
+    );
+  }
+
   // GET /api/registrations (admin endpoint)
   if (url.pathname === "/api/registrations" && request.method === "GET") {
     return handleGetRegistrations(request, env, corsHeaders);
@@ -1595,6 +1607,45 @@ async function handleRegistration(request, env, corsHeaders) {
         status: 500,
         headers: corsHeaders,
       },
+    );
+  }
+}
+
+/** Public check-in lookup: requires knowing the registration id (e.g. from QR). */
+async function handleGetCheckinRegistration(env, corsHeaders, registrationIdRaw) {
+  try {
+    const id = String(registrationIdRaw || "").trim();
+    if (!id || !/^[a-zA-Z0-9_-]{8,128}$/.test(id)) {
+      return jsonResponse(
+        { success: false, error: "Invalid registration id" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const row = await env.ISIR_DB.prepare(
+      `SELECT id, first_name, last_name, email, ticket_type, accompanying_count, is_invited_speaker,
+       lunch_days, breakfast_days, dinner_days, opening_reception_attending, gala_dinner_attending
+       FROM registrations WHERE id = ? LIMIT 1`,
+    )
+      .bind(id)
+      .first();
+
+    if (!row?.id) {
+      return jsonResponse(
+        { success: false, error: "Registration not found" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    return jsonResponse({ success: true, data: row }, 200, corsHeaders);
+  } catch (error) {
+    console.error("Check-in registration lookup error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Lookup failed" },
+      500,
+      corsHeaders,
     );
   }
 }
