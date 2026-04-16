@@ -826,21 +826,10 @@ const RegistrationForm = ({ onClose }) => {
         selectedBreakfastDays.length > 0
           ? formatCongressMealDayList(selectedBreakfastDays)
           : "Not selected";
-      const isInvitedSpeaker = formData.ticketType === "invited-speaker";
-      const checkInQrText = [
-        "ISIR 2026 CHECK-IN",
-        `Registration ID: ${registrationId || "Pending"}`,
-        `Name: ${`${formData.firstName || ""} ${formData.lastName || ""}`.trim() || "Attendee"}`,
-        `Email: ${formData.email || ""}`,
-        `Ticket: ${ticketLabel}`,
-        `Accompanying: ${Number(formData.accompanyingPersonCount || 0)}`,
-        `Invited Speaker: ${isInvitedSpeaker ? "Yes" : "No"}`,
-        `Opening Reception: ${formData.openingReceptionAttending ? "Attending" : "Not attending"}`,
-        `Gala Dinner: ${formData.galaDinnerAttending ? "Attending" : "Not attending"}`,
-        `Lunch: ${lunchDisplay}`,
-        `Breakfast: ${breakfastDisplay}`,
-      ].join("\n");
-      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(checkInQrText)}`;
+      const qrId = registrationId ? String(registrationId).trim() : "";
+      const qrCodeUrl = qrId
+        ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(qrId)}`
+        : undefined;
       const doc = (
         <RegistrationConfirmationPDF
           attendeeName={`${formData.firstName || ""} ${formData.lastName || ""}`.trim()}

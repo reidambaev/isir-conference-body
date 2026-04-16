@@ -2820,21 +2820,7 @@ async function sendRegistrationConfirmationEmail(env, registrationId) {
       breakfastDays.length > 0
         ? formatCongressMealDayListForEmail(breakfastDays)
         : "Not selected";
-    const qrPayloadText = [
-      "ISIR 2026 CHECK-IN",
-      `Registration ID: ${String(registrationId)}`,
-      `Name: ${name}`,
-      `Email: ${String(row.email || "")}`,
-      `Ticket: ${ticketLabel}`,
-      `Accompanying: ${acc}`,
-      `Invited Speaker: ${invitedSpeaker ? "Yes" : "No"}`,
-      `Opening Reception: ${openingReception ? "Attending" : "Not attending"}`,
-      `Gala Dinner: ${galaAttending ? "Attending" : "Not attending"}`,
-      `Lunch: ${lunchDisplay}`,
-      `Breakfast: ${breakfastDisplay}`,
-      `Generated At: ${new Date().toISOString()}`,
-    ].join("\n");
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(qrPayloadText)}`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(String(registrationId))}`;
     const paymentLine =
       Number(row.total_price) > 0
         ? "Your payment has been received and your place at the ISIR 2026 World Congress is confirmed."
