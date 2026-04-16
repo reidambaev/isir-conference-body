@@ -90,6 +90,8 @@ export default function AdminTab() {
 
   // Confirmation-email sending state (retroactive single + bulk)
   const [sendingConfirmationId, setSendingConfirmationId] = useState(null);
+  const [sendingRegistrationConfirmationId, setSendingRegistrationConfirmationId] =
+    useState(null);
   const [bulkSendingConfirmations, setBulkSendingConfirmations] =
     useState(false);
   const [confirmationSendSummary, setConfirmationSendSummary] = useState(null);
@@ -1131,6 +1133,41 @@ export default function AdminTab() {
       alert(err.message || "Failed to send confirmation emails");
     } finally {
       setBulkSendingConfirmations(false);
+    }
+  };
+
+  // Send (or resend) confirmation email for a single registration.
+  const sendRegistrationConfirmation = async (registrationId) => {
+    if (!adminToken) {
+      alert("Admin access token is missing.");
+      return;
+    }
+    setSendingRegistrationConfirmationId(registrationId);
+    try {
+      const response = await fetch(
+        `/api/admin/registrations/${registrationId}/send-confirmation`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Token": adminToken,
+          },
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(
+          result?.error || "Failed to send registration confirmation email",
+        );
+      }
+      alert(
+        `Registration confirmation email sent to ${result.sentTo || "attendee"}.`,
+      );
+    } catch (err) {
+      console.error("Error sending registration confirmation email:", err);
+      alert(err.message || "Failed to send registration confirmation email");
+    } finally {
+      setSendingRegistrationConfirmationId(null);
     }
   };
 
@@ -3215,8 +3252,24 @@ export default function AdminTab() {
                                         <dt className="text-gray-500">
                                           Registration ID
                                         </dt>
-                                        <dd className="font-mono text-xs break-all">
-                                          {reg.id}
+                                        <dd className="font-mono text-xs break-all flex flex-wrap items-center gap-2">
+                                          <span>{reg.id}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              sendRegistrationConfirmation(reg.id)
+                                            }
+                                            disabled={
+                                              sendingRegistrationConfirmationId ===
+                                              reg.id
+                                            }
+                                            className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                          >
+                                            {sendingRegistrationConfirmationId ===
+                                            reg.id
+                                              ? "Sending…"
+                                              : "Resend confirmation"}
+                                          </button>
                                         </dd>
                                         <dt className="text-gray-500">
                                           Full name
@@ -3261,7 +3314,9 @@ export default function AdminTab() {
                                             )
                                             .join(", ") || "—"}
                                         </dd>
-                                        <dt className="text-gray-500">Phone</dt>
+                                        <dt className="text-gray-500">
+                                          Office phone
+                                        </dt>
                                         <dd>{reg.phone || "—"}</dd>
                                         <dt className="text-gray-500">
                                           Cell phone
@@ -3318,16 +3373,12 @@ export default function AdminTab() {
                                               0,
                                           ) === 1
                                             ? "Attending"
-                                            : "Not attending / N/A"}
+                                            : "Not attending"}
                                         </dd>
                                         <dt className="text-gray-500">
                                           Gala dinner
                                         </dt>
                                         <dd>
-                                          {Number(reg.gala_dinner || 0) === 1
-                                            ? "Selected in package"
-                                            : "—"}
-                                          {" · "}
                                           {Number(
                                             reg.gala_dinner_attending || 0,
                                           ) === 1
@@ -3340,7 +3391,7 @@ export default function AdminTab() {
                                         <dd>
                                           {lunchDays.length
                                             ? formatCongressMealDayList(lunchDays)
-                                            : "—"}
+                                            : "Not selected"}
                                         </dd>
                                         <dt className="text-gray-500">
                                           Breakfast (Fri–Sun, Nov 6–8)
@@ -3348,7 +3399,7 @@ export default function AdminTab() {
                                         <dd>
                                           {breakfastDays.length
                                             ? formatCongressMealDayList(breakfastDays)
-                                            : "—"}
+                                            : "Not selected"}
                                         </dd>
                                         <dt className="text-gray-500">
                                           Dietary

@@ -269,7 +269,7 @@ const RegistrationForm = ({ onClose }) => {
     state: null,
     zip: "",
     country: null,
-    phone: "",
+    officePhone: "",
     cellPhone: "",
     email: "",
     isPhysician: null,
@@ -603,6 +603,10 @@ const RegistrationForm = ({ onClose }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!formData.officePhone && !formData.cellPhone) {
+      alert("Please provide at least one phone number (office or cell).");
+      return;
+    }
     console.log("Registration Info:", formData);
     const invitedSpeakerFlow = formData.ticketType === "invited-speaker";
     const totalNow = getTotalPrice();
@@ -618,6 +622,7 @@ const RegistrationForm = ({ onClose }) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               ...formData,
+              phone: formData.officePhone,
               ...previewRegisterPayload,
               inviteToken:
                 speakerInvite.status === "valid"
@@ -701,6 +706,7 @@ const RegistrationForm = ({ onClose }) => {
         },
         body: JSON.stringify({
           ...formData,
+          phone: formData.officePhone,
           ...previewRegisterPayload,
           inviteToken:
             formData.ticketType === "invited-speaker" &&
@@ -806,6 +812,12 @@ const RegistrationForm = ({ onClose }) => {
     setIsGeneratingPdf(true);
     try {
       const ticketLabel = getTicketLabel();
+      const selectedLunchDays = CONGRESS_WEEKEND_MEALS.filter(
+        ({ key }) => formData.mealAttendance.lunch[key],
+      ).map(({ key }) => key);
+      const selectedBreakfastDays = CONGRESS_WEEKEND_MEALS.filter(
+        ({ key }) => formData.mealAttendance.breakfast[key],
+      ).map(({ key }) => key);
       const doc = (
         <RegistrationConfirmationPDF
           attendeeName={`${formData.firstName || ""} ${formData.lastName || ""}`.trim()}
@@ -834,6 +846,22 @@ const RegistrationForm = ({ onClose }) => {
           totalLabel="Total Amount Paid"
           totalAmount={formatCurrency(getTotalPrice(), currency)}
           taxNote={isKoreanCustomer ? "* Includes 10% Korean tax" : null}
+          lunchAttendanceLabel={
+            selectedLunchDays.length > 0
+              ? formatCongressMealDayList(selectedLunchDays)
+              : "Not selected"
+          }
+          breakfastAttendanceLabel={
+            selectedBreakfastDays.length > 0
+              ? formatCongressMealDayList(selectedBreakfastDays)
+              : "Not selected"
+          }
+          openingReceptionAttendanceLabel={
+            formData.openingReceptionAttending ? "Attending" : "Not attending"
+          }
+          galaDinnerAttendanceLabel={
+            formData.galaDinnerAttending ? "Attending" : "Not attending"
+          }
           registrationId={registrationId ?? undefined}
           paymentId={paymentIntent?.id ?? undefined}
           generatedDate={new Date().toLocaleString()}
@@ -1884,7 +1912,7 @@ const RegistrationForm = ({ onClose }) => {
                       name="suffix"
                       value={formData.suffix}
                       onChange={handleChange}
-                      placeholder="MD, PhD, etc."
+                      placeholder="Jr., Sr., III, etc."
                     />
                   </div>
                   <div>
@@ -2086,19 +2114,19 @@ const RegistrationForm = ({ onClose }) => {
                 </h5>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
                   <div>
-                    <FormLabel>Phone</FormLabel>
+                    <FormLabel>Office Phone</FormLabel>
                     <PhoneInput
                       international
                       defaultCountry="US"
-                      value={formData.phone}
+                      value={formData.officePhone}
                       onChange={(value) =>
-                        setFormData((prev) => ({ ...prev, phone: value }))
+                        setFormData((prev) => ({ ...prev, officePhone: value }))
                       }
                       className="phone-input-custom border-2 border-gray-200 rounded-xl bg-white focus-within:border-blue-500"
                     />
                   </div>
                   <div>
-                    <FormLabel required>Cell Phone</FormLabel>
+                    <FormLabel>Cell Phone</FormLabel>
                     <PhoneInput
                       international
                       defaultCountry="US"
@@ -2150,18 +2178,18 @@ const RegistrationForm = ({ onClose }) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
                       <p className="text-sm font-semibold text-gray-700 mb-3">
-                        Lunch
+                        Breakfast
                       </p>
                       <div className="space-y-2">
                         {CONGRESS_WEEKEND_MEALS.map(({ key, date }) => (
                           <label
-                            key={`lunch-${key}`}
+                            key={`breakfast-${key}`}
                             className="flex items-center gap-2"
                           >
                             <input
                               type="checkbox"
-                              name={`meal_lunch_${key}`}
-                              checked={formData.mealAttendance.lunch[key]}
+                              name={`meal_breakfast_${key}`}
+                              checked={formData.mealAttendance.breakfast[key]}
                               onChange={handleChange}
                               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
@@ -2175,18 +2203,18 @@ const RegistrationForm = ({ onClose }) => {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-gray-700 mb-3">
-                        Breakfast
+                        Lunch
                       </p>
                       <div className="space-y-2">
                         {CONGRESS_WEEKEND_MEALS.map(({ key, date }) => (
                           <label
-                            key={`breakfast-${key}`}
+                            key={`lunch-${key}`}
                             className="flex items-center gap-2"
                           >
                             <input
                               type="checkbox"
-                              name={`meal_breakfast_${key}`}
-                              checked={formData.mealAttendance.breakfast[key]}
+                              name={`meal_lunch_${key}`}
+                              checked={formData.mealAttendance.lunch[key]}
                               onChange={handleChange}
                               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />

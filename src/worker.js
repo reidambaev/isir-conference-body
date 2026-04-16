@@ -173,6 +173,19 @@ async function handleApiRequest(request, env, url) {
     );
   }
 
+  // POST /api/admin/registrations/:id/send-confirmation - (Re)send a single registration confirmation email
+  const sendRegistrationConfirmationMatch = url.pathname.match(
+    /^\/api\/admin\/registrations\/([^/]+)\/send-confirmation$/,
+  );
+  if (sendRegistrationConfirmationMatch && request.method === "POST") {
+    return handleSendRegistrationConfirmation(
+      request,
+      env,
+      corsHeaders,
+      sendRegistrationConfirmationMatch[1],
+    );
+  }
+
   // PATCH /api/admin/abstracts/:id/status - Update abstract status
   const abstractStatusMatch = url.pathname.match(
     /^\/api\/admin\/abstracts\/(\d+)\/status$/,
@@ -1554,6 +1567,11 @@ async function handleRegistration(request, env, corsHeaders) {
       }
     }
 
+    if (totalPrice === 0) {
+      // Free registrations bypass Stripe webhook, so send confirmation here.
+      await sendRegistrationConfirmationEmail(env, registrationId);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -2682,6 +2700,238 @@ function formatCongressMealDayListForEmail(arr) {
     .join(", ");
 }
 
+async function sendRegistrationConfirmationEmail(env, registrationId) {
+  if (
+    !env?.ISIR_DB ||
+    !env?.RESEND_API_KEY ||
+    !env?.CONFIRMATION_FROM_EMAIL ||
+    !registrationId
+  ) {
+    return {
+      success: false,
+      error:
+        "Email service not configured (missing DB, RESEND_API_KEY, CONFIRMATION_FROM_EMAIL, or registration ID).",
+    };
+  }
+
+  try {
+    const row = await env.ISIR_DB.prepare(
+      `SELECT email, first_name, middle_name, last_name, ticket_type, ticket_price, total_price, currency,
+       accompanying_count, gala_dinner, gala_dinner_attending, lunch_days, breakfast_days, dinner_days,
+       opening_reception_attending, institution, badge_name, is_invited_speaker
+       FROM registrations WHERE id = ?`,
+    )
+      .bind(registrationId)
+      .first();
+
+    if (!row?.email) {
+      return { success: false, error: "Registration not found" };
+    }
+
+    const name =
+      [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(" ") ||
+      "Attendee";
+    const ticketLabel = formatTicketLabel(row.ticket_type);
+    const amount =
+      row.total_price != null
+        ? `${row.currency || "USD"} ${Number(row.total_price).toFixed(2)}`
+        : "";
+    const acc = Number(row.accompanying_count) || 0;
+    const gala = Number(row.gala_dinner) || 0;
+    const galaAttending = Number(row.gala_dinner_attending) === 1;
+    const openingReception = Number(row.opening_reception_attending) === 1;
+    const lunchDays = (() => {
+      try {
+        const parsed = JSON.parse(row.lunch_days || "[]");
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    })();
+    const breakfastDays = (() => {
+      try {
+        const fromBreakfast = JSON.parse(row.breakfast_days || "[]");
+        if (Array.isArray(fromBreakfast) && fromBreakfast.length > 0) {
+          return fromBreakfast;
+        }
+        const legacy = JSON.parse(row.dinner_days || "[]");
+        return Array.isArray(legacy) ? legacy : [];
+      } catch {
+        return [];
+      }
+    })();
+    const invitedSpeaker = Number(row.is_invited_speaker || 0) === 1;
+    const lunchDisplay =
+      lunchDays.length > 0
+        ? formatCongressMealDayListForEmail(lunchDays)
+        : "Not selected";
+    const breakfastDisplay =
+      breakfastDays.length > 0
+        ? formatCongressMealDayListForEmail(breakfastDays)
+        : "Not selected";
+    const qrPayload = JSON.stringify({
+      type: "isir2026-registration-checkin",
+      registrationId: String(registrationId),
+      name,
+      email: String(row.email || ""),
+      ticketType: ticketLabel,
+      accompanyingCount: acc,
+      invitedSpeaker,
+      openingReception: openingReception ? "Attending" : "Not attending",
+      galaDinner: galaAttending ? "Attending" : "Not attending",
+      lunch: lunchDays,
+      breakfast: breakfastDays,
+      generatedAt: new Date().toISOString(),
+    });
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(qrPayload)}`;
+
+    const paymentLine =
+      Number(row.total_price) > 0
+        ? "Your payment has been received and your place at the ISIR 2026 World Congress is confirmed."
+        : "Your registration is complete and your place at the ISIR 2026 World Congress is confirmed.";
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Registration Confirmed – ISIR 2026</title></head>
+<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
+  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
+    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Registration confirmed</p>
+  </div>
+  <p>Dear ${escapeHtml(name)},</p>
+  <p>${paymentLine}</p>
+  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Registration summary</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+      <tr><td style="padding: 4px 0;">Registration ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(registrationId)}</strong></td></tr>
+      <tr><td style="padding: 4px 0;">Ticket type</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(ticketLabel)}</td></tr>
+      ${acc > 0 ? `<tr><td style="padding: 4px 0;">Accompanying persons</td><td style="padding: 4px 0; text-align: right;">${acc}</td></tr>` : ""}
+      ${gala > 0 ? `<tr><td style="padding: 4px 0;">Gala dinner tickets</td><td style="padding: 4px 0; text-align: right;">${gala}</td></tr>` : ""}
+      <tr><td colspan="2" style="padding: 10px 0 6px 0; border-top: 1px solid #ddd; font-weight: 600; color: #1a3a6c;">Meal Attendance</td></tr>
+      <tr><td style="padding: 4px 0;">Opening reception</td><td style="padding: 4px 0; text-align: right;">${openingReception ? "Attending" : "Not attending"}</td></tr>
+      <tr><td style="padding: 4px 0;">Gala dinner</td><td style="padding: 4px 0; text-align: right;">${galaAttending ? "Attending" : "Not attending"}</td></tr>
+      <tr><td style="padding: 4px 0;">Lunch (Fri-Sun, Nov 6-8)</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(lunchDisplay)}</td></tr>
+      <tr><td style="padding: 4px 0;">Breakfast (Fri-Sun, Nov 6-8)</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(breakfastDisplay)}</td></tr>
+      <tr><td style="padding: 4px 0;">Invited speaker</td><td style="padding: 4px 0; text-align: right;">${invitedSpeaker ? "Yes" : "No"}</td></tr>
+      ${row.badge_name ? `<tr><td style="padding: 4px 0;">Badge name</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(row.badge_name)}</td></tr>` : ""}
+      ${amount ? `<tr><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd;">Amount paid</td><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd; text-align: right;"><strong>${escapeHtml(amount)}</strong></td></tr>` : ""}
+    </table>
+  </div>
+  <div style="text-align: center; margin: 24px 0;">
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Badge Check-In QR Code</p>
+    <p style="margin: 0 0 12px 0; font-size: 0.88rem; color: #555;">Present this QR code at the badge booth for faster check-in.</p>
+    <img src="${qrCodeUrl}" alt="Registration check-in QR code" width="220" height="220" style="display: block; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 6px; background: #fff;" />
+  </div>
+  <p><strong>What happens next</strong></p>
+  <ul style="margin: 0 0 20px 0; padding-left: 1.2rem;">
+    <li>Keep this email as your confirmation. You may be asked for your registration ID.</li>
+    <li>We will send further details (programme, venue, travel) closer to the event.</li>
+  </ul>
+  <p>If you have any questions, please contact the organizers at <a href="mailto:support@isir2026.org" style="color: #1a3a6c;">support@isir2026.org</a>.</p>
+  <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
+</body>
+</html>`;
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: env.CONFIRMATION_FROM_EMAIL,
+        to: [row.email],
+        subject: "ISIR 2026 – Registration confirmed",
+        html,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("Resend email failed:", res.status, err);
+      return {
+        success: false,
+        error: `Resend ${res.status}: ${err || "email send failed"}`,
+      };
+    } else {
+      console.log(`Confirmation email sent to ${row.email}`);
+      return { success: true, toEmail: row.email, sentAt: Date.now() };
+    }
+  } catch (emailError) {
+    console.error("Registration confirmation email error:", emailError);
+    return {
+      success: false,
+      error: emailError?.message || "Failed to send registration email",
+    };
+  }
+}
+
+async function handleSendRegistrationConfirmation(
+  request,
+  env,
+  corsHeaders,
+  registrationId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!registrationId) {
+      return jsonResponse(
+        { success: false, error: "Missing registration id" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const row = await env.ISIR_DB.prepare(
+      `SELECT id FROM registrations WHERE id = ? LIMIT 1`,
+    )
+      .bind(registrationId)
+      .first();
+
+    if (!row?.id) {
+      return jsonResponse(
+        { success: false, error: "Registration not found" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    const result = await sendRegistrationConfirmationEmail(env, registrationId);
+    if (!result?.success) {
+      return jsonResponse(
+        {
+          success: false,
+          error: result?.error || "Failed to send registration confirmation",
+        },
+        500,
+        corsHeaders,
+      );
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        id: registrationId,
+        sentTo: result.toEmail,
+        sentAt: result.sentAt,
+        message: `Registration confirmation sent to ${result.toEmail}`,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Send registration confirmation error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Internal error" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
 // Handle Stripe webhook
 async function handleStripeWebhook(request, env) {
   try {
@@ -2762,114 +3012,7 @@ async function handleStripeWebhook(request, env) {
               console.error("Failed to mark speaker invite used:", e);
             }
 
-            // Send confirmation email if Resend is configured
-            if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
-              const row = await env.ISIR_DB.prepare(
-                `SELECT email, first_name, middle_name, last_name, ticket_type, ticket_price, total_price, currency,
-                 accompanying_count, gala_dinner, gala_dinner_attending, lunch_days, breakfast_days, dinner_days, opening_reception_attending, institution, badge_name FROM registrations WHERE id = ?`,
-              )
-                .bind(registrationId)
-                .first();
-
-              if (row?.email) {
-                const name =
-                  [row.first_name, row.middle_name, row.last_name]
-                    .filter(Boolean)
-                    .join(" ") || "Attendee";
-                const ticketLabel = formatTicketLabel(row.ticket_type);
-                const amount =
-                  row.total_price != null
-                    ? `${row.currency || "USD"} ${Number(row.total_price).toFixed(2)}`
-                    : "";
-                const acc = Number(row.accompanying_count) || 0;
-                const gala = Number(row.gala_dinner) || 0;
-                const galaAttending = Number(row.gala_dinner_attending) === 1;
-                const openingReception =
-                  Number(row.opening_reception_attending) === 1;
-                const lunchDays = (() => {
-                  try {
-                    const parsed = JSON.parse(row.lunch_days || "[]");
-                    return Array.isArray(parsed) ? parsed : [];
-                  } catch {
-                    return [];
-                  }
-                })();
-                const breakfastDays = (() => {
-                  try {
-                    const fromBreakfast = JSON.parse(
-                      row.breakfast_days || "[]",
-                    );
-                    if (
-                      Array.isArray(fromBreakfast) &&
-                      fromBreakfast.length > 0
-                    ) {
-                      return fromBreakfast;
-                    }
-                    const legacy = JSON.parse(row.dinner_days || "[]");
-                    return Array.isArray(legacy) ? legacy : [];
-                  } catch {
-                    return [];
-                  }
-                })();
-
-                const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Registration Confirmed – ISIR 2026</title></head>
-<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
-  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
-    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
-    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Registration confirmed</p>
-  </div>
-  <p>Dear ${escapeHtml(name)},</p>
-  <p>Thank you for registering. Your payment has been received and your place at the ISIR 2026 World Congress is confirmed.</p>
-  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
-    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Registration summary</p>
-    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
-      <tr><td style="padding: 4px 0;">Registration ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(registrationId)}</strong></td></tr>
-      <tr><td style="padding: 4px 0;">Ticket type</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(ticketLabel)}</td></tr>
-      ${acc > 0 ? `<tr><td style="padding: 4px 0;">Accompanying persons</td><td style="padding: 4px 0; text-align: right;">${acc}</td></tr>` : ""}
-      ${gala > 0 ? `<tr><td style="padding: 4px 0;">Gala dinner tickets</td><td style="padding: 4px 0; text-align: right;">${gala}</td></tr>` : ""}
-      <tr><td style="padding: 4px 0;">Opening reception</td><td style="padding: 4px 0; text-align: right;">${openingReception ? "Attending" : "Not attending"}</td></tr>
-      <tr><td style="padding: 4px 0;">Gala dinner</td><td style="padding: 4px 0; text-align: right;">${galaAttending ? "Attending" : "Not attending"}</td></tr>
-      ${lunchDays.length > 0 ? `<tr><td style="padding: 4px 0;">Lunch (Fri–Sun)</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(formatCongressMealDayListForEmail(lunchDays))}</td></tr>` : ""}
-      ${breakfastDays.length > 0 ? `<tr><td style="padding: 4px 0;">Breakfast (Fri–Sun)</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(formatCongressMealDayListForEmail(breakfastDays))}</td></tr>` : ""}
-      ${row.badge_name ? `<tr><td style="padding: 4px 0;">Badge name</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(row.badge_name)}</td></tr>` : ""}
-      ${amount ? `<tr><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd;">Amount paid</td><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd; text-align: right;"><strong>${escapeHtml(amount)}</strong></td></tr>` : ""}
-    </table>
-  </div>
-  <p><strong>What happens next</strong></p>
-  <ul style="margin: 0 0 20px 0; padding-left: 1.2rem;">
-    <li>Keep this email as your confirmation. You may be asked for your registration ID.</li>
-    <li>We will send further details (programme, venue, travel) closer to the event.</li>
-  </ul>
-  <p>If you have any questions, please contact the organizers at <a href="mailto:support@isir2026.org" style="color: #1a3a6c;">support@isir2026.org</a>.</p>
-  <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
-</body>
-</html>`;
-
-                const res = await fetch("https://api.resend.com/emails", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${env.RESEND_API_KEY}`,
-                  },
-                  body: JSON.stringify({
-                    from: env.CONFIRMATION_FROM_EMAIL,
-                    to: [row.email],
-                    subject: "ISIR 2026 – Registration confirmed",
-                    html,
-                  }),
-                });
-
-                if (!res.ok) {
-                  const err = await res.text();
-                  console.error("Resend email failed:", res.status, err);
-                } else {
-                  console.log(`Confirmation email sent to ${row.email}`);
-                }
-              }
-            }
+            await sendRegistrationConfirmationEmail(env, registrationId);
           } catch (dbError) {
             console.error("Database update error:", dbError);
             // Don't fail the webhook - payment succeeded

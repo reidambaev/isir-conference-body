@@ -129,6 +129,10 @@ const RegistrationConfirmationPDF = ({
   registrationId,
   paymentId,
   generatedDate,
+  lunchAttendanceLabel,
+  breakfastAttendanceLabel,
+  openingReceptionAttendanceLabel,
+  galaDinnerAttendanceLabel,
 }) => (
   <Document>
     <Page size="A4" style={styles.page}>
@@ -177,6 +181,24 @@ const RegistrationConfirmationPDF = ({
       {taxNote ? (
         <Text style={[styles.label, { marginTop: 4 }]}>{taxNote}</Text>
       ) : null}
+
+      <Text style={styles.sectionTitle}>Meal Attendance</Text>
+      <View style={styles.lineItem}>
+        <Text>Lunch (Fri-Sun, Nov 6-8)</Text>
+        <Text style={styles.value}>{lunchAttendanceLabel}</Text>
+      </View>
+      <View style={styles.lineItem}>
+        <Text>Breakfast (Fri-Sun, Nov 6-8)</Text>
+        <Text style={styles.value}>{breakfastAttendanceLabel}</Text>
+      </View>
+      <View style={styles.lineItem}>
+        <Text>Opening reception</Text>
+        <Text style={styles.value}>{openingReceptionAttendanceLabel}</Text>
+      </View>
+      <View style={styles.lineItem}>
+        <Text>Gala dinner</Text>
+        <Text style={styles.value}>{galaDinnerAttendanceLabel}</Text>
+      </View>
 
       <View style={styles.footer}>
         <Text>
