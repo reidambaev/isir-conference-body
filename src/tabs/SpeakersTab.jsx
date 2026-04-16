@@ -20,7 +20,7 @@ const plenarySpeakers = [
     affiliation:
       "Professor at Penn State University and a Distinguished Professor at Konkuk University in Seoul, Korea",
     image: "sam-richards.png",
-    imagePosition: "center 22%",
+    imagePosition: "center 30%",
   },
 ];
 
@@ -43,6 +43,13 @@ const speakers = [
     imagePosition: "center 20%",
   },
   {
+    name: "Larry Chamley",
+    affiliation:
+      "Professor and Head of Department of Obstetrics, Gynaecology and Reproductive Sciences, University of Auckland, New Zealand",
+    image: "Larry-Chamley.jpg",
+    imagePosition: "center 20%",
+  },
+  {
     name: "Anke Diemert",
     affiliation:
       "University Professorship for Midwifery Science / Obstetrics and Prenatal Medicine, Department of Obstetrics and Prenatal Medicine, University Medical Center Hamburg-Eppendorf, Hamburg, Germany",
@@ -53,6 +60,13 @@ const speakers = [
     name: "Brice Gauilliere",
     affiliation: "Professor, Stanford University School of Medicine",
     image: "brice-gauilliere.jpg",
+  },
+  {
+    name: "Sylvie Girard",
+    affiliation:
+      "Department of Ob/Gyn, Dept of Immunology, Mayo Clinic, MN, USA",
+    image: "Sylvie-Girard.png",
+    imagePosition: "center 15%",
   },
   {
     name: "Nardhy Gomez-Lopez",
