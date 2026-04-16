@@ -88,6 +88,12 @@ export default function AdminTab() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectionModal, setShowRejectionModal] = useState(false);
 
+  // Confirmation-email sending state (retroactive single + bulk)
+  const [sendingConfirmationId, setSendingConfirmationId] = useState(null);
+  const [bulkSendingConfirmations, setBulkSendingConfirmations] =
+    useState(false);
+  const [confirmationSendSummary, setConfirmationSendSummary] = useState(null);
+
   // Reviewer overview state
   const [reviewerOverview, setReviewerOverview] = useState(null);
   const [reviewerOverviewLoading, setReviewerOverviewLoading] = useState(false);
@@ -1004,6 +1010,130 @@ export default function AdminTab() {
     }
   };
 
+  // Send (or resend) confirmation email for a single abstract. Used both for
+  // one-off resends and for retroactively sending confirmations to authors
+  // who submitted before automatic confirmation emails were enabled.
+  const sendAbstractConfirmation = async (abstractId) => {
+    if (!adminToken) {
+      alert("Admin access token is missing.");
+      return;
+    }
+    setSendingConfirmationId(abstractId);
+    try {
+      const response = await fetch(
+        `/api/admin/abstracts/${abstractId}/send-confirmation`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Token": adminToken,
+          },
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "Failed to send confirmation email");
+      }
+
+      const sentAt = result.sentAt || Date.now();
+      setAbstracts((prev) =>
+        prev.map((a) =>
+          a.id === abstractId ? { ...a, confirmation_sent_at: sentAt } : a,
+        ),
+      );
+      alert(`Confirmation email sent to ${result.sentTo || "author"}.`);
+    } catch (err) {
+      console.error("Error sending confirmation email:", err);
+      alert(err.message || "Failed to send confirmation email");
+    } finally {
+      setSendingConfirmationId(null);
+    }
+  };
+
+  // Retroactively send confirmation emails to abstracts that have not yet
+  // received one. When onlyMissing is false, resends to every abstract.
+  const bulkSendAbstractConfirmations = async (onlyMissing = true) => {
+    if (!adminToken) {
+      alert("Admin access token is missing.");
+      return;
+    }
+    const missingCount = abstracts.filter(
+      (a) => !a.confirmation_sent_at,
+    ).length;
+    const targetCount = onlyMissing ? missingCount : abstracts.length;
+
+    if (targetCount === 0) {
+      alert(
+        onlyMissing
+          ? "All abstracts already have a confirmation email on record."
+          : "There are no abstracts to send to.",
+      );
+      return;
+    }
+
+    const verb = onlyMissing ? "send" : "resend";
+    const noun = onlyMissing
+      ? `the ${missingCount} abstract${missingCount === 1 ? "" : "s"} missing a confirmation`
+      : `all ${abstracts.length} abstract${abstracts.length === 1 ? "" : "s"}`;
+    if (!window.confirm(`About to ${verb} confirmation emails to ${noun}. Continue?`)) {
+      return;
+    }
+
+    setBulkSendingConfirmations(true);
+    setConfirmationSendSummary(null);
+    try {
+      const response = await fetch(
+        "/api/admin/abstracts/send-confirmations",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Token": adminToken,
+          },
+          body: JSON.stringify({ onlyMissing }),
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(
+          result?.error || "Failed to send confirmation emails",
+        );
+      }
+
+      const sentMap = new Map();
+      (result.results || []).forEach((r) => {
+        if (r.status === "sent" && r.sentAt) {
+          sentMap.set(r.id, r.sentAt);
+        }
+      });
+      if (sentMap.size > 0) {
+        setAbstracts((prev) =>
+          prev.map((a) =>
+            sentMap.has(a.id)
+              ? { ...a, confirmation_sent_at: sentMap.get(a.id) }
+              : a,
+          ),
+        );
+      }
+
+      setConfirmationSendSummary({
+        sent: result.sent || 0,
+        skipped: result.skipped || 0,
+        failed: result.failed || 0,
+        total: result.total || 0,
+        onlyMissing,
+        failures: (result.results || [])
+          .filter((r) => r.status === "failed")
+          .slice(0, 20),
+      });
+    } catch (err) {
+      console.error("Bulk confirmation send error:", err);
+      alert(err.message || "Failed to send confirmation emails");
+    } finally {
+      setBulkSendingConfirmations(false);
+    }
+  };
+
   // Start review mode
   const startReviewMode = () => {
     setReviewIndex(0);
@@ -1311,6 +1441,31 @@ export default function AdminTab() {
                 </button>
               )}
               <button
+                onClick={() => bulkSendAbstractConfirmations(true)}
+                disabled={bulkSendingConfirmations}
+                className="px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-2 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                title="Send confirmation emails retroactively to every abstract that doesn't have one yet"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-2 11H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2z"
+                  />
+                </svg>
+                {bulkSendingConfirmations
+                  ? "Sending…"
+                  : `Send missing confirmations (${
+                      abstracts.filter((a) => !a.confirmation_sent_at).length
+                    })`}
+              </button>
+              <button
                 onClick={exportToCSV}
                 className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-2 font-medium"
               >
@@ -1331,6 +1486,61 @@ export default function AdminTab() {
               </button>
             </div>
           </div>
+
+          {confirmationSendSummary && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-start gap-3">
+              <svg
+                className="w-5 h-5 text-indigo-600 mt-0.5 flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div className="flex-1 text-sm text-indigo-900">
+                <p className="font-semibold">
+                  Confirmation email batch complete
+                </p>
+                <p className="mt-1">
+                  Sent <strong>{confirmationSendSummary.sent}</strong>,
+                  skipped <strong>{confirmationSendSummary.skipped}</strong>,
+                  failed <strong>{confirmationSendSummary.failed}</strong> out
+                  of {confirmationSendSummary.total}
+                  {confirmationSendSummary.onlyMissing
+                    ? " (only those missing a prior confirmation)"
+                    : " (all abstracts)"}
+                  .
+                </p>
+                {confirmationSendSummary.failures?.length > 0 && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer font-medium">
+                      Show failures ({confirmationSendSummary.failures.length})
+                    </summary>
+                    <ul className="mt-2 text-xs list-disc pl-5 space-y-1">
+                      {confirmationSendSummary.failures.map((f) => (
+                        <li key={f.id}>
+                          <span className="font-mono">{f.id}</span>: {f.error}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmationSendSummary(null)}
+                className="text-indigo-600 hover:text-indigo-800"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* Stats Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2310,6 +2520,44 @@ export default function AdminTab() {
                                   ({abstract.corresponding_email})
                                 </span>
                               </p>
+                              <div className="mt-3 p-3 bg-white rounded-lg border border-gray-100">
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                  <div className="text-xs text-gray-600">
+                                    <span className="font-semibold text-gray-700">
+                                      Confirmation email:
+                                    </span>{" "}
+                                    {abstract.confirmation_sent_at ? (
+                                      <span className="text-emerald-700">
+                                        Sent{" "}
+                                        {formatDate(
+                                          abstract.confirmation_sent_at,
+                                        )}
+                                      </span>
+                                    ) : (
+                                      <span className="text-amber-700">
+                                        Not sent
+                                      </span>
+                                    )}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      sendAbstractConfirmation(abstract.id);
+                                    }}
+                                    disabled={
+                                      sendingConfirmationId === abstract.id
+                                    }
+                                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                  >
+                                    {sendingConfirmationId === abstract.id
+                                      ? "Sending…"
+                                      : abstract.confirmation_sent_at
+                                        ? "Resend confirmation"
+                                        : "Send confirmation"}
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                           </div>
 

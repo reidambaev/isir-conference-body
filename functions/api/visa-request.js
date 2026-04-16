@@ -7,8 +7,8 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
-const VISA_NOTIFY_EMAIL = "atdambaev@gmail.com";
-const VISA_NOTIFY_NAME = "A. Tdambaev";
+const VISA_NOTIFY_EMAIL = "sklee@kyuh.ac.kr";
+const VISA_NOTIFY_NAME = "Sung Ki Lee";
 
 export async function onRequestPost(context) {
   try {

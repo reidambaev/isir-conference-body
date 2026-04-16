@@ -152,6 +152,27 @@ async function handleApiRequest(request, env, url) {
     return handleGetAbstracts(request, env, corsHeaders);
   }
 
+  // POST /api/admin/abstracts/send-confirmations - Bulk (re)send confirmation emails
+  if (
+    url.pathname === "/api/admin/abstracts/send-confirmations" &&
+    request.method === "POST"
+  ) {
+    return handleBulkSendAbstractConfirmations(request, env, corsHeaders);
+  }
+
+  // POST /api/admin/abstracts/:id/send-confirmation - (Re)send a single confirmation email
+  const sendConfirmationMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)\/send-confirmation$/,
+  );
+  if (sendConfirmationMatch && request.method === "POST") {
+    return handleSendAbstractConfirmation(
+      request,
+      env,
+      corsHeaders,
+      sendConfirmationMatch[1],
+    );
+  }
+
   // PATCH /api/admin/abstracts/:id/status - Update abstract status
   const abstractStatusMatch = url.pathname.match(
     /^\/api\/admin\/abstracts\/(\d+)\/status$/,
@@ -168,6 +189,14 @@ async function handleApiRequest(request, env, url) {
   // GET /api/admin/visa-requests
   if (url.pathname === "/api/admin/visa-requests" && request.method === "GET") {
     return handleGetVisaRequests(request, env, corsHeaders);
+  }
+
+  // POST /api/admin/visa-requests/resend-reviewer-email
+  if (
+    url.pathname === "/api/admin/visa-requests/resend-reviewer-email" &&
+    request.method === "POST"
+  ) {
+    return handleResendVisaReviewerEmails(request, env, corsHeaders);
   }
 
   // POST /api/reviewers/login
@@ -1825,6 +1854,24 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
       }
     }
 
+    // Send confirmation email to the corresponding author (non-blocking)
+    try {
+      await sendAbstractConfirmationEmail(env, {
+        id: submissionId,
+        title: data.title.trim(),
+        category: data.category,
+        abstract: data.abstract.trim(),
+        word_count: wordCount,
+        presentation_preference: data.presentationPreference,
+        presenter_name: data.presenterName.trim(),
+        presenter_email: data.presenterEmail.trim(),
+        corresponding_name: data.correspondingName.trim(),
+        corresponding_email: data.correspondingEmail.trim(),
+      });
+    } catch (emailError) {
+      console.error("Abstract confirmation email error:", emailError);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -1839,6 +1886,228 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
       JSON.stringify({ error: error.message || "Failed to submit abstract" }),
       { status: 500, headers: corsHeaders },
     );
+  }
+}
+
+// Build and send the abstract-received confirmation email via Resend.
+// Accepts a normalized abstract row (DB columns or in-memory equivalent).
+// On success, records the send timestamp on the abstract row.
+async function sendAbstractConfirmationEmail(env, abstract) {
+  if (!env.RESEND_API_KEY || !env.CONFIRMATION_FROM_EMAIL) {
+    return {
+      success: false,
+      error:
+        "Email service not configured (missing RESEND_API_KEY or CONFIRMATION_FROM_EMAIL).",
+    };
+  }
+  if (!abstract || !abstract.id) {
+    return { success: false, error: "Missing abstract record" };
+  }
+
+  const toEmail =
+    (abstract.corresponding_email || "").trim() ||
+    (abstract.presenter_email || "").trim();
+  if (!toEmail) {
+    return { success: false, error: "No recipient email on file" };
+  }
+
+  const name =
+    (abstract.corresponding_name || "").trim() ||
+    (abstract.presenter_name || "").trim() ||
+    "Author";
+  const submissionId = abstract.id;
+  const title = (abstract.title || "").trim();
+  const category = (abstract.category || "").trim();
+  const pref = String(abstract.presentation_preference || "").toLowerCase();
+  const prefLabel =
+    pref === "oral"
+      ? "Oral"
+      : pref === "poster"
+        ? "Poster"
+        : pref === "either"
+          ? "Oral or Poster"
+          : abstract.presentation_preference || "";
+  const wordCount = abstract.word_count || 0;
+  const abstractText = (abstract.abstract || "").trim();
+  const abstractSnippet = abstractText.slice(0, 280);
+  const abstractDisplay =
+    abstractSnippet + (abstractText.length > 280 ? "…" : "");
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Abstract Received – ISIR 2026</title></head>
+<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
+  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
+    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Abstract submission received</p>
+  </div>
+  <p>Dear ${escapeHtml(name)},</p>
+  <p>Thank you for submitting your abstract to the ISIR 2026 World Congress. We have received your submission and it will be reviewed by the scientific committee.</p>
+  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Submission details</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+      <tr><td style="padding: 4px 0; vertical-align: top;">Submission ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(submissionId)}</strong></td></tr>
+      <tr><td style="padding: 4px 0; vertical-align: top;">Title</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(title)}</td></tr>
+      <tr><td style="padding: 4px 0;">Category</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(category)}</td></tr>
+      <tr><td style="padding: 4px 0;">Presentation preference</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(prefLabel)}</td></tr>
+      <tr><td style="padding: 4px 0;">Word count</td><td style="padding: 4px 0; text-align: right;">${wordCount} / 300</td></tr>
+    </table>
+    ${abstractDisplay ? `<p style="margin: 12px 0 0 0; font-size: 0.9rem; color: #555;"><strong>Abstract (excerpt):</strong><br/>${escapeHtml(abstractDisplay)}</p>` : ""}
+  </div>
+  <p><strong>What happens next</strong></p>
+  <ul style="margin: 0 0 20px 0; padding-left: 1.2rem;">
+    <li><strong>Save your Submission ID</strong> (${escapeHtml(submissionId)}) — you may need it when contacting us or checking status.</li>
+    <li>Your abstract will be reviewed by the scientific committee. You will be notified of the outcome by email.</li>
+  </ul>
+  <p>If you have any questions, please contact the organizers at <a href="mailto:support@theisir.org" style="color: #1a3a6c;">support@theisir.org</a> and quote your submission ID.</p>
+  <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
+</body>
+</html>`;
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: env.CONFIRMATION_FROM_EMAIL,
+        to: [toEmail],
+        subject: "ISIR 2026 – Abstract submission received",
+        html,
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.error(
+        "Resend abstract confirmation failed:",
+        res.status,
+        errText,
+      );
+      return {
+        success: false,
+        error: `Resend ${res.status}: ${errText || "email send failed"}`,
+      };
+    }
+
+    const sentAt = Date.now();
+    // Best-effort persist the send timestamp. Swallow error if the column is
+    // missing on older databases so that the email still counts as sent.
+    try {
+      await env.ISIR_DB.prepare(
+        `UPDATE abstractions SET confirmation_sent_at = ? WHERE id = ?`,
+      )
+        .bind(sentAt, submissionId)
+        .run();
+    } catch (e) {
+      console.warn(
+        "Could not update confirmation_sent_at (migration pending?):",
+        e?.message || e,
+      );
+    }
+
+    console.log(`Abstract confirmation email sent to ${toEmail}`);
+    return { success: true, toEmail, sentAt };
+  } catch (emailError) {
+    console.error("Abstract confirmation email error:", emailError);
+    return {
+      success: false,
+      error: String(emailError?.message || emailError),
+    };
+  }
+}
+
+const VISA_NOTIFY_EMAIL = "atdambaev@gmail.com";
+const VISA_NOTIFY_NAME = "Sung Ki Lee";
+
+function formatVisaSubmittedAt(timestamp) {
+  return (
+    new Date(timestamp).toISOString().replace("T", " ").slice(0, 19) + " UTC"
+  );
+}
+
+function buildVisaReviewerNotificationHtml({
+  visaRequestId,
+  name,
+  email,
+  country,
+  notes,
+  timestamp,
+}) {
+  const safeNotes = notes && String(notes).trim() ? String(notes).trim() : "";
+  const submittedAt = formatVisaSubmittedAt(timestamp);
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>New Visa Request – ISIR 2026</title></head>
+<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
+  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
+    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">New visa support request</p>
+  </div>
+  <p>Dear ${escapeHtml(VISA_NOTIFY_NAME)},</p>
+  <p>A new visa support request has been submitted for the ISIR 2026 World Congress.</p>
+  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Request details</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+      <tr><td style="padding: 4px 0;">Request ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(visaRequestId)}</strong></td></tr>
+      <tr><td style="padding: 4px 0;">Name</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(name)}</td></tr>
+      <tr><td style="padding: 4px 0;">Email</td><td style="padding: 4px 0; text-align: right;"><a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></td></tr>
+      <tr><td style="padding: 4px 0;">Country</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(country)}</td></tr>
+      <tr><td style="padding: 4px 0;">Submitted</td><td style="padding: 4px 0; text-align: right;">${submittedAt}</td></tr>
+    </table>
+    <p style="margin: 12px 0 0 0; font-size: 0.9rem; color: #555;"><strong>Additional notes:</strong><br/>${safeNotes ? escapeHtml(safeNotes) : "None provided"}</p>
+  </div>
+  <p>Please review and process this request at your earliest convenience.</p>
+  <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 System</strong></p>
+</body>
+</html>`;
+}
+
+async function sendVisaReviewerNotificationEmail(env, visaRequest) {
+  if (!env.RESEND_API_KEY || !env.CONFIRMATION_FROM_EMAIL) {
+    return {
+      success: false,
+      skipped: true,
+      error: "Resend not configured",
+    };
+  }
+
+  const html = buildVisaReviewerNotificationHtml(visaRequest);
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: env.CONFIRMATION_FROM_EMAIL,
+        to: [VISA_NOTIFY_EMAIL],
+        subject: `ISIR 2026 – Visa request from ${visaRequest.name} (${visaRequest.country})`,
+        html,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      console.error("Visa notification email failed:", res.status, err);
+      return {
+        success: false,
+        error: `Resend ${res.status}: ${err || "email send failed"}`,
+      };
+    }
+
+    console.log(`Visa notification email sent to ${VISA_NOTIFY_EMAIL}`);
+    return { success: true };
+  } catch (emailError) {
+    console.error("Visa notification email error:", emailError);
+    return {
+      success: false,
+      error: String(emailError?.message || emailError),
+    };
   }
 }
 
@@ -1881,62 +2150,16 @@ async function handleVisaRequest(request, env, corsHeaders) {
     // Send notification and requester confirmation emails
     // (Non-blocking: DB insert succeeds even if email fails)
     if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
-      const VISA_NOTIFY_EMAIL = "atdambaev@gmail.com";
-      const VISA_NOTIFY_NAME = "A. Tdambaev";
-      const safeNotes = notes && String(notes).trim() ? String(notes).trim() : "";
-      const submittedAt =
-        new Date(timestamp).toISOString().replace("T", " ").slice(0, 19) + " UTC";
-
-      const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>New Visa Request – ISIR 2026</title></head>
-<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
-  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
-    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
-    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">New visa support request</p>
-  </div>
-  <p>Dear ${escapeHtml(VISA_NOTIFY_NAME)},</p>
-  <p>A new visa support request has been submitted for the ISIR 2026 World Congress.</p>
-  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
-    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Request details</p>
-    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
-      <tr><td style="padding: 4px 0;">Request ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(visaRequestId)}</strong></td></tr>
-      <tr><td style="padding: 4px 0;">Name</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(name)}</td></tr>
-      <tr><td style="padding: 4px 0;">Email</td><td style="padding: 4px 0; text-align: right;"><a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></td></tr>
-      <tr><td style="padding: 4px 0;">Country</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(country)}</td></tr>
-      <tr><td style="padding: 4px 0;">Submitted</td><td style="padding: 4px 0; text-align: right;">${submittedAt}</td></tr>
-    </table>
-    <p style="margin: 12px 0 0 0; font-size: 0.9rem; color: #555;"><strong>Additional notes:</strong><br/>${safeNotes ? escapeHtml(safeNotes) : "None provided"}</p>
-  </div>
-  <p>Please review and process this request at your earliest convenience.</p>
-  <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 System</strong></p>
-</body>
-</html>`;
-
-      try {
-        const res = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${env.RESEND_API_KEY}`,
-          },
-          body: JSON.stringify({
-            from: env.CONFIRMATION_FROM_EMAIL,
-            to: [VISA_NOTIFY_EMAIL],
-            subject: `ISIR 2026 – Visa request from ${name} (${country})`,
-            html,
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.text();
-          console.error("Visa notification email failed:", res.status, err);
-        } else {
-          console.log(`Visa notification email sent to ${VISA_NOTIFY_EMAIL}`);
-        }
-      } catch (emailError) {
-        console.error("Visa notification email error:", emailError);
-      }
+      const safeNotes =
+        notes && String(notes).trim() ? String(notes).trim() : "";
+      await sendVisaReviewerNotificationEmail(env, {
+        visaRequestId,
+        name,
+        email,
+        country,
+        notes: safeNotes,
+        timestamp,
+      });
 
       const requesterHtml = `
 <!DOCTYPE html>
@@ -1981,7 +2204,11 @@ async function handleVisaRequest(request, env, corsHeaders) {
         });
         if (!requesterRes.ok) {
           const err = await requesterRes.text();
-          console.error("Visa requester confirmation email failed:", requesterRes.status, err);
+          console.error(
+            "Visa requester confirmation email failed:",
+            requesterRes.status,
+            err,
+          );
         } else {
           console.log(`Visa requester confirmation email sent to ${email}`);
         }
@@ -2569,8 +2796,13 @@ async function handleStripeWebhook(request, env) {
                 })();
                 const breakfastDays = (() => {
                   try {
-                    const fromBreakfast = JSON.parse(row.breakfast_days || "[]");
-                    if (Array.isArray(fromBreakfast) && fromBreakfast.length > 0) {
+                    const fromBreakfast = JSON.parse(
+                      row.breakfast_days || "[]",
+                    );
+                    if (
+                      Array.isArray(fromBreakfast) &&
+                      fromBreakfast.length > 0
+                    ) {
                       return fromBreakfast;
                     }
                     const legacy = JSON.parse(row.dinner_days || "[]");
@@ -2815,6 +3047,164 @@ async function handleUpdateAbstractStatus(
   }
 }
 
+// Admin endpoint: (Re)send the submission confirmation email for a single abstract.
+// Used to retroactively email authors whose abstracts were submitted before
+// automatic confirmation emails were enabled, or to resend on request.
+async function handleSendAbstractConfirmation(
+  request,
+  env,
+  corsHeaders,
+  abstractId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!abstractId) {
+      return jsonResponse(
+        { success: false, error: "Missing abstract id" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const row = await env.ISIR_DB.prepare(
+      `SELECT * FROM abstractions WHERE id = ?`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!row) {
+      return jsonResponse(
+        { success: false, error: "Abstract not found" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    const result = await sendAbstractConfirmationEmail(env, row);
+    if (!result.success) {
+      return jsonResponse(
+        { success: false, error: result.error || "Failed to send email" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        id: abstractId,
+        sentTo: result.toEmail,
+        sentAt: result.sentAt,
+        message: `Confirmation email sent to ${result.toEmail}`,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Send abstract confirmation error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Internal error" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+// Admin endpoint: Bulk (re)send submission confirmation emails for abstracts.
+// Body (JSON, all optional):
+//   - onlyMissing (boolean, default true): only send to abstracts with no
+//     recorded confirmation_sent_at value
+//   - abstractIds (string[]): restrict to the provided ids
+async function handleBulkSendAbstractConfirmations(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
+
+    const onlyMissing = body?.onlyMissing !== false; // default true
+    const ids = Array.isArray(body?.abstractIds)
+      ? body.abstractIds.filter((x) => typeof x === "string" && x.trim())
+      : null;
+
+    let rows = [];
+    if (ids && ids.length > 0) {
+      const placeholders = ids.map(() => "?").join(",");
+      const res = await env.ISIR_DB.prepare(
+        `SELECT * FROM abstractions WHERE id IN (${placeholders}) ORDER BY submission_date ASC`,
+      )
+        .bind(...ids)
+        .all();
+      rows = res.results || [];
+    } else {
+      const res = await env.ISIR_DB.prepare(
+        `SELECT * FROM abstractions ORDER BY submission_date ASC LIMIT 1000`,
+      ).all();
+      rows = res.results || [];
+    }
+
+    let sent = 0;
+    let skipped = 0;
+    let failed = 0;
+    const results = [];
+
+    for (const row of rows) {
+      if (onlyMissing && row.confirmation_sent_at) {
+        skipped++;
+        results.push({
+          id: row.id,
+          status: "skipped",
+          reason: "already sent",
+          sentAt: row.confirmation_sent_at,
+        });
+        continue;
+      }
+
+      const r = await sendAbstractConfirmationEmail(env, row);
+      if (r.success) {
+        sent++;
+        results.push({
+          id: row.id,
+          status: "sent",
+          to: r.toEmail,
+          sentAt: r.sentAt,
+        });
+      } else {
+        failed++;
+        results.push({ id: row.id, status: "failed", error: r.error });
+      }
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        total: rows.length,
+        sent,
+        skipped,
+        failed,
+        onlyMissing,
+        results,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Bulk send abstract confirmations error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Internal error" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
 // Admin endpoint: Get all visa requests
 async function handleGetVisaRequests(request, env, corsHeaders) {
   try {
@@ -2846,6 +3236,110 @@ async function handleGetVisaRequests(request, env, corsHeaders) {
         status: 500,
         headers: corsHeaders,
       },
+    );
+  }
+}
+
+// Admin endpoint: resend visa reviewer notification emails for existing requests
+async function handleResendVisaReviewerEmails(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {
+      // allow empty body
+    }
+
+    const visaRequestId = String(body?.visaRequestId || "").trim();
+    const limitRaw = Number(body?.limit);
+    const limit = Number.isFinite(limitRaw)
+      ? Math.min(200, Math.max(1, Math.trunc(limitRaw)))
+      : 50;
+
+    const query = visaRequestId
+      ? env.ISIR_DB.prepare(
+          `SELECT id, email, name, country, notes, created_at FROM visa_requests WHERE id = ? LIMIT 1`,
+        ).bind(visaRequestId)
+      : env.ISIR_DB.prepare(
+          `SELECT id, email, name, country, notes, created_at FROM visa_requests ORDER BY created_at DESC LIMIT ?`,
+        ).bind(limit);
+
+    const rowsResult = visaRequestId ? await query.first() : await query.all();
+    const rows = visaRequestId
+      ? rowsResult
+        ? [rowsResult]
+        : []
+      : rowsResult.results || [];
+
+    if (rows.length === 0) {
+      return jsonResponse(
+        {
+          success: false,
+          error: visaRequestId
+            ? `Visa request not found: ${visaRequestId}`
+            : "No visa requests found",
+        },
+        404,
+        corsHeaders,
+      );
+    }
+
+    let sent = 0;
+    let failed = 0;
+    const results = [];
+
+    for (const row of rows) {
+      const emailResult = await sendVisaReviewerNotificationEmail(env, {
+        visaRequestId: row.id,
+        name: row.name,
+        email: row.email,
+        country: row.country,
+        notes: row.notes || "",
+        timestamp: Number(row.created_at) || Date.now(),
+      });
+      if (emailResult.success) sent += 1;
+      else failed += 1;
+      results.push({
+        visaRequestId: row.id,
+        success: Boolean(emailResult.success),
+        error: emailResult.success
+          ? null
+          : emailResult.error || "Failed to send",
+      });
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        total: rows.length,
+        sent,
+        failed,
+        reviewerEmail: VISA_NOTIFY_EMAIL,
+        results,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Resend visa reviewer emails error:", error);
+    return jsonResponse(
+      {
+        success: false,
+        error: error.message || "Failed to resend visa emails",
+      },
+      500,
+      corsHeaders,
     );
   }
 }
