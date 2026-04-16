@@ -5,6 +5,7 @@ import {
   View,
   Text,
   StyleSheet,
+  Image,
 } from "@react-pdf/renderer";
 
 const styles = StyleSheet.create({
@@ -107,6 +108,23 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: "#9ca3af",
   },
+  qrSection: {
+    marginTop: 16,
+    alignItems: "center",
+  },
+  qrImage: {
+    width: 140,
+    height: 140,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  qrText: {
+    fontSize: 8,
+    color: "#4b5563",
+    textAlign: "left",
+    lineHeight: 1.3,
+    width: "100%",
+  },
 });
 
 /**
@@ -133,6 +151,8 @@ const RegistrationConfirmationPDF = ({
   breakfastAttendanceLabel,
   openingReceptionAttendanceLabel,
   galaDinnerAttendanceLabel,
+  qrCodeUrl,
+  qrPayloadText,
 }) => (
   <Document>
     <Page size="A4" style={styles.page}>
@@ -199,6 +219,17 @@ const RegistrationConfirmationPDF = ({
         <Text>Gala dinner</Text>
         <Text style={styles.value}>{galaDinnerAttendanceLabel}</Text>
       </View>
+
+      {qrCodeUrl ? (
+        <View style={styles.qrSection}>
+          <Text style={styles.sectionTitle}>Badge Check-In QR Code</Text>
+          <Text style={styles.label}>
+            Present at the badge booth for faster check-in.
+          </Text>
+          <Image src={qrCodeUrl} style={styles.qrImage} />
+          {qrPayloadText ? <Text style={styles.qrText}>{qrPayloadText}</Text> : null}
+        </View>
+      ) : null}
 
       <View style={styles.footer}>
         <Text>

@@ -818,6 +818,29 @@ const RegistrationForm = ({ onClose }) => {
       const selectedBreakfastDays = CONGRESS_WEEKEND_MEALS.filter(
         ({ key }) => formData.mealAttendance.breakfast[key],
       ).map(({ key }) => key);
+      const lunchDisplay =
+        selectedLunchDays.length > 0
+          ? formatCongressMealDayList(selectedLunchDays)
+          : "Not selected";
+      const breakfastDisplay =
+        selectedBreakfastDays.length > 0
+          ? formatCongressMealDayList(selectedBreakfastDays)
+          : "Not selected";
+      const isInvitedSpeaker = formData.ticketType === "invited-speaker";
+      const checkInQrText = [
+        "ISIR 2026 CHECK-IN",
+        `Registration ID: ${registrationId || "Pending"}`,
+        `Name: ${`${formData.firstName || ""} ${formData.lastName || ""}`.trim() || "Attendee"}`,
+        `Email: ${formData.email || ""}`,
+        `Ticket: ${ticketLabel}`,
+        `Accompanying: ${Number(formData.accompanyingPersonCount || 0)}`,
+        `Invited Speaker: ${isInvitedSpeaker ? "Yes" : "No"}`,
+        `Opening Reception: ${formData.openingReceptionAttending ? "Attending" : "Not attending"}`,
+        `Gala Dinner: ${formData.galaDinnerAttending ? "Attending" : "Not attending"}`,
+        `Lunch: ${lunchDisplay}`,
+        `Breakfast: ${breakfastDisplay}`,
+      ].join("\n");
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(checkInQrText)}`;
       const doc = (
         <RegistrationConfirmationPDF
           attendeeName={`${formData.firstName || ""} ${formData.lastName || ""}`.trim()}
@@ -847,14 +870,10 @@ const RegistrationForm = ({ onClose }) => {
           totalAmount={formatCurrency(getTotalPrice(), currency)}
           taxNote={isKoreanCustomer ? "* Includes 10% Korean tax" : null}
           lunchAttendanceLabel={
-            selectedLunchDays.length > 0
-              ? formatCongressMealDayList(selectedLunchDays)
-              : "Not selected"
+            lunchDisplay
           }
           breakfastAttendanceLabel={
-            selectedBreakfastDays.length > 0
-              ? formatCongressMealDayList(selectedBreakfastDays)
-              : "Not selected"
+            breakfastDisplay
           }
           openingReceptionAttendanceLabel={
             formData.openingReceptionAttending ? "Attending" : "Not attending"
@@ -862,6 +881,8 @@ const RegistrationForm = ({ onClose }) => {
           galaDinnerAttendanceLabel={
             formData.galaDinnerAttending ? "Attending" : "Not attending"
           }
+          qrCodeUrl={qrCodeUrl}
+          qrPayloadText={checkInQrText}
           registrationId={registrationId ?? undefined}
           paymentId={paymentIntent?.id ?? undefined}
           generatedDate={new Date().toLocaleString()}
