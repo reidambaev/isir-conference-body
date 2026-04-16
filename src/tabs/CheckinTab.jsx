@@ -45,7 +45,11 @@ export default function CheckinTab() {
 
   const html5QrRef = useRef(null);
   const stoppingRef = useRef(false);
-  const decodeHandledRef = useRef(false);
+  /** Ignore rapid repeats of the same registration id while the camera stays on. */
+  const lookupInFlightRef = useRef(false);
+  const lastExtractedIdRef = useRef("");
+  const lastScanAtRef = useRef(0);
+  const SAME_ID_COOLDOWN_MS = 2000;
 
   const stopScanner = useCallback(async () => {
     if (stoppingRef.current) return;
@@ -131,7 +135,8 @@ export default function CheckinTab() {
     }
 
     try {
-      decodeHandledRef.current = false;
+      lastExtractedIdRef.current = "";
+      lastScanAtRef.current = 0;
       await stopScanner();
       const { Html5Qrcode } = await import("html5-qrcode");
       const html5QrCode = new Html5Qrcode(CHECKIN_READER_ID);
@@ -146,10 +151,25 @@ export default function CheckinTab() {
           aspectRatio: 1.777,
         },
         async (decodedText) => {
-          if (stoppingRef.current || decodeHandledRef.current) return;
-          decodeHandledRef.current = true;
-          await stopScanner();
-          await fetchCheckinById(decodedText);
+          if (stoppingRef.current) return;
+          const extractedId = extractRegistrationIdFromScan(decodedText);
+          if (!extractedId) return;
+          const now = Date.now();
+          if (lookupInFlightRef.current) return;
+          if (
+            lastExtractedIdRef.current === extractedId &&
+            now - lastScanAtRef.current < SAME_ID_COOLDOWN_MS
+          ) {
+            return;
+          }
+          lastExtractedIdRef.current = extractedId;
+          lastScanAtRef.current = now;
+          lookupInFlightRef.current = true;
+          try {
+            await fetchCheckinById(decodedText);
+          } finally {
+            lookupInFlightRef.current = false;
+          }
         },
         () => {
           /* per-frame scan errors — ignore */
@@ -163,7 +183,12 @@ export default function CheckinTab() {
       html5QrRef.current = null;
       setScannerStatus("idle");
     }
-  }, [fetchCheckinById, scannerStatus, stopScanner]);
+  }, [
+    extractRegistrationIdFromScan,
+    fetchCheckinById,
+    scannerStatus,
+    stopScanner,
+  ]);
 
   return (
     <div className="space-y-6">
