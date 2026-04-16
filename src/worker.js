@@ -2019,7 +2019,7 @@ async function sendAbstractConfirmationEmail(env, abstract) {
   }
 }
 
-const VISA_NOTIFY_EMAIL = "atdambaev@gmail.com";
+const VISA_NOTIFY_EMAIL = "sklee@kyuh.ac.kr";
 const VISA_NOTIFY_NAME = "Sung Ki Lee";
 
 function formatVisaSubmittedAt(timestamp) {
