@@ -882,7 +882,6 @@ const RegistrationForm = ({ onClose }) => {
             formData.galaDinnerAttending ? "Attending" : "Not attending"
           }
           qrCodeUrl={qrCodeUrl}
-          qrPayloadText={checkInQrText}
           registrationId={registrationId ?? undefined}
           paymentId={paymentIntent?.id ?? undefined}
           generatedDate={new Date().toLocaleString()}

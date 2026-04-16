@@ -26,6 +26,7 @@ import {
   AccessibilityTab,
   AdminTab,
   ReviewerTab,
+  CheckinTab,
 } from "./tabs";
 
 export default function App() {
@@ -63,6 +64,14 @@ export default function App() {
       pathname.startsWith("/reviewer")
     );
   });
+  const [isCheckinPage, setIsCheckinPage] = useState(() => {
+    const pathname = window.location.pathname || document.location.pathname;
+    return (
+      pathname === "/checkin" ||
+      pathname === "/checkin/" ||
+      pathname.startsWith("/checkin")
+    );
+  });
 
   // Update admin page state when pathname changes
   useEffect(() => {
@@ -87,6 +96,11 @@ export default function App() {
           pathname === "/reviewer/" ||
           pathname.startsWith("/reviewer");
         setIsReviewerPage(isReviewer);
+        const isCheckin =
+          pathname === "/checkin" ||
+          pathname === "/checkin/" ||
+          pathname.startsWith("/checkin");
+        setIsCheckinPage(isCheckin);
       }, 0);
     };
 
@@ -266,6 +280,20 @@ export default function App() {
   if (isReviewerPage) {
     console.log("Rendering reviewer page");
     return <ReviewerTab />;
+  }
+
+  // Render check-in page if on /checkin route
+  if (isCheckinPage) {
+    console.log("Rendering check-in page");
+    return (
+      <div ref={appRef} className="min-h-screen bg-gray-50">
+        <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
+            <CheckinTab />
+          </div>
+        </main>
+      </div>
+    );
   }
 
   console.log("Rendering main app, pathname:", window.location.pathname);

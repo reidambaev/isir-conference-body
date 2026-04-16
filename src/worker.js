@@ -2784,7 +2784,6 @@ async function sendRegistrationConfirmationEmail(env, registrationId) {
       `Generated At: ${new Date().toISOString()}`,
     ].join("\n");
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(qrPayloadText)}`;
-
     const paymentLine =
       Number(row.total_price) > 0
         ? "Your payment has been received and your place at the ISIR 2026 World Congress is confirmed."
@@ -2820,9 +2819,7 @@ async function sendRegistrationConfirmationEmail(env, registrationId) {
   </div>
   <div style="text-align: center; margin: 24px 0;">
     <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Badge Check-In QR Code</p>
-    <p style="margin: 0 0 12px 0; font-size: 0.88rem; color: #555;">Present this QR code at the badge booth for faster check-in.</p>
     <img src="${qrCodeUrl}" alt="Registration check-in QR code" width="220" height="220" style="display: block; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 6px; background: #fff;" />
-    <pre style="text-align: left; white-space: pre-wrap; word-break: break-word; margin: 12px auto 0; max-width: 540px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; color: #374151; font-size: 12px; line-height: 1.4;">${escapeHtml(qrPayloadText)}</pre>
   </div>
   <p><strong>What happens next</strong></p>
   <ul style="margin: 0 0 20px 0; padding-left: 1.2rem;">

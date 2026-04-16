@@ -15,6 +15,7 @@ export { default as TermsOfServiceTab } from "./TermsOfServiceTab";
 export { default as AccessibilityTab } from "./AccessibilityTab";
 export { default as AdminTab } from "./AdminTab";
 export { default as ReviewerTab } from "./ReviewerTab";
+export { default as CheckinTab } from "./CheckinTab";
 
 // Form exports
 export { default as VisaRequestForm } from "../forms/VisaRequestForm";

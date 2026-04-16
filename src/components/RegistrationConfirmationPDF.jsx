@@ -116,14 +116,7 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     marginTop: 6,
-    marginBottom: 8,
-  },
-  qrText: {
-    fontSize: 8,
-    color: "#4b5563",
-    textAlign: "left",
-    lineHeight: 1.3,
-    width: "100%",
+    marginBottom: 4,
   },
 });
 
@@ -152,7 +145,6 @@ const RegistrationConfirmationPDF = ({
   openingReceptionAttendanceLabel,
   galaDinnerAttendanceLabel,
   qrCodeUrl,
-  qrPayloadText,
 }) => (
   <Document>
     <Page size="A4" style={styles.page}>
@@ -227,7 +219,6 @@ const RegistrationConfirmationPDF = ({
             Present at the badge booth for faster check-in.
           </Text>
           <Image src={qrCodeUrl} style={styles.qrImage} />
-          {qrPayloadText ? <Text style={styles.qrText}>{qrPayloadText}</Text> : null}
         </View>
       ) : null}
 
