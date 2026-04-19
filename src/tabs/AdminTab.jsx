@@ -61,6 +61,16 @@ function registrationPaymentBadgeClass(status) {
   return "bg-red-100 text-red-800";
 }
 
+function getAbstractTypeLabel(abstract) {
+  const raw = String(
+    abstract?.abstract_submission_type || abstract?.abstractSubmissionType || "",
+  ).trim();
+  if (!raw) return "Not specified";
+  if (raw === "Clinical Research") return "Clinical Studies";
+  if (raw === "Basic Research") return "Basic Studies";
+  return raw;
+}
+
 export default function AdminTab() {
   const [abstracts, setAbstracts] = useState([]);
   const [visaRequests, setVisaRequests] = useState([]);
@@ -890,6 +900,7 @@ export default function AdminTab() {
         (a) =>
           a.title?.toLowerCase().includes(search) ||
           a.abstract?.toLowerCase().includes(search) ||
+          getAbstractTypeLabel(a).toLowerCase().includes(search) ||
           a.presenter_name?.toLowerCase().includes(search) ||
           a.presenter_email?.toLowerCase().includes(search) ||
           a.corresponding_name?.toLowerCase().includes(search) ||
@@ -1222,6 +1233,7 @@ export default function AdminTab() {
       "ID",
       "Title",
       "Category",
+      "Abstract Type",
       "Status",
       "Presenter",
       "Presenter Email",
@@ -1235,6 +1247,7 @@ export default function AdminTab() {
       a.id,
       `"${(a.title || "").replace(/"/g, '""')}"`,
       a.category,
+      getAbstractTypeLabel(a),
       a.status,
       a.presenter_name,
       a.presenter_email,
@@ -1940,6 +1953,9 @@ export default function AdminTab() {
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
                         {currentReviewAbstract.category}
                       </span>
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-700">
+                        {getAbstractTypeLabel(currentReviewAbstract)}
+                      </span>
                       <span
                         className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
                           currentReviewAbstract.presentation_preference ===
@@ -2351,6 +2367,9 @@ export default function AdminTab() {
                       Category
                     </th>
                     <th className="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                       Presenter
                     </th>
                     <th className="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
@@ -2388,6 +2407,11 @@ export default function AdminTab() {
                       <td className="px-5 py-4 text-sm">
                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
                           {abstract.category}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-sm">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-700">
+                          {getAbstractTypeLabel(abstract)}
                         </span>
                       </td>
                       <td className="px-5 py-4 text-sm">
@@ -2450,6 +2474,9 @@ export default function AdminTab() {
                           <div className="flex flex-wrap gap-2">
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 ring-1 ring-slate-200">
                               {abstract.category}
+                            </span>
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-700 ring-1 ring-cyan-200">
+                              {getAbstractTypeLabel(abstract)}
                             </span>
                             <span
                               className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
