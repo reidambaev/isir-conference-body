@@ -45,6 +45,7 @@ export async function onRequestPost(context) {
       "correspondingName",
       "correspondingEmail",
       "category",
+      "abstractSubmissionType",
       "keywords",
       "abstract",
       "presentationPreference",
@@ -138,6 +139,25 @@ export async function onRequestPost(context) {
       return new Response(
         JSON.stringify({
           error: "Invalid presentation preference",
+        }),
+        {
+          status: 400,
+          headers: corsHeaders,
+        },
+      );
+    }
+    const submissionTypeMap = {
+      "Clinical Studies": "Clinical Studies",
+      "Basic Studies": "Basic Studies",
+      "Clinical Research": "Clinical Studies",
+      "Basic Research": "Basic Studies",
+    };
+    const normalizedSubmissionType =
+      submissionTypeMap[data.abstractSubmissionType];
+    if (!normalizedSubmissionType) {
+      return new Response(
+        JSON.stringify({
+          error: "Invalid abstract submission type",
         }),
         {
           status: 400,
@@ -266,45 +286,95 @@ export async function onRequestPost(context) {
     const correspondingAuthorId = `AUTH-${submissionId}-${correspondingAuthorIndex}`;
 
     // Insert abstract into D1 database
-    const abstractResult = await env.ISIR_DB.prepare(
-      `
-      INSERT INTO abstractions (
-        id,
-        submission_date,
-        title,
-        category,
-        keywords,
-        abstract,
-        word_count,
-        presentation_preference,
-        presenter_name,
-        presenter_email,
-        corresponding_name,
-        corresponding_email,
-        corresponding_author_id,
-        status,
-        created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    )
-      .bind(
-        submissionId,
-        submissionDate,
-        data.title.trim(),
-        data.category,
-        data.keywords.trim(),
-        data.abstract.trim(),
-        wordCount,
-        data.presentationPreference,
-        data.presenterName.trim(),
-        data.presenterEmail.trim(),
-        data.correspondingName.trim(),
-        data.correspondingEmail.trim(),
-        correspondingAuthorId,
-        "submitted",
-        submissionDate,
+    // Prefer storing abstract_submission_type when the column exists.
+    // Fall back to legacy insert for older DBs without this migration.
+    try {
+      await env.ISIR_DB.prepare(
+        `
+        INSERT INTO abstractions (
+          id,
+          submission_date,
+          title,
+          category,
+          abstract_submission_type,
+          keywords,
+          abstract,
+          word_count,
+          presentation_preference,
+          presenter_name,
+          presenter_email,
+          corresponding_name,
+          corresponding_email,
+          corresponding_author_id,
+          status,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
       )
-      .run();
+        .bind(
+          submissionId,
+          submissionDate,
+          data.title.trim(),
+          data.category,
+          normalizedSubmissionType,
+          data.keywords.trim(),
+          data.abstract.trim(),
+          wordCount,
+          data.presentationPreference,
+          data.presenterName.trim(),
+          data.presenterEmail.trim(),
+          data.correspondingName.trim(),
+          data.correspondingEmail.trim(),
+          correspondingAuthorId,
+          "submitted",
+          submissionDate,
+        )
+        .run();
+    } catch (insertError) {
+      const message = String(insertError?.message || "");
+      if (!message.includes("abstract_submission_type")) {
+        throw insertError;
+      }
+      await env.ISIR_DB.prepare(
+        `
+        INSERT INTO abstractions (
+          id,
+          submission_date,
+          title,
+          category,
+          keywords,
+          abstract,
+          word_count,
+          presentation_preference,
+          presenter_name,
+          presenter_email,
+          corresponding_name,
+          corresponding_email,
+          corresponding_author_id,
+          status,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      )
+        .bind(
+          submissionId,
+          submissionDate,
+          data.title.trim(),
+          data.category,
+          data.keywords.trim(),
+          data.abstract.trim(),
+          wordCount,
+          data.presentationPreference,
+          data.presenterName.trim(),
+          data.presenterEmail.trim(),
+          data.correspondingName.trim(),
+          data.correspondingEmail.trim(),
+          correspondingAuthorId,
+          "submitted",
+          submissionDate,
+        )
+        .run();
+    }
 
     // Insert individual authors for easier querying
     for (let i = 0; i < authorsData.length; i++) {

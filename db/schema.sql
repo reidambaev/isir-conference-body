@@ -116,6 +116,7 @@ CREATE TABLE
         submission_date INTEGER NOT NULL,
         title TEXT NOT NULL,
         category TEXT NOT NULL,
+        abstract_submission_type TEXT,
         keywords TEXT NOT NULL,
         abstract TEXT NOT NULL,
         word_count INTEGER NOT NULL,

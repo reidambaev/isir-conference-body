@@ -2,7 +2,6 @@ import React, { useState, useMemo } from "react";
 import { SUBMISSION_OPEN, isPreviewMode } from "../config/constants";
 
 const SubmissionTab = () => {
-  const [abstractType, setAbstractType] = useState("");
   const [formData, setFormData] = useState({
     title: "",
     allAuthors: [
@@ -24,6 +23,7 @@ const SubmissionTab = () => {
       },
     ],
     category: "",
+    abstractSubmissionType: "",
     keywords: "",
     abstract: "",
     presentationPreference: "oral",
@@ -55,6 +55,7 @@ const SubmissionTab = () => {
     "Novel Technologies and Methods",
     "Other",
   ];
+  const abstractSubmissionTypes = ["Clinical Research", "Basic Research"];
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -128,6 +129,7 @@ const SubmissionTab = () => {
     }
 
     if (!formData.category) return "Category selection is required";
+    if (!formData.abstractSubmissionType) return "Abstract type is required";
     if (!formData.keywords.trim()) return "Keywords are required";
     if (!formData.abstract.trim()) return "Abstract text is required";
 
@@ -219,6 +221,7 @@ const SubmissionTab = () => {
           authors: JSON.stringify(authors),
           affiliations: JSON.stringify(affiliations),
           category: formData.category,
+          abstractSubmissionType: formData.abstractSubmissionType,
           keywords: formData.keywords,
           abstract: formData.abstract,
           presentationPreference: formData.presentationPreference,
@@ -260,12 +263,12 @@ const SubmissionTab = () => {
             },
           ],
           category: "",
+          abstractSubmissionType: "",
           keywords: "",
           abstract: "",
           presentationPreference: "oral",
           youngInvestigator: false,
         });
-        setAbstractType("");
       }
     } catch (error) {
       console.error("Submission error:", error);
@@ -1158,7 +1161,7 @@ const SubmissionTab = () => {
           </div>
 
           {/* Category and Keywords */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Category <span className="text-red-500">*</span>
@@ -1174,6 +1177,25 @@ const SubmissionTab = () => {
                 {categories.map((cat) => (
                   <option key={cat} value={cat}>
                     {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                Abstract Type <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="abstractSubmissionType"
+                value={formData.abstractSubmissionType}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                required
+              >
+                <option value="">Select abstract type</option>
+                {abstractSubmissionTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
                   </option>
                 ))}
               </select>
