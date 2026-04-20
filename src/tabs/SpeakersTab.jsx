@@ -29,7 +29,8 @@ const speakers = [
     name: "Ricardo Barini",
     affiliation:
       "Collaborating Professor, University of Campinas (UNICAMP), Brazil",
-    image: null,
+    image: "Ricardo-Barini.png",
+    imagePosition: "center 20%",
   },
   {
     name: "Lina Bergman",
@@ -147,9 +148,23 @@ const speakers = [
     imagePosition: "center 40%",
   },
   {
+    name: "Jei Won Moon",
+    affiliation: "Executive Medical Director, M Fertility Center, Seoul, Korea",
+    image: "jei-won-moon.jpg",
+    imagePosition: "center 20%",
+  },
+  {
+    name: "Gil Mor",
+    affiliation:
+      "Scientific Director and Professor, C.S. Mott Center, Wayne State University, Detroit, MI, USA",
+    image: "gil-mor.jpg",
+    imagePosition: "center 20%",
+  },
+  {
     name: "Takeshi Nagamatsu",
     affiliation: "International University of Health and Welfare",
-    image: null,
+    image: "Takeshi-Nagamatsu.jpg",
+    imagePosition: "center 20%",
   },
   {
     name: "Joon Cheol Park",
@@ -160,13 +175,15 @@ const speakers = [
   {
     name: "Marie-Pierre Piccinni",
     affiliation: "Professor, University of Florence, Italy",
-    image: null,
+    image: "Marie-Pierre-Piccinni.png",
+    imagePosition: "center 20%",
   },
   {
-    name: "Trishia Sinha",
+    name: "Trishnia Sinha",
     affiliation:
       "Postdoctoral Researcher, University Medical Center Groningen, the Netherlands",
-    image: null,
+    image: "Trishnia-Sinha.png",
+    imagePosition: "center 20%",
   },
   {
     name: "Anna Stanhewicz",
