@@ -4376,7 +4376,7 @@ export default function AdminTab() {
                 /speaker-profile
               </code>{" "}
               for speakers to type their name, affiliation, and optional
-              headshot (max 800 KB). Approve submissions under{" "}
+              headshot (max 1 MB). Approve submissions under{" "}
               <button
                 type="button"
                 onClick={() => setActiveSection("speakerProfiles")}

@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
-const MAX_PHOTO_BYTES = 800 * 1024;
+const MAX_PHOTO_BYTES = 1024 * 1024; // 1 MiB
 
 export default function SpeakerProfileTab() {
   const [email, setEmail] = useState("");
@@ -8,9 +8,20 @@ export default function SpeakerProfileTab() {
   const [affiliation, setAffiliation] = useState("");
   const [imagePosition, setImagePosition] = useState("");
   const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return undefined;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   const onFileChange = (e) => {
     const f = e.target.files?.[0];
@@ -18,9 +29,14 @@ export default function SpeakerProfileTab() {
     setError(null);
     if (f && f.size > MAX_PHOTO_BYTES) {
       setError(
-        `Please choose an image under ${Math.floor(MAX_PHOTO_BYTES / 1024)} KB (JPEG or PNG).`,
+        "Please choose an image under 1 MB (JPEG or PNG).",
       );
     }
+  };
+
+  const clearPhoto = () => {
+    setFile(null);
+    setError(null);
   };
 
   const onSubmit = async (e) => {
@@ -32,9 +48,7 @@ export default function SpeakerProfileTab() {
       return;
     }
     if (file && file.size > MAX_PHOTO_BYTES) {
-      setError(
-        `Photo must be under ${Math.floor(MAX_PHOTO_BYTES / 1024)} KB (JPEG or PNG).`,
-      );
+      setError("Photo must be under 1 MB (JPEG or PNG).");
       return;
     }
 
@@ -81,8 +95,7 @@ export default function SpeakerProfileTab() {
         <p className="text-gray-600 text-sm leading-relaxed">
           Enter your name and affiliation as they should appear in the
           program. You may add an optional headshot. Submissions are reviewed
-          before they go live. Photos are limited to{" "}
-          {Math.floor(MAX_PHOTO_BYTES / 1024)} KB (JPEG or PNG).
+          before they go live. Photos may be up to 1 MB (JPEG or PNG).
         </p>
       </div>
 
@@ -145,10 +158,45 @@ export default function SpeakerProfileTab() {
             className="block w-full text-sm text-gray-800 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-800"
           />
           <p className="mt-1 text-xs text-gray-500">
-            JPEG or PNG, max {Math.floor(MAX_PHOTO_BYTES / 1024)} KB. Without a
-            photo, approved entries show initials in the same style as other
-            speakers.
+            JPEG or PNG, max 1 MB. Without a photo, approved entries show
+            initials in the same style as other speakers.
           </p>
+          {previewUrl && file && file.size <= MAX_PHOTO_BYTES && (
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-start gap-4">
+              <div
+                className="flex-shrink-0 rounded-full p-1 mx-auto sm:mx-0"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--color-primary), var(--color-secondary))",
+                }}
+              >
+                <img
+                  src={previewUrl}
+                  alt="Headshot preview"
+                  className="w-32 h-32 sm:w-36 sm:h-36 rounded-full object-cover border-4 border-white"
+                  style={
+                    imagePosition.trim()
+                      ? { objectPosition: imagePosition.trim() }
+                      : undefined
+                  }
+                />
+              </div>
+              <div className="flex-1 text-sm text-gray-600 pt-1">
+                <p className="font-medium text-gray-800 mb-1">Preview</p>
+                <p className="text-xs mb-3">
+                  {(file.size / 1024).toFixed(1)} KB — this is how the circular
+                  crop will look on the site (after approval).
+                </p>
+                <button
+                  type="button"
+                  onClick={clearPhoto}
+                  className="text-sm text-red-700 font-medium hover:underline"
+                >
+                  Remove photo
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div>
@@ -162,6 +210,9 @@ export default function SpeakerProfileTab() {
             className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm font-mono"
             placeholder="e.g. center 20% (CSS object-position)"
           />
+          <p className="mt-1 text-xs text-gray-500">
+            Adjust above and the preview updates if the file is under 1 MB.
+          </p>
         </div>
 
         {error && (

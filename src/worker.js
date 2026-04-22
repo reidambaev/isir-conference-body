@@ -2,7 +2,7 @@
  * ISIR Conference Worker
  * Handles static assets + API routes
  */
-const SPEAKER_PHOTO_MAX_BYTES = 800 * 1024; // 800 KB cap for R2 headshots (JPEG/PNG)
+const SPEAKER_PHOTO_MAX_BYTES = 1024 * 1024; // 1 MiB cap for R2 headshots (JPEG/PNG)
 
 export default {
   async fetch(request, env, ctx) {
@@ -2749,7 +2749,8 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: `Photo is too large. Maximum size is ${Math.floor(SPEAKER_PHOTO_MAX_BYTES / 1024)} KB to limit storage use.`,
+          error:
+            "Photo is too large. Maximum size is 1 MB (JPEG or PNG) to limit storage use.",
         }),
         { status: 400, headers: jsonHeaders },
       );
