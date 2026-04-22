@@ -484,7 +484,7 @@ export default function AdminTab() {
     if (!adminToken?.trim() || !id) return;
     if (action === "delete") {
       const ok = window.confirm(
-        "Remove this speaker profile from the website and delete their stored headshot from file storage? This cannot be undone.",
+        "Delete this speaker from the website and remove their stored headshot from file storage? This cannot be undone.",
       );
       if (!ok) return;
     }
@@ -4465,8 +4465,11 @@ export default function AdminTab() {
               . Approve to add them to the main Speakers grid on the Speakers
               page. The Speaker key column is for legacy rows only; new rows
               show (new). Rejecting removes a pending headshot from storage.
-              For approved (or rejected) rows, use Remove to delete the record
-              and any R2 photo so they no longer appear on the site.
+            </p>
+            <p className="text-sm mt-2 font-medium text-gray-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 max-w-2xl">
+              For <strong>approved</strong> or <strong>rejected</strong> rows, use
+              the red <strong>Delete from site</strong> button in the{" "}
+              <strong>Actions</strong> column (not shown for pending rows).
             </p>
           </div>
           <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-sm">
@@ -4486,7 +4489,11 @@ export default function AdminTab() {
                   ? speakerProfileSubmissions
                   : []
                 ).map((row) => {
-                  const isPending = String(row.status) === "pending";
+                  const statusNorm = String(row.status || "")
+                    .trim()
+                    .toLowerCase();
+                  const isPending = statusNorm === "pending";
+                  const isApproved = statusNorm === "approved";
                   return (
                     <tr key={row.id} className="align-top">
                       <td className="px-3 py-2">
@@ -4494,12 +4501,12 @@ export default function AdminTab() {
                           className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
                             isPending
                               ? "bg-amber-100 text-amber-900"
-                              : String(row.status) === "approved"
+                              : isApproved
                                 ? "bg-green-100 text-green-900"
                                 : "bg-slate-200 text-slate-800"
                           }`}
                         >
-                          {String(row.status || "")}
+                          {statusNorm || "—"}
                         </span>
                       </td>
                       <td className="px-3 py-2 font-mono text-xs text-gray-800">
@@ -4568,11 +4575,11 @@ export default function AdminTab() {
                             type="button"
                             disabled={speakerProfileActionId === row.id}
                             onClick={() => runSpeakerProfileAction(row.id, "delete")}
-                            className="px-2.5 py-1 rounded border border-gray-400 text-gray-900 text-xs font-medium hover:bg-gray-100 disabled:opacity-50"
+                            className="px-2.5 py-1.5 rounded-md border-2 border-red-300 bg-red-50 text-red-900 text-xs font-semibold hover:bg-red-100 disabled:opacity-50 whitespace-nowrap"
                           >
                             {speakerProfileActionId === row.id
                               ? "…"
-                              : "Remove"}
+                              : "Delete from site"}
                           </button>
                         )}
                       </td>
