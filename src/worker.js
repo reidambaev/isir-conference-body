@@ -54,10 +54,7 @@ async function handleR2PublicGet(request, env, url) {
     );
     // Speaker headshots can be removed from R2; avoid year-long browser cache so deletes show up.
     if (key.startsWith("speaker-photos/")) {
-      headers.set(
-        "Cache-Control",
-        "private, max-age=0, must-revalidate",
-      );
+      headers.set("Cache-Control", "private, max-age=0, must-revalidate");
     } else {
       headers.set("Cache-Control", "public, max-age=31536000");
     }
@@ -2939,12 +2936,7 @@ async function handleAdminSpeakerProfileReject(request, env, corsHeaders, id) {
   }
 }
 
-async function handleAdminSpeakerProfileDelete(
-  request,
-  env,
-  corsHeaders,
-  id,
-) {
+async function handleAdminSpeakerProfileDelete(request, env, corsHeaders, id) {
   const auth = ensureAdmin(request, env, corsHeaders);
   if (auth) return auth;
   if (!env.ISIR_DB) {

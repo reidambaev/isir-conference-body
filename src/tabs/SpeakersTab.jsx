@@ -30,7 +30,8 @@ function SpeakersTab() {
         const m = new Map();
         const extra = [];
         for (const row of data.approved) {
-          const k = row.speaker_key != null ? String(row.speaker_key).trim() : "";
+          const k =
+            row.speaker_key != null ? String(row.speaker_key).trim() : "";
           if (k) {
             m.set(k, {
               display_name: String(row.display_name || ""),
