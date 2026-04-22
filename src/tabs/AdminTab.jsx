@@ -85,6 +85,9 @@ export default function AdminTab() {
     [],
   );
   const [speakerProfileActionId, setSpeakerProfileActionId] = useState(null);
+  const [catalogImportBusy, setCatalogImportBusy] = useState(false);
+  const [catalogImportMessage, setCatalogImportMessage] = useState(null);
+  const [catalogImportError, setCatalogImportError] = useState(null);
   const [expandedAbstracts, setExpandedAbstracts] = useState(new Set());
 
   // Abstract filtering/sorting state
@@ -510,6 +513,65 @@ export default function AdminTab() {
       setError(e?.message || `Failed to ${action}`);
     } finally {
       setSpeakerProfileActionId(null);
+    }
+  };
+
+  const seedBundledSpeakerCatalog = async () => {
+    if (!adminToken?.trim()) return;
+    setCatalogImportBusy(true);
+    setCatalogImportError(null);
+    setCatalogImportMessage(null);
+    try {
+      const res = await fetch("/api/admin/speaker-catalog/seed-bundled", {
+        method: "POST",
+        headers: { "X-Admin-Token": adminToken },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setCatalogImportError(data.error || `HTTP ${res.status}`);
+        return;
+      }
+      setCatalogImportMessage(
+        data.message || `Upserted ${data.count} catalog rows.`,
+      );
+      await fetchAllData(adminToken);
+    } catch (e) {
+      setCatalogImportError(e?.message || "Request failed");
+    } finally {
+      setCatalogImportBusy(false);
+    }
+  };
+
+  const importSpeakerCatalogTsv = async (file) => {
+    if (!adminToken?.trim() || !file) return;
+    setCatalogImportBusy(true);
+    setCatalogImportError(null);
+    setCatalogImportMessage(null);
+    try {
+      const fd = new FormData();
+      fd.set("file", file);
+      const res = await fetch("/api/admin/speaker-catalog/import-tsv", {
+        method: "POST",
+        headers: { "X-Admin-Token": adminToken },
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setCatalogImportError(data.error || `HTTP ${res.status}`);
+        return;
+      }
+      const errNote =
+        Array.isArray(data.errors) && data.errors.length > 0
+          ? ` Warnings: ${data.errors.join("; ")}`
+          : "";
+      setCatalogImportMessage(
+        (data.message || `Imported ${data.count} row(s).`) + errNote,
+      );
+      await fetchAllData(adminToken);
+    } catch (e) {
+      setCatalogImportError(e?.message || "Request failed");
+    } finally {
+      setCatalogImportBusy(false);
     }
   };
 
@@ -4472,6 +4534,68 @@ export default function AdminTab() {
               <strong>Actions</strong> column (not shown for pending rows).
             </p>
           </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 space-y-4 max-w-3xl">
+            <h3 className="text-lg font-semibold text-slate-900">
+              Import built-in speaker catalog into D1
+            </h3>
+            <p className="text-sm text-slate-700">
+              Creates or updates <strong>approved</strong> rows for every plenary
+              and congress speaker from{" "}
+              <code className="text-xs bg-white px-1 rounded">invitedSpeakersCatalog.js</code>
+              , keyed by <code className="text-xs">speaker_key</code>. Uses
+              placeholder emails like{" "}
+              <code className="text-xs">catalog+ricardo-barini@speakers-import.invalid</code>
+              . Re-running syncs name/affiliation/image crop from the codebase;
+              existing uploaded (R2) headshots for that key are not removed.
+            </p>
+            <button
+              type="button"
+              disabled={catalogImportBusy}
+              onClick={seedBundledSpeakerCatalog}
+              className="px-4 py-2.5 rounded-lg bg-slate-800 text-white text-sm font-semibold hover:bg-slate-900 disabled:opacity-50"
+            >
+              {catalogImportBusy ? "Working…" : "Import catalog from codebase"}
+            </button>
+            <div className="border-t border-slate-200 pt-4">
+              <p className="text-sm font-medium text-slate-900 mb-2">
+                Or upload a tab-separated file (.tsv)
+              </p>
+              <p className="text-xs text-slate-600 mb-2">
+                First row (headers):{" "}
+                <code className="bg-white px-1 rounded">
+                  speaker_key	name	affiliation	email
+                </code>{" "}
+                — use tabs between columns. <code className="bg-white px-1">email</code>{" "}
+                is optional (placeholder used if empty). Avoid tabs inside
+                cells.
+              </p>
+              <input
+                type="file"
+                accept=".tsv,text/tab-separated-values,text/plain"
+                disabled={catalogImportBusy}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) {
+                    importSpeakerCatalogTsv(f);
+                  }
+                }}
+                className="block w-full text-sm text-slate-900 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-white file:text-slate-800"
+              />
+            </div>
+            {catalogImportMessage && (
+              <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                {catalogImportMessage}
+              </p>
+            )}
+            {catalogImportError && (
+              <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {catalogImportError}
+              </p>
+            )}
+          </div>
+
           <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-sm">
             <table className="min-w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-700 font-medium">
