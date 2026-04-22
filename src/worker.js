@@ -2,6 +2,9 @@
  * ISIR Conference Worker
  * Handles static assets + API routes
  */
+import { getInvitedSpeakerByKey, isValidInvitedSpeakerKey } from "./invitedSpeakersCatalog.js";
+
+const SPEAKER_PHOTO_MAX_BYTES = 800 * 1024; // 800 KB cap for R2 headshots (JPEG/PNG)
 
 export default {
   async fetch(request, env, ctx) {
@@ -12,9 +15,12 @@ export default {
       return handleApiRequest(request, env, url);
     }
 
-    // Serve trainee letters from R2 storage
-    if (url.pathname.startsWith("/trainee-letters/")) {
-      return handleTraineeLetterGet(request, env, url);
+    // Public reads from R2 (trainee letters + invited speaker headshots)
+    if (
+      url.pathname.startsWith("/trainee-letters/") ||
+      url.pathname.startsWith("/speaker-photos/")
+    ) {
+      return handleR2PublicGet(request, env, url);
     }
 
     // Serve static assets for everything else
@@ -32,9 +38,9 @@ export default {
   },
 };
 
-// Handle GET requests for trainee letters from R2
-async function handleTraineeLetterGet(request, env, url) {
-  const key = url.pathname.slice(1); // Remove leading slash
+// Public GET for R2 objects (path must match key, e.g. speaker-photos/… or trainee-letters/…)
+async function handleR2PublicGet(request, env, url) {
+  const key = url.pathname.slice(1);
 
   try {
     const object = await env.TRAINEE_LETTERS_BUCKET.get(key);
@@ -52,7 +58,7 @@ async function handleTraineeLetterGet(request, env, url) {
 
     return new Response(object.body, { headers });
   } catch (error) {
-    console.error("Error fetching trainee letter:", error);
+    console.error("Error fetching R2 object:", error);
     return new Response("Error fetching file", { status: 500 });
   }
 }
@@ -282,6 +288,48 @@ async function handleApiRequest(request, env, url) {
     request.method === "GET"
   ) {
     return handleAdminReviewerAbstractScores(request, env, corsHeaders);
+  }
+
+  // GET /api/speaker-profiles/approved (public, for speakers page)
+  if (
+    url.pathname === "/api/speaker-profiles/approved" &&
+    request.method === "GET"
+  ) {
+    return handleGetApprovedSpeakerProfiles(request, env, url, corsHeaders);
+  }
+
+  // POST /api/speaker-profiles/submit (multipart, invited speakers)
+  if (url.pathname === "/api/speaker-profiles/submit" && request.method === "POST") {
+    return handleSubmitSpeakerProfile(request, env, corsHeaders);
+  }
+
+  // GET /api/admin/speaker-profiles
+  if (url.pathname === "/api/admin/speaker-profiles" && request.method === "GET") {
+    return handleAdminListSpeakerProfiles(request, env, corsHeaders);
+  }
+
+  const spApproveMatch = url.pathname.match(
+    /^\/api\/admin\/speaker-profiles\/([^/]+)\/approve$/,
+  );
+  if (spApproveMatch && request.method === "POST") {
+    return handleAdminSpeakerProfileApprove(
+      request,
+      env,
+      corsHeaders,
+      spApproveMatch[1],
+    );
+  }
+
+  const spRejectMatch = url.pathname.match(
+    /^\/api\/admin\/speaker-profiles\/([^/]+)\/reject$/,
+  );
+  if (spRejectMatch && request.method === "POST") {
+    return handleAdminSpeakerProfileReject(
+      request,
+      env,
+      corsHeaders,
+      spRejectMatch[1],
+    );
   }
 
   return new Response(JSON.stringify({ error: "Not Found" }), {
@@ -1612,7 +1660,11 @@ async function handleRegistration(request, env, corsHeaders) {
 }
 
 /** Public check-in lookup: requires knowing the registration id (e.g. from QR). */
-async function handleGetCheckinRegistration(env, corsHeaders, registrationIdRaw) {
+async function handleGetCheckinRegistration(
+  env,
+  corsHeaders,
+  registrationIdRaw,
+) {
   try {
     const id = String(registrationIdRaw || "").trim();
     if (!id || !/^[a-zA-Z0-9_-]{8,128}$/.test(id)) {
@@ -2485,6 +2537,369 @@ async function handleTraineeLetterUpload(request, env, corsHeaders) {
   }
 }
 
+async function safeDeleteR2Object(env, key) {
+  if (!key || !env.TRAINEE_LETTERS_BUCKET) return;
+  try {
+    await env.TRAINEE_LETTERS_BUCKET.delete(key);
+  } catch (e) {
+    console.error("R2 delete failed:", key, e);
+  }
+}
+
+async function handleGetApprovedSpeakerProfiles(request, env, _url, corsHeaders) {
+  if (!env.ISIR_DB) {
+    return jsonResponse(
+      { success: false, error: "Database not configured" },
+      500,
+      corsHeaders,
+    );
+  }
+  try {
+    const { results } = await env.ISIR_DB.prepare(
+      `SELECT speaker_key, display_name, affiliation, r2_key, image_position
+       FROM speaker_profile_submissions WHERE status = 'approved'`,
+    ).all();
+    const out = (results || []).map((r) => ({
+      speaker_key: r.speaker_key,
+      display_name: r.display_name,
+      affiliation: r.affiliation,
+      r2_key: r.r2_key || null,
+      image_position: r.image_position || null,
+    }));
+    return jsonResponse({ success: true, approved: out }, 200, corsHeaders);
+  } catch (e) {
+    console.error("handleGetApprovedSpeakerProfiles:", e);
+    return jsonResponse(
+      { success: false, error: "Failed to load speaker profiles" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
+  if (!env.ISIR_DB) {
+    return jsonResponse(
+      { success: false, error: "Database not configured" },
+      500,
+      corsHeaders,
+    );
+  }
+  const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch (e) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Invalid form data" }),
+      { status: 400, headers: jsonHeaders },
+    );
+  }
+
+  const speakerKey = String(formData.get("speakerKey") || "").trim();
+  const email = normalizeEmail(formData.get("email"));
+  const name = String(formData.get("name") || "").trim();
+  const affiliation = String(formData.get("affiliation") || "").trim();
+  const imagePosition = String(formData.get("imagePosition") || "").trim();
+  const file = formData.get("file");
+  const wantsUpload = Boolean(
+    file && typeof file.size === "number" && file.size > 0,
+  );
+
+  if (wantsUpload && !env.TRAINEE_LETTERS_BUCKET) {
+    return jsonResponse(
+      {
+        success: false,
+        error:
+          "File storage is not configured. Photo upload requires the R2 bucket (same binding as trainee letters).",
+      },
+      500,
+      corsHeaders,
+    );
+  }
+
+  if (!isValidInvitedSpeakerKey(speakerKey)) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Invalid speaker selection" }),
+      { status: 400, headers: jsonHeaders },
+    );
+  }
+  if (!email) {
+    return new Response(
+      JSON.stringify({ success: false, error: "A valid email is required" }),
+      { status: 400, headers: jsonHeaders },
+    );
+  }
+  if (name.length < 2) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Please enter your name" }),
+      { status: 400, headers: jsonHeaders },
+    );
+  }
+  if (affiliation.length < 3) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Please enter your full affiliation or institution",
+      }),
+      { status: 400, headers: jsonHeaders },
+    );
+  }
+
+  const meta = getInvitedSpeakerByKey(speakerKey);
+  if (!meta) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Invalid speaker" }),
+      { status: 400, headers: jsonHeaders },
+    );
+  }
+
+  const now = Date.now();
+  let r2Key = null;
+
+  if (wantsUpload) {
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
+    const fileType = file.type;
+    if (!allowedTypes.includes(fileType)) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Photo must be JPEG or PNG.",
+        }),
+        { status: 400, headers: jsonHeaders },
+      );
+    }
+    if (file.size > SPEAKER_PHOTO_MAX_BYTES) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Photo is too large. Maximum size is ${Math.floor(SPEAKER_PHOTO_MAX_BYTES / 1024)} KB to limit storage use.`,
+        }),
+        { status: 400, headers: jsonHeaders },
+      );
+    }
+    const timestamp = Date.now();
+    const randomId = Math.random().toString(36).slice(2, 11).toUpperCase();
+    const ext = fileType === "image/png" ? "png" : "jpg";
+    r2Key = `speaker-photos/${speakerKey}_${timestamp}_${randomId}.${ext}`;
+    const fileBuffer = await file.arrayBuffer();
+    await env.TRAINEE_LETTERS_BUCKET.put(r2Key, fileBuffer, {
+      httpMetadata: { contentType: fileType },
+      customMetadata: {
+        email,
+        speakerKey,
+        uploadedAt: new Date().toISOString(),
+      },
+    });
+  }
+
+  try {
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT id, status, r2_key FROM speaker_profile_submissions WHERE speaker_key = ?`,
+    )
+      .bind(speakerKey)
+      .first();
+
+    if (existing?.status === "approved") {
+      if (r2Key) {
+        await safeDeleteR2Object(env, r2Key);
+      }
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "A profile is already approved for this speaker. Contact the organizers if you need to change it.",
+        }),
+        { status: 400, headers: jsonHeaders },
+      );
+    }
+
+    if (r2Key && existing?.r2_key && String(existing.r2_key) !== r2Key) {
+      await safeDeleteR2Object(env, existing.r2_key);
+    }
+
+    const id = existing?.id || crypto.randomUUID();
+    const r2ToStore = r2Key != null ? r2Key : existing?.r2_key || null;
+    const pos = imagePosition || meta.imagePosition || null;
+
+    if (existing) {
+      await env.ISIR_DB.prepare(
+        `UPDATE speaker_profile_submissions SET
+          email = ?, display_name = ?, affiliation = ?,
+          r2_key = ?, image_position = ?, status = 'pending', updated_at = ?
+        WHERE speaker_key = ?`,
+      )
+        .bind(
+          email,
+          name,
+          affiliation,
+          r2ToStore,
+          pos,
+          now,
+          speakerKey,
+        )
+        .run();
+    } else {
+      await env.ISIR_DB.prepare(
+        `INSERT INTO speaker_profile_submissions
+        (id, speaker_key, email, display_name, affiliation, r2_key, image_position, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      )
+        .bind(
+          id,
+          speakerKey,
+          email,
+          name,
+          affiliation,
+          r2ToStore,
+          pos,
+          now,
+          now,
+        )
+        .run();
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message:
+          "Profile submitted. It will appear on the site after the organizers approve it.",
+      }),
+      { status: 200, headers: jsonHeaders },
+    );
+  } catch (e) {
+    console.error("handleSubmitSpeakerProfile:", e);
+    if (r2Key) {
+      await safeDeleteR2Object(env, r2Key);
+    }
+    return new Response(
+      JSON.stringify({ success: false, error: "Failed to save submission" }),
+      { status: 500, headers: jsonHeaders },
+    );
+  }
+}
+
+async function handleAdminListSpeakerProfiles(request, env, corsHeaders) {
+  const auth = ensureAdmin(request, env, corsHeaders);
+  if (auth) return auth;
+  if (!env.ISIR_DB) {
+    return jsonResponse(
+      { success: false, error: "Database not configured" },
+      500,
+      corsHeaders,
+    );
+  }
+  try {
+    const { results } = await env.ISIR_DB.prepare(
+      `SELECT id, speaker_key, email, display_name, affiliation, r2_key, image_position, status, created_at, updated_at
+       FROM speaker_profile_submissions ORDER BY updated_at DESC`,
+    ).all();
+    return jsonResponse(
+      { success: true, submissions: results || [] },
+      200,
+      corsHeaders,
+    );
+  } catch (e) {
+    console.error("handleAdminListSpeakerProfiles:", e);
+    return jsonResponse(
+      { success: false, error: "Failed to list speaker profiles" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleAdminSpeakerProfileApprove(
+  request,
+  env,
+  corsHeaders,
+  id,
+) {
+  const auth = ensureAdmin(request, env, corsHeaders);
+  if (auth) return auth;
+  if (!env.ISIR_DB) {
+    return jsonResponse(
+      { success: false, error: "Database not configured" },
+      500,
+      corsHeaders,
+    );
+  }
+  const now = Date.now();
+  try {
+    const r = await env.ISIR_DB.prepare(
+      `UPDATE speaker_profile_submissions SET status = 'approved', updated_at = ? WHERE id = ? AND status = 'pending'`,
+    )
+      .bind(now, id)
+      .run();
+    if (!r.success || (r.meta?.changes || 0) < 1) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "No pending submission with that id, or already processed",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+    return jsonResponse({ success: true }, 200, corsHeaders);
+  } catch (e) {
+    console.error("handleAdminSpeakerProfileApprove:", e);
+    return jsonResponse(
+      { success: false, error: "Approve failed" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleAdminSpeakerProfileReject(
+  request,
+  env,
+  corsHeaders,
+  id,
+) {
+  const auth = ensureAdmin(request, env, corsHeaders);
+  if (auth) return auth;
+  if (!env.ISIR_DB) {
+    return jsonResponse(
+      { success: false, error: "Database not configured" },
+      500,
+      corsHeaders,
+    );
+  }
+  const now = Date.now();
+  try {
+    const row = await env.ISIR_DB.prepare(
+      `SELECT id, r2_key, status FROM speaker_profile_submissions WHERE id = ?`,
+    )
+      .bind(id)
+      .first();
+    if (!row || row.status !== "pending") {
+      return jsonResponse(
+        { success: false, error: "No pending submission with that id" },
+        400,
+        corsHeaders,
+      );
+    }
+    if (row.r2_key) {
+      await safeDeleteR2Object(env, row.r2_key);
+    }
+    await env.ISIR_DB.prepare(
+      `UPDATE speaker_profile_submissions SET
+        status = 'rejected', r2_key = NULL, updated_at = ? WHERE id = ?`,
+    )
+      .bind(now, id)
+      .run();
+    return jsonResponse({ success: true }, 200, corsHeaders);
+  } catch (e) {
+    console.error("handleAdminSpeakerProfileReject:", e);
+    return jsonResponse(
+      { success: false, error: "Reject failed" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
 async function handleAdminTestPaymentIntent(request, env, corsHeaders) {
   try {
     const auth = ensureAdmin(request, env, corsHeaders);
@@ -2836,8 +3251,9 @@ async function sendRegistrationConfirmationEmail(env, registrationId) {
     }
 
     const name =
-      [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(" ") ||
-      "Attendee";
+      [row.first_name, row.middle_name, row.last_name]
+        .filter(Boolean)
+        .join(" ") || "Attendee";
     const ticketLabel = formatTicketLabel(row.ticket_type);
     const amount =
       row.total_price != null

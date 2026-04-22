@@ -28,6 +28,7 @@ import {
   ReviewerTab,
   CheckinTab,
 } from "./tabs";
+import SpeakerProfileTab from "./tabs/SpeakerProfileTab";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("about");
@@ -72,6 +73,14 @@ export default function App() {
       pathname.startsWith("/checkin")
     );
   });
+  const [isSpeakerProfilePage, setIsSpeakerProfilePage] = useState(() => {
+    const pathname = window.location.pathname || document.location.pathname;
+    return (
+      pathname === "/speaker-profile" ||
+      pathname === "/speaker-profile/" ||
+      pathname.startsWith("/speaker-profile")
+    );
+  });
 
   // Update admin page state when pathname changes
   useEffect(() => {
@@ -101,6 +110,11 @@ export default function App() {
           pathname === "/checkin/" ||
           pathname.startsWith("/checkin");
         setIsCheckinPage(isCheckin);
+        const isSpeakerProfile =
+          pathname === "/speaker-profile" ||
+          pathname === "/speaker-profile/" ||
+          pathname.startsWith("/speaker-profile");
+        setIsSpeakerProfilePage(isSpeakerProfile);
       }, 0);
     };
 
@@ -134,7 +148,8 @@ export default function App() {
         url.pathname === "/commercial-disclosure" ||
         url.pathname === "/commercial-disclosure/";
       const wantsPrivacyPolicy =
-        url.pathname === "/privacy-policy" || url.pathname === "/privacy-policy/";
+        url.pathname === "/privacy-policy" ||
+        url.pathname === "/privacy-policy/";
       const wantsTermsOfService =
         url.pathname === "/terms-of-service" ||
         url.pathname === "/terms-of-service/";
@@ -290,6 +305,18 @@ export default function App() {
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
             <CheckinTab />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (isSpeakerProfilePage) {
+    return (
+      <div ref={appRef} className="min-h-screen bg-gray-50">
+        <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
+            <SpeakerProfileTab />
           </div>
         </main>
       </div>

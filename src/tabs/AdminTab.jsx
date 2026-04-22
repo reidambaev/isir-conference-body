@@ -39,7 +39,8 @@ function normalizeWeekendMealDayList(raw) {
   const out = [];
   for (const d of arr) {
     if (CONGRESS_WEEKEND_MEAL_KEYS.includes(d)) out.push(d);
-    else if (LEGACY_MEAL_DAY_TO_WEEKEND[d]) out.push(LEGACY_MEAL_DAY_TO_WEEKEND[d]);
+    else if (LEGACY_MEAL_DAY_TO_WEEKEND[d])
+      out.push(LEGACY_MEAL_DAY_TO_WEEKEND[d]);
   }
   return out;
 }
@@ -63,7 +64,9 @@ function registrationPaymentBadgeClass(status) {
 
 function getAbstractTypeLabel(abstract) {
   const raw = String(
-    abstract?.abstract_submission_type || abstract?.abstractSubmissionType || "",
+    abstract?.abstract_submission_type ||
+      abstract?.abstractSubmissionType ||
+      "",
   ).trim();
   if (!raw) return "Not specified";
   if (raw === "Clinical Research") return "Clinical Studies";
@@ -78,6 +81,10 @@ export default function AdminTab() {
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState("abstracts");
   const [error, setError] = useState(null);
+  const [speakerProfileSubmissions, setSpeakerProfileSubmissions] = useState(
+    [],
+  );
+  const [speakerProfileActionId, setSpeakerProfileActionId] = useState(null);
   const [expandedAbstracts, setExpandedAbstracts] = useState(new Set());
 
   // Abstract filtering/sorting state
@@ -100,8 +107,10 @@ export default function AdminTab() {
 
   // Confirmation-email sending state (retroactive single + bulk)
   const [sendingConfirmationId, setSendingConfirmationId] = useState(null);
-  const [sendingRegistrationConfirmationId, setSendingRegistrationConfirmationId] =
-    useState(null);
+  const [
+    sendingRegistrationConfirmationId,
+    setSendingRegistrationConfirmationId,
+  ] = useState(null);
   const [bulkSendingConfirmations, setBulkSendingConfirmations] =
     useState(false);
   const [confirmationSendSummary, setConfirmationSendSummary] = useState(null);
@@ -165,12 +174,16 @@ export default function AdminTab() {
         const id = String(a.id || "").toLowerCase();
         const category = String(a.category || "").toLowerCase();
         return (
-          title.includes(query) || id.includes(query) || category.includes(query)
+          title.includes(query) ||
+          id.includes(query) ||
+          category.includes(query)
         );
       });
     }
     if (reviewerAbstractCategoryFilter !== "all") {
-      result = result.filter((a) => a.category === reviewerAbstractCategoryFilter);
+      result = result.filter(
+        (a) => a.category === reviewerAbstractCategoryFilter,
+      );
     }
     return result;
   }, [
@@ -387,14 +400,21 @@ export default function AdminTab() {
         "X-Admin-Token": token,
       };
 
-      const [abstractsRes, visaRes, registrationsRes, reviewersRes, reviewerAbstractScoresRes] =
-        await Promise.all([
-          fetch("/api/admin/abstracts", { headers: authHeaders }),
-          fetch("/api/admin/visa-requests", { headers: authHeaders }),
-          fetch("/api/registrations", { headers: authHeaders }),
-          fetch("/api/admin/reviewers/overview", { headers: authHeaders }),
-          fetch("/api/admin/reviewers/abstract-scores", { headers: authHeaders }),
-        ]);
+      const [
+        abstractsRes,
+        visaRes,
+        registrationsRes,
+        reviewersRes,
+        reviewerAbstractScoresRes,
+        speakerProfilesRes,
+      ] = await Promise.all([
+        fetch("/api/admin/abstracts", { headers: authHeaders }),
+        fetch("/api/admin/visa-requests", { headers: authHeaders }),
+        fetch("/api/registrations", { headers: authHeaders }),
+        fetch("/api/admin/reviewers/overview", { headers: authHeaders }),
+        fetch("/api/admin/reviewers/abstract-scores", { headers: authHeaders }),
+        fetch("/api/admin/speaker-profiles", { headers: authHeaders }),
+      ]);
 
       const failureDetails = [];
       const addFailure = async (name, res) => {
@@ -405,7 +425,9 @@ export default function AdminTab() {
         } catch {
           bodyText = "";
         }
-        const snippet = String(bodyText || "").trim().slice(0, 500);
+        const snippet = String(bodyText || "")
+          .trim()
+          .slice(0, 500);
         failureDetails.push(
           `${name}: HTTP ${res.status}${snippet ? ` — ${snippet}` : ""}`,
         );
@@ -420,10 +442,13 @@ export default function AdminTab() {
           "GET /api/admin/reviewers/abstract-scores",
           reviewerAbstractScoresRes,
         ),
+        addFailure("GET /api/admin/speaker-profiles", speakerProfilesRes),
       ]);
 
       if (failureDetails.length > 0) {
-        throw new Error(`Failed to fetch admin data.\n${failureDetails.join("\n")}`);
+        throw new Error(
+          `Failed to fetch admin data.\n${failureDetails.join("\n")}`,
+        );
       }
 
       const abstractsData = await abstractsRes.json();
@@ -431,18 +456,54 @@ export default function AdminTab() {
       const registrationsData = await registrationsRes.json();
       const reviewersData = await reviewersRes.json();
       const reviewerAbstractScoresData = await reviewerAbstractScoresRes.json();
+      const speakerProfilesData = await speakerProfilesRes.json();
 
       setAbstracts(abstractsData.data || []);
       setVisaRequests(visaData.data || []);
       setRegistrations(registrationsData.data || []);
       setReviewerOverview(reviewersData || null);
       setReviewerAbstractScores(reviewerAbstractScoresData?.data || []);
+      setSpeakerProfileSubmissions(speakerProfilesData.submissions || []);
       setReviewerOverviewError("");
     } catch (err) {
       console.error("Error fetching admin data:", err);
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const pendingSpeakerProfileCount = useMemo(() => {
+    const list = Array.isArray(speakerProfileSubmissions)
+      ? speakerProfileSubmissions
+      : [];
+    return list.filter((s) => String(s.status || "") === "pending").length;
+  }, [speakerProfileSubmissions]);
+
+  const runSpeakerProfileAction = async (id, action) => {
+    if (!adminToken?.trim() || !id) return;
+    setSpeakerProfileActionId(id);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/admin/speaker-profiles/${encodeURIComponent(id)}/${action}`,
+        {
+          method: "POST",
+          headers: { "X-Admin-Token": adminToken },
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setError(
+          data.error || `Failed to ${action} speaker profile (HTTP ${res.status})`,
+        );
+        return;
+      }
+      await fetchAllData(adminToken);
+    } catch (e) {
+      setError(e?.message || `Failed to ${action}`);
+    } finally {
+      setSpeakerProfileActionId(null);
     }
   };
 
@@ -508,8 +569,12 @@ export default function AdminTab() {
       if (!res.ok || !data?.success) {
         throw new Error(data?.error || "Failed to load environment variables.");
       }
-      setEnvBindingNames(Array.isArray(data.availableBindings) ? data.availableBindings : []);
-      setEnvConfiguredVars(Array.isArray(data.configured) ? data.configured : []);
+      setEnvBindingNames(
+        Array.isArray(data.availableBindings) ? data.availableBindings : [],
+      );
+      setEnvConfiguredVars(
+        Array.isArray(data.configured) ? data.configured : [],
+      );
     } catch (err) {
       setEnvVarsError(err?.message || "Failed to load environment variables.");
     } finally {
@@ -544,7 +609,9 @@ export default function AdminTab() {
     setEmailFileName(file.name);
 
     if (!adminToken.trim()) {
-      setPasswordError("Admin access token missing. Open /admin with ?admin=YOUR_TOKEN.");
+      setPasswordError(
+        "Admin access token missing. Open /admin with ?admin=YOUR_TOKEN.",
+      );
       return;
     }
 
@@ -662,9 +729,7 @@ export default function AdminTab() {
       const outWb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(outWb, outSheet, "ReviewerPasswords");
       const downloadName =
-        "reviewer-passwords-" +
-        new Date().toISOString().slice(0, 10) +
-        ".xlsx";
+        "reviewer-passwords-" + new Date().toISOString().slice(0, 10) + ".xlsx";
       XLSX.writeFile(outWb, downloadName);
     } catch (e) {
       console.error("Error processing email Excel:", e);
@@ -727,7 +792,9 @@ export default function AdminTab() {
       let inviteColIdx = headerRow.findIndex((cell) => {
         if (typeof cell !== "string") return false;
         const val = cell.trim().toLowerCase();
-        return val === "invite_link" || val === "invite link" || val === "invitelink";
+        return (
+          val === "invite_link" || val === "invite link" || val === "invitelink"
+        );
       });
       if (inviteColIdx < 0) {
         inviteColIdx = headerRow.length;
@@ -766,7 +833,8 @@ export default function AdminTab() {
           emailToToken.set(email, token);
         }
 
-        row[inviteColIdx] = `${base}/registration?invite=${encodeURIComponent(token)}`;
+        row[inviteColIdx] =
+          `${base}/registration?invite=${encodeURIComponent(token)}`;
         rows[i] = row;
         generated += 1;
       }
@@ -1088,29 +1156,28 @@ export default function AdminTab() {
     const noun = onlyMissing
       ? `the ${missingCount} abstract${missingCount === 1 ? "" : "s"} missing a confirmation`
       : `all ${abstracts.length} abstract${abstracts.length === 1 ? "" : "s"}`;
-    if (!window.confirm(`About to ${verb} confirmation emails to ${noun}. Continue?`)) {
+    if (
+      !window.confirm(
+        `About to ${verb} confirmation emails to ${noun}. Continue?`,
+      )
+    ) {
       return;
     }
 
     setBulkSendingConfirmations(true);
     setConfirmationSendSummary(null);
     try {
-      const response = await fetch(
-        "/api/admin/abstracts/send-confirmations",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Admin-Token": adminToken,
-          },
-          body: JSON.stringify({ onlyMissing }),
+      const response = await fetch("/api/admin/abstracts/send-confirmations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Token": adminToken,
         },
-      );
+        body: JSON.stringify({ onlyMissing }),
+      });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.success) {
-        throw new Error(
-          result?.error || "Failed to send confirmation emails",
-        );
+        throw new Error(result?.error || "Failed to send confirmation emails");
       }
 
       const sentMap = new Map();
@@ -1414,6 +1481,21 @@ export default function AdminTab() {
           Speaker Invite Links
         </button>
         <button
+          onClick={() => setActiveSection("speakerProfiles")}
+          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+            activeSection === "speakerProfiles"
+              ? "bg-rose-600 text-white shadow-md"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Speaker profile queue
+          {pendingSpeakerProfileCount > 0 ? (
+            <span className="ml-2 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-white/25 px-1.5 text-xs">
+              {pendingSpeakerProfileCount}
+            </span>
+          ) : null}
+        </button>
+        <button
           onClick={() => setActiveSection("environment")}
           className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
             activeSection === "environment"
@@ -1434,9 +1516,9 @@ export default function AdminTab() {
                 Abstract Submissions
               </h2>
               <p className="text-gray-500 text-sm mt-1 max-w-2xl">
-                Browse full text, keywords, and author details; update acceptance
-                status; export a list. For Gusdon reviewer scores, category
-                averages, notes, and COI details, open{" "}
+                Browse full text, keywords, and author details; update
+                acceptance status; export a list. For Gusdon reviewer scores,
+                category averages, notes, and COI details, open{" "}
                 <button
                   type="button"
                   onClick={() => setActiveSection("abstractReviewScores")}
@@ -1557,10 +1639,10 @@ export default function AdminTab() {
                   Confirmation email batch complete
                 </p>
                 <p className="mt-1">
-                  Sent <strong>{confirmationSendSummary.sent}</strong>,
-                  skipped <strong>{confirmationSendSummary.skipped}</strong>,
-                  failed <strong>{confirmationSendSummary.failed}</strong> out
-                  of {confirmationSendSummary.total}
+                  Sent <strong>{confirmationSendSummary.sent}</strong>, skipped{" "}
+                  <strong>{confirmationSendSummary.skipped}</strong>, failed{" "}
+                  <strong>{confirmationSendSummary.failed}</strong> out of{" "}
+                  {confirmationSendSummary.total}
                   {confirmationSendSummary.onlyMissing
                     ? " (only those missing a prior confirmation)"
                     : " (all abstracts)"}
@@ -2720,9 +2802,9 @@ export default function AdminTab() {
                 Abstract review scores
               </h2>
               <p className="text-gray-500 text-sm mt-1 max-w-2xl">
-                Average scores by category across reviewers, per-abstract totals,
-                reviewer notes, and conflict-of-interest flags. Submissions
-                (accept/reject, full text) stay under{" "}
+                Average scores by category across reviewers, per-abstract
+                totals, reviewer notes, and conflict-of-interest flags.
+                Submissions (accept/reject, full text) stay under{" "}
                 <button
                   type="button"
                   onClick={() => setActiveSection("abstracts")}
@@ -2787,8 +2869,8 @@ export default function AdminTab() {
                 Scoring summary by abstract
               </h3>
               <p className="text-xs text-gray-500 mt-1">
-                Expand a row for category averages and each reviewer&apos;s scores,
-                notes, and COI details.
+                Expand a row for category averages and each reviewer&apos;s
+                scores, notes, and COI details.
               </p>
             </div>
 
@@ -2919,58 +3001,69 @@ export default function AdminTab() {
                             <table className="min-w-full text-xs bg-white border border-gray-200 rounded-lg overflow-hidden">
                               <thead className="bg-gray-100 text-gray-600">
                                 <tr>
-                                  <th className="text-left px-3 py-2">Reviewer</th>
-                                  <th className="text-left px-3 py-2">Scores</th>
+                                  <th className="text-left px-3 py-2">
+                                    Reviewer
+                                  </th>
+                                  <th className="text-left px-3 py-2">
+                                    Scores
+                                  </th>
                                   <th className="text-left px-3 py-2">
                                     Additional notes
                                   </th>
                                   <th className="text-left px-3 py-2">
                                     COI / flags
                                   </th>
-                                  <th className="text-left px-3 py-2">Updated</th>
+                                  <th className="text-left px-3 py-2">
+                                    Updated
+                                  </th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {(item.reviewer_reviews || []).map((rev, idx) => {
-                                  const coiFlags = [];
-                                  if (rev.coi_mentor_pi) coiFlags.push("Mentor/PI");
-                                  if (rev.coi_same_lab) coiFlags.push("Same lab");
-                                  if (rev.coi_other) coiFlags.push("Other COI");
-                                  return (
-                                    <tr
-                                      key={`${item.id}-${rev.reviewer_email}-${idx}`}
-                                      className="border-t border-gray-100 align-top"
-                                    >
-                                      <td className="px-3 py-2 text-gray-800">
-                                        {rev.reviewer_email}
-                                      </td>
-                                      <td className="px-3 py-2 text-gray-700">
-                                        O:{rev.originality ?? "—"} C:
-                                        {rev.clarity ?? "—"} SD:
-                                        {rev.study_design ?? "—"} DA:
-                                        {rev.data_analysis ?? "—"} S:
-                                        {rev.significance ?? "—"} T:
-                                        {rev.total ?? "—"}
-                                      </td>
-                                      <td className="px-3 py-2 text-gray-700 max-w-md whitespace-pre-wrap">
-                                        {rev.previous_study_notes || "—"}
-                                      </td>
-                                      <td className="px-3 py-2 text-gray-700 max-w-xs whitespace-pre-wrap">
-                                        {coiFlags.length > 0
-                                          ? coiFlags.join(", ")
-                                          : "None"}
-                                        {rev.coi_other_details
-                                          ? `\n${rev.coi_other_details}`
-                                          : ""}
-                                      </td>
-                                      <td className="px-3 py-2 text-gray-600">
-                                        {rev.updated_at
-                                          ? formatDate(rev.updated_at)
-                                          : "—"}
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
+                                {(item.reviewer_reviews || []).map(
+                                  (rev, idx) => {
+                                    const coiFlags = [];
+                                    if (rev.coi_mentor_pi)
+                                      coiFlags.push("Mentor/PI");
+                                    if (rev.coi_same_lab)
+                                      coiFlags.push("Same lab");
+                                    if (rev.coi_other)
+                                      coiFlags.push("Other COI");
+                                    return (
+                                      <tr
+                                        key={`${item.id}-${rev.reviewer_email}-${idx}`}
+                                        className="border-t border-gray-100 align-top"
+                                      >
+                                        <td className="px-3 py-2 text-gray-800">
+                                          {rev.reviewer_email}
+                                        </td>
+                                        <td className="px-3 py-2 text-gray-700">
+                                          O:{rev.originality ?? "—"} C:
+                                          {rev.clarity ?? "—"} SD:
+                                          {rev.study_design ?? "—"} DA:
+                                          {rev.data_analysis ?? "—"} S:
+                                          {rev.significance ?? "—"} T:
+                                          {rev.total ?? "—"}
+                                        </td>
+                                        <td className="px-3 py-2 text-gray-700 max-w-md whitespace-pre-wrap">
+                                          {rev.previous_study_notes || "—"}
+                                        </td>
+                                        <td className="px-3 py-2 text-gray-700 max-w-xs whitespace-pre-wrap">
+                                          {coiFlags.length > 0
+                                            ? coiFlags.join(", ")
+                                            : "None"}
+                                          {rev.coi_other_details
+                                            ? `\n${rev.coi_other_details}`
+                                            : ""}
+                                        </td>
+                                        <td className="px-3 py-2 text-gray-600">
+                                          {rev.updated_at
+                                            ? formatDate(rev.updated_at)
+                                            : "—"}
+                                        </td>
+                                      </tr>
+                                    );
+                                  },
+                                )}
                               </tbody>
                             </table>
                           </div>
@@ -3095,7 +3188,8 @@ export default function AdminTab() {
                   />
                 </label>
                 <p className="text-sm text-gray-500 pb-1">
-                  Showing {filteredRegistrations.length} of {registrations.length}
+                  Showing {filteredRegistrations.length} of{" "}
+                  {registrations.length}
                 </p>
               </div>
               {filteredRegistrations.length === 0 ? (
@@ -3148,9 +3242,8 @@ export default function AdminTab() {
                         const lunchDays = normalizeWeekendMealDayList(
                           reg.lunch_days,
                         );
-                        const breakfastDays = registrationBreakfastDaysForDisplay(
-                          reg,
-                        );
+                        const breakfastDays =
+                          registrationBreakfastDaysForDisplay(reg);
                         const dietaryBits = [];
                         if (Number(reg.dietary_vegan) === 1) {
                           dietaryBits.push("Vegan");
@@ -3284,7 +3377,9 @@ export default function AdminTab() {
                                           <button
                                             type="button"
                                             onClick={() =>
-                                              sendRegistrationConfirmation(reg.id)
+                                              sendRegistrationConfirmation(
+                                                reg.id,
+                                              )
                                             }
                                             disabled={
                                               sendingRegistrationConfirmationId ===
@@ -3325,11 +3420,7 @@ export default function AdminTab() {
                                           {[
                                             reg.address1,
                                             reg.address2,
-                                            [
-                                              reg.city,
-                                              reg.state,
-                                              reg.zip,
-                                            ]
+                                            [reg.city, reg.state, reg.zip]
                                               .filter(Boolean)
                                               .join(", "),
                                             reg.country,
@@ -3371,9 +3462,7 @@ export default function AdminTab() {
                                         <dd className="tabular-nums">
                                           {fmtMoney(reg.ticket_price)}
                                         </dd>
-                                        <dt className="text-gray-500">
-                                          Total
-                                        </dt>
+                                        <dt className="text-gray-500">Total</dt>
                                         <dd className="tabular-nums font-medium">
                                           {fmtMoney(reg.total_price)}
                                         </dd>
@@ -3417,7 +3506,9 @@ export default function AdminTab() {
                                         </dt>
                                         <dd>
                                           {lunchDays.length
-                                            ? formatCongressMealDayList(lunchDays)
+                                            ? formatCongressMealDayList(
+                                                lunchDays,
+                                              )
                                             : "Not selected"}
                                         </dd>
                                         <dt className="text-gray-500">
@@ -3425,7 +3516,9 @@ export default function AdminTab() {
                                         </dt>
                                         <dd>
                                           {breakfastDays.length
-                                            ? formatCongressMealDayList(breakfastDays)
+                                            ? formatCongressMealDayList(
+                                                breakfastDays,
+                                              )
                                             : "Not selected"}
                                         </dd>
                                         <dt className="text-gray-500">
@@ -3440,8 +3533,9 @@ export default function AdminTab() {
                                           Special assistance
                                         </dt>
                                         <dd>
-                                          {Number(reg.special_assistance || 0) ===
-                                          1
+                                          {Number(
+                                            reg.special_assistance || 0,
+                                          ) === 1
                                             ? "Yes"
                                             : "No"}
                                         </dd>
@@ -3449,8 +3543,9 @@ export default function AdminTab() {
                                           Invited speaker
                                         </dt>
                                         <dd>
-                                          {Number(reg.is_invited_speaker || 0) ===
-                                          1
+                                          {Number(
+                                            reg.is_invited_speaker || 0,
+                                          ) === 1
                                             ? "Yes"
                                             : "No"}
                                         </dd>
@@ -3479,9 +3574,7 @@ export default function AdminTab() {
                                         <dt className="text-gray-500">
                                           Payment date
                                         </dt>
-                                        <dd>
-                                          {formatDate(reg.payment_date)}
-                                        </dd>
+                                        <dd>{formatDate(reg.payment_date)}</dd>
                                         <dt className="text-gray-500">
                                           Payment ref.
                                         </dt>
@@ -3503,8 +3596,9 @@ export default function AdminTab() {
                                             ? "Yes"
                                             : "No"}
                                           {" · "}Marketing:{" "}
-                                          {Number(reg.privacy_marketing || 0) ===
-                                          1
+                                          {Number(
+                                            reg.privacy_marketing || 0,
+                                          ) === 1
                                             ? "Yes"
                                             : "No"}
                                           {" · "}App:{" "}
@@ -3546,7 +3640,9 @@ export default function AdminTab() {
               <p className="text-gray-500 text-sm mt-1 max-w-3xl">
                 Rollups from the registration list loaded in this session (API
                 returns up to the 100 most recent). Revenue uses{" "}
-                <code className="text-xs bg-gray-100 px-1 rounded">total_price</code>{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">
+                  total_price
+                </code>{" "}
                 and counts payments with status{" "}
                 <span className="font-medium">completed</span> or{" "}
                 <span className="font-medium">paid</span>.
@@ -3602,15 +3698,15 @@ export default function AdminTab() {
               </p>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-              <p className="text-sm font-medium text-gray-500">Other admin data</p>
+              <p className="text-sm font-medium text-gray-500">
+                Other admin data
+              </p>
               <p className="text-sm text-gray-700 mt-2 space-y-1">
                 <span className="block">
-                  Abstracts:{" "}
-                  <strong>{abstracts.length}</strong>
+                  Abstracts: <strong>{abstracts.length}</strong>
                 </span>
                 <span className="block">
-                  Visa requests:{" "}
-                  <strong>{visaRequests.length}</strong>
+                  Visa requests: <strong>{visaRequests.length}</strong>
                 </span>
                 <span className="block">
                   Invited speaker registrations:{" "}
@@ -4018,7 +4114,8 @@ export default function AdminTab() {
                         {reviewerStats.completedReviewers}
                       </p>
                       <p className="mt-1 text-[11px] text-gray-500">
-                        {reviewerStats.reviewersWithPending} with pending reviews
+                        {reviewerStats.reviewersWithPending} with pending
+                        reviews
                       </p>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-lime-100 flex items-center justify-center">
@@ -4065,8 +4162,8 @@ export default function AdminTab() {
                             isComplete
                               ? "border-emerald-500"
                               : pending > 0
-                              ? "border-amber-400"
-                              : "border-gray-200"
+                                ? "border-amber-400"
+                                : "border-gray-200"
                           }`}
                         >
                           <summary className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50">
@@ -4076,8 +4173,8 @@ export default function AdminTab() {
                                   {rev.reviewer_email}
                                 </p>
                                 <p className="text-xs text-gray-500 mt-0.5">
-                                  Assigned {rev.assigned_count || 0} •
-                                  Reviewed {rev.reviewed_count || 0} • Pending{" "}
+                                  Assigned {rev.assigned_count || 0} • Reviewed{" "}
+                                  {rev.reviewed_count || 0} • Pending{" "}
                                   {pending < 0 ? 0 : pending}
                                 </p>
                                 <div className="mt-1 flex flex-wrap gap-2 text-[11px]">
@@ -4139,15 +4236,11 @@ export default function AdminTab() {
                                 <table className="min-w-full text-xs">
                                   <thead>
                                     <tr className="text-left text-gray-500 border-b border-gray-200">
-                                      <th className="py-2 pr-4">
-                                        Abstract ID
-                                      </th>
+                                      <th className="py-2 pr-4">Abstract ID</th>
                                       <th className="py-2 pr-4">Title</th>
                                       <th className="py-2 pr-4">Status</th>
                                       <th className="py-2 pr-4">Score</th>
-                                      <th className="py-2 pr-4">
-                                        Assigned
-                                      </th>
+                                      <th className="py-2 pr-4">Assigned</th>
                                       <th className="py-2 pr-2">
                                         Last updated
                                       </th>
@@ -4275,8 +4368,27 @@ export default function AdminTab() {
             <h2 className="text-2xl font-semibold text-gray-800">
               Speaker Invite Link Generator
             </h2>
+            <p className="mt-3 text-sm text-fuchsia-900 bg-fuchsia-50 border border-fuchsia-200 rounded-lg px-3 py-2 max-w-2xl">
+              <span className="font-semibold">Invited speaker profile form:</span>{" "}
+              send the public link{" "}
+              <code className="text-xs break-all">
+                {typeof window !== "undefined" ? window.location.origin : ""}
+                /speaker-profile
+              </code>{" "}
+              so listed speakers can confirm their name, affiliation, and photo
+              (max 800 KB) before you approve it under{" "}
+              <button
+                type="button"
+                onClick={() => setActiveSection("speakerProfiles")}
+                className="font-semibold text-fuchsia-800 underline"
+              >
+                Speaker profile queue
+              </button>
+              .
+            </p>
             <p className="text-gray-600 text-sm mt-1 max-w-2xl">
-              Upload your speaker list as an Excel/CSV file. The tool will add an{" "}
+              Upload your speaker list as an Excel/CSV file. The tool will add
+              an{" "}
               <code className="px-1 rounded bg-gray-100 text-[11px]">
                 invite_link
               </code>{" "}
@@ -4332,6 +4444,139 @@ export default function AdminTab() {
         </div>
       )}
 
+      {activeSection === "speakerProfiles" && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-800">
+              Speaker profile queue
+            </h2>
+            <p className="text-gray-600 text-sm mt-1 max-w-2xl">
+              Submissions from the invited speaker form (
+              <code className="text-xs">
+                {typeof window !== "undefined" ? window.location.origin : ""}
+                /speaker-profile
+              </code>
+              ). Approve to publish name, affiliation, and optional headshot on
+              the Speakers page. Rejecting deletes a pending headshot from
+              storage.
+            </p>
+          </div>
+          <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-sm">
+            <table className="min-w-full text-sm text-left">
+              <thead className="bg-gray-50 text-gray-700 font-medium">
+                <tr>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Speaker key</th>
+                  <th className="px-3 py-2">Name / affiliation</th>
+                  <th className="px-3 py-2">Email</th>
+                  <th className="px-3 py-2">Photo</th>
+                  <th className="px-3 py-2 w-40">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(Array.isArray(speakerProfileSubmissions)
+                  ? speakerProfileSubmissions
+                  : []
+                ).map((row) => {
+                  const isPending = String(row.status) === "pending";
+                  return (
+                    <tr key={row.id} className="align-top">
+                      <td className="px-3 py-2">
+                        <span
+                          className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
+                            isPending
+                              ? "bg-amber-100 text-amber-900"
+                              : String(row.status) === "approved"
+                                ? "bg-green-100 text-green-900"
+                                : "bg-slate-200 text-slate-800"
+                          }`}
+                        >
+                          {String(row.status || "")}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 font-mono text-xs text-gray-800">
+                        {row.speaker_key}
+                      </td>
+                      <td className="px-3 py-2 max-w-sm">
+                        <div className="font-medium text-gray-900">
+                          {row.display_name}
+                        </div>
+                        <div className="text-gray-600 text-xs mt-0.5">
+                          {row.affiliation}
+                        </div>
+                        {row.image_position ? (
+                          <div className="text-gray-500 text-xs mt-1 font-mono">
+                            {row.image_position}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2 text-gray-800 break-all">
+                        {row.email}
+                      </td>
+                      <td className="px-3 py-2">
+                        {row.r2_key ? (
+                          <a
+                            href={`/${row.r2_key}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block"
+                          >
+                            <img
+                              src={`/${row.r2_key}`}
+                              alt=""
+                              className="h-16 w-16 rounded-lg object-cover border border-gray-200"
+                            />
+                          </a>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {isPending ? (
+                          <div className="flex flex-col gap-1.5">
+                            <button
+                              type="button"
+                              disabled={speakerProfileActionId === row.id}
+                              onClick={() => runSpeakerProfileAction(row.id, "approve")}
+                              className="px-2.5 py-1 rounded bg-green-600 text-white text-xs font-medium hover:bg-green-700 disabled:opacity-50"
+                            >
+                              {speakerProfileActionId === row.id
+                                ? "…"
+                                : "Approve"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={speakerProfileActionId === row.id}
+                              onClick={() => runSpeakerProfileAction(row.id, "reject")}
+                              className="px-2.5 py-1 rounded border border-red-300 text-red-800 text-xs font-medium hover:bg-red-50 disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {(!speakerProfileSubmissions ||
+                  speakerProfileSubmissions.length === 0) && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-3 py-6 text-center text-gray-500"
+                    >
+                      No speaker profile submissions yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Environment Section */}
       {activeSection === "environment" && (
         <div className="space-y-6">
@@ -4365,7 +4610,9 @@ export default function AdminTab() {
               Key configuration status
             </h3>
             {envConfiguredVars.length === 0 ? (
-              <p className="text-sm text-gray-500">No configuration data yet.</p>
+              <p className="text-sm text-gray-500">
+                No configuration data yet.
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
@@ -4379,7 +4626,9 @@ export default function AdminTab() {
                   <tbody>
                     {envConfiguredVars.map((item) => (
                       <tr key={item.name} className="border-b border-gray-100">
-                        <td className="py-2 pr-4 font-mono text-xs">{item.name}</td>
+                        <td className="py-2 pr-4 font-mono text-xs">
+                          {item.name}
+                        </td>
                         <td className="py-2 pr-4">
                           <span
                             className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -4476,8 +4725,8 @@ export default function AdminTab() {
               {testStripeModeInfo && (
                 <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                   Stripe key modes: publishable ={" "}
-                  <strong>{testStripeModeInfo.publishableKeyMode}</strong>, secret ={" "}
-                  <strong>{testStripeModeInfo.secretKeyMode}</strong>
+                  <strong>{testStripeModeInfo.publishableKeyMode}</strong>,
+                  secret = <strong>{testStripeModeInfo.secretKeyMode}</strong>
                 </div>
               )}
 
