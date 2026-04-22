@@ -305,12 +305,18 @@ async function handleApiRequest(request, env, url) {
   }
 
   // POST /api/speaker-profiles/submit (multipart, invited speakers)
-  if (url.pathname === "/api/speaker-profiles/submit" && request.method === "POST") {
+  if (
+    url.pathname === "/api/speaker-profiles/submit" &&
+    request.method === "POST"
+  ) {
     return handleSubmitSpeakerProfile(request, env, corsHeaders);
   }
 
   // GET /api/admin/speaker-profiles
-  if (url.pathname === "/api/admin/speaker-profiles" && request.method === "GET") {
+  if (
+    url.pathname === "/api/admin/speaker-profiles" &&
+    request.method === "GET"
+  ) {
     return handleAdminListSpeakerProfiles(request, env, corsHeaders);
   }
 
@@ -2610,7 +2616,12 @@ async function safeDeleteR2Object(env, key) {
   }
 }
 
-async function handleGetApprovedSpeakerProfiles(request, env, _url, corsHeaders) {
+async function handleGetApprovedSpeakerProfiles(
+  request,
+  env,
+  _url,
+  corsHeaders,
+) {
   if (!env.ISIR_DB) {
     return jsonResponse(
       { success: false, error: "Database not configured" },
@@ -2625,7 +2636,10 @@ async function handleGetApprovedSpeakerProfiles(request, env, _url, corsHeaders)
     ).all();
     const out = (results || []).map((r) => ({
       id: r.id,
-      speaker_key: r.speaker_key != null && String(r.speaker_key).trim() !== "" ? r.speaker_key : null,
+      speaker_key:
+        r.speaker_key != null && String(r.speaker_key).trim() !== ""
+          ? r.speaker_key
+          : null,
       display_name: r.display_name,
       affiliation: r.affiliation,
       r2_key: r.r2_key || null,
@@ -2763,16 +2777,7 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
       (id, speaker_key, email, display_name, affiliation, r2_key, image_position, status, created_at, updated_at)
       VALUES (?, NULL, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
     )
-      .bind(
-        id,
-        email,
-        name,
-        affiliation,
-        r2Key,
-        pos,
-        now,
-        now,
-      )
+      .bind(id, email, name, affiliation, r2Key, pos, now, now)
       .run();
 
     return new Response(
@@ -2825,12 +2830,7 @@ async function handleAdminListSpeakerProfiles(request, env, corsHeaders) {
   }
 }
 
-async function handleAdminSpeakerProfileApprove(
-  request,
-  env,
-  corsHeaders,
-  id,
-) {
+async function handleAdminSpeakerProfileApprove(request, env, corsHeaders, id) {
   const auth = ensureAdmin(request, env, corsHeaders);
   if (auth) return auth;
   if (!env.ISIR_DB) {
@@ -2868,12 +2868,7 @@ async function handleAdminSpeakerProfileApprove(
   }
 }
 
-async function handleAdminSpeakerProfileReject(
-  request,
-  env,
-  corsHeaders,
-  id,
-) {
+async function handleAdminSpeakerProfileReject(request, env, corsHeaders, id) {
   const auth = ensureAdmin(request, env, corsHeaders);
   if (auth) return auth;
   if (!env.ISIR_DB) {
