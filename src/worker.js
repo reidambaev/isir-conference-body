@@ -2701,7 +2701,6 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
   const email = normalizeEmail(formData.get("email"));
   const name = String(formData.get("name") || "").trim();
   const affiliation = String(formData.get("affiliation") || "").trim();
-  const imagePosition = String(formData.get("imagePosition") || "").trim();
   const file = formData.get("file");
   const wantsUpload = Boolean(
     file && typeof file.size === "number" && file.size > 0,
@@ -2793,15 +2792,13 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
     });
   }
 
-  const pos = imagePosition.trim() || null;
-
   try {
     await env.ISIR_DB.prepare(
       `INSERT INTO speaker_profile_submissions
       (id, speaker_key, email, display_name, affiliation, r2_key, image_position, status, created_at, updated_at)
-      VALUES (?, NULL, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      VALUES (?, NULL, ?, ?, ?, ?, NULL, 'pending', ?, ?)`,
     )
-      .bind(id, email, name, affiliation, r2Key, pos, now, now)
+      .bind(id, email, name, affiliation, r2Key, now, now)
       .run();
 
     return new Response(

@@ -6,7 +6,6 @@ export default function SpeakerProfileTab() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [affiliation, setAffiliation] = useState("");
-  const [imagePosition, setImagePosition] = useState("");
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -58,9 +57,6 @@ export default function SpeakerProfileTab() {
       fd.set("email", email.trim());
       fd.set("name", name.trim());
       fd.set("affiliation", affiliation.trim());
-      if (imagePosition.trim()) {
-        fd.set("imagePosition", imagePosition.trim());
-      }
       if (file) {
         fd.set("file", file);
       }
@@ -171,9 +167,6 @@ export default function SpeakerProfileTab() {
                   className="w-28 h-28 rounded-full object-cover border-2 flex-shrink-0"
                   style={{
                     borderColor: "var(--color-secondary)",
-                    ...(imagePosition.trim() && {
-                      objectPosition: imagePosition.trim(),
-                    }),
                   }}
                 />
               </div>
@@ -193,22 +186,6 @@ export default function SpeakerProfileTab() {
               </div>
             </div>
           )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-800 mb-1.5">
-            Image crop (optional)
-          </label>
-          <input
-            type="text"
-            value={imagePosition}
-            onChange={(e) => setImagePosition(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm font-mono"
-            placeholder="e.g. center 20% (CSS object-position)"
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Adjust above and the preview updates if the file is under 1 MB.
-          </p>
         </div>
 
         {error && (
