@@ -2,8 +2,6 @@
  * ISIR Conference Worker
  * Handles static assets + API routes
  */
-import { getInvitedSpeakerByKey, isValidInvitedSpeakerKey } from "./invitedSpeakersCatalog.js";
-
 const SPEAKER_PHOTO_MAX_BYTES = 800 * 1024; // 800 KB cap for R2 headshots (JPEG/PNG)
 
 export default {
@@ -296,6 +294,14 @@ async function handleApiRequest(request, env, url) {
     request.method === "GET"
   ) {
     return handleGetApprovedSpeakerProfiles(request, env, url, corsHeaders);
+  }
+
+  // GET /api/speaker-profiles/invite-check?email= — same list as /api/speaker-invites/check, no token; ignores used (after registration is OK)
+  if (
+    url.pathname === "/api/speaker-profiles/invite-check" &&
+    request.method === "GET"
+  ) {
+    return handleSpeakerProfileInviteCheck(request, env, url, corsHeaders);
   }
 
   // POST /api/speaker-profiles/submit (multipart, invited speakers)
@@ -640,6 +646,64 @@ async function handleCheckSpeakerInviteByEmail(request, env, url, corsHeaders) {
     console.error("Check speaker invite error:", error);
     return jsonResponse(
       { success: false, error: error.message || "Failed to check invite" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+/** Same `speaker_invites` table as registration; email only (no token). Used invites still OK so people can register first, then submit a headshot. */
+async function getSpeakerProfileInviteAccess(env, email) {
+  if (!env.ISIR_DB || !email) {
+    return { ok: false, code: "not_in_list" };
+  }
+  const now = Date.now();
+  const row = await env.ISIR_DB.prepare(
+    `SELECT email, expires_at FROM speaker_invites WHERE email = ?`,
+  )
+    .bind(email)
+    .first();
+  if (!row?.email) {
+    return { ok: false, code: "not_in_list" };
+  }
+  if (Number(row.expires_at || 0) <= now) {
+    return { ok: false, code: "expired" };
+  }
+  return { ok: true, code: "ok" };
+}
+
+async function handleSpeakerProfileInviteCheck(request, env, url, corsHeaders) {
+  try {
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+    const email = normalizeEmail(url.searchParams.get("email") || "");
+    if (!email) {
+      return jsonResponse(
+        { success: false, error: "email is required" },
+        400,
+        corsHeaders,
+      );
+    }
+    const access = await getSpeakerProfileInviteAccess(env, email);
+    return jsonResponse(
+      {
+        success: true,
+        allowed: access.ok,
+        code: access.code,
+        email,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (e) {
+    console.error("handleSpeakerProfileInviteCheck:", e);
+    return jsonResponse(
+      { success: false, error: "Failed to check invite" },
       500,
       corsHeaders,
     );
@@ -2556,11 +2620,12 @@ async function handleGetApprovedSpeakerProfiles(request, env, _url, corsHeaders)
   }
   try {
     const { results } = await env.ISIR_DB.prepare(
-      `SELECT speaker_key, display_name, affiliation, r2_key, image_position
-       FROM speaker_profile_submissions WHERE status = 'approved'`,
+      `SELECT id, speaker_key, display_name, affiliation, r2_key, image_position
+       FROM speaker_profile_submissions WHERE status = 'approved' ORDER BY display_name ASC`,
     ).all();
     const out = (results || []).map((r) => ({
-      speaker_key: r.speaker_key,
+      id: r.id,
+      speaker_key: r.speaker_key != null && String(r.speaker_key).trim() !== "" ? r.speaker_key : null,
       display_name: r.display_name,
       affiliation: r.affiliation,
       r2_key: r.r2_key || null,
@@ -2596,7 +2661,6 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
     );
   }
 
-  const speakerKey = String(formData.get("speakerKey") || "").trim();
   const email = normalizeEmail(formData.get("email"));
   const name = String(formData.get("name") || "").trim();
   const affiliation = String(formData.get("affiliation") || "").trim();
@@ -2615,13 +2679,6 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
       },
       500,
       corsHeaders,
-    );
-  }
-
-  if (!isValidInvitedSpeakerKey(speakerKey)) {
-    return new Response(
-      JSON.stringify({ success: false, error: "Invalid speaker selection" }),
-      { status: 400, headers: jsonHeaders },
     );
   }
   if (!email) {
@@ -2646,14 +2703,19 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
     );
   }
 
-  const meta = getInvitedSpeakerByKey(speakerKey);
-  if (!meta) {
-    return new Response(
-      JSON.stringify({ success: false, error: "Invalid speaker" }),
-      { status: 400, headers: jsonHeaders },
-    );
+  const inviteAccess = await getSpeakerProfileInviteAccess(env, email);
+  if (!inviteAccess.ok) {
+    const msg =
+      inviteAccess.code === "expired"
+        ? "The speaker invite for this email has expired. Contact the organizers."
+        : "This email is not on the invited speaker list. Use the same address the organizers added for your speaker invite (as for conference registration).";
+    return new Response(JSON.stringify({ success: false, error: msg }), {
+      status: 403,
+      headers: jsonHeaders,
+    });
   }
 
+  const id = crypto.randomUUID();
   const now = Date.now();
   let r2Key = null;
 
@@ -2681,82 +2743,37 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).slice(2, 11).toUpperCase();
     const ext = fileType === "image/png" ? "png" : "jpg";
-    r2Key = `speaker-photos/${speakerKey}_${timestamp}_${randomId}.${ext}`;
+    r2Key = `speaker-photos/nsp-${id.slice(0, 8)}_${timestamp}_${randomId}.${ext}`;
     const fileBuffer = await file.arrayBuffer();
     await env.TRAINEE_LETTERS_BUCKET.put(r2Key, fileBuffer, {
       httpMetadata: { contentType: fileType },
       customMetadata: {
         email,
-        speakerKey,
+        submissionId: id,
         uploadedAt: new Date().toISOString(),
       },
     });
   }
 
+  const pos = imagePosition.trim() || null;
+
   try {
-    const existing = await env.ISIR_DB.prepare(
-      `SELECT id, status, r2_key FROM speaker_profile_submissions WHERE speaker_key = ?`,
+    await env.ISIR_DB.prepare(
+      `INSERT INTO speaker_profile_submissions
+      (id, speaker_key, email, display_name, affiliation, r2_key, image_position, status, created_at, updated_at)
+      VALUES (?, NULL, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
     )
-      .bind(speakerKey)
-      .first();
-
-    if (existing?.status === "approved") {
-      if (r2Key) {
-        await safeDeleteR2Object(env, r2Key);
-      }
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "A profile is already approved for this speaker. Contact the organizers if you need to change it.",
-        }),
-        { status: 400, headers: jsonHeaders },
-      );
-    }
-
-    if (r2Key && existing?.r2_key && String(existing.r2_key) !== r2Key) {
-      await safeDeleteR2Object(env, existing.r2_key);
-    }
-
-    const id = existing?.id || crypto.randomUUID();
-    const r2ToStore = r2Key != null ? r2Key : existing?.r2_key || null;
-    const pos = imagePosition || meta.imagePosition || null;
-
-    if (existing) {
-      await env.ISIR_DB.prepare(
-        `UPDATE speaker_profile_submissions SET
-          email = ?, display_name = ?, affiliation = ?,
-          r2_key = ?, image_position = ?, status = 'pending', updated_at = ?
-        WHERE speaker_key = ?`,
+      .bind(
+        id,
+        email,
+        name,
+        affiliation,
+        r2Key,
+        pos,
+        now,
+        now,
       )
-        .bind(
-          email,
-          name,
-          affiliation,
-          r2ToStore,
-          pos,
-          now,
-          speakerKey,
-        )
-        .run();
-    } else {
-      await env.ISIR_DB.prepare(
-        `INSERT INTO speaker_profile_submissions
-        (id, speaker_key, email, display_name, affiliation, r2_key, image_position, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-      )
-        .bind(
-          id,
-          speakerKey,
-          email,
-          name,
-          affiliation,
-          r2ToStore,
-          pos,
-          now,
-          now,
-        )
-        .run();
-    }
+      .run();
 
     return new Response(
       JSON.stringify({

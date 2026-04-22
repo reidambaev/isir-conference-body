@@ -1,14 +1,8 @@
-import React, { useMemo, useState } from "react";
-import {
-  plenarySpeakers,
-  invitedCongressSpeakers,
-  getInvitedSpeakerByKey,
-} from "../invitedSpeakersCatalog";
+import React, { useState } from "react";
 
 const MAX_PHOTO_BYTES = 800 * 1024;
 
 export default function SpeakerProfileTab() {
-  const [speakerKey, setSpeakerKey] = useState("");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [affiliation, setAffiliation] = useState("");
@@ -17,23 +11,6 @@ export default function SpeakerProfileTab() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
-
-  const selected = useMemo(
-    () => (speakerKey ? getInvitedSpeakerByKey(speakerKey) : null),
-    [speakerKey],
-  );
-
-  const onPickSpeaker = (key) => {
-    setSpeakerKey(key);
-    const m = getInvitedSpeakerByKey(key);
-    if (m) {
-      setName(m.name);
-      setAffiliation(m.affiliation);
-      setImagePosition(m.imagePosition || "");
-    }
-    setError(null);
-    setMessage(null);
-  };
 
   const onFileChange = (e) => {
     const f = e.target.files?.[0];
@@ -50,10 +27,6 @@ export default function SpeakerProfileTab() {
     e.preventDefault();
     setError(null);
     setMessage(null);
-    if (!speakerKey) {
-      setError("Select your name from the list.");
-      return;
-    }
     if (!email.trim() || !name.trim() || !affiliation.trim()) {
       setError("Email, name, and affiliation are required.");
       return;
@@ -68,7 +41,6 @@ export default function SpeakerProfileTab() {
     setSubmitting(true);
     try {
       const fd = new FormData();
-      fd.set("speakerKey", speakerKey);
       fd.set("email", email.trim());
       fd.set("name", name.trim());
       fd.set("affiliation", affiliation.trim());
@@ -104,15 +76,13 @@ export default function SpeakerProfileTab() {
           className="text-2xl font-bold mb-2"
           style={{ color: "var(--color-primary)" }}
         >
-          Invited speaker profile
+          New speaker registration
         </h1>
         <p className="text-gray-600 text-sm leading-relaxed">
-          If you are listed as a plenary or invited speaker, select your name,
-          confirm your details, and optionally upload a headshot. Your
-          information is reviewed before it appears on the public speakers page.
-          Photo uploads are limited to{" "}
-          {Math.floor(MAX_PHOTO_BYTES / 1024)} KB (JPEG or PNG) to keep storage
-          efficient.
+          Enter your name and affiliation as they should appear in the
+          program. You may add an optional headshot. Submissions are reviewed
+          before they go live. Photos are limited to{" "}
+          {Math.floor(MAX_PHOTO_BYTES / 1024)} KB (JPEG or PNG).
         </p>
       </div>
 
@@ -122,30 +92,17 @@ export default function SpeakerProfileTab() {
       >
         <div>
           <label className="block text-sm font-medium text-gray-800 mb-1.5">
-            I am <span className="text-red-600">*</span>
+            Name (as it should appear) <span className="text-red-600">*</span>
           </label>
-          <select
+          <input
+            type="text"
             required
-            value={speakerKey}
-            onChange={(e) => onPickSpeaker(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">Select your name…</option>
-            <optgroup label="Plenary speakers">
-              {plenarySpeakers.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.name}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Invited speakers">
-              {invitedCongressSpeakers.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.name}
-                </option>
-              ))}
-            </optgroup>
-          </select>
+            autoComplete="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"
+            placeholder="Your full name"
+          />
         </div>
 
         <div>
@@ -165,19 +122,6 @@ export default function SpeakerProfileTab() {
 
         <div>
           <label className="block text-sm font-medium text-gray-800 mb-1.5">
-            Name as it should appear <span className="text-red-600">*</span>
-          </label>
-          <input
-            type="text"
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-800 mb-1.5">
             Affiliation / institution <span className="text-red-600">*</span>
           </label>
           <textarea
@@ -186,6 +130,7 @@ export default function SpeakerProfileTab() {
             value={affiliation}
             onChange={(e) => setAffiliation(e.target.value)}
             className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"
+            placeholder="Department, organization, city, country"
           />
         </div>
 
@@ -200,8 +145,9 @@ export default function SpeakerProfileTab() {
             className="block w-full text-sm text-gray-800 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-800"
           />
           <p className="mt-1 text-xs text-gray-500">
-            Square or portrait JPEG/PNG, max {Math.floor(MAX_PHOTO_BYTES / 1024)}{" "}
-            KB. If you skip this, the site may use the default image on file.
+            JPEG or PNG, max {Math.floor(MAX_PHOTO_BYTES / 1024)} KB. Without a
+            photo, approved entries show initials in the same style as other
+            speakers.
           </p>
         </div>
 
@@ -214,22 +160,8 @@ export default function SpeakerProfileTab() {
             value={imagePosition}
             onChange={(e) => setImagePosition(e.target.value)}
             className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm font-mono"
-            placeholder='e.g. center 20% (CSS object-position)'
+            placeholder="e.g. center 20% (CSS object-position)"
           />
-          {selected?.imagePosition && (
-            <p className="mt-1 text-xs text-gray-500">
-              Suggested for you:{" "}
-              <button
-                type="button"
-                className="text-blue-700 underline"
-                onClick={() =>
-                  setImagePosition(selected.imagePosition || "")
-                }
-              >
-                use default
-              </button>
-            </p>
-          )}
         </div>
 
         {error && (

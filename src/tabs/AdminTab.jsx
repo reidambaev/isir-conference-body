@@ -4369,14 +4369,14 @@ export default function AdminTab() {
               Speaker Invite Link Generator
             </h2>
             <p className="mt-3 text-sm text-fuchsia-900 bg-fuchsia-50 border border-fuchsia-200 rounded-lg px-3 py-2 max-w-2xl">
-              <span className="font-semibold">Invited speaker profile form:</span>{" "}
+              <span className="font-semibold">New speaker registration:</span>{" "}
               send the public link{" "}
               <code className="text-xs break-all">
                 {typeof window !== "undefined" ? window.location.origin : ""}
                 /speaker-profile
               </code>{" "}
-              so listed speakers can confirm their name, affiliation, and photo
-              (max 800 KB) before you approve it under{" "}
+              for speakers to type their name, affiliation, and optional
+              headshot (max 800 KB). Approve submissions under{" "}
               <button
                 type="button"
                 onClick={() => setActiveSection("speakerProfiles")}
@@ -4451,14 +4451,15 @@ export default function AdminTab() {
               Speaker profile queue
             </h2>
             <p className="text-gray-600 text-sm mt-1 max-w-2xl">
-              Submissions from the invited speaker form (
+              New speaker registrations (free-text name) from{" "}
               <code className="text-xs">
                 {typeof window !== "undefined" ? window.location.origin : ""}
                 /speaker-profile
               </code>
-              ). Approve to publish name, affiliation, and optional headshot on
-              the Speakers page. Rejecting deletes a pending headshot from
-              storage.
+              . Approve to add them to the main Speakers grid on the Speakers
+              page. The Speaker key column is for legacy rows
+              only; new rows show (new). Rejecting removes a pending headshot
+              from storage.
             </p>
           </div>
           <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-sm">
@@ -4495,7 +4496,9 @@ export default function AdminTab() {
                         </span>
                       </td>
                       <td className="px-3 py-2 font-mono text-xs text-gray-800">
-                        {row.speaker_key}
+                        {row.speaker_key ? row.speaker_key : (
+                          <span className="text-gray-500 italic">(new)</span>
+                        )}
                       </td>
                       <td className="px-3 py-2 max-w-sm">
                         <div className="font-medium text-gray-900">

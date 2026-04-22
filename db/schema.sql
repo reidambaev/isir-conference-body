@@ -208,11 +208,11 @@ CREATE INDEX IF NOT EXISTS idx_visa_requests_status ON visa_requests (status);
 
 CREATE INDEX IF NOT EXISTS idx_visa_requests_date ON visa_requests (created_at);
 
--- Invited speaker profile form (D1 + R2 photo in existing bucket under speaker-photos/)
+-- New speaker profile form (D1 + R2 under speaker-photos/); speaker_key null = not tied to the static catalog
 CREATE TABLE
     IF NOT EXISTS speaker_profile_submissions (
         id TEXT PRIMARY KEY,
-        speaker_key TEXT NOT NULL UNIQUE,
+        speaker_key TEXT UNIQUE,
         email TEXT NOT NULL,
         display_name TEXT NOT NULL,
         affiliation TEXT NOT NULL,

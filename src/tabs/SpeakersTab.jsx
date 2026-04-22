@@ -15,6 +15,7 @@ function getInitials(name) {
 
 function SpeakersTab() {
   const [approvedMap, setApprovedMap] = useState(() => new Map());
+  const [additionalSpeakers, setAdditionalSpeakers] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,17 +25,30 @@ function SpeakersTab() {
         const data = await res.json();
         if (!res.ok || !data.success || !Array.isArray(data.approved)) return;
         const m = new Map();
+        const extra = [];
         for (const row of data.approved) {
-          const k = String(row.speaker_key || "");
-          if (!k) continue;
-          m.set(k, {
-            display_name: String(row.display_name || ""),
-            affiliation: String(row.affiliation || ""),
-            r2_key: row.r2_key || null,
-            image_position: row.image_position || null,
-          });
+          const k = row.speaker_key != null ? String(row.speaker_key).trim() : "";
+          if (k) {
+            m.set(k, {
+              display_name: String(row.display_name || ""),
+              affiliation: String(row.affiliation || ""),
+              r2_key: row.r2_key || null,
+              image_position: row.image_position || null,
+            });
+          } else {
+            extra.push({
+              id: String(row.id || ""),
+              name: String(row.display_name || ""),
+              affiliation: String(row.affiliation || ""),
+              r2_key: row.r2_key || null,
+              image_position: row.image_position || null,
+            });
+          }
         }
-        if (!cancelled) setApprovedMap(m);
+        if (!cancelled) {
+          setApprovedMap(m);
+          setAdditionalSpeakers(extra);
+        }
       } catch {
         // public page: keep static data if API fails
       }
@@ -58,7 +72,7 @@ function SpeakersTab() {
   }, [approvedMap]);
 
   const speakers = useMemo(() => {
-    return congressCatalog.map((s) => {
+    const fromCatalog = congressCatalog.map((s) => {
       const o = approvedMap.get(s.key);
       return {
         ...s,
@@ -68,7 +82,16 @@ function SpeakersTab() {
         imagePosition: o?.image_position || s.imagePosition,
       };
     });
-  }, [approvedMap]);
+    const fromProfiles = additionalSpeakers.map((a) => ({
+      key: `speaker-profile-${a.id}`,
+      name: a.name,
+      affiliation: a.affiliation,
+      image: null,
+      customPhotoKey: a.r2_key,
+      imagePosition: a.image_position || undefined,
+    }));
+    return [...fromCatalog, ...fromProfiles];
+  }, [approvedMap, additionalSpeakers]);
 
   return (
     <div role="tabpanel">
