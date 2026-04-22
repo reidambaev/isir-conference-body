@@ -52,7 +52,15 @@ async function handleR2PublicGet(request, env, url) {
       "Content-Type",
       object.httpMetadata?.contentType || "application/octet-stream",
     );
-    headers.set("Cache-Control", "public, max-age=31536000");
+    // Speaker headshots can be removed from R2; avoid year-long browser cache so deletes show up.
+    if (key.startsWith("speaker-photos/")) {
+      headers.set(
+        "Cache-Control",
+        "private, max-age=0, must-revalidate",
+      );
+    } else {
+      headers.set("Cache-Control", "public, max-age=31536000");
+    }
 
     return new Response(object.body, { headers });
   } catch (error) {
@@ -341,6 +349,18 @@ async function handleApiRequest(request, env, url) {
       env,
       corsHeaders,
       spRejectMatch[1],
+    );
+  }
+
+  const spDeleteMatch = url.pathname.match(
+    /^\/api\/admin\/speaker-profiles\/([^/]+)\/delete$/,
+  );
+  if (spDeleteMatch && request.method === "POST") {
+    return handleAdminSpeakerProfileDelete(
+      request,
+      env,
+      corsHeaders,
+      spDeleteMatch[1],
     );
   }
 
@@ -2645,7 +2665,13 @@ async function handleGetApprovedSpeakerProfiles(
       r2_key: r.r2_key || null,
       image_position: r.image_position || null,
     }));
-    return jsonResponse({ success: true, approved: out }, 200, corsHeaders);
+    return new Response(JSON.stringify({ success: true, approved: out }), {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        "Cache-Control": "private, no-store, max-age=0",
+      },
+    });
   } catch (e) {
     console.error("handleGetApprovedSpeakerProfiles:", e);
     return jsonResponse(
@@ -2907,6 +2933,60 @@ async function handleAdminSpeakerProfileReject(request, env, corsHeaders, id) {
     console.error("handleAdminSpeakerProfileReject:", e);
     return jsonResponse(
       { success: false, error: "Reject failed" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleAdminSpeakerProfileDelete(
+  request,
+  env,
+  corsHeaders,
+  id,
+) {
+  const auth = ensureAdmin(request, env, corsHeaders);
+  if (auth) return auth;
+  if (!env.ISIR_DB) {
+    return jsonResponse(
+      { success: false, error: "Database not configured" },
+      500,
+      corsHeaders,
+    );
+  }
+  try {
+    const row = await env.ISIR_DB.prepare(
+      `SELECT id, r2_key FROM speaker_profile_submissions WHERE id = ?`,
+    )
+      .bind(id)
+      .first();
+    if (!row?.id) {
+      return jsonResponse(
+        { success: false, error: "No submission with that id" },
+        404,
+        corsHeaders,
+      );
+    }
+    if (row.r2_key) {
+      await safeDeleteR2Object(env, row.r2_key);
+    }
+    const del = await env.ISIR_DB.prepare(
+      `DELETE FROM speaker_profile_submissions WHERE id = ?`,
+    )
+      .bind(id)
+      .run();
+    if (!del.success || (del.meta?.changes || 0) < 1) {
+      return jsonResponse(
+        { success: false, error: "Delete failed" },
+        500,
+        corsHeaders,
+      );
+    }
+    return jsonResponse({ success: true }, 200, corsHeaders);
+  } catch (e) {
+    console.error("handleAdminSpeakerProfileDelete:", e);
+    return jsonResponse(
+      { success: false, error: "Delete failed" },
       500,
       corsHeaders,
     );

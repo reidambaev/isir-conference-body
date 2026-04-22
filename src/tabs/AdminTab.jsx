@@ -482,6 +482,12 @@ export default function AdminTab() {
 
   const runSpeakerProfileAction = async (id, action) => {
     if (!adminToken?.trim() || !id) return;
+    if (action === "delete") {
+      const ok = window.confirm(
+        "Remove this speaker profile from the website and delete their stored headshot from file storage? This cannot be undone.",
+      );
+      if (!ok) return;
+    }
     setSpeakerProfileActionId(id);
     setError(null);
     try {
@@ -4457,9 +4463,10 @@ export default function AdminTab() {
                 /speaker-profile
               </code>
               . Approve to add them to the main Speakers grid on the Speakers
-              page. The Speaker key column is for legacy rows
-              only; new rows show (new). Rejecting removes a pending headshot
-              from storage.
+              page. The Speaker key column is for legacy rows only; new rows
+              show (new). Rejecting removes a pending headshot from storage.
+              For approved (or rejected) rows, use Remove to delete the record
+              and any R2 photo so they no longer appear on the site.
             </p>
           </div>
           <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-sm">
@@ -4471,7 +4478,7 @@ export default function AdminTab() {
                   <th className="px-3 py-2">Name / affiliation</th>
                   <th className="px-3 py-2">Email</th>
                   <th className="px-3 py-2">Photo</th>
-                  <th className="px-3 py-2 w-40">Actions</th>
+                  <th className="px-3 py-2 min-w-[9rem]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -4557,7 +4564,16 @@ export default function AdminTab() {
                             </button>
                           </div>
                         ) : (
-                          <span className="text-gray-400 text-xs">—</span>
+                          <button
+                            type="button"
+                            disabled={speakerProfileActionId === row.id}
+                            onClick={() => runSpeakerProfileAction(row.id, "delete")}
+                            className="px-2.5 py-1 rounded border border-gray-400 text-gray-900 text-xs font-medium hover:bg-gray-100 disabled:opacity-50"
+                          >
+                            {speakerProfileActionId === row.id
+                              ? "…"
+                              : "Remove"}
+                          </button>
                         )}
                       </td>
                     </tr>

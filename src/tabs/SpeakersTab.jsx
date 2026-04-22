@@ -19,9 +19,12 @@ function SpeakersTab() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    const loadApproved = async () => {
       try {
-        const res = await fetch("/api/speaker-profiles/approved");
+        const res = await fetch("/api/speaker-profiles/approved", {
+          cache: "no-store",
+        });
         const data = await res.json();
         if (!res.ok || !data.success || !Array.isArray(data.approved)) return;
         const m = new Map();
@@ -52,9 +55,27 @@ function SpeakersTab() {
       } catch {
         // public page: keep static data if API fails
       }
-    })();
+    };
+
+    loadApproved();
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        loadApproved();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    const onPageShow = (e) => {
+      if (e.persisted) {
+        loadApproved();
+      }
+    };
+    window.addEventListener("pageshow", onPageShow);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onPageShow);
     };
   }, []);
 

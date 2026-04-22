@@ -163,29 +163,25 @@ export default function SpeakerProfileTab() {
           </p>
           {previewUrl && file && file.size <= MAX_PHOTO_BYTES && (
             <div className="mt-4 flex flex-col sm:flex-row sm:items-start gap-4">
-              <div
-                className="flex-shrink-0 rounded-full p-1 mx-auto sm:mx-0"
-                style={{
-                  background:
-                    "linear-gradient(135deg, var(--color-primary), var(--color-secondary))",
-                }}
-              >
+              {/* Same avatar frame as main Speakers grid (SpeakersTab): w-28 + border-2 secondary */}
+              <div className="flex-shrink-0 mx-auto sm:mx-0 rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5 flex flex-col items-center">
                 <img
                   src={previewUrl}
                   alt="Headshot preview"
-                  className="w-32 h-32 sm:w-36 sm:h-36 rounded-full object-cover border-4 border-white"
-                  style={
-                    imagePosition.trim()
-                      ? { objectPosition: imagePosition.trim() }
-                      : undefined
-                  }
+                  className="w-28 h-28 rounded-full object-cover border-2 flex-shrink-0"
+                  style={{
+                    borderColor: "var(--color-secondary)",
+                    ...(imagePosition.trim() && {
+                      objectPosition: imagePosition.trim(),
+                    }),
+                  }}
                 />
               </div>
               <div className="flex-1 text-sm text-gray-600 pt-1">
                 <p className="font-medium text-gray-800 mb-1">Preview</p>
                 <p className="text-xs mb-3">
-                  {(file.size / 1024).toFixed(1)} KB — this is how the circular
-                  crop will look on the site (after approval).
+                  {(file.size / 1024).toFixed(1)} KB — matches the main Speakers
+                  list (112×112px circle, same border and crop as the live site).
                 </p>
                 <button
                   type="button"
