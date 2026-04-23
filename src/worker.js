@@ -48,19 +48,38 @@ export default {
 };
 
 // Public GET for R2 objects (path must match key, e.g. speaker-photos/… or trainee-letters/…)
+function isR2BucketBinding(value) {
+  return (
+    value != null &&
+    typeof value.get === "function" &&
+    typeof value.put === "function" &&
+    typeof value.delete === "function"
+  );
+}
+
 function getSpeakerPhotosBucketForWrite(env) {
-  return env.SPEAKER_PHOTOS_BUCKET || null;
+  return isR2BucketBinding(env.SPEAKER_PHOTOS_BUCKET)
+    ? env.SPEAKER_PHOTOS_BUCKET
+    : null;
 }
 
 function getSpeakerPhotosBucketForRead(env) {
-  return env.SPEAKER_PHOTOS_BUCKET || env.TRAINEE_LETTERS_BUCKET || null;
+  if (isR2BucketBinding(env.SPEAKER_PHOTOS_BUCKET)) {
+    return env.SPEAKER_PHOTOS_BUCKET;
+  }
+  if (isR2BucketBinding(env.TRAINEE_LETTERS_BUCKET)) {
+    return env.TRAINEE_LETTERS_BUCKET;
+  }
+  return null;
 }
 
 function getBucketForR2Key(env, key) {
   if (String(key || "").startsWith("speaker-photos/")) {
     return getSpeakerPhotosBucketForRead(env);
   }
-  return env.TRAINEE_LETTERS_BUCKET || null;
+  return isR2BucketBinding(env.TRAINEE_LETTERS_BUCKET)
+    ? env.TRAINEE_LETTERS_BUCKET
+    : null;
 }
 
 async function handleR2PublicGet(request, env, url) {
@@ -2678,14 +2697,20 @@ async function safeDeleteR2Object(env, key) {
   try {
     const k = String(key);
     if (k.startsWith("speaker-photos/")) {
-      const primary = env.SPEAKER_PHOTOS_BUCKET || null;
-      const fallback = env.TRAINEE_LETTERS_BUCKET || null;
+      const primary = isR2BucketBinding(env.SPEAKER_PHOTOS_BUCKET)
+        ? env.SPEAKER_PHOTOS_BUCKET
+        : null;
+      const fallback = isR2BucketBinding(env.TRAINEE_LETTERS_BUCKET)
+        ? env.TRAINEE_LETTERS_BUCKET
+        : null;
       if (primary) await primary.delete(k);
       // Legacy safety: old speaker photos may exist in trainee bucket.
       if (fallback && fallback !== primary) await fallback.delete(k);
       return;
     }
-    const bucket = env.TRAINEE_LETTERS_BUCKET || null;
+    const bucket = isR2BucketBinding(env.TRAINEE_LETTERS_BUCKET)
+      ? env.TRAINEE_LETTERS_BUCKET
+      : null;
     if (!bucket) return;
     await bucket.delete(k);
   } catch (e) {
@@ -2857,7 +2882,7 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
       {
         success: false,
         error:
-          "File storage is not configured. Photo upload requires SPEAKER_PHOTOS_BUCKET.",
+          "Speaker photo storage is misconfigured. Bind SPEAKER_PHOTOS_BUCKET as an R2 bucket (not a plain env var).",
       },
       500,
       corsHeaders,
@@ -2933,7 +2958,8 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
       return jsonResponse(
         {
           success: false,
-          error: "Speaker photo bucket is not configured.",
+          error:
+            "Speaker photo storage is misconfigured. Bind SPEAKER_PHOTOS_BUCKET as an R2 bucket.",
         },
         500,
         corsHeaders,
