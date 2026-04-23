@@ -48,13 +48,17 @@ export default {
 };
 
 // Public GET for R2 objects (path must match key, e.g. speaker-photos/… or trainee-letters/…)
-function getSpeakerPhotosBucket(env) {
+function getSpeakerPhotosBucketForWrite(env) {
+  return env.SPEAKER_PHOTOS_BUCKET || null;
+}
+
+function getSpeakerPhotosBucketForRead(env) {
   return env.SPEAKER_PHOTOS_BUCKET || env.TRAINEE_LETTERS_BUCKET || null;
 }
 
 function getBucketForR2Key(env, key) {
   if (String(key || "").startsWith("speaker-photos/")) {
-    return getSpeakerPhotosBucket(env);
+    return getSpeakerPhotosBucketForRead(env);
   }
   return env.TRAINEE_LETTERS_BUCKET || null;
 }
@@ -2650,9 +2654,18 @@ async function handleTraineeLetterUpload(request, env, corsHeaders) {
 async function safeDeleteR2Object(env, key) {
   if (!key) return;
   try {
-    const bucket = getBucketForR2Key(env, key);
+    const k = String(key);
+    if (k.startsWith("speaker-photos/")) {
+      const primary = env.SPEAKER_PHOTOS_BUCKET || null;
+      const fallback = env.TRAINEE_LETTERS_BUCKET || null;
+      if (primary) await primary.delete(k);
+      // Legacy safety: old speaker photos may exist in trainee bucket.
+      if (fallback && fallback !== primary) await fallback.delete(k);
+      return;
+    }
+    const bucket = env.TRAINEE_LETTERS_BUCKET || null;
     if (!bucket) return;
-    await bucket.delete(key);
+    await bucket.delete(k);
   } catch (e) {
     console.error("R2 delete failed:", key, e);
   }
@@ -2817,12 +2830,12 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
     file && typeof file.size === "number" && file.size > 0,
   );
 
-  if (wantsUpload && !getSpeakerPhotosBucket(env)) {
+  if (wantsUpload && !getSpeakerPhotosBucketForWrite(env)) {
     return jsonResponse(
       {
         success: false,
         error:
-          "File storage is not configured. Photo upload requires SPEAKER_PHOTOS_BUCKET (or TRAINEE_LETTERS_BUCKET fallback).",
+          "File storage is not configured. Photo upload requires SPEAKER_PHOTOS_BUCKET.",
       },
       500,
       corsHeaders,
@@ -2893,7 +2906,7 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
     const ext = fileType === "image/png" ? "png" : "jpg";
     r2Key = `speaker-photos/nsp-${id.slice(0, 8)}_${timestamp}_${randomId}.${ext}`;
     const fileBuffer = await file.arrayBuffer();
-    const speakerBucket = getSpeakerPhotosBucket(env);
+    const speakerBucket = getSpeakerPhotosBucketForWrite(env);
     if (!speakerBucket) {
       return jsonResponse(
         {
