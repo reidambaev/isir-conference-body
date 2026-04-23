@@ -5,6 +5,7 @@
 import bundledSpeakerSeed from "./speakersSeed.js";
 
 const SPEAKER_PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MiB cap for R2 headshots (JPEG/PNG)
+const MAX_SPEAKER_AFFILIATION_CHARS = 90;
 
 function seedRowBySpeakerKey(speakerKey) {
   if (speakerKey == null || String(speakerKey).trim() === "") return null;
@@ -154,6 +155,11 @@ async function handleApiRequest(request, env, url) {
     request.method === "GET"
   ) {
     return handleCheckSpeakerInviteByEmail(request, env, url, corsHeaders);
+  }
+
+  // GET /api/discount-code/verify?code=...
+  if (url.pathname === "/api/discount-code/verify" && request.method === "GET") {
+    return handleVerifyDiscountCode(env, url, corsHeaders);
   }
 
   // GET /api/checkin/registration/:id — public read for badge booth (no admin token)
@@ -523,6 +529,24 @@ function normalizeEmail(value) {
   if (!s) return "";
   const m = s.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   return (m ? m[0] : s).trim().toLowerCase();
+}
+
+function getFlatDiscountConfig(env) {
+  const expectedCode =
+    typeof env.REGISTRATION_FLAT_DISCOUNT_CODE === "string"
+      ? env.REGISTRATION_FLAT_DISCOUNT_CODE.trim()
+      : "";
+  const amountUsd = Number(env.REGISTRATION_FLAT_DISCOUNT_AMOUNT_USD || 175);
+  const enabled =
+    expectedCode.length > 0 && Number.isFinite(amountUsd) && amountUsd >= 0;
+  return { expectedCode, amountUsd, enabled };
+}
+
+function isValidFlatDiscountCode(env, rawCode) {
+  const { expectedCode, enabled } = getFlatDiscountConfig(env);
+  const code = typeof rawCode === "string" ? rawCode.trim() : "";
+  if (!enabled || code.length === 0) return false;
+  return code.toLowerCase() === expectedCode.toLowerCase();
 }
 
 async function handleAdminCreateSpeakerInvite(request, env, corsHeaders) {
@@ -1648,21 +1672,15 @@ async function handleRegistration(request, env, corsHeaders) {
     // Discount-code override: force a flat registration total regardless of selected ticket mode.
     const discountCodeRaw =
       typeof data.discountCode === "string" ? data.discountCode.trim() : "";
-    const expectedFlatDiscountCode =
-      typeof env.REGISTRATION_FLAT_DISCOUNT_CODE === "string"
-        ? env.REGISTRATION_FLAT_DISCOUNT_CODE.trim()
-        : "";
-    const flatDiscountUsd = Number(
-      env.REGISTRATION_FLAT_DISCOUNT_AMOUNT_USD || 175,
-    );
-    const hasFlatDiscountConfigured =
-      expectedFlatDiscountCode.length > 0 &&
-      Number.isFinite(flatDiscountUsd) &&
-      flatDiscountUsd >= 0;
-    const hasValidFlatDiscountCode =
-      hasFlatDiscountConfigured &&
-      discountCodeRaw.length > 0 &&
-      discountCodeRaw.toLowerCase() === expectedFlatDiscountCode.toLowerCase();
+    const { amountUsd: flatDiscountUsd } = getFlatDiscountConfig(env);
+    const hasValidFlatDiscountCode = isValidFlatDiscountCode(env, discountCodeRaw);
+    if (discountCodeRaw.length > 0 && !hasValidFlatDiscountCode) {
+      return jsonResponse(
+        { success: false, error: "Invalid discount code" },
+        400,
+        corsHeaders,
+      );
+    }
     if (hasValidFlatDiscountCode) {
       totalPrice = flatDiscountUsd;
     }
@@ -1810,6 +1828,45 @@ async function handleRegistration(request, env, corsHeaders) {
         status: 500,
         headers: corsHeaders,
       },
+    );
+  }
+}
+
+async function handleVerifyDiscountCode(env, url, corsHeaders) {
+  try {
+    const code = String(url.searchParams.get("code") || "").trim();
+    if (!code) {
+      return jsonResponse(
+        { success: true, valid: false, error: "Discount code is required" },
+        200,
+        corsHeaders,
+      );
+    }
+    const { amountUsd, enabled } = getFlatDiscountConfig(env);
+    const valid = isValidFlatDiscountCode(env, code);
+    return jsonResponse(
+      {
+        success: true,
+        valid,
+        amountUsd: valid ? amountUsd : null,
+        error: !enabled
+          ? "Discount code feature is not configured"
+          : valid
+            ? null
+            : "Invalid discount code",
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    return jsonResponse(
+      {
+        success: false,
+        valid: false,
+        error: error?.message || "Failed to verify discount code",
+      },
+      500,
+      corsHeaders,
     );
   }
 }
@@ -2905,6 +2962,15 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
       JSON.stringify({
         success: false,
         error: "Please enter your full affiliation or institution",
+      }),
+      { status: 400, headers: jsonHeaders },
+    );
+  }
+  if (affiliation.length > MAX_SPEAKER_AFFILIATION_CHARS) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: `Affiliation must be ${MAX_SPEAKER_AFFILIATION_CHARS} characters or fewer`,
       }),
       { status: 400, headers: jsonHeaders },
     );

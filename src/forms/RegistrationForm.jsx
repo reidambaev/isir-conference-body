@@ -216,6 +216,11 @@ const RegistrationForm = ({ onClose }) => {
     status: "idle", // idle | checking | eligible | ineligible | error
     error: "",
   });
+  const [discountCodeStatus, setDiscountCodeStatus] = useState({
+    state: "idle", // idle | checking | valid | invalid | error
+    amountUsd: null,
+    error: "",
+  });
   const isVerifiedMember = React.useMemo(() => {
     if (!membershipData) return false;
     // Only consider verified if is_member is true AND membership_level is not "Non-Member"
@@ -608,6 +613,17 @@ const RegistrationForm = ({ onClose }) => {
       alert("Please provide at least one phone number (office or cell).");
       return;
     }
+    if (hasDiscountCodeAttempt && discountCodeStatus.state === "checking") {
+      alert("Checking discount code... please wait a moment.");
+      return;
+    }
+    if (hasDiscountCodeAttempt && !hasValidDiscountCode) {
+      alert(
+        discountCodeStatus.error ||
+          "The discount code is invalid. Please correct it or remove it to continue.",
+      );
+      return;
+    }
     console.log("Registration Info:", formData);
     const invitedSpeakerFlow = formData.ticketType === "invited-speaker";
     const totalNow = getTotalPrice();
@@ -628,7 +644,7 @@ const RegistrationForm = ({ onClose }) => {
               ...formData,
               phone: formData.officePhone,
               ...previewRegisterPayload,
-              discountCode: enteredDiscountCode || null,
+              discountCode: hasValidDiscountCode ? enteredDiscountCode : null,
               inviteToken:
                 speakerInvite.status === "valid"
                   ? speakerInvite.token
@@ -713,7 +729,7 @@ const RegistrationForm = ({ onClose }) => {
           ...formData,
           phone: formData.officePhone,
           ...previewRegisterPayload,
-          discountCode: enteredDiscountCode || null,
+          discountCode: hasValidDiscountCode ? enteredDiscountCode : null,
           inviteToken:
             formData.ticketType === "invited-speaker" &&
             speakerInvite.status === "valid"
@@ -929,6 +945,60 @@ const RegistrationForm = ({ onClose }) => {
     : {};
   const enteredDiscountCode = (formData.discountCode || "").trim();
   const hasDiscountCodeAttempt = enteredDiscountCode.length > 0;
+  const hasValidDiscountCode = discountCodeStatus.state === "valid";
+  const verifiedDiscountTotalUsd = Number(discountCodeStatus.amountUsd || 175);
+
+  useEffect(() => {
+    if (!hasDiscountCodeAttempt) {
+      setDiscountCodeStatus({ state: "idle", amountUsd: null, error: "" });
+      return;
+    }
+    let cancelled = false;
+    setDiscountCodeStatus((prev) => ({
+      state: "checking",
+      amountUsd: prev.amountUsd,
+      error: "",
+    }));
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/discount-code/verify?code=${encodeURIComponent(enteredDiscountCode)}`,
+        );
+        const json = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok || !json?.success) {
+          throw new Error(json?.error || "Failed to verify discount code");
+        }
+        if (json.valid) {
+          setDiscountCodeStatus({
+            state: "valid",
+            amountUsd: Number(json.amountUsd || 175),
+            error: "",
+          });
+        } else {
+          setDiscountCodeStatus({
+            state: "invalid",
+            amountUsd: null,
+            error: json.error || "Invalid discount code",
+          });
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setDiscountCodeStatus({
+          state: "error",
+          amountUsd: null,
+          error:
+            error?.message ||
+            "Could not verify discount code. Please try again.",
+        });
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [enteredDiscountCode, hasDiscountCodeAttempt]);
 
   const getTicketPrice = (type, inBaseCurrency = false) => {
     if (!type) return 0;
@@ -979,6 +1049,11 @@ const RegistrationForm = ({ onClose }) => {
     if (isPreviewRegistrationTest) {
       if (inBaseCurrency) return PREVIEW_REGISTRATION_TEST_USD;
       return getFinalPrice(PREVIEW_REGISTRATION_TEST_USD, formData.country);
+    }
+    // Mirror the server's flat discount pricing so checkout totals are not alarming.
+    if (hasValidDiscountCode) {
+      if (inBaseCurrency) return verifiedDiscountTotalUsd;
+      return getFinalPrice(verifiedDiscountTotalUsd, formData.country);
     }
     const ticketPrice = getTicketPrice(formData.ticketType, inBaseCurrency);
     const accompanyingPrice =
@@ -2280,6 +2355,24 @@ const RegistrationForm = ({ onClose }) => {
                     placeholder="Enter discount code"
                     autoComplete="off"
                   />
+                  {hasDiscountCodeAttempt && discountCodeStatus.state === "checking" && (
+                    <p className="mt-2 text-sm text-blue-700">
+                      Verifying discount code...
+                    </p>
+                  )}
+                  {hasDiscountCodeAttempt && discountCodeStatus.state === "valid" && (
+                    <p className="mt-2 text-sm text-emerald-700">
+                      Discount code verified. Total will be{" "}
+                      {formatCurrency(getTotalPrice(), currency)}.
+                    </p>
+                  )}
+                  {hasDiscountCodeAttempt &&
+                    (discountCodeStatus.state === "invalid" ||
+                      discountCodeStatus.state === "error") && (
+                      <p className="mt-2 text-sm text-red-700">
+                        {discountCodeStatus.error || "Invalid discount code."}
+                      </p>
+                    )}
                 </div>
 
                 {/* Preferences Section */}
@@ -2361,12 +2454,26 @@ const RegistrationForm = ({ onClose }) => {
                     </div>
                   ) : (
                     <>
-                      {hasDiscountCodeAttempt && (
-                        <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
-                          Discount code entered. Final payable amount is
-                          validated on the server before payment is created.
-                        </div>
-                      )}
+                      {hasDiscountCodeAttempt &&
+                        discountCodeStatus.state === "checking" && (
+                          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                            Verifying discount code...
+                          </div>
+                        )}
+                      {hasDiscountCodeAttempt &&
+                        discountCodeStatus.state === "valid" && (
+                          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                            Discount code verified. Discounted total is applied.
+                          </div>
+                        )}
+                      {hasDiscountCodeAttempt &&
+                        (discountCodeStatus.state === "invalid" ||
+                          discountCodeStatus.state === "error") && (
+                          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+                            {discountCodeStatus.error ||
+                              "Discount code could not be verified."}
+                          </div>
+                        )}
                       <div className="flex justify-between text-base py-3 border-b border-gray-200">
                         <span className="text-gray-700">
                           {ticketPrices[formData.ticketType]?.label}{" "}

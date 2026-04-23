@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MiB
+const MAX_AFFILIATION_CHARS = 90;
 
 export default function SpeakerProfileTab() {
   const [email, setEmail] = useState("");
@@ -53,6 +54,10 @@ export default function SpeakerProfileTab() {
     }
     if (file && file.size > MAX_PHOTO_BYTES) {
       setError("Photo must be under 5 MB (JPEG or PNG).");
+      return;
+    }
+    if (affiliation.trim().length > MAX_AFFILIATION_CHARS) {
+      setError(`Affiliation must be ${MAX_AFFILIATION_CHARS} characters or fewer.`);
       return;
     }
 
@@ -178,9 +183,13 @@ export default function SpeakerProfileTab() {
             rows={3}
             value={affiliation}
             onChange={(e) => setAffiliation(e.target.value)}
+            maxLength={MAX_AFFILIATION_CHARS}
             className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"
             placeholder="Department, organization, city, country"
           />
+          <p className="mt-1 text-xs text-gray-500">
+            {affiliation.length}/{MAX_AFFILIATION_CHARS} characters
+          </p>
         </div>
 
         <div>
