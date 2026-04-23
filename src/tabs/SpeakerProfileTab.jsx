@@ -4,7 +4,9 @@ const MAX_PHOTO_BYTES = 1024 * 1024; // 1 MiB
 
 export default function SpeakerProfileTab() {
   const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [middleName, setMiddleName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [affiliation, setAffiliation] = useState("");
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -42,8 +44,8 @@ export default function SpeakerProfileTab() {
     e.preventDefault();
     setError(null);
     setMessage(null);
-    if (!email.trim() || !name.trim() || !affiliation.trim()) {
-      setError("Email, name, and affiliation are required.");
+    if (!email.trim() || !firstName.trim() || !lastName.trim() || !affiliation.trim()) {
+      setError("Email, first name, last name, and affiliation are required.");
       return;
     }
     if (file && file.size > MAX_PHOTO_BYTES) {
@@ -55,7 +57,9 @@ export default function SpeakerProfileTab() {
     try {
       const fd = new FormData();
       fd.set("email", email.trim());
-      fd.set("name", name.trim());
+      fd.set("first_name", firstName.trim());
+      fd.set("middle_name", middleName.trim());
+      fd.set("last_name", lastName.trim());
       fd.set("affiliation", affiliation.trim());
       if (file) {
         fd.set("file", file);
@@ -89,7 +93,7 @@ export default function SpeakerProfileTab() {
           New speaker registration
         </h1>
         <p className="text-gray-600 text-sm leading-relaxed">
-          Enter your name and affiliation as they should appear in the
+          Enter your first, middle (optional), and last name plus affiliation as they should appear in the
           program. You may add an optional headshot. Submissions are reviewed
           before they go live. Photos may be up to 1 MB (JPEG or PNG).
         </p>
@@ -99,18 +103,48 @@ export default function SpeakerProfileTab() {
         onSubmit={onSubmit}
         className="space-y-5 bg-gradient-to-br from-slate-50 to-white border border-gray-200 rounded-xl p-6 shadow-sm"
       >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-800 mb-1.5">
+              First name <span className="text-red-600">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"
+              placeholder="First name"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-800 mb-1.5">
+              Last name <span className="text-red-600">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              autoComplete="family-name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"
+              placeholder="Last name"
+            />
+          </div>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-800 mb-1.5">
-            Name (as it should appear) <span className="text-red-600">*</span>
+            Middle name (optional)
           </label>
           <input
             type="text"
-            required
-            autoComplete="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            autoComplete="additional-name"
+            value={middleName}
+            onChange={(e) => setMiddleName(e.target.value)}
             className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"
-            placeholder="Your full name"
+            placeholder="Middle name"
           />
         </div>
 

@@ -2660,15 +2660,32 @@ async function safeDeleteR2Object(env, key) {
   }
 }
 
+function splitNameParts(fullName) {
+  const normalized = String(fullName || "").trim().replace(/\s+/g, " ");
+  if (!normalized) return { first_names: "", last_name: "" };
+  const parts = normalized.split(" ");
+  if (parts.length === 1) {
+    return { first_names: "", last_name: parts[0] };
+  }
+  return {
+    first_names: parts.slice(0, -1).join(" "),
+    last_name: parts[parts.length - 1],
+  };
+}
+
 function mapPublicSpeakerRow(r) {
   const sk =
     r.speaker_key != null && String(r.speaker_key).trim() !== ""
       ? String(r.speaker_key).trim()
       : null;
+  const name = String(r.display_name || "");
+  const { first_names, last_name } = splitNameParts(name);
   return {
     id: r.id,
     key: sk || `speaker-profile-${r.id}`,
-    name: r.display_name,
+    name,
+    first_names,
+    last_name,
     affiliation: r.affiliation,
     image: r.static_image || null,
     r2_key: r.r2_key || null,
@@ -2676,7 +2693,19 @@ function mapPublicSpeakerRow(r) {
   };
 }
 
-function sortSpeakersByNameAsc(a, b) {
+function sortSpeakersByLastNameAsc(a, b) {
+  const byLast = String(a.last_name || "").localeCompare(
+    String(b.last_name || ""),
+    undefined,
+    { sensitivity: "base" },
+  );
+  if (byLast !== 0) return byLast;
+  const byFirst = String(a.first_names || "").localeCompare(
+    String(b.first_names || ""),
+    undefined,
+    { sensitivity: "base" },
+  );
+  if (byFirst !== 0) return byFirst;
   return String(a.name || "").localeCompare(String(b.name || ""), undefined, {
     sensitivity: "base",
   });
@@ -2727,8 +2756,8 @@ async function handleGetPublicSpeakerProfiles(request, env, corsHeaders) {
       if (merged.tier === "plenary") plenary.push(row);
       else congress.push(row);
     }
-    plenary.sort(sortSpeakersByNameAsc);
-    congress.sort(sortSpeakersByNameAsc);
+    plenary.sort(sortSpeakersByLastNameAsc);
+    congress.sort(sortSpeakersByLastNameAsc);
     return new Response(
       JSON.stringify({
         success: true,
@@ -2773,7 +2802,11 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
   }
 
   const email = normalizeEmail(formData.get("email"));
-  const name = String(formData.get("name") || "").trim();
+  const firstName = String(formData.get("first_name") || "").trim();
+  const middleName = String(formData.get("middle_name") || "").trim();
+  const lastName = String(formData.get("last_name") || "").trim();
+  const legacyName = String(formData.get("name") || "").trim();
+  const name = [firstName, middleName, lastName].filter(Boolean).join(" ").trim() || legacyName;
   const affiliation = String(formData.get("affiliation") || "").trim();
   const file = formData.get("file");
   const wantsUpload = Boolean(
@@ -2799,7 +2832,7 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
   }
   if (name.length < 2) {
     return new Response(
-      JSON.stringify({ success: false, error: "Please enter your name" }),
+      JSON.stringify({ success: false, error: "Please enter your first and last name" }),
       { status: 400, headers: jsonHeaders },
     );
   }
