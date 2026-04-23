@@ -299,6 +299,7 @@ const RegistrationForm = ({ onClose }) => {
     privacyMarketing: false,
     privacyApp: false,
     optOutMailing: false,
+    discountCode: "",
     // Trainee letter upload data
     traineeLetterFile: null,
     traineeLetterUrl: null,
@@ -613,7 +614,10 @@ const RegistrationForm = ({ onClose }) => {
     const previewFreeRegistration = isPreviewMode() && totalNow === 0;
 
     // Invited speakers and $0 preview: skip Stripe
-    if ((invitedSpeakerFlow && totalNow === 0) || previewFreeRegistration) {
+    if (
+      ((invitedSpeakerFlow && totalNow === 0) || previewFreeRegistration) &&
+      !hasDiscountCodeAttempt
+    ) {
       (async () => {
         try {
           setIsProcessingPayment(true);
@@ -624,6 +628,7 @@ const RegistrationForm = ({ onClose }) => {
               ...formData,
               phone: formData.officePhone,
               ...previewRegisterPayload,
+              discountCode: enteredDiscountCode || null,
               inviteToken:
                 speakerInvite.status === "valid"
                   ? speakerInvite.token
@@ -708,6 +713,7 @@ const RegistrationForm = ({ onClose }) => {
           ...formData,
           phone: formData.officePhone,
           ...previewRegisterPayload,
+          discountCode: enteredDiscountCode || null,
           inviteToken:
             formData.ticketType === "invited-speaker" &&
             speakerInvite.status === "valid"
@@ -921,6 +927,8 @@ const RegistrationForm = ({ onClose }) => {
   const previewRegisterPayload = isPreviewRegistrationTest
     ? { previewKey: PREVIEW_KEY }
     : {};
+  const enteredDiscountCode = (formData.discountCode || "").trim();
+  const hasDiscountCodeAttempt = enteredDiscountCode.length > 0;
 
   const getTicketPrice = (type, inBaseCurrency = false) => {
     if (!type) return 0;
@@ -2257,6 +2265,23 @@ const RegistrationForm = ({ onClose }) => {
                   </div>
                 </div>
 
+                <div className="bg-gradient-to-br from-indigo-50 to-white rounded-xl p-6 border-2 border-indigo-200 mt-8">
+                  <h5 className="font-bold text-gray-800 mb-2">
+                    Discount Code (Optional)
+                  </h5>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Enter your code exactly as provided. If valid, your final
+                    registration total is adjusted at checkout.
+                  </p>
+                  <FormInput
+                    name="discountCode"
+                    value={formData.discountCode}
+                    onChange={handleChange}
+                    placeholder="Enter discount code"
+                    autoComplete="off"
+                  />
+                </div>
+
                 {/* Preferences Section */}
                 <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-6 border-2 border-blue-200 mt-8">
                   <h5 className="font-bold text-gray-800 mb-4">
@@ -2336,6 +2361,12 @@ const RegistrationForm = ({ onClose }) => {
                     </div>
                   ) : (
                     <>
+                      {hasDiscountCodeAttempt && (
+                        <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+                          Discount code entered. Final payable amount is
+                          validated on the server before payment is created.
+                        </div>
+                      )}
                       <div className="flex justify-between text-base py-3 border-b border-gray-200">
                         <span className="text-gray-700">
                           {ticketPrices[formData.ticketType]?.label}{" "}

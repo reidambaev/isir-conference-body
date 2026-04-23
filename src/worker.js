@@ -1626,6 +1626,28 @@ async function handleRegistration(request, env, corsHeaders) {
       totalPrice = 0;
     }
 
+    // Discount-code override: force a flat registration total regardless of selected ticket mode.
+    const discountCodeRaw =
+      typeof data.discountCode === "string" ? data.discountCode.trim() : "";
+    const expectedFlatDiscountCode =
+      typeof env.REGISTRATION_FLAT_DISCOUNT_CODE === "string"
+        ? env.REGISTRATION_FLAT_DISCOUNT_CODE.trim()
+        : "";
+    const flatDiscountUsd = Number(
+      env.REGISTRATION_FLAT_DISCOUNT_AMOUNT_USD || 175,
+    );
+    const hasFlatDiscountConfigured =
+      expectedFlatDiscountCode.length > 0 &&
+      Number.isFinite(flatDiscountUsd) &&
+      flatDiscountUsd >= 0;
+    const hasValidFlatDiscountCode =
+      hasFlatDiscountConfigured &&
+      discountCodeRaw.length > 0 &&
+      discountCodeRaw.toLowerCase() === expectedFlatDiscountCode.toLowerCase();
+    if (hasValidFlatDiscountCode) {
+      totalPrice = flatDiscountUsd;
+    }
+
     // Extract primitive values from objects (react-country-state-city returns objects)
     const city =
       typeof data.city === "object"

@@ -38,6 +38,8 @@ import.meta.env.VITE_ISIR_API_KEY
 **Variables needed here:**
 - `STRIPE_SECRET_KEY` - Stripe secret key (NEVER expose to frontend!)
 - `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret
+- `REGISTRATION_FLAT_DISCOUNT_CODE` - discount code that forces a flat registration total
+- `REGISTRATION_FLAT_DISCOUNT_AMOUNT_USD` - flat USD total used when the discount code matches (default: `175`)
 
 **How they're accessed:**
 ```javascript
@@ -61,6 +63,8 @@ async function handleCreatePaymentIntent(request, env, corsHeaders) {
 | `VITE_ISIR_API_KEY` | Build-time | CI/CD Variables | Frontend React | Yes (but needed in frontend) |
 | `STRIPE_SECRET_KEY` | Runtime | Worker Variables/Secrets | Backend Worker | **YES** |
 | `STRIPE_WEBHOOK_SECRET` | Runtime | Worker Variables/Secrets | Backend Worker | **YES** |
+| `REGISTRATION_FLAT_DISCOUNT_CODE` | Runtime | Worker Variables/Secrets | Backend Worker | **YES** |
+| `REGISTRATION_FLAT_DISCOUNT_AMOUNT_USD` | Runtime | Worker Variables/Secrets | Backend Worker | No |
 
 ---
 
@@ -74,6 +78,8 @@ async function handleCreatePaymentIntent(request, env, corsHeaders) {
 ### In Worker Runtime Settings:
 - [ ] Add `STRIPE_SECRET_KEY` as Secret
 - [ ] Add `STRIPE_WEBHOOK_SECRET` as Secret
+- [ ] Add `REGISTRATION_FLAT_DISCOUNT_CODE` as Secret
+- [ ] (Optional) Add `REGISTRATION_FLAT_DISCOUNT_AMOUNT_USD` as Variable (defaults to `175`)
 
 ---
 
