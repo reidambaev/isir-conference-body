@@ -5,7 +5,9 @@
 import bundledSpeakerSeed from "./speakersSeed.js";
 
 const SPEAKER_PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MiB cap for R2 headshots (JPEG/PNG)
+const SPEAKER_CV_MAX_BYTES = 10 * 1024 * 1024; // 10 MiB cap for brief CV (PDF/Word)
 const MAX_SPEAKER_AFFILIATION_CHARS = 90;
+const MAX_SPEAKER_PRESENTATION_TITLE_CHARS = 300;
 
 function seedRowBySpeakerKey(speakerKey) {
   if (speakerKey == null || String(speakerKey).trim() === "") return null;
@@ -2826,6 +2828,40 @@ function sortSpeakersByLastNameAsc(a, b) {
   });
 }
 
+/** @returns {{ ok: true, ext: string, contentType: string } | { ok: false, error: string }} */
+function getSpeakerBriefCvTypeAndExt(file) {
+  const t = String(file.type || "").toLowerCase();
+  if (t === "application/pdf")
+    return { ok: true, ext: "pdf", contentType: "application/pdf" };
+  if (t === "application/msword" || t === "application/x-msword")
+    return { ok: true, ext: "doc", contentType: "application/msword" };
+  if (
+    t ===
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ) {
+    return {
+      ok: true,
+      ext: "docx",
+      contentType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    };
+  }
+  const name = String(file.name || "").toLowerCase();
+  if (name.endsWith(".pdf"))
+    return { ok: true, ext: "pdf", contentType: "application/pdf" };
+  if (name.endsWith(".docx")) {
+    return {
+      ok: true,
+      ext: "docx",
+      contentType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    };
+  }
+  if (name.endsWith(".doc"))
+    return { ok: true, ext: "doc", contentType: "application/msword" };
+  return { ok: false, error: "Brief CV must be a PDF or Word file (.pdf, .doc, .docx)." };
+}
+
 async function handleGetPublicSpeakerProfiles(request, env, corsHeaders) {
   if (!env.ISIR_DB) {
     return jsonResponse(
@@ -2929,12 +2965,19 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
   const dbMiddleName = middleName || null;
   const dbLastName = lastName || normalizedParts.last_name || null;
   const affiliation = String(formData.get("affiliation") || "").trim();
+  const presentationTitleRaw = String(
+    formData.get("presentation_title") || "",
+  ).trim();
   const file = formData.get("file");
   const wantsUpload = Boolean(
     file && typeof file.size === "number" && file.size > 0,
   );
+  const cvFile = formData.get("brief_cv");
+  const wantsCvUpload = Boolean(
+    cvFile && typeof cvFile.size === "number" && cvFile.size > 0,
+  );
 
-  if (wantsUpload && !getSpeakerPhotosBucketForWrite(env)) {
+  if ((wantsUpload || wantsCvUpload) && !getSpeakerPhotosBucketForWrite(env)) {
     return jsonResponse(
       {
         success: false,
@@ -2975,6 +3018,34 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
       { status: 400, headers: jsonHeaders },
     );
   }
+  if (!presentationTitleRaw) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Presentation title is required.",
+      }),
+      { status: 400, headers: jsonHeaders },
+    );
+  }
+  if (presentationTitleRaw.length > MAX_SPEAKER_PRESENTATION_TITLE_CHARS) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: `Presentation title must be ${MAX_SPEAKER_PRESENTATION_TITLE_CHARS} characters or fewer`,
+      }),
+      { status: 400, headers: jsonHeaders },
+    );
+  }
+  if (!wantsCvUpload) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Brief CV (PDF or Word) is required.",
+      }),
+      { status: 400, headers: jsonHeaders },
+    );
+  }
+  const presentationTitle = presentationTitleRaw;
 
   const inviteAccess = await getSpeakerProfileInviteAccess(env, email);
   if (!inviteAccess.ok) {
@@ -2991,6 +3062,7 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
   const id = crypto.randomUUID();
   const now = Date.now();
   let r2Key = null;
+  let cvR2Key = null;
 
   if (wantsUpload) {
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
@@ -3041,11 +3113,64 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
     });
   }
 
+  if (wantsCvUpload) {
+    const cvResolved = getSpeakerBriefCvTypeAndExt(cvFile);
+    if (!cvResolved.ok) {
+      if (r2Key) {
+        await safeDeleteR2Object(env, r2Key);
+      }
+      return new Response(
+        JSON.stringify({ success: false, error: cvResolved.error }),
+        { status: 400, headers: jsonHeaders },
+      );
+    }
+    if (cvFile.size > SPEAKER_CV_MAX_BYTES) {
+      if (r2Key) {
+        await safeDeleteR2Object(env, r2Key);
+      }
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Brief CV is too large. Maximum size is 10 MB (PDF or Word).",
+        }),
+        { status: 400, headers: jsonHeaders },
+      );
+    }
+    const speakerBucketCv = getSpeakerPhotosBucketForWrite(env);
+    if (!speakerBucketCv) {
+      if (r2Key) {
+        await safeDeleteR2Object(env, r2Key);
+      }
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "Speaker file storage is misconfigured. Bind SPEAKER_PHOTOS_BUCKET as an R2 bucket.",
+        },
+        500,
+        corsHeaders,
+      );
+    }
+    const cvTimestamp = Date.now();
+    const cvRandomId = Math.random().toString(36).slice(2, 11).toUpperCase();
+    cvR2Key = `speaker-photos/cv-nsp-${id.slice(0, 8)}_${cvTimestamp}_${cvRandomId}.${cvResolved.ext}`;
+    const cvBuffer = await cvFile.arrayBuffer();
+    await speakerBucketCv.put(cvR2Key, cvBuffer, {
+      httpMetadata: { contentType: cvResolved.contentType },
+      customMetadata: {
+        email,
+        submissionId: id,
+        kind: "brief-cv",
+        uploadedAt: new Date().toISOString(),
+      },
+    });
+  }
+
   try {
     await env.ISIR_DB.prepare(
       `INSERT INTO speaker_profile_submissions
-      (id, speaker_key, email, first_name, middle_name, last_name, display_name, affiliation, r2_key, image_position, tier, static_image, sort_order, status, created_at, updated_at)
-      VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, 'pending', ?, ?)`,
+      (id, speaker_key, email, first_name, middle_name, last_name, display_name, affiliation, r2_key, presentation_title, cv_r2_key, image_position, tier, static_image, sort_order, status, created_at, updated_at)
+      VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, 'pending', ?, ?)`,
     )
       .bind(
         id,
@@ -3056,6 +3181,8 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
         name,
         affiliation,
         r2Key,
+        presentationTitle,
+        cvR2Key,
         now,
         now,
       )
@@ -3073,6 +3200,9 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
     console.error("handleSubmitSpeakerProfile:", e);
     if (r2Key) {
       await safeDeleteR2Object(env, r2Key);
+    }
+    if (cvR2Key) {
+      await safeDeleteR2Object(env, cvR2Key);
     }
     return new Response(
       JSON.stringify({ success: false, error: "Failed to save submission" }),
@@ -3093,7 +3223,7 @@ async function handleAdminListSpeakerProfiles(request, env, corsHeaders) {
   }
   try {
     const { results } = await env.ISIR_DB.prepare(
-      `SELECT id, speaker_key, email, first_name, middle_name, last_name, display_name, affiliation, r2_key, image_position, tier, static_image, sort_order, status, created_at, updated_at
+      `SELECT id, speaker_key, email, first_name, middle_name, last_name, display_name, affiliation, r2_key, presentation_title, cv_r2_key, image_position, tier, static_image, sort_order, status, created_at, updated_at
        FROM speaker_profile_submissions ORDER BY updated_at DESC`,
     ).all();
     return jsonResponse(
@@ -3162,7 +3292,7 @@ async function handleAdminSpeakerProfileReject(request, env, corsHeaders, id) {
   const now = Date.now();
   try {
     const row = await env.ISIR_DB.prepare(
-      `SELECT id, r2_key, status FROM speaker_profile_submissions WHERE id = ?`,
+      `SELECT id, r2_key, cv_r2_key, status FROM speaker_profile_submissions WHERE id = ?`,
     )
       .bind(id)
       .first();
@@ -3176,9 +3306,12 @@ async function handleAdminSpeakerProfileReject(request, env, corsHeaders, id) {
     if (row.r2_key) {
       await safeDeleteR2Object(env, row.r2_key);
     }
+    if (row.cv_r2_key) {
+      await safeDeleteR2Object(env, row.cv_r2_key);
+    }
     await env.ISIR_DB.prepare(
       `UPDATE speaker_profile_submissions SET
-        status = 'rejected', r2_key = NULL, updated_at = ? WHERE id = ?`,
+        status = 'rejected', r2_key = NULL, cv_r2_key = NULL, updated_at = ? WHERE id = ?`,
     )
       .bind(now, id)
       .run();
@@ -3205,7 +3338,7 @@ async function handleAdminSpeakerProfileDelete(request, env, corsHeaders, id) {
   }
   try {
     const row = await env.ISIR_DB.prepare(
-      `SELECT id, r2_key FROM speaker_profile_submissions WHERE id = ?`,
+      `SELECT id, r2_key, cv_r2_key FROM speaker_profile_submissions WHERE id = ?`,
     )
       .bind(id)
       .first();
@@ -3218,6 +3351,9 @@ async function handleAdminSpeakerProfileDelete(request, env, corsHeaders, id) {
     }
     if (row.r2_key) {
       await safeDeleteR2Object(env, row.r2_key);
+    }
+    if (row.cv_r2_key) {
+      await safeDeleteR2Object(env, row.cv_r2_key);
     }
     const del = await env.ISIR_DB.prepare(
       `DELETE FROM speaker_profile_submissions WHERE id = ?`,

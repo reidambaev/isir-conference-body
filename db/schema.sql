@@ -221,6 +221,8 @@ CREATE TABLE
         display_name TEXT NOT NULL,
         affiliation TEXT NOT NULL,
         r2_key TEXT,
+        presentation_title TEXT,
+        cv_r2_key TEXT,
         image_position TEXT,
         tier TEXT,
         static_image TEXT,

@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MiB
+const MAX_CV_BYTES = 10 * 1024 * 1024; // 10 MiB
 const MAX_AFFILIATION_CHARS = 90;
+const MAX_PRESENTATION_TITLE_CHARS = 300;
 
 export default function SpeakerProfileTab() {
   const [email, setEmail] = useState("");
@@ -9,6 +11,8 @@ export default function SpeakerProfileTab() {
   const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
   const [affiliation, setAffiliation] = useState("");
+  const [presentationTitle, setPresentationTitle] = useState("");
+  const [briefCv, setBriefCv] = useState(null);
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -32,6 +36,20 @@ export default function SpeakerProfileTab() {
     if (f && f.size > MAX_PHOTO_BYTES) {
       setError("Please choose an image under 5 MB (JPEG or PNG).");
     }
+  };
+
+  const onBriefCvChange = (e) => {
+    const f = e.target.files?.[0];
+    setBriefCv(f || null);
+    setError(null);
+    if (f && f.size > MAX_CV_BYTES) {
+      setError("Brief CV must be under 10 MB (PDF or Word).");
+    }
+  };
+
+  const clearBriefCv = () => {
+    setBriefCv(null);
+    setError(null);
   };
 
   const clearPhoto = () => {
@@ -60,6 +78,24 @@ export default function SpeakerProfileTab() {
       setError(`Affiliation must be ${MAX_AFFILIATION_CHARS} characters or fewer.`);
       return;
     }
+    if (!presentationTitle.trim()) {
+      setError("Title of presentation is required.");
+      return;
+    }
+    if (presentationTitle.trim().length > MAX_PRESENTATION_TITLE_CHARS) {
+      setError(
+        `Presentation title must be ${MAX_PRESENTATION_TITLE_CHARS} characters or fewer.`,
+      );
+      return;
+    }
+    if (!briefCv) {
+      setError("Brief CV (PDF or Word) is required.");
+      return;
+    }
+    if (briefCv.size > MAX_CV_BYTES) {
+      setError("Brief CV must be under 10 MB (PDF or Word).");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -69,9 +105,11 @@ export default function SpeakerProfileTab() {
       fd.set("middle_name", middleName.trim());
       fd.set("last_name", lastName.trim());
       fd.set("affiliation", affiliation.trim());
+      fd.set("presentation_title", presentationTitle.trim());
       if (file) {
         fd.set("file", file);
       }
+      fd.set("brief_cv", briefCv);
 
       const res = await fetch("/api/speaker-profiles/submit", {
         method: "POST",
@@ -86,6 +124,8 @@ export default function SpeakerProfileTab() {
       }
       setMessage(data.message || "Submitted successfully.");
       setFile(null);
+      setBriefCv(null);
+      setPresentationTitle("");
     } catch {
       setError("Network error. Check your connection and try again.");
     } finally {
@@ -104,9 +144,11 @@ export default function SpeakerProfileTab() {
         </h1>
         <p className="text-gray-600 text-sm leading-relaxed">
           Enter your first, middle (optional), and last name plus affiliation as
-          they should appear in the program. You may add an optional headshot.
-          Submissions are reviewed before they go live. Photos may be up to 5 MB
-          (JPEG or PNG).
+          they should appear in the program. A presentation title and brief CV
+          (for organizer reference only; not shown on the public site) are
+          required. You may add an optional headshot. Submissions are reviewed
+          before they go live. Photos may be up to 5 MB (JPEG or PNG). CVs may
+          be up to 10 MB (PDF or Word).
         </p>
       </div>
 
@@ -190,6 +232,57 @@ export default function SpeakerProfileTab() {
           <p className="mt-1 text-xs text-gray-500">
             {affiliation.length}/{MAX_AFFILIATION_CHARS} characters
           </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-800 mb-1.5">
+            Title of presentation{" "}
+            <span className="text-red-600">*</span>{" "}
+            <span className="text-gray-500 font-normal">(organizer reference only)</span>
+          </label>
+          <input
+            type="text"
+            required
+            value={presentationTitle}
+            onChange={(e) => setPresentationTitle(e.target.value)}
+            maxLength={MAX_PRESENTATION_TITLE_CHARS}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"
+            placeholder="Working title of your talk"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Not shown on the public website. {presentationTitle.length}/
+            {MAX_PRESENTATION_TITLE_CHARS}
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-800 mb-1.5">
+            Brief CV (PDF or Word) <span className="text-red-600">*</span>{" "}
+            <span className="text-gray-500 font-normal">(organizer reference only)</span>
+          </label>
+          <input
+            type="file"
+            required
+            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            onChange={onBriefCvChange}
+            className="block w-full text-sm text-gray-800 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-50 file:text-slate-800"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Max 10 MB. Stored for organizers; not published on the site.
+          </p>
+          {briefCv && briefCv.size <= MAX_CV_BYTES && (
+            <div className="mt-2 text-sm text-gray-700">
+              <span className="font-medium">Selected:</span> {briefCv.name} (
+              {(briefCv.size / 1024).toFixed(1)} KB)
+              <button
+                type="button"
+                onClick={clearBriefCv}
+                className="ml-3 text-red-700 font-medium hover:underline"
+              >
+                Remove file
+              </button>
+            </div>
+          )}
         </div>
 
         <div>

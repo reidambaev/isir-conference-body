@@ -95,6 +95,7 @@ export default function AdminTab() {
   const [abstractViewMode, setAbstractViewMode] = useState("cards"); // "cards", "table", or "review"
 
   const [registrationSearch, setRegistrationSearch] = useState("");
+  const [speakerProfileSearch, setSpeakerProfileSearch] = useState("");
   const [expandedRegistrationIds, setExpandedRegistrationIds] = useState(
     new Set(),
   );
@@ -480,11 +481,39 @@ export default function AdminTab() {
     return list.filter((s) => String(s.status || "") === "pending").length;
   }, [speakerProfileSubmissions]);
 
+  const filteredSpeakerProfileSubmissions = useMemo(() => {
+    const list = Array.isArray(speakerProfileSubmissions)
+      ? speakerProfileSubmissions
+      : [];
+    const q = speakerProfileSearch.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((row) => {
+      const parts = [
+        row.id,
+        row.speaker_key,
+        row.status,
+        row.email,
+        row.display_name,
+        row.affiliation,
+        row.first_name,
+        row.middle_name,
+        row.last_name,
+        row.presentation_title,
+        row.r2_key,
+        row.cv_r2_key,
+        row.image_position,
+      ]
+        .filter((x) => x != null && String(x).trim() !== "")
+        .map((x) => String(x).toLowerCase());
+      return parts.some((p) => p.includes(q));
+    });
+  }, [speakerProfileSubmissions, speakerProfileSearch]);
+
   const runSpeakerProfileAction = async (id, action) => {
     if (!adminToken?.trim() || !id) return;
     if (action === "delete") {
       const ok = window.confirm(
-        "Delete this speaker from the website and remove their stored headshot from file storage? This cannot be undone.",
+        "Delete this speaker from the website and remove their stored headshot and brief CV (if any) from file storage? This cannot be undone.",
       );
       if (!ok) return;
     }
@@ -4464,13 +4493,36 @@ export default function AdminTab() {
               </code>
               . Approve to add them to the main Speakers grid on the Speakers
               page. The Speaker key column is for legacy rows only; new rows
-              show (new). Rejecting removes a pending headshot from storage.
+              show (new). Presentation title and brief CV are for organizer
+              reference only and are not shown on the public site. Rejecting
+              removes a pending headshot and CV from storage.
             </p>
             <p className="text-sm mt-2 font-medium text-gray-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 max-w-2xl">
               For <strong>approved</strong> or <strong>rejected</strong> rows, use
               the red <strong>Delete from site</strong> button in the{" "}
               <strong>Actions</strong> column (not shown for pending rows).
             </p>
+
+            {speakerProfileSubmissions.length > 0 && (
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-between max-w-2xl">
+                <label className="block flex-1 min-w-0">
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Search
+                  </span>
+                  <input
+                    type="search"
+                    value={speakerProfileSearch}
+                    onChange={(e) => setSpeakerProfileSearch(e.target.value)}
+                    placeholder="Name, email, title, affiliation, status…"
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  />
+                </label>
+                <p className="text-sm text-gray-500 pb-1">
+                  Showing {filteredSpeakerProfileSubmissions.length} of{" "}
+                  {speakerProfileSubmissions.length}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-sm">
@@ -4480,16 +4532,17 @@ export default function AdminTab() {
                   <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2">Speaker key</th>
                   <th className="px-3 py-2">Name / affiliation</th>
+                  <th className="px-3 py-2 min-w-[10rem]">
+                    Presentation (reference)
+                  </th>
                   <th className="px-3 py-2">Email</th>
                   <th className="px-3 py-2">Photo</th>
+                  <th className="px-3 py-2">Brief CV</th>
                   <th className="px-3 py-2 min-w-[9rem]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {(Array.isArray(speakerProfileSubmissions)
-                  ? speakerProfileSubmissions
-                  : []
-                ).map((row) => {
+                {filteredSpeakerProfileSubmissions.map((row) => {
                   const statusNorm = String(row.status || "")
                     .trim()
                     .toLowerCase();
@@ -4528,6 +4581,15 @@ export default function AdminTab() {
                           </div>
                         ) : null}
                       </td>
+                      <td className="px-3 py-2 max-w-[14rem] text-gray-800 text-sm">
+                        {row.presentation_title ? (
+                          <span className="line-clamp-3" title={row.presentation_title}>
+                            {row.presentation_title}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-gray-800 break-all">
                         {row.email}
                       </td>
@@ -4544,6 +4606,20 @@ export default function AdminTab() {
                               alt=""
                               className="h-16 w-16 rounded-lg object-cover border border-gray-200"
                             />
+                          </a>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {row.cv_r2_key ? (
+                          <a
+                            href={`/${row.cv_r2_key}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-700 hover:underline font-medium"
+                          >
+                            Open file
                           </a>
                         ) : (
                           <span className="text-gray-400">—</span>
@@ -4591,13 +4667,24 @@ export default function AdminTab() {
                   speakerProfileSubmissions.length === 0) && (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={8}
                       className="px-3 py-6 text-center text-gray-500"
                     >
                       No speaker profile submissions yet.
                     </td>
                   </tr>
                 )}
+                {speakerProfileSubmissions.length > 0 &&
+                  filteredSpeakerProfileSubmissions.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={8}
+                        className="px-3 py-6 text-center text-gray-500"
+                      >
+                        No rows match your search.
+                      </td>
+                    </tr>
+                  )}
               </tbody>
             </table>
           </div>
