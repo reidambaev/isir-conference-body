@@ -4472,7 +4472,6 @@ export default function AdminTab() {
               <strong>Actions</strong> column (not shown for pending rows).
             </p>
           </div>
-<<<<<<< HEAD
 
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 space-y-4 max-w-3xl">
             <h3 className="text-lg font-semibold text-slate-900">
@@ -4541,8 +4540,6 @@ export default function AdminTab() {
             )}
           </div>
 
-=======
->>>>>>> parent of 3f7f62f (add migration path for old speakers)
           <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-sm">
             <table className="min-w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-700 font-medium">

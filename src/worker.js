@@ -2,12 +2,18 @@
  * ISIR Conference Worker
  * Handles static assets + API routes
  */
-<<<<<<< HEAD
 import bundledSpeakerSeed from "./speakersSeed.js";
 
-=======
->>>>>>> parent of 3f7f62f (add migration path for old speakers)
 const SPEAKER_PHOTO_MAX_BYTES = 1024 * 1024; // 1 MiB cap for R2 headshots (JPEG/PNG)
+
+function seedRowBySpeakerKey(speakerKey) {
+  if (speakerKey == null || String(speakerKey).trim() === "") return null;
+  const k = String(speakerKey).trim();
+  for (const s of bundledSpeakerSeed) {
+    if (String(s.key || "").trim() === k) return s;
+  }
+  return null;
+}
 
 export default {
   async fetch(request, env, ctx) {
@@ -366,7 +372,6 @@ async function handleApiRequest(request, env, url) {
     );
   }
 
-<<<<<<< HEAD
   // POST /api/admin/speaker-catalog/seed-bundled — upsert plenary + congress from speakersSeed.js
   if (
     url.pathname === "/api/admin/speaker-catalog/seed-bundled" &&
@@ -383,8 +388,6 @@ async function handleApiRequest(request, env, url) {
     return handleAdminImportSpeakerCatalogTsv(request, env, corsHeaders);
   }
 
-=======
->>>>>>> parent of 3f7f62f (add migration path for old speakers)
   return new Response(JSON.stringify({ error: "Not Found" }), {
     status: 404,
     headers: corsHeaders,
@@ -2695,8 +2698,33 @@ async function handleGetPublicSpeakerProfiles(request, env, corsHeaders) {
     const plenary = [];
     const congress = [];
     for (const r of results || []) {
-      const row = mapPublicSpeakerRow(r);
-      if (r.tier === "plenary") plenary.push(row);
+      const seed = seedRowBySpeakerKey(r.speaker_key);
+      const tierRaw =
+        r.tier != null && String(r.tier).trim() !== ""
+          ? String(r.tier).trim()
+          : null;
+      const tier =
+        tierRaw === "plenary" || tierRaw === "congress"
+          ? tierRaw
+          : seed?.tier === "plenary" || seed?.tier === "congress"
+            ? seed.tier
+            : null;
+      const static_image =
+        r.static_image != null && String(r.static_image).trim() !== ""
+          ? String(r.static_image).trim()
+          : seed?.image != null && String(seed.image).trim() !== ""
+            ? String(seed.image).trim()
+            : null;
+      const image_position =
+        r.image_position != null && String(r.image_position).trim() !== ""
+          ? String(r.image_position).trim()
+          : seed?.imagePosition != null &&
+              String(seed.imagePosition).trim() !== ""
+            ? String(seed.imagePosition).trim()
+            : null;
+      const merged = { ...r, tier, static_image, image_position };
+      const row = mapPublicSpeakerRow(merged);
+      if (merged.tier === "plenary") plenary.push(row);
       else congress.push(row);
     }
     plenary.sort(sortSpeakersByNameAsc);
@@ -3028,7 +3056,6 @@ async function handleAdminSpeakerProfileDelete(request, env, corsHeaders, id) {
   }
 }
 
-<<<<<<< HEAD
 function catalogSeedPlaceholderEmail(speakerKey) {
   const safe = String(speakerKey || "x").replace(/[^a-z0-9._-]/gi, "-");
   return `catalog+${safe}@speakers-import.invalid`;
@@ -3273,8 +3300,6 @@ async function handleAdminImportSpeakerCatalogTsv(request, env, corsHeaders) {
   }
 }
 
-=======
->>>>>>> parent of 3f7f62f (add migration path for old speakers)
 async function handleAdminTestPaymentIntent(request, env, corsHeaders) {
   try {
     const auth = ensureAdmin(request, env, corsHeaders);

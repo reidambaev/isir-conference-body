@@ -1,6 +1,7 @@
 /**
- * Bundled data for POST /api/admin/speaker-catalog/seed-bundled only.
- * Public speaker lists come from D1 (tier, static_image, sort_order).
+ * Bundled speaker list: admin seed (POST …/seed-bundled), Worker merge when
+ * D1 rows lack tier/static_image for a known speaker_key, and Vite dev stub
+ * for GET /api/speaker-profiles/public.
  */
 export default [
   {
