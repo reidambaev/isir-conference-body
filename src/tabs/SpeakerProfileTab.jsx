@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-const MAX_PHOTO_BYTES = 1024 * 1024; // 1 MiB
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MiB
 
 export default function SpeakerProfileTab() {
   const [email, setEmail] = useState("");
@@ -30,7 +30,7 @@ export default function SpeakerProfileTab() {
     setError(null);
     if (f && f.size > MAX_PHOTO_BYTES) {
       setError(
-        "Please choose an image under 1 MB (JPEG or PNG).",
+        "Please choose an image under 5 MB (JPEG or PNG).",
       );
     }
   };
@@ -49,7 +49,7 @@ export default function SpeakerProfileTab() {
       return;
     }
     if (file && file.size > MAX_PHOTO_BYTES) {
-      setError("Photo must be under 1 MB (JPEG or PNG).");
+      setError("Photo must be under 5 MB (JPEG or PNG).");
       return;
     }
 
@@ -95,7 +95,7 @@ export default function SpeakerProfileTab() {
         <p className="text-gray-600 text-sm leading-relaxed">
           Enter your first, middle (optional), and last name plus affiliation as they should appear in the
           program. You may add an optional headshot. Submissions are reviewed
-          before they go live. Photos may be up to 1 MB (JPEG or PNG).
+          before they go live. Photos may be up to 5 MB (JPEG or PNG).
         </p>
       </div>
 
@@ -188,7 +188,7 @@ export default function SpeakerProfileTab() {
             className="block w-full text-sm text-gray-800 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-800"
           />
           <p className="mt-1 text-xs text-gray-500">
-            JPEG or PNG, max 1 MB. Without a photo, approved entries show
+            JPEG or PNG, max 5 MB. Without a photo, approved entries show
             initials in the same style as other speakers.
           </p>
           {previewUrl && file && file.size <= MAX_PHOTO_BYTES && (

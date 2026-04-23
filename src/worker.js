@@ -4,7 +4,7 @@
  */
 import bundledSpeakerSeed from "./speakersSeed.js";
 
-const SPEAKER_PHOTO_MAX_BYTES = 1024 * 1024; // 1 MiB cap for R2 headshots (JPEG/PNG)
+const SPEAKER_PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MiB cap for R2 headshots (JPEG/PNG)
 
 function seedRowBySpeakerKey(speakerKey) {
   if (speakerKey == null || String(speakerKey).trim() === "") return null;
@@ -48,11 +48,23 @@ export default {
 };
 
 // Public GET for R2 objects (path must match key, e.g. speaker-photos/… or trainee-letters/…)
+function getSpeakerPhotosBucket(env) {
+  return env.SPEAKER_PHOTOS_BUCKET || env.TRAINEE_LETTERS_BUCKET || null;
+}
+
+function getBucketForR2Key(env, key) {
+  if (String(key || "").startsWith("speaker-photos/")) {
+    return getSpeakerPhotosBucket(env);
+  }
+  return env.TRAINEE_LETTERS_BUCKET || null;
+}
+
 async function handleR2PublicGet(request, env, url) {
   const key = url.pathname.slice(1);
 
   try {
-    const object = await env.TRAINEE_LETTERS_BUCKET.get(key);
+    const bucket = getBucketForR2Key(env, key);
+    const object = bucket ? await bucket.get(key) : null;
 
     if (!object) {
       return new Response("File not found", { status: 404 });
@@ -2652,9 +2664,11 @@ async function handleTraineeLetterUpload(request, env, corsHeaders) {
 }
 
 async function safeDeleteR2Object(env, key) {
-  if (!key || !env.TRAINEE_LETTERS_BUCKET) return;
+  if (!key) return;
   try {
-    await env.TRAINEE_LETTERS_BUCKET.delete(key);
+    const bucket = getBucketForR2Key(env, key);
+    if (!bucket) return;
+    await bucket.delete(key);
   } catch (e) {
     console.error("R2 delete failed:", key, e);
   }
@@ -2806,19 +2820,25 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
   const middleName = String(formData.get("middle_name") || "").trim();
   const lastName = String(formData.get("last_name") || "").trim();
   const legacyName = String(formData.get("name") || "").trim();
-  const name = [firstName, middleName, lastName].filter(Boolean).join(" ").trim() || legacyName;
+  const name =
+    [firstName, middleName, lastName].filter(Boolean).join(" ").trim() ||
+    legacyName;
+  const normalizedParts = splitNameParts(name);
+  const dbFirstName = firstName || normalizedParts.first_names || null;
+  const dbMiddleName = middleName || null;
+  const dbLastName = lastName || normalizedParts.last_name || null;
   const affiliation = String(formData.get("affiliation") || "").trim();
   const file = formData.get("file");
   const wantsUpload = Boolean(
     file && typeof file.size === "number" && file.size > 0,
   );
 
-  if (wantsUpload && !env.TRAINEE_LETTERS_BUCKET) {
+  if (wantsUpload && !getSpeakerPhotosBucket(env)) {
     return jsonResponse(
       {
         success: false,
         error:
-          "File storage is not configured. Photo upload requires the R2 bucket (same binding as trainee letters).",
+          "File storage is not configured. Photo upload requires SPEAKER_PHOTOS_BUCKET (or TRAINEE_LETTERS_BUCKET fallback).",
       },
       500,
       corsHeaders,
@@ -2879,7 +2899,7 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
         JSON.stringify({
           success: false,
           error:
-            "Photo is too large. Maximum size is 1 MB (JPEG or PNG) to limit storage use.",
+            "Photo is too large. Maximum size is 5 MB (JPEG or PNG).",
         }),
         { status: 400, headers: jsonHeaders },
       );
@@ -2889,7 +2909,18 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
     const ext = fileType === "image/png" ? "png" : "jpg";
     r2Key = `speaker-photos/nsp-${id.slice(0, 8)}_${timestamp}_${randomId}.${ext}`;
     const fileBuffer = await file.arrayBuffer();
-    await env.TRAINEE_LETTERS_BUCKET.put(r2Key, fileBuffer, {
+    const speakerBucket = getSpeakerPhotosBucket(env);
+    if (!speakerBucket) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Speaker photo bucket is not configured.",
+        },
+        500,
+        corsHeaders,
+      );
+    }
+    await speakerBucket.put(r2Key, fileBuffer, {
       httpMetadata: { contentType: fileType },
       customMetadata: {
         email,
@@ -2902,10 +2933,21 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
   try {
     await env.ISIR_DB.prepare(
       `INSERT INTO speaker_profile_submissions
-      (id, speaker_key, email, display_name, affiliation, r2_key, image_position, tier, static_image, sort_order, status, created_at, updated_at)
-      VALUES (?, NULL, ?, ?, ?, ?, NULL, NULL, NULL, NULL, 'pending', ?, ?)`,
+      (id, speaker_key, email, first_name, middle_name, last_name, display_name, affiliation, r2_key, image_position, tier, static_image, sort_order, status, created_at, updated_at)
+      VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, 'pending', ?, ?)`,
     )
-      .bind(id, email, name, affiliation, r2Key, now, now)
+      .bind(
+        id,
+        email,
+        dbFirstName,
+        dbMiddleName,
+        dbLastName,
+        name,
+        affiliation,
+        r2Key,
+        now,
+        now,
+      )
       .run();
 
     return new Response(
@@ -2940,7 +2982,7 @@ async function handleAdminListSpeakerProfiles(request, env, corsHeaders) {
   }
   try {
     const { results } = await env.ISIR_DB.prepare(
-      `SELECT id, speaker_key, email, display_name, affiliation, r2_key, image_position, tier, static_image, sort_order, status, created_at, updated_at
+      `SELECT id, speaker_key, email, first_name, middle_name, last_name, display_name, affiliation, r2_key, image_position, tier, static_image, sort_order, status, created_at, updated_at
        FROM speaker_profile_submissions ORDER BY updated_at DESC`,
     ).all();
     return jsonResponse(
@@ -3113,6 +3155,7 @@ async function upsertCatalogSpeakerRow(
   },
 ) {
   const id = stableCatalogSeedId(speakerKey);
+  const nameParts = splitNameParts(displayName);
   const em =
     email != null && String(email).trim()
       ? String(email).trim()
@@ -3138,9 +3181,11 @@ async function upsertCatalogSpeakerRow(
   }
   await env.ISIR_DB.prepare(
     `INSERT INTO speaker_profile_submissions (
-      id, speaker_key, email, display_name, affiliation, r2_key, image_position, tier, static_image, sort_order, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 'approved', ?, ?)
+      id, speaker_key, email, first_name, middle_name, last_name, display_name, affiliation, r2_key, image_position, tier, static_image, sort_order, status, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, NULL, ?, ?, ?, ?, 'approved', ?, ?)
     ON CONFLICT(speaker_key) DO UPDATE SET
+      first_name = excluded.first_name,
+      last_name = excluded.last_name,
       display_name = excluded.display_name,
       affiliation = excluded.affiliation,
       image_position = excluded.image_position,
@@ -3153,6 +3198,8 @@ async function upsertCatalogSpeakerRow(
       id,
       speakerKey,
       em,
+      nameParts.first_names || null,
+      nameParts.last_name || null,
       displayName,
       affiliation,
       pos,
