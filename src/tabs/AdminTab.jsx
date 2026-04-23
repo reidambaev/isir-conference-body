@@ -4537,17 +4537,18 @@ export default function AdminTab() {
 
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 space-y-4 max-w-3xl">
             <h3 className="text-lg font-semibold text-slate-900">
-              Import built-in speaker catalog into D1
+              Seed bundled speaker list into D1
             </h3>
             <p className="text-sm text-slate-700">
-              Creates or updates <strong>approved</strong> rows for every plenary
-              and congress speaker from{" "}
-              <code className="text-xs bg-white px-1 rounded">invitedSpeakersCatalog.js</code>
+              Creates or updates <strong>approved</strong> rows for the bundled
+              plenary and congress list from{" "}
+              <code className="text-xs bg-white px-1 rounded">speakersSeed.js</code>
               , keyed by <code className="text-xs">speaker_key</code>. Uses
               placeholder emails like{" "}
               <code className="text-xs">catalog+ricardo-barini@speakers-import.invalid</code>
-              . Re-running syncs name/affiliation/image crop from the codebase;
-              existing uploaded (R2) headshots for that key are not removed.
+              . Re-running syncs name, affiliation, tier, static image filename,
+              sort order, and image crop from the repo; existing uploaded (R2)
+              headshots for that key are not removed.
             </p>
             <button
               type="button"
@@ -4555,7 +4556,7 @@ export default function AdminTab() {
               onClick={seedBundledSpeakerCatalog}
               className="px-4 py-2.5 rounded-lg bg-slate-800 text-white text-sm font-semibold hover:bg-slate-900 disabled:opacity-50"
             >
-              {catalogImportBusy ? "Working…" : "Import catalog from codebase"}
+              {catalogImportBusy ? "Working…" : "Import bundled seed into D1"}
             </button>
             <div className="border-t border-slate-200 pt-4">
               <p className="text-sm font-medium text-slate-900 mb-2">
@@ -4564,10 +4565,15 @@ export default function AdminTab() {
               <p className="text-xs text-slate-600 mb-2">
                 First row (headers):{" "}
                 <code className="bg-white px-1 rounded">
-                  speaker_key	name	affiliation	email
+                  speaker_key	name	affiliation	email	tier	static_image	sort_order
                 </code>{" "}
                 — use tabs between columns. <code className="bg-white px-1">email</code>{" "}
-                is optional (placeholder used if empty). Avoid tabs inside
+                is optional (placeholder used if empty). Optional:{" "}
+                <code className="bg-white px-1">tier</code> (plenary or congress),{" "}
+                <code className="bg-white px-1">static_image</code> or{" "}
+                <code className="bg-white px-1">image</code> (filename under{" "}
+                <code className="bg-white px-1">/speakers/</code>),{" "}
+                <code className="bg-white px-1">sort_order</code>. Avoid tabs inside
                 cells.
               </p>
               <input

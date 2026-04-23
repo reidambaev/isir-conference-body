@@ -1,8 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
-import {
-  plenarySpeakers as plenaryCatalog,
-  invitedCongressSpeakers as congressCatalog,
-} from "../invitedSpeakersCatalog";
+import React, { useEffect, useState } from "react";
 
 function getInitials(name) {
   return name
@@ -14,61 +10,41 @@ function getInitials(name) {
 }
 
 function SpeakersTab() {
-  const [approvedMap, setApprovedMap] = useState(() => new Map());
-  const [additionalSpeakers, setAdditionalSpeakers] = useState([]);
+  const [plenarySpeakers, setPlenarySpeakers] = useState([]);
+  const [congressSpeakers, setCongressSpeakers] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
 
-    const loadApproved = async () => {
+    const loadPublic = async () => {
       try {
-        const res = await fetch("/api/speaker-profiles/approved", {
+        const res = await fetch("/api/speaker-profiles/public", {
           cache: "no-store",
         });
         const data = await res.json();
-        if (!res.ok || !data.success || !Array.isArray(data.approved)) return;
-        const m = new Map();
-        const extra = [];
-        for (const row of data.approved) {
-          const k =
-            row.speaker_key != null ? String(row.speaker_key).trim() : "";
-          if (k) {
-            m.set(k, {
-              display_name: String(row.display_name || ""),
-              affiliation: String(row.affiliation || ""),
-              r2_key: row.r2_key || null,
-              image_position: row.image_position || null,
-            });
-          } else {
-            extra.push({
-              id: String(row.id || ""),
-              name: String(row.display_name || ""),
-              affiliation: String(row.affiliation || ""),
-              r2_key: row.r2_key || null,
-              image_position: row.image_position || null,
-            });
-          }
-        }
-        if (!cancelled) {
-          setApprovedMap(m);
-          setAdditionalSpeakers(extra);
-        }
+        if (!res.ok || !data.success) return;
+        if (cancelled) return;
+        setPlenarySpeakers(Array.isArray(data.plenary) ? data.plenary : []);
+        setCongressSpeakers(Array.isArray(data.congress) ? data.congress : []);
       } catch {
-        // public page: keep static data if API fails
+        if (!cancelled) {
+          setPlenarySpeakers([]);
+          setCongressSpeakers([]);
+        }
       }
     };
 
-    loadApproved();
+    loadPublic();
 
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        loadApproved();
+        loadPublic();
       }
     };
     document.addEventListener("visibilitychange", onVisible);
     const onPageShow = (e) => {
       if (e.persisted) {
-        loadApproved();
+        loadPublic();
       }
     };
     window.addEventListener("pageshow", onPageShow);
@@ -79,41 +55,6 @@ function SpeakersTab() {
       window.removeEventListener("pageshow", onPageShow);
     };
   }, []);
-
-  const plenarySpeakers = useMemo(() => {
-    return plenaryCatalog.map((s) => {
-      const o = approvedMap.get(s.key);
-      return {
-        ...s,
-        name: o?.display_name || s.name,
-        affiliation: o?.affiliation || s.affiliation,
-        customPhotoKey: o?.r2_key || null,
-        imagePosition: o?.image_position || s.imagePosition,
-      };
-    });
-  }, [approvedMap]);
-
-  const speakers = useMemo(() => {
-    const fromCatalog = congressCatalog.map((s) => {
-      const o = approvedMap.get(s.key);
-      return {
-        ...s,
-        name: o?.display_name || s.name,
-        affiliation: o?.affiliation || s.affiliation,
-        customPhotoKey: o?.r2_key || null,
-        imagePosition: o?.image_position || s.imagePosition,
-      };
-    });
-    const fromProfiles = additionalSpeakers.map((a) => ({
-      key: `speaker-profile-${a.id}`,
-      name: a.name,
-      affiliation: a.affiliation,
-      image: null,
-      customPhotoKey: a.r2_key,
-      imagePosition: a.image_position || undefined,
-    }));
-    return [...fromCatalog, ...fromProfiles];
-  }, [approvedMap, additionalSpeakers]);
 
   return (
     <div role="tabpanel">
@@ -170,8 +111,8 @@ function SpeakersTab() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {plenarySpeakers.map((speaker) => {
-            const imgSrc = speaker.customPhotoKey
-              ? `/${speaker.customPhotoKey}`
+            const imgSrc = speaker.r2_key
+              ? `/${speaker.r2_key}`
               : speaker.image
                 ? `/speakers/${speaker.image}`
                 : null;
@@ -197,8 +138,8 @@ function SpeakersTab() {
                       alt={speaker.name}
                       className="w-36 h-36 rounded-full object-cover border-4 border-white flex-shrink-0"
                       style={{
-                        ...(speaker.imagePosition && {
-                          objectPosition: speaker.imagePosition,
+                        ...(speaker.image_position && {
+                          objectPosition: speaker.image_position,
                         }),
                       }}
                     />
@@ -249,9 +190,9 @@ function SpeakersTab() {
           Speakers
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {speakers.map((speaker) => {
-            const imgSrc = speaker.customPhotoKey
-              ? `/${speaker.customPhotoKey}`
+          {congressSpeakers.map((speaker) => {
+            const imgSrc = speaker.r2_key
+              ? `/${speaker.r2_key}`
               : speaker.image
                 ? `/speakers/${speaker.image}`
                 : null;
@@ -267,8 +208,8 @@ function SpeakersTab() {
                     className="w-28 h-28 rounded-full object-cover mb-3 border-2 flex-shrink-0"
                     style={{
                       borderColor: "var(--color-secondary)",
-                      ...(speaker.imagePosition && {
-                        objectPosition: speaker.imagePosition,
+                      ...(speaker.image_position && {
+                        objectPosition: speaker.image_position,
                       }),
                     }}
                   />

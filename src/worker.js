@@ -2,10 +2,7 @@
  * ISIR Conference Worker
  * Handles static assets + API routes
  */
-import {
-  invitedCongressSpeakers,
-  plenarySpeakers,
-} from "./invitedSpeakersCatalog.js";
+import bundledSpeakerSeed from "./speakersSeed.js";
 
 const SPEAKER_PHOTO_MAX_BYTES = 1024 * 1024; // 1 MiB cap for R2 headshots (JPEG/PNG)
 
@@ -298,12 +295,12 @@ async function handleApiRequest(request, env, url) {
     return handleAdminReviewerAbstractScores(request, env, corsHeaders);
   }
 
-  // GET /api/speaker-profiles/approved (public, for speakers page)
+  // GET /api/speaker-profiles/public — plenary + congress grids (D1 only)
   if (
-    url.pathname === "/api/speaker-profiles/approved" &&
+    url.pathname === "/api/speaker-profiles/public" &&
     request.method === "GET"
   ) {
-    return handleGetApprovedSpeakerProfiles(request, env, url, corsHeaders);
+    return handleGetPublicSpeakerProfiles(request, env, corsHeaders);
   }
 
   // GET /api/speaker-profiles/invite-check?email= — same list as /api/speaker-invites/check, no token; ignores used (after registration is OK)
@@ -366,7 +363,7 @@ async function handleApiRequest(request, env, url) {
     );
   }
 
-  // POST /api/admin/speaker-catalog/seed-bundled — upsert plenary + congress from invitedSpeakersCatalog.js
+  // POST /api/admin/speaker-catalog/seed-bundled — upsert plenary + congress from speakersSeed.js
   if (
     url.pathname === "/api/admin/speaker-catalog/seed-bundled" &&
     request.method === "POST"
@@ -2654,12 +2651,29 @@ async function safeDeleteR2Object(env, key) {
   }
 }
 
-async function handleGetApprovedSpeakerProfiles(
-  request,
-  env,
-  _url,
-  corsHeaders,
-) {
+function mapPublicSpeakerRow(r) {
+  const sk =
+    r.speaker_key != null && String(r.speaker_key).trim() !== ""
+      ? String(r.speaker_key).trim()
+      : null;
+  return {
+    id: r.id,
+    key: sk || `speaker-profile-${r.id}`,
+    name: r.display_name,
+    affiliation: r.affiliation,
+    image: r.static_image || null,
+    r2_key: r.r2_key || null,
+    image_position: r.image_position || null,
+  };
+}
+
+function sortSpeakersByNameAsc(a, b) {
+  return String(a.name || "").localeCompare(String(b.name || ""), undefined, {
+    sensitivity: "base",
+  });
+}
+
+async function handleGetPublicSpeakerProfiles(request, env, corsHeaders) {
   if (!env.ISIR_DB) {
     return jsonResponse(
       { success: false, error: "Database not configured" },
@@ -2669,29 +2683,34 @@ async function handleGetApprovedSpeakerProfiles(
   }
   try {
     const { results } = await env.ISIR_DB.prepare(
-      `SELECT id, speaker_key, display_name, affiliation, r2_key, image_position
-       FROM speaker_profile_submissions WHERE status = 'approved' ORDER BY display_name ASC`,
+      `SELECT id, speaker_key, display_name, affiliation, r2_key, image_position, tier, static_image
+       FROM speaker_profile_submissions WHERE status = 'approved'`,
     ).all();
-    const out = (results || []).map((r) => ({
-      id: r.id,
-      speaker_key:
-        r.speaker_key != null && String(r.speaker_key).trim() !== ""
-          ? r.speaker_key
-          : null,
-      display_name: r.display_name,
-      affiliation: r.affiliation,
-      r2_key: r.r2_key || null,
-      image_position: r.image_position || null,
-    }));
-    return new Response(JSON.stringify({ success: true, approved: out }), {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        "Cache-Control": "private, no-store, max-age=0",
+    const plenary = [];
+    const congress = [];
+    for (const r of results || []) {
+      const row = mapPublicSpeakerRow(r);
+      if (r.tier === "plenary") plenary.push(row);
+      else congress.push(row);
+    }
+    plenary.sort(sortSpeakersByNameAsc);
+    congress.sort(sortSpeakersByNameAsc);
+    return new Response(
+      JSON.stringify({
+        success: true,
+        plenary,
+        congress,
+      }),
+      {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Cache-Control": "private, no-store, max-age=0",
+        },
       },
-    });
+    );
   } catch (e) {
-    console.error("handleGetApprovedSpeakerProfiles:", e);
+    console.error("handleGetPublicSpeakerProfiles:", e);
     return jsonResponse(
       { success: false, error: "Failed to load speaker profiles" },
       500,
@@ -2816,8 +2835,8 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
   try {
     await env.ISIR_DB.prepare(
       `INSERT INTO speaker_profile_submissions
-      (id, speaker_key, email, display_name, affiliation, r2_key, image_position, status, created_at, updated_at)
-      VALUES (?, NULL, ?, ?, ?, ?, NULL, 'pending', ?, ?)`,
+      (id, speaker_key, email, display_name, affiliation, r2_key, image_position, tier, static_image, sort_order, status, created_at, updated_at)
+      VALUES (?, NULL, ?, ?, ?, ?, NULL, NULL, NULL, NULL, 'pending', ?, ?)`,
     )
       .bind(id, email, name, affiliation, r2Key, now, now)
       .run();
@@ -2854,7 +2873,7 @@ async function handleAdminListSpeakerProfiles(request, env, corsHeaders) {
   }
   try {
     const { results } = await env.ISIR_DB.prepare(
-      `SELECT id, speaker_key, email, display_name, affiliation, r2_key, image_position, status, created_at, updated_at
+      `SELECT id, speaker_key, email, display_name, affiliation, r2_key, image_position, tier, static_image, sort_order, status, created_at, updated_at
        FROM speaker_profile_submissions ORDER BY updated_at DESC`,
     ).all();
     return jsonResponse(
@@ -3020,6 +3039,9 @@ async function upsertCatalogSpeakerRow(
     affiliation,
     email,
     imagePosition,
+    tier,
+    staticImage,
+    sortOrder,
     now,
   },
 ) {
@@ -3032,17 +3054,47 @@ async function upsertCatalogSpeakerRow(
     imagePosition != null && String(imagePosition).trim()
       ? String(imagePosition).trim()
       : null;
+  const tierVal =
+    tier === "plenary" || tier === "congress"
+      ? tier
+      : tier != null && String(tier).trim()
+        ? String(tier).trim()
+        : null;
+  const staticImg =
+    staticImage != null && String(staticImage).trim()
+      ? String(staticImage).trim()
+      : null;
+  let sortVal = null;
+  if (sortOrder != null && String(sortOrder).trim() !== "") {
+    const n = Number(sortOrder);
+    if (!Number.isNaN(n)) sortVal = n;
+  }
   await env.ISIR_DB.prepare(
     `INSERT INTO speaker_profile_submissions (
-      id, speaker_key, email, display_name, affiliation, r2_key, image_position, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, NULL, ?, 'approved', ?, ?)
+      id, speaker_key, email, display_name, affiliation, r2_key, image_position, tier, static_image, sort_order, status, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 'approved', ?, ?)
     ON CONFLICT(speaker_key) DO UPDATE SET
       display_name = excluded.display_name,
       affiliation = excluded.affiliation,
       image_position = excluded.image_position,
+      tier = excluded.tier,
+      static_image = excluded.static_image,
+      sort_order = excluded.sort_order,
       updated_at = excluded.updated_at`,
   )
-    .bind(id, speakerKey, em, displayName, affiliation, pos, now, now)
+    .bind(
+      id,
+      speakerKey,
+      em,
+      displayName,
+      affiliation,
+      pos,
+      tierVal,
+      staticImg,
+      sortVal,
+      now,
+      now,
+    )
     .run();
 }
 
@@ -3057,17 +3109,22 @@ async function handleAdminSeedBundledSpeakerCatalog(request, env, corsHeaders) {
     );
   }
   const now = Date.now();
-  const rows = [...plenarySpeakers, ...invitedCongressSpeakers];
+  const rows = Array.isArray(bundledSpeakerSeed) ? bundledSpeakerSeed : [];
   let count = 0;
   try {
     for (const s of rows) {
       const key = String(s.key || "").trim();
       if (!key) continue;
+      const tierRaw = String(s.tier || "").trim().toLowerCase();
+      const tier = tierRaw === "plenary" ? "plenary" : "congress";
       await upsertCatalogSpeakerRow(env, {
         speakerKey: key,
         displayName: String(s.name || "").trim(),
         affiliation: String(s.affiliation || "").trim(),
         imagePosition: s.imagePosition,
+        tier,
+        staticImage: s.image != null ? s.image : null,
+        sortOrder: s.sortOrder,
         now,
       });
       count += 1;
@@ -3076,7 +3133,7 @@ async function handleAdminSeedBundledSpeakerCatalog(request, env, corsHeaders) {
       {
         success: true,
         count,
-        message: `Upserted ${count} catalog speakers as approved rows (placeholder emails). Existing R2 headshots for the same key were left unchanged.`,
+        message: `Upserted ${count} bundled seed speakers as approved rows (placeholder emails). Existing R2 headshots for the same key were left unchanged.`,
       },
       200,
       corsHeaders,
@@ -3132,12 +3189,17 @@ async function handleAdminImportSpeakerCatalogTsv(request, env, corsHeaders) {
     );
     const idxAff = headerCells.findIndex((h) => h === "affiliation");
     const idxEmail = headerCells.findIndex((h) => h === "email");
+    const idxTier = headerCells.findIndex((h) => h === "tier");
+    const idxStatic = headerCells.findIndex(
+      (h) => h === "static_image" || h === "image",
+    );
+    const idxSort = headerCells.findIndex((h) => h === "sort_order");
     if (idxKey < 0 || idxName < 0 || idxAff < 0) {
       return jsonResponse(
         {
           success: false,
           error:
-            "Header row must include tab-separated columns: speaker_key, name (or display_name), affiliation, and optionally email",
+            "Header row must include tab-separated columns: speaker_key, name (or display_name), affiliation, and optionally email, tier (plenary|congress), static_image (or image), sort_order",
         },
         400,
         corsHeaders,
@@ -3153,6 +3215,13 @@ async function handleAdminImportSpeakerCatalogTsv(request, env, corsHeaders) {
       const affiliation = String(parts[idxAff] || "").trim();
       const emailRaw =
         idxEmail >= 0 ? String(parts[idxEmail] || "").trim() : "";
+      const tierRaw =
+        idxTier >= 0 ? String(parts[idxTier] || "").trim().toLowerCase() : "";
+      const tier =
+        tierRaw === "plenary" || tierRaw === "congress" ? tierRaw : null;
+      const staticRaw =
+        idxStatic >= 0 ? String(parts[idxStatic] || "").trim() : "";
+      const sortRaw = idxSort >= 0 ? String(parts[idxSort] || "").trim() : "";
       if (!speakerKey) {
         errors.push(`Line ${i + 1}: missing speaker_key`);
         continue;
@@ -3167,6 +3236,9 @@ async function handleAdminImportSpeakerCatalogTsv(request, env, corsHeaders) {
         affiliation,
         email: emailRaw,
         imagePosition: null,
+        tier,
+        staticImage: staticRaw || null,
+        sortOrder: sortRaw || null,
         now,
       });
       count += 1;

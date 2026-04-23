@@ -208,7 +208,8 @@ CREATE INDEX IF NOT EXISTS idx_visa_requests_status ON visa_requests (status);
 
 CREATE INDEX IF NOT EXISTS idx_visa_requests_date ON visa_requests (created_at);
 
--- New speaker profile form (D1 + R2 under speaker-photos/); speaker_key null = not tied to the static catalog
+-- Speaker profiles (D1 + R2 under speaker-photos/). speaker_key null = self-registered (congress grid).
+-- tier: plenary | congress | NULL (NULL treated as congress on the public page). static_image: filename under /speakers/.
 CREATE TABLE
     IF NOT EXISTS speaker_profile_submissions (
         id TEXT PRIMARY KEY,
@@ -218,6 +219,9 @@ CREATE TABLE
         affiliation TEXT NOT NULL,
         r2_key TEXT,
         image_position TEXT,
+        tier TEXT,
+        static_image TEXT,
+        sort_order INTEGER,
         status TEXT NOT NULL DEFAULT 'pending',
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
