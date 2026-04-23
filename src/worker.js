@@ -2,8 +2,11 @@
  * ISIR Conference Worker
  * Handles static assets + API routes
  */
+<<<<<<< HEAD
 import bundledSpeakerSeed from "./speakersSeed.js";
 
+=======
+>>>>>>> parent of 3f7f62f (add migration path for old speakers)
 const SPEAKER_PHOTO_MAX_BYTES = 1024 * 1024; // 1 MiB cap for R2 headshots (JPEG/PNG)
 
 export default {
@@ -363,6 +366,7 @@ async function handleApiRequest(request, env, url) {
     );
   }
 
+<<<<<<< HEAD
   // POST /api/admin/speaker-catalog/seed-bundled — upsert plenary + congress from speakersSeed.js
   if (
     url.pathname === "/api/admin/speaker-catalog/seed-bundled" &&
@@ -379,6 +383,8 @@ async function handleApiRequest(request, env, url) {
     return handleAdminImportSpeakerCatalogTsv(request, env, corsHeaders);
   }
 
+=======
+>>>>>>> parent of 3f7f62f (add migration path for old speakers)
   return new Response(JSON.stringify({ error: "Not Found" }), {
     status: 404,
     headers: corsHeaders,
@@ -3022,6 +3028,7 @@ async function handleAdminSpeakerProfileDelete(request, env, corsHeaders, id) {
   }
 }
 
+<<<<<<< HEAD
 function catalogSeedPlaceholderEmail(speakerKey) {
   const safe = String(speakerKey || "x").replace(/[^a-z0-9._-]/gi, "-");
   return `catalog+${safe}@speakers-import.invalid`;
@@ -3266,6 +3273,8 @@ async function handleAdminImportSpeakerCatalogTsv(request, env, corsHeaders) {
   }
 }
 
+=======
+>>>>>>> parent of 3f7f62f (add migration path for old speakers)
 async function handleAdminTestPaymentIntent(request, env, corsHeaders) {
   try {
     const auth = ensureAdmin(request, env, corsHeaders);

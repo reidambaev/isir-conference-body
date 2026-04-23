@@ -85,9 +85,6 @@ export default function AdminTab() {
     [],
   );
   const [speakerProfileActionId, setSpeakerProfileActionId] = useState(null);
-  const [catalogImportBusy, setCatalogImportBusy] = useState(false);
-  const [catalogImportMessage, setCatalogImportMessage] = useState(null);
-  const [catalogImportError, setCatalogImportError] = useState(null);
   const [expandedAbstracts, setExpandedAbstracts] = useState(new Set());
 
   // Abstract filtering/sorting state
@@ -513,65 +510,6 @@ export default function AdminTab() {
       setError(e?.message || `Failed to ${action}`);
     } finally {
       setSpeakerProfileActionId(null);
-    }
-  };
-
-  const seedBundledSpeakerCatalog = async () => {
-    if (!adminToken?.trim()) return;
-    setCatalogImportBusy(true);
-    setCatalogImportError(null);
-    setCatalogImportMessage(null);
-    try {
-      const res = await fetch("/api/admin/speaker-catalog/seed-bundled", {
-        method: "POST",
-        headers: { "X-Admin-Token": adminToken },
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
-        setCatalogImportError(data.error || `HTTP ${res.status}`);
-        return;
-      }
-      setCatalogImportMessage(
-        data.message || `Upserted ${data.count} catalog rows.`,
-      );
-      await fetchAllData(adminToken);
-    } catch (e) {
-      setCatalogImportError(e?.message || "Request failed");
-    } finally {
-      setCatalogImportBusy(false);
-    }
-  };
-
-  const importSpeakerCatalogTsv = async (file) => {
-    if (!adminToken?.trim() || !file) return;
-    setCatalogImportBusy(true);
-    setCatalogImportError(null);
-    setCatalogImportMessage(null);
-    try {
-      const fd = new FormData();
-      fd.set("file", file);
-      const res = await fetch("/api/admin/speaker-catalog/import-tsv", {
-        method: "POST",
-        headers: { "X-Admin-Token": adminToken },
-        body: fd,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
-        setCatalogImportError(data.error || `HTTP ${res.status}`);
-        return;
-      }
-      const errNote =
-        Array.isArray(data.errors) && data.errors.length > 0
-          ? ` Warnings: ${data.errors.join("; ")}`
-          : "";
-      setCatalogImportMessage(
-        (data.message || `Imported ${data.count} row(s).`) + errNote,
-      );
-      await fetchAllData(adminToken);
-    } catch (e) {
-      setCatalogImportError(e?.message || "Request failed");
-    } finally {
-      setCatalogImportBusy(false);
     }
   };
 
@@ -4534,6 +4472,7 @@ export default function AdminTab() {
               <strong>Actions</strong> column (not shown for pending rows).
             </p>
           </div>
+<<<<<<< HEAD
 
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 space-y-4 max-w-3xl">
             <h3 className="text-lg font-semibold text-slate-900">
@@ -4602,6 +4541,8 @@ export default function AdminTab() {
             )}
           </div>
 
+=======
+>>>>>>> parent of 3f7f62f (add migration path for old speakers)
           <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-sm">
             <table className="min-w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-700 font-medium">
