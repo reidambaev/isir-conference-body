@@ -29,9 +29,7 @@ export default function SpeakerProfileTab() {
     setFile(f || null);
     setError(null);
     if (f && f.size > MAX_PHOTO_BYTES) {
-      setError(
-        "Please choose an image under 5 MB (JPEG or PNG).",
-      );
+      setError("Please choose an image under 5 MB (JPEG or PNG).");
     }
   };
 
@@ -44,7 +42,12 @@ export default function SpeakerProfileTab() {
     e.preventDefault();
     setError(null);
     setMessage(null);
-    if (!email.trim() || !firstName.trim() || !lastName.trim() || !affiliation.trim()) {
+    if (
+      !email.trim() ||
+      !firstName.trim() ||
+      !lastName.trim() ||
+      !affiliation.trim()
+    ) {
       setError("Email, first name, last name, and affiliation are required.");
       return;
     }
@@ -71,7 +74,9 @@ export default function SpeakerProfileTab() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
-        setError(data.error || "Submission failed. Try again or contact support.");
+        setError(
+          data.error || "Submission failed. Try again or contact support.",
+        );
         return;
       }
       setMessage(data.message || "Submitted successfully.");
@@ -93,9 +98,10 @@ export default function SpeakerProfileTab() {
           New speaker registration
         </h1>
         <p className="text-gray-600 text-sm leading-relaxed">
-          Enter your first, middle (optional), and last name plus affiliation as they should appear in the
-          program. You may add an optional headshot. Submissions are reviewed
-          before they go live. Photos may be up to 5 MB (JPEG or PNG).
+          Enter your first, middle (optional), and last name plus affiliation as
+          they should appear in the program. You may add an optional headshot.
+          Submissions are reviewed before they go live. Photos may be up to 5 MB
+          (JPEG or PNG).
         </p>
       </div>
 
@@ -207,8 +213,7 @@ export default function SpeakerProfileTab() {
               <div className="flex-1 text-sm text-gray-600 pt-1">
                 <p className="font-medium text-gray-800 mb-1">Preview</p>
                 <p className="text-xs mb-3">
-                  {(file.size / 1024).toFixed(1)} KB — matches the main Speakers
-                  list (112×112px circle, same border and crop as the live site).
+                  {(file.size / 1024).toFixed(1)} KB.
                 </p>
                 <button
                   type="button"
