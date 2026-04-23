@@ -1,7 +1,7 @@
 /**
- * Bundled speaker list: admin seed (POST …/seed-bundled), Worker merge when
- * D1 rows lack tier/static_image for a known speaker_key, and Vite dev stub
- * for GET /api/speaker-profiles/public.
+ * Bundled speaker list for fallback behavior only:
+ * - Worker merge when D1 rows lack tier/static_image for known speaker_key
+ * - Vite dev stub for GET /api/speaker-profiles/public
  */
 export default [
   {
