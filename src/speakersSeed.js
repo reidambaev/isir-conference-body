@@ -286,7 +286,7 @@ export default [
     key: "sayaka-tsuda",
     name: "Sayaka Tsuda",
     affiliation: "University of Toyama, Toyama, Japan",
-    image: null,
+    image: "sayaka-tsuda.jpg",
     sortOrder: 27,
   },
   {
