@@ -58,6 +58,17 @@ const TravelTab = () => {
               basis and must be booked by August 10, 2026. Book early, as rooms
               will sell out!
             </p>
+            <p className="text-sm text-gray-600 mb-4">
+              <strong>Invited speakers:</strong> submit your hotel stay details
+              (dates and contact information) on the{" "}
+              <a
+                href="/speaker-hotel"
+                className="text-blue-700 font-semibold hover:underline"
+              >
+                invited speaker hotel registration
+              </a>{" "}
+              page.
+            </p>
             <div className="flex flex-wrap gap-4">
               <button
                 disabled

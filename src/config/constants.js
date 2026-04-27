@@ -48,6 +48,18 @@ export const TICKET_PRICES = {
 export const EARLY_BIRD_DEADLINE = new Date("2026-07-31");
 export const GALA_DINNER_PRICE = 100;
 
+/** Inclusive ISO dates for the on-site congress (invited speaker hotel dates must fall in this range). */
+export const CONFERENCE_HOTEL_STAY_DATE_MIN = "2026-11-05";
+export const CONFERENCE_HOTEL_STAY_DATE_MAX = "2026-11-08";
+
+export function isDateWithinConferenceHotelStay(isoDate) {
+  return (
+    typeof isoDate === "string" &&
+    isoDate >= CONFERENCE_HOTEL_STAY_DATE_MIN &&
+    isoDate <= CONFERENCE_HOTEL_STAY_DATE_MAX
+  );
+}
+
 /** Fri–Sun of congress week (Nov 5–8, 2026); stored JSON uses `key` only. */
 export const CONGRESS_WEEKEND_MEALS = [
   { key: "Friday", date: "Nov 6, 2026" },

@@ -7,8 +7,11 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
-const VISA_NOTIFY_EMAIL = "sklee@kyuh.ac.kr";
-const VISA_NOTIFY_NAME = "Sung Ki Lee";
+const VISA_NOTIFY_EMAILS = [
+  "sklee@kyuh.ac.kr",
+  "office@the-ksri.org", // Ms. Lee, KSRI office
+];
+const VISA_NOTIFY_SALUTATION = "Sung Ki Lee and Ms. Lee";
 
 export async function onRequestPost(context) {
   try {
@@ -64,7 +67,7 @@ export async function onRequestPost(context) {
     <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
     <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">New visa support request</p>
   </div>
-  <p>Dear ${escapeHtml(VISA_NOTIFY_NAME)},</p>
+  <p>Dear ${escapeHtml(VISA_NOTIFY_SALUTATION)},</p>
   <p>A new visa support request has been submitted for the ISIR 2026 World Congress.</p>
   <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
     <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Request details</p>
@@ -91,7 +94,7 @@ export async function onRequestPost(context) {
           },
           body: JSON.stringify({
             from: env.CONFIRMATION_FROM_EMAIL,
-            to: [VISA_NOTIFY_EMAIL],
+            to: VISA_NOTIFY_EMAILS,
             subject: `ISIR 2026 – Visa request from ${name} (${country})`,
             html,
           }),
@@ -100,7 +103,9 @@ export async function onRequestPost(context) {
           const err = await res.text();
           console.error("Visa notification email failed:", res.status, err);
         } else {
-          console.log(`Visa notification email sent to ${VISA_NOTIFY_EMAIL}`);
+          console.log(
+            `Visa notification email sent to ${VISA_NOTIFY_EMAILS.join(", ")}`,
+          );
         }
       } catch (emailError) {
         console.error("Visa notification email error:", emailError);

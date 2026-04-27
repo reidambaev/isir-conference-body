@@ -29,6 +29,7 @@ import {
   CheckinTab,
 } from "./tabs";
 import SpeakerProfileTab from "./tabs/SpeakerProfileTab";
+import SpeakerHotelTab from "./tabs/SpeakerHotelTab";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("about");
@@ -81,6 +82,14 @@ export default function App() {
       pathname.startsWith("/speaker-profile")
     );
   });
+  const [isSpeakerHotelPage, setIsSpeakerHotelPage] = useState(() => {
+    const pathname = window.location.pathname || document.location.pathname;
+    return (
+      pathname === "/speaker-hotel" ||
+      pathname === "/speaker-hotel/" ||
+      pathname.startsWith("/speaker-hotel")
+    );
+  });
 
   // Update admin page state when pathname changes
   useEffect(() => {
@@ -115,6 +124,11 @@ export default function App() {
           pathname === "/speaker-profile/" ||
           pathname.startsWith("/speaker-profile");
         setIsSpeakerProfilePage(isSpeakerProfile);
+        const isSpeakerHotel =
+          pathname === "/speaker-hotel" ||
+          pathname === "/speaker-hotel/" ||
+          pathname.startsWith("/speaker-hotel");
+        setIsSpeakerHotelPage(isSpeakerHotel);
       }, 0);
     };
 
@@ -317,6 +331,18 @@ export default function App() {
         <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
             <SpeakerProfileTab />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (isSpeakerHotelPage) {
+    return (
+      <div ref={appRef} className="min-h-screen bg-gray-50">
+        <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
+            <SpeakerHotelTab />
           </div>
         </main>
       </div>

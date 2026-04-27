@@ -109,6 +109,22 @@ CREATE TABLE
         updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)
     );
 
+-- Invited speaker hotel registration
+CREATE TABLE
+    IF NOT EXISTS speaker_hotel_registrations (
+        id TEXT PRIMARY KEY,
+        invited_speaker_email TEXT NOT NULL UNIQUE,
+        nationality TEXT NOT NULL,
+        guest_count INTEGER NOT NULL DEFAULT 1,
+        address_physical TEXT NOT NULL,
+        contact_email TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        arrival_date TEXT NOT NULL,
+        departure_date TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+
 -- Abstract Submissions table
 CREATE TABLE
     IF NOT EXISTS abstractions (

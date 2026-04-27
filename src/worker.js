@@ -194,6 +194,22 @@ async function handleApiRequest(request, env, url) {
     return handleVisaRequest(request, env, corsHeaders);
   }
 
+  // GET /api/speaker-hotel/check-invite?email= — row exists in speaker_invites (any token state)
+  if (
+    url.pathname === "/api/speaker-hotel/check-invite" &&
+    request.method === "GET"
+  ) {
+    return handleSpeakerHotelCheckInvite(request, env, url, corsHeaders);
+  }
+
+  // POST /api/speaker-hotel-registration
+  if (
+    url.pathname === "/api/speaker-hotel-registration" &&
+    request.method === "POST"
+  ) {
+    return handleSpeakerHotelRegistration(request, env, corsHeaders);
+  }
+
   // POST /api/upload-trainee-letter
   if (url.pathname === "/api/upload-trainee-letter") {
     if (request.method === "POST") {
@@ -2410,8 +2426,11 @@ async function sendAbstractConfirmationEmail(env, abstract) {
   }
 }
 
-const VISA_NOTIFY_EMAIL = "sklee@kyuh.ac.kr";
-const VISA_NOTIFY_NAME = "Sung Ki Lee";
+const VISA_NOTIFY_EMAILS = [
+  "sklee@kyuh.ac.kr",
+  "office@the-ksri.org", // Ms. Lee, KSRI office
+];
+const VISA_NOTIFY_SALUTATION = "Sung Ki Lee and Ms. Lee";
 
 function formatVisaSubmittedAt(timestamp) {
   return (
@@ -2438,7 +2457,7 @@ function buildVisaReviewerNotificationHtml({
     <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
     <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">New visa support request</p>
   </div>
-  <p>Dear ${escapeHtml(VISA_NOTIFY_NAME)},</p>
+  <p>Dear ${escapeHtml(VISA_NOTIFY_SALUTATION)},</p>
   <p>A new visa support request has been submitted for the ISIR 2026 World Congress.</p>
   <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
     <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Request details</p>
@@ -2476,7 +2495,7 @@ async function sendVisaReviewerNotificationEmail(env, visaRequest) {
       },
       body: JSON.stringify({
         from: env.CONFIRMATION_FROM_EMAIL,
-        to: [VISA_NOTIFY_EMAIL],
+        to: VISA_NOTIFY_EMAILS,
         subject: `ISIR 2026 – Visa request from ${visaRequest.name} (${visaRequest.country})`,
         html,
       }),
@@ -2491,7 +2510,9 @@ async function sendVisaReviewerNotificationEmail(env, visaRequest) {
       };
     }
 
-    console.log(`Visa notification email sent to ${VISA_NOTIFY_EMAIL}`);
+    console.log(
+      `Visa notification email sent to ${VISA_NOTIFY_EMAILS.join(", ")}`,
+    );
     return { success: true };
   } catch (emailError) {
     console.error("Visa notification email error:", emailError);
@@ -2624,6 +2645,324 @@ async function handleVisaRequest(request, env, corsHeaders) {
         error: "Failed to submit visa request",
       }),
       { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+/** Congress on-site dates (Nov 5–8, 2026); arrival/departure must fall in this inclusive range. */
+const SPEAKER_HOTEL_STAY_MIN = "2026-11-05";
+const SPEAKER_HOTEL_STAY_MAX = "2026-11-08";
+
+function isValidSpeakerHotelIsoDate(iso) {
+  if (typeof iso !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(iso.trim())) {
+    return false;
+  }
+  const s = iso.trim();
+  return s >= SPEAKER_HOTEL_STAY_MIN && s <= SPEAKER_HOTEL_STAY_MAX;
+}
+
+async function handleSpeakerHotelCheckInvite(request, env, url, corsHeaders) {
+  try {
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+    const email = normalizeEmail(url.searchParams.get("email") || "");
+    if (!email) {
+      return jsonResponse({ success: false, error: "email is required" }, 400, corsHeaders);
+    }
+    const row = await env.ISIR_DB.prepare(
+      `SELECT email FROM speaker_invites WHERE email = ?`,
+    )
+      .bind(email)
+      .first();
+    return jsonResponse(
+      { success: true, invited: Boolean(row?.email) },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Speaker hotel check invite error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to check invite" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function sendSpeakerHotelConfirmationEmail(env, row) {
+  if (!env.RESEND_API_KEY || !env.CONFIRMATION_FROM_EMAIL) {
+    return;
+  }
+  const {
+    registrationId,
+    invitedSpeakerEmail,
+    contactEmail,
+    nationality,
+    guestCount,
+    arrivalDate,
+    departureDate,
+    phone,
+    addressPhysical,
+    submittedAt,
+  } = row;
+  const to = [contactEmail];
+  if (
+    invitedSpeakerEmail &&
+    invitedSpeakerEmail !== contactEmail &&
+    !to.includes(invitedSpeakerEmail)
+  ) {
+    to.push(invitedSpeakerEmail);
+  }
+  const addrShort =
+    addressPhysical.length > 500
+      ? `${escapeHtml(addressPhysical.slice(0, 500))}…`
+      : escapeHtml(addressPhysical);
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Hotel registration – ISIR 2026</title></head>
+<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
+  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
+    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Invited speaker hotel registration received</p>
+  </div>
+  <p>Thank you. We have recorded your hotel stay details for planning purposes.</p>
+  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Your submission</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+      <tr><td style="padding: 4px 0;">Reference</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(registrationId)}</strong></td></tr>
+      <tr><td style="padding: 4px 0;">Invitation email</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(invitedSpeakerEmail)}</td></tr>
+      <tr><td style="padding: 4px 0;">Contact email</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(contactEmail)}</td></tr>
+      <tr><td style="padding: 4px 0;">Nationality</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(nationality)}</td></tr>
+      <tr><td style="padding: 4px 0;">Guests</td><td style="padding: 4px 0; text-align: right;">${guestCount}</td></tr>
+      <tr><td style="padding: 4px 0;">Arrival</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(arrivalDate)}</td></tr>
+      <tr><td style="padding: 4px 0;">Departure</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(departureDate)}</td></tr>
+      <tr><td style="padding: 4px 0;">Phone</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(phone)}</td></tr>
+      <tr><td style="padding: 4px 0;">Submitted</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(submittedAt)}</td></tr>
+    </table>
+    <p style="margin: 12px 0 0 0; font-size: 0.9rem; color: #555;"><strong>Address on file</strong><br/>${addrShort}</p>
+  </div>
+  <p>To update your stay details, submit the form again with the same invitation email; your latest submission will replace the previous one.</p>
+  <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
+</body>
+</html>`;
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: env.CONFIRMATION_FROM_EMAIL,
+        to,
+        subject: "ISIR 2026 – Hotel registration received",
+        html,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      console.error("Speaker hotel confirmation email failed:", res.status, err);
+    } else {
+      console.log(`Speaker hotel confirmation email sent to ${to.join(", ")}`);
+    }
+  } catch (e) {
+    console.error("Speaker hotel confirmation email error:", e);
+  }
+}
+
+async function handleSpeakerHotelRegistration(request, env, corsHeaders) {
+  const maxLen = (s, n) => {
+    const t = String(s ?? "").trim();
+    if (t.length > n) return null;
+    return t;
+  };
+  try {
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+    const data = await request.json();
+    const invitedSpeakerEmail = normalizeEmail(
+      data?.invitedSpeakerEmail ?? data?.invited_speaker_email ?? "",
+    );
+    const nationality = maxLen(data?.nationality, 120);
+    const guestCountRaw = Number(data?.guestCount ?? data?.guest_count);
+    const guestCount =
+      Number.isFinite(guestCountRaw) &&
+      guestCountRaw >= 1 &&
+      guestCountRaw <= 50
+        ? Math.floor(guestCountRaw)
+        : null;
+    const addressPhysical = maxLen(data?.addressPhysical ?? data?.address_physical, 2000);
+    const contactEmail = normalizeEmail(data?.contactEmail ?? data?.contact_email ?? "");
+    const phone = maxLen(data?.phone, 80);
+    const arrivalDate = String(data?.arrivalDate ?? data?.arrival_date ?? "").trim();
+    const departureDate = String(
+      data?.departureDate ?? data?.departure_date ?? "",
+    ).trim();
+
+    if (!invitedSpeakerEmail) {
+      return jsonResponse(
+        { success: false, error: "Invited speaker email is required" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const inviteRow = await env.ISIR_DB.prepare(
+      `SELECT email FROM speaker_invites WHERE email = ?`,
+    )
+      .bind(invitedSpeakerEmail)
+      .first();
+    if (!inviteRow?.email) {
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "This email is not on the invited speaker list. Use the same email your invitation was sent to.",
+        },
+        403,
+        corsHeaders,
+      );
+    }
+
+    if (!nationality || !addressPhysical || !contactEmail || !phone) {
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "Nationality, physical address, contact email, and phone are required",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+    if (guestCount === null) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Number of guests must be between 1 and 50 (include yourself)",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+    if (!isValidSpeakerHotelIsoDate(arrivalDate)) {
+      return jsonResponse(
+        {
+          success: false,
+          error: `Arrival date must be between ${SPEAKER_HOTEL_STAY_MIN} and ${SPEAKER_HOTEL_STAY_MAX}`,
+        },
+        400,
+        corsHeaders,
+      );
+    }
+    if (!isValidSpeakerHotelIsoDate(departureDate)) {
+      return jsonResponse(
+        {
+          success: false,
+          error: `Departure date must be between ${SPEAKER_HOTEL_STAY_MIN} and ${SPEAKER_HOTEL_STAY_MAX}`,
+        },
+        400,
+        corsHeaders,
+      );
+    }
+    if (departureDate < arrivalDate) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Departure date must be on or after arrival date",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const id = crypto.randomUUID();
+    const now = Date.now();
+
+    await env.ISIR_DB.prepare(
+      `INSERT INTO speaker_hotel_registrations (
+        id, invited_speaker_email, nationality, guest_count, address_physical,
+        contact_email, phone, arrival_date, departure_date, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(invited_speaker_email) DO UPDATE SET
+        nationality = excluded.nationality,
+        guest_count = excluded.guest_count,
+        address_physical = excluded.address_physical,
+        contact_email = excluded.contact_email,
+        phone = excluded.phone,
+        arrival_date = excluded.arrival_date,
+        departure_date = excluded.departure_date,
+        updated_at = excluded.updated_at`,
+    )
+      .bind(
+        id,
+        invitedSpeakerEmail,
+        nationality,
+        guestCount,
+        addressPhysical,
+        contactEmail,
+        phone,
+        arrivalDate,
+        departureDate,
+        now,
+        now,
+      )
+      .run();
+
+    const savedRow = await env.ISIR_DB.prepare(
+      `SELECT id FROM speaker_hotel_registrations WHERE invited_speaker_email = ?`,
+    )
+      .bind(invitedSpeakerEmail)
+      .first();
+    const registrationId = String(savedRow?.id || id);
+    const submittedAt = new Date(now).toLocaleString("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+    const confirmationEmailSent = await sendSpeakerHotelConfirmationEmail(
+      env,
+      {
+        registrationId,
+        invitedSpeakerEmail,
+        contactEmail,
+        nationality,
+        guestCount,
+        arrivalDate,
+        departureDate,
+        phone,
+        addressPhysical,
+        submittedAt,
+      },
+    );
+
+    return jsonResponse(
+      {
+        success: true,
+        message: "Hotel registration saved",
+        id: registrationId,
+        confirmationEmailSent,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Speaker hotel registration error:", error);
+    return jsonResponse(
+      { success: false, error: "Failed to save hotel registration" },
+      500,
+      corsHeaders,
     );
   }
 }
@@ -4453,7 +4792,7 @@ async function handleResendVisaReviewerEmails(request, env, corsHeaders) {
         total: rows.length,
         sent,
         failed,
-        reviewerEmail: VISA_NOTIFY_EMAIL,
+        reviewerEmails: VISA_NOTIFY_EMAILS,
         results,
       },
       200,
