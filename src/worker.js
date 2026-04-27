@@ -295,6 +295,14 @@ async function handleApiRequest(request, env, url) {
     return handleGetVisaRequests(request, env, corsHeaders);
   }
 
+  // GET /api/admin/speaker-hotel-registrations
+  if (
+    url.pathname === "/api/admin/speaker-hotel-registrations" &&
+    request.method === "GET"
+  ) {
+    return handleGetSpeakerHotelRegistrations(request, env, corsHeaders);
+  }
+
   // POST /api/admin/visa-requests/resend-reviewer-email
   if (
     url.pathname === "/api/admin/visa-requests/resend-reviewer-email" &&
@@ -2694,14 +2702,14 @@ async function handleSpeakerHotelCheckInvite(request, env, url, corsHeaders) {
   }
 }
 
+/** @returns {Promise<boolean>} whether Resend accepted the message */
 async function sendSpeakerHotelConfirmationEmail(env, row) {
   if (!env.RESEND_API_KEY || !env.CONFIRMATION_FROM_EMAIL) {
-    return;
+    return false;
   }
   const {
     registrationId,
     invitedSpeakerEmail,
-    contactEmail,
     nationality,
     guestCount,
     arrivalDate,
@@ -2710,14 +2718,7 @@ async function sendSpeakerHotelConfirmationEmail(env, row) {
     addressPhysical,
     submittedAt,
   } = row;
-  const to = [contactEmail];
-  if (
-    invitedSpeakerEmail &&
-    invitedSpeakerEmail !== contactEmail &&
-    !to.includes(invitedSpeakerEmail)
-  ) {
-    to.push(invitedSpeakerEmail);
-  }
+  const to = [invitedSpeakerEmail];
   const addrShort =
     addressPhysical.length > 500
       ? `${escapeHtml(addressPhysical.slice(0, 500))}…`
@@ -2735,8 +2736,7 @@ async function sendSpeakerHotelConfirmationEmail(env, row) {
     <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Your submission</p>
     <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
       <tr><td style="padding: 4px 0;">Reference</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(registrationId)}</strong></td></tr>
-      <tr><td style="padding: 4px 0;">Invitation email</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(invitedSpeakerEmail)}</td></tr>
-      <tr><td style="padding: 4px 0;">Contact email</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(contactEmail)}</td></tr>
+      <tr><td style="padding: 4px 0;">Email</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(invitedSpeakerEmail)}</td></tr>
       <tr><td style="padding: 4px 0;">Nationality</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(nationality)}</td></tr>
       <tr><td style="padding: 4px 0;">Guests</td><td style="padding: 4px 0; text-align: right;">${guestCount}</td></tr>
       <tr><td style="padding: 4px 0;">Arrival</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(arrivalDate)}</td></tr>
@@ -2768,11 +2768,13 @@ async function sendSpeakerHotelConfirmationEmail(env, row) {
     if (!res.ok) {
       const err = await res.text().catch(() => "");
       console.error("Speaker hotel confirmation email failed:", res.status, err);
-    } else {
-      console.log(`Speaker hotel confirmation email sent to ${to.join(", ")}`);
+      return false;
     }
+    console.log(`Speaker hotel confirmation email sent to ${to.join(", ")}`);
+    return true;
   } catch (e) {
     console.error("Speaker hotel confirmation email error:", e);
+    return false;
   }
 }
 
@@ -2803,7 +2805,6 @@ async function handleSpeakerHotelRegistration(request, env, corsHeaders) {
         ? Math.floor(guestCountRaw)
         : null;
     const addressPhysical = maxLen(data?.addressPhysical ?? data?.address_physical, 2000);
-    const contactEmail = normalizeEmail(data?.contactEmail ?? data?.contact_email ?? "");
     const phone = maxLen(data?.phone, 80);
     const arrivalDate = String(data?.arrivalDate ?? data?.arrival_date ?? "").trim();
     const departureDate = String(
@@ -2835,17 +2836,18 @@ async function handleSpeakerHotelRegistration(request, env, corsHeaders) {
       );
     }
 
-    if (!nationality || !addressPhysical || !contactEmail || !phone) {
+    if (!nationality || !addressPhysical || !phone) {
       return jsonResponse(
         {
           success: false,
-          error:
-            "Nationality, physical address, contact email, and phone are required",
+          error: "Nationality, physical address, and phone are required",
         },
         400,
         corsHeaders,
       );
     }
+
+    const contactEmail = invitedSpeakerEmail;
     if (guestCount === null) {
       return jsonResponse(
         {
@@ -2936,7 +2938,6 @@ async function handleSpeakerHotelRegistration(request, env, corsHeaders) {
       {
         registrationId,
         invitedSpeakerEmail,
-        contactEmail,
         nationality,
         guestCount,
         arrivalDate,
@@ -4703,6 +4704,39 @@ async function handleGetVisaRequests(request, env, corsHeaders) {
         status: 500,
         headers: corsHeaders,
       },
+    );
+  }
+}
+
+// Admin endpoint: invited speaker hotel registrations
+async function handleGetSpeakerHotelRegistrations(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    const result = await env.ISIR_DB.prepare(
+      `SELECT * FROM speaker_hotel_registrations ORDER BY updated_at DESC LIMIT 500`,
+    ).all();
+
+    return jsonResponse(
+      { success: true, data: result.results || [] },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Get speaker hotel registrations error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Query failed" },
+      500,
+      corsHeaders,
     );
   }
 }

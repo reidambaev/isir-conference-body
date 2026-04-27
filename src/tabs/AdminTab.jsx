@@ -77,6 +77,9 @@ function getAbstractTypeLabel(abstract) {
 export default function AdminTab() {
   const [abstracts, setAbstracts] = useState([]);
   const [visaRequests, setVisaRequests] = useState([]);
+  const [speakerHotelRegistrations, setSpeakerHotelRegistrations] = useState(
+    [],
+  );
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState("abstracts");
@@ -404,6 +407,7 @@ export default function AdminTab() {
       const [
         abstractsRes,
         visaRes,
+        speakerHotelRes,
         registrationsRes,
         reviewersRes,
         reviewerAbstractScoresRes,
@@ -411,6 +415,9 @@ export default function AdminTab() {
       ] = await Promise.all([
         fetch("/api/admin/abstracts", { headers: authHeaders }),
         fetch("/api/admin/visa-requests", { headers: authHeaders }),
+        fetch("/api/admin/speaker-hotel-registrations", {
+          headers: authHeaders,
+        }),
         fetch("/api/registrations", { headers: authHeaders }),
         fetch("/api/admin/reviewers/overview", { headers: authHeaders }),
         fetch("/api/admin/reviewers/abstract-scores", { headers: authHeaders }),
@@ -437,6 +444,10 @@ export default function AdminTab() {
       await Promise.all([
         addFailure("GET /api/admin/abstracts", abstractsRes),
         addFailure("GET /api/admin/visa-requests", visaRes),
+        addFailure(
+          "GET /api/admin/speaker-hotel-registrations",
+          speakerHotelRes,
+        ),
         addFailure("GET /api/registrations", registrationsRes),
         addFailure("GET /api/admin/reviewers/overview", reviewersRes),
         addFailure(
@@ -454,6 +465,7 @@ export default function AdminTab() {
 
       const abstractsData = await abstractsRes.json();
       const visaData = await visaRes.json();
+      const speakerHotelData = await speakerHotelRes.json();
       const registrationsData = await registrationsRes.json();
       const reviewersData = await reviewersRes.json();
       const reviewerAbstractScoresData = await reviewerAbstractScoresRes.json();
@@ -461,6 +473,7 @@ export default function AdminTab() {
 
       setAbstracts(abstractsData.data || []);
       setVisaRequests(visaData.data || []);
+      setSpeakerHotelRegistrations(speakerHotelData.data || []);
       setRegistrations(registrationsData.data || []);
       setReviewerOverview(reviewersData || null);
       setReviewerAbstractScores(reviewerAbstractScoresData?.data || []);
@@ -1399,7 +1412,8 @@ export default function AdminTab() {
           Admin Dashboard
         </h1>
         <p className="mt-2 text-slate-300">
-          Manage submissions, reviewer scores, visa requests, and registrations
+          Manage submissions, reviewer scores, visa and speaker hotel requests,
+          and registrations
         </p>
         <div className="flex flex-wrap gap-3 mt-6">
           <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
@@ -1412,6 +1426,12 @@ export default function AdminTab() {
             <span className="text-slate-300 text-sm">Visa Requests</span>
             <span className="text-white font-bold ml-2">
               {visaRequests.length}
+            </span>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
+            <span className="text-slate-300 text-sm">Speaker hotel</span>
+            <span className="text-white font-bold ml-2">
+              {speakerHotelRegistrations.length}
             </span>
           </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
@@ -1454,6 +1474,16 @@ export default function AdminTab() {
           }`}
         >
           Visa Requests
+        </button>
+        <button
+          onClick={() => setActiveSection("speakerHotel")}
+          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+            activeSection === "speakerHotel"
+              ? "bg-cyan-600 text-white shadow-md"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Speaker hotel
         </button>
         <button
           onClick={() => setActiveSection("registrations")}
@@ -3190,6 +3220,98 @@ export default function AdminTab() {
         </div>
       )}
 
+      {/* Speaker hotel registrations */}
+      {activeSection === "speakerHotel" && (
+        <div className="space-y-4">
+          <h2 className="text-2xl font-semibold text-gray-800">
+            Invited speaker — hotel registrations
+          </h2>
+          <p className="text-sm text-gray-600 max-w-3xl">
+            Submissions from{" "}
+            <a
+              href="/speaker-hotel"
+              className="text-cyan-700 font-medium hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              /speaker-hotel
+            </a>
+            . One row per invitation email (latest update wins).
+          </p>
+          {speakerHotelRegistrations.length === 0 ? (
+            <p className="text-gray-500">No speaker hotel registrations yet.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Invitation email
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Nationality
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Guests
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Arrival
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Departure
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Phone
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Address
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Updated
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {speakerHotelRegistrations.map((row) => (
+                    <tr key={row.id} className="align-top">
+                      <td className="px-4 py-3 text-sm text-gray-900 max-w-[10rem] break-all">
+                        {row.invited_speaker_email}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                        {row.nationality}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                        {row.guest_count}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                        {row.arrival_date}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                        {row.departure_date}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                        {row.phone}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 max-w-xs">
+                        <span
+                          className="line-clamp-3"
+                          title={row.address_physical}
+                        >
+                          {row.address_physical}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
+                        {formatDate(row.updated_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Registrations Section */}
       {activeSection === "registrations" && (
         <div className="space-y-4">
@@ -3742,6 +3864,10 @@ export default function AdminTab() {
                 </span>
                 <span className="block">
                   Visa requests: <strong>{visaRequests.length}</strong>
+                </span>
+                <span className="block">
+                  Speaker hotel forms:{" "}
+                  <strong>{speakerHotelRegistrations.length}</strong>
                 </span>
                 <span className="block">
                   Invited speaker registrations:{" "}

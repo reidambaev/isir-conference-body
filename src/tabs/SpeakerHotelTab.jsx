@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import { CountrySelect } from "react-country-state-city";
 import "react-country-state-city/dist/react-country-state-city.css";
 import {
@@ -23,8 +25,8 @@ export default function SpeakerHotelTab() {
   const [nationalityCountry, setNationalityCountry] = useState(null);
   const [guestCount, setGuestCount] = useState(1);
   const [addressPhysical, setAddressPhysical] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  /** E.164 string or undefined (same pattern as RegistrationForm office/cell phone) */
+  const [phone, setPhone] = useState(undefined);
   /** Longest allowed stay within congress dates (Nov 5–8, 2026) */
   const [arrivalDate, setArrivalDate] = useState(
     CONFERENCE_HOTEL_STAY_DATE_MIN,
@@ -77,7 +79,6 @@ export default function SpeakerHotelTab() {
       }
       setVerifiedEmail(email);
       setDevPreviewBypass(false);
-      setContactEmail((prev) => (prev.trim() ? prev : email));
     } catch (err) {
       setVerifyError(
         err?.message ||
@@ -95,7 +96,6 @@ export default function SpeakerHotelTab() {
     const email =
       normalizeClientEmail(inviteEmail) || "preview-local@dev.invalid";
     setVerifiedEmail(email);
-    setContactEmail((prev) => (prev.trim() ? prev : email));
   };
 
   const onSubmit = async (e) => {
@@ -112,12 +112,8 @@ export default function SpeakerHotelTab() {
       );
       return;
     }
-    const cEmail = normalizeClientEmail(contactEmail);
-    if (!cEmail) {
-      setSubmitError("Contact email is required.");
-      return;
-    }
-    if (!phone.trim()) {
+    const phoneStr = String(phone || "").trim();
+    if (!phoneStr) {
       setSubmitError("Phone number is required.");
       return;
     }
@@ -155,8 +151,7 @@ export default function SpeakerHotelTab() {
           nationality: nationalityName,
           guestCount,
           addressPhysical: addressPhysical.trim(),
-          contactEmail: cEmail,
-          phone: phone.trim(),
+          phone: phoneStr,
           arrivalDate,
           departureDate,
         }),
@@ -167,15 +162,7 @@ export default function SpeakerHotelTab() {
           data.error || "Submission failed. Please check your details.",
         );
       }
-      const confirmTargets = [cEmail];
-      if (
-        verifiedEmail &&
-        verifiedEmail !== cEmail &&
-        !confirmTargets.includes(verifiedEmail)
-      ) {
-        confirmTargets.push(verifiedEmail);
-      }
-      setConfirmationEmails(confirmTargets);
+      setConfirmationEmails([verifiedEmail]);
       setConfirmationEmailSent(Boolean(data.confirmationEmailSent));
       setSubmitted(true);
     } catch (err) {
@@ -342,6 +329,7 @@ export default function SpeakerHotelTab() {
                 setDevPreviewBypass(false);
                 setSubmitError(null);
                 setNationalityCountry(null);
+                setPhone(undefined);
                 setArrivalDate(CONFERENCE_HOTEL_STAY_DATE_MIN);
                 setDepartureDate(CONFERENCE_HOTEL_STAY_DATE_MAX);
               }}
@@ -399,33 +387,17 @@ export default function SpeakerHotelTab() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Contact email <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="email"
-                autoComplete="email"
-                value={contactEmail}
-                onChange={(e) => setContactEmail(e.target.value)}
-                className="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Phone number <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="tel"
-                autoComplete="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                required
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Phone number <span className="text-red-500">*</span>
+            </label>
+            <PhoneInput
+              international
+              defaultCountry="US"
+              value={phone}
+              onChange={setPhone}
+              className="phone-input-custom border-2 border-gray-200 rounded-xl bg-white focus-within:border-blue-500"
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
