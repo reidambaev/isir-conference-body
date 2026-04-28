@@ -36,6 +36,7 @@ CREATE TABLE
         lunch_days TEXT,
         dinner_days TEXT,
         breakfast_days TEXT,
+        day_pass_days TEXT,
         opening_reception_attending INTEGER DEFAULT 0,
         ticket_price INTEGER NOT NULL,
         total_price INTEGER NOT NULL,

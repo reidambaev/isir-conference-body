@@ -16,20 +16,19 @@ import {
 } from "@stripe/react-stripe-js";
 import {
   CONGRESS_WEEKEND_MEALS,
+  DAY_PASS_GALA_DAY,
+  DAY_PASS_OPENING_RECEPTION_DAY,
   formatCongressMealDayList,
   ISIR_API_CONFIG,
   isPreviewMode,
+  isSouthKoreaResidenceCountry,
   PREVIEW_KEY,
   PREVIEW_REGISTRATION_TEST_USD,
 } from "../config/constants";
 import {
-  isKorea,
   getCurrency,
   getFinalPrice,
   formatCurrency,
-  getCurrencySymbol,
-  applyKoreanTax,
-  usdToKrw,
 } from "../utils/currency";
 import PaymentForm from "../components/PaymentForm";
 import { pdf } from "@react-pdf/renderer";
@@ -297,6 +296,11 @@ const RegistrationForm = ({ onClose }) => {
         Sunday: false,
       },
     },
+    dayPassDays: {
+      Friday: false,
+      Saturday: false,
+      Sunday: false,
+    },
     openingReceptionAttending: false,
     galaDinnerAttending: false,
     specialAssistance: false,
@@ -390,6 +394,28 @@ const RegistrationForm = ({ onClose }) => {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
+    if (name.startsWith("dayPass_")) {
+      const day = name.replace("dayPass_", "");
+      setFormData((prev) => {
+        const nextDayPass = { ...prev.dayPassDays, [day]: checked };
+        const upd = { ...prev, dayPassDays: nextDayPass };
+        if (!checked) {
+          upd.mealAttendance = {
+            ...prev.mealAttendance,
+            lunch: { ...prev.mealAttendance.lunch, [day]: false },
+            breakfast: { ...prev.mealAttendance.breakfast, [day]: false },
+          };
+        }
+        if (day === DAY_PASS_OPENING_RECEPTION_DAY && !checked) {
+          upd.openingReceptionAttending = false;
+        }
+        if (day === DAY_PASS_GALA_DAY && !checked) {
+          upd.galaDinnerAttending = false;
+        }
+        return upd;
+      });
+      return;
+    }
     if (name.startsWith("dietary_")) {
       const key = name.split("_")[1];
       setFormData((prev) => ({
@@ -398,6 +424,12 @@ const RegistrationForm = ({ onClose }) => {
       }));
     } else if (name.startsWith("meal_")) {
       const [, mealType, day] = name.split("_");
+      if (
+        formData.ticketType === "korea-day-pass" &&
+        !formData.dayPassDays[day]
+      ) {
+        return;
+      }
       setFormData((prev) => ({
         ...prev,
         mealAttendance: {
@@ -407,6 +439,17 @@ const RegistrationForm = ({ onClose }) => {
             [day]: checked,
           },
         },
+      }));
+    } else if (name === "ticketType") {
+      setFormData((prev) => ({
+        ...prev,
+        ticketType: value,
+        accompanyingPersonCount:
+          value === "korea-day-pass" ? 0 : prev.accompanyingPersonCount,
+        dayPassDays:
+          value === "korea-day-pass"
+            ? prev.dayPassDays
+            : { Friday: false, Saturday: false, Sunday: false },
       }));
     } else if (type === "checkbox") {
       setFormData((prev) => ({ ...prev, [name]: checked }));
@@ -536,6 +579,16 @@ const RegistrationForm = ({ onClose }) => {
       return;
     }
 
+    if (formData.ticketType === "korea-day-pass") {
+      const dayCount = CONGRESS_WEEKEND_MEALS.filter(
+        ({ key }) => formData.dayPassDays[key],
+      ).length;
+      if (dayCount === 0) {
+        alert("Select at least one congress day for your day pass.");
+        return;
+      }
+    }
+
     // Validate that the selected ticket is allowed for this user
     const memberTicketIds = ["isir-member", "trainee-member"];
     if (!isVerifiedMember && memberTicketIds.includes(formData.ticketType)) {
@@ -609,6 +662,21 @@ const RegistrationForm = ({ onClose }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (formData.ticketType === "korea-day-pass") {
+      if (!isSouthKoreaResidenceCountry(formData.country)) {
+        alert(
+          "Daypass (Korean citizens only) requires Country: South Korea. Please update your country or choose another ticket.",
+        );
+        return;
+      }
+      const dayCount = CONGRESS_WEEKEND_MEALS.filter(
+        ({ key }) => formData.dayPassDays[key],
+      ).length;
+      if (dayCount === 0) {
+        alert("Select at least one congress day for your day pass.");
+        return;
+      }
+    }
     if (!formData.officePhone && !formData.cellPhone) {
       alert("Please provide at least one phone number (office or cell).");
       return;
@@ -879,7 +947,7 @@ const RegistrationForm = ({ onClose }) => {
           galaPrice={null}
           totalLabel="Total Amount Paid"
           totalAmount={formatCurrency(getTotalPrice(), currency)}
-          taxNote={isKoreanCustomer ? "* Includes 10% Korean tax" : null}
+          taxNote={null}
           lunchAttendanceLabel={
             lunchDisplay
           }
@@ -927,15 +995,18 @@ const RegistrationForm = ({ onClose }) => {
       label: "Trainee / Student Non-Member",
     },
     "invited-speaker": { early: 0, standard: 0, label: "Invited Speaker" },
+    "korea-day-pass": {
+      early: 150,
+      standard: 200,
+      label: "Daypass (Korean citizens only)",
+    },
   };
   const isInvitedSpeakerMode =
     formData.ticketType === "invited-speaker" ||
     speakerInvite.status === "valid" ||
     speakerEligible.status === "eligible";
 
-  // Get currency based on country
-  const currency = getCurrency(formData.country);
-  const isKoreanCustomer = isKorea(formData.country);
+  const currency = getCurrency();
 
   /** Matches server: flat test charge when URL has ?preview=PREVIEW_KEY */
   const isPreviewRegistrationTest = isPreviewMode();
@@ -1004,6 +1075,19 @@ const RegistrationForm = ({ onClose }) => {
     if (!type) return 0;
     if (type === "invited-speaker") return 0;
 
+    if (type === "korea-day-pass") {
+      const n = CONGRESS_WEEKEND_MEALS.filter(
+        ({ key }) => formData.dayPassDays[key],
+      ).length;
+      if (n === 0) return 0;
+      const perDay = isEarlyBirdPeriod
+        ? ticketPrices["korea-day-pass"].early
+        : ticketPrices["korea-day-pass"].standard;
+      const subtotal = n * perDay;
+      if (inBaseCurrency) return subtotal;
+      return getFinalPrice(subtotal);
+    }
+
     // Try to get price from API data first
     if (membershipData?.ticket_options?.available_tickets) {
       const ticket = membershipData.ticket_options.available_tickets.find(
@@ -1012,7 +1096,7 @@ const RegistrationForm = ({ onClose }) => {
       if (ticket && ticket.current_price !== undefined) {
         const basePrice = ticket.current_price;
         if (inBaseCurrency) return basePrice;
-        return getFinalPrice(basePrice, formData.country);
+        return getFinalPrice(basePrice);
       }
     }
 
@@ -1023,7 +1107,7 @@ const RegistrationForm = ({ onClose }) => {
       : ticketPrices[type].standard;
 
     if (inBaseCurrency) return basePrice;
-    return getFinalPrice(basePrice, formData.country);
+    return getFinalPrice(basePrice);
   };
 
   const getAccompanyingPrice = (inBaseCurrency = false) => {
@@ -1036,24 +1120,24 @@ const RegistrationForm = ({ onClose }) => {
           ? membershipData.ticket_options.accompanying.early_price
           : membershipData.ticket_options.accompanying.standard_price);
       if (inBaseCurrency) return basePrice;
-      return getFinalPrice(basePrice, formData.country);
+      return getFinalPrice(basePrice);
     }
 
     // Fallback to hardcoded prices
     const basePrice = isEarlyBirdPeriod ? 250 : 350;
     if (inBaseCurrency) return basePrice;
-    return getFinalPrice(basePrice, formData.country);
+    return getFinalPrice(basePrice);
   };
 
   const getTotalPrice = (inBaseCurrency = false) => {
     if (isPreviewRegistrationTest) {
       if (inBaseCurrency) return PREVIEW_REGISTRATION_TEST_USD;
-      return getFinalPrice(PREVIEW_REGISTRATION_TEST_USD, formData.country);
+      return getFinalPrice(PREVIEW_REGISTRATION_TEST_USD);
     }
     // Mirror the server's flat discount pricing so checkout totals are not alarming.
     if (hasValidDiscountCode) {
       if (inBaseCurrency) return verifiedDiscountTotalUsd;
-      return getFinalPrice(verifiedDiscountTotalUsd, formData.country);
+      return getFinalPrice(verifiedDiscountTotalUsd);
     }
     const ticketPrice = getTicketPrice(formData.ticketType, inBaseCurrency);
     const accompanyingPrice =
@@ -1061,11 +1145,10 @@ const RegistrationForm = ({ onClose }) => {
     return ticketPrice + accompanyingPrice;
   };
 
-  // Get price for Stripe (in smallest currency unit)
+  // Get price for Stripe (USD cents)
   const getStripeAmount = () => {
     const total = getTotalPrice();
-    // Stripe amounts are in smallest currency unit (cents for USD, won for KRW)
-    return currency === "KRW" ? total : Math.round(total * 100);
+    return Math.round(total * 100);
   };
 
   return (
@@ -1147,10 +1230,9 @@ const RegistrationForm = ({ onClose }) => {
             ) : (
               <>
                 checkout uses a test charge of{" "}
-                {formatCurrency(PREVIEW_REGISTRATION_TEST_USD, "USD")} (Korean
-                addresses use the usual KRW conversion + tax on that base).
-                Ticket lines elsewhere may still show list prices; Stripe will
-                only charge the test total.
+                {formatCurrency(PREVIEW_REGISTRATION_TEST_USD, "USD")}. Ticket
+                lines elsewhere may still show list prices; Stripe will only
+                charge the test total.
               </>
             )}
           </div>
@@ -1517,35 +1599,50 @@ const RegistrationForm = ({ onClose }) => {
                             className="text-xl font-bold"
                             style={{ color: "var(--color-primary)" }}
                           >
-                            {formatCurrency(0, getCurrency(formData.country))}
+                            {formatCurrency(0, getCurrency())}
                           </span>
                         </div>
                         <div className="p-5 text-center flex items-center justify-center">
                           <span className="text-xl font-bold text-gray-500">
-                            {formatCurrency(0, getCurrency(formData.country))}
+                            {formatCurrency(0, getCurrency())}
                           </span>
                         </div>
                       </div>
                     ) : membershipData?.ticket_options?.available_tickets ? (
-                      // Use ticket options from API
-                      membershipData.ticket_options.available_tickets
-                        .filter((ticket) => {
-                          // Only trainees should see trainee-member tickets
-                          if (ticket.id === "trainee-member" && !isTrainee) {
-                            return false;
-                          }
-                          // For verified members, hide non‑member / trainee‑non‑member rows
-                          if (
-                            isVerifiedMember &&
-                            (ticket.id === "non-member" ||
-                              ticket.id === "trainee-non-member")
-                          ) {
-                            return false;
-                          }
-                          // Otherwise keep; we'll disable radios as needed below.
-                          return true;
-                        })
-                        .map((ticket, index) => {
+                      (() => {
+                        const filteredApiTickets =
+                          membershipData.ticket_options.available_tickets.filter(
+                            (ticket) => {
+                              if (ticket.id === "trainee-member" && !isTrainee) {
+                                return false;
+                              }
+                              if (
+                                isVerifiedMember &&
+                                (ticket.id === "non-member" ||
+                                  ticket.id === "trainee-non-member")
+                              ) {
+                                return false;
+                              }
+                              return true;
+                            },
+                          );
+                        const apiTicketsWithDayPass = filteredApiTickets.some(
+                          (t) => t.id === "korea-day-pass",
+                        )
+                          ? filteredApiTickets
+                          : [
+                              ...filteredApiTickets,
+                              {
+                                id: "korea-day-pass",
+                                label: "Daypass (Korean citizens only)",
+                                requires_membership: false,
+                                available: true,
+                                current_price: 150,
+                                early_price: 150,
+                                standard_price: 200,
+                              },
+                            ];
+                        return apiTicketsWithDayPass.map((ticket, index) => {
                           const verifiedMember = isVerifiedMember;
                           const requiresMembership =
                             ticket.requires_membership === true;
@@ -1567,19 +1664,25 @@ const RegistrationForm = ({ onClose }) => {
                                   ? "bg-blue-100 ring-2 ring-blue-500 ring-inset"
                                   : ""
                               } ${
-                                index !==
-                                membershipData.ticket_options.available_tickets
-                                  .length -
-                                  1
+                                index !== apiTicketsWithDayPass.length - 1
                                   ? "border-b border-gray-200"
                                   : ""
                               }`}
                               onClick={() => {
                                 if (!isAvailable) return;
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  ticketType: ticket.id,
-                                }));
+                                setFormData((prev) => {
+                                  const next = { ...prev, ticketType: ticket.id };
+                                  if (ticket.id === "korea-day-pass") {
+                                    next.accompanyingPersonCount = 0;
+                                  } else {
+                                    next.dayPassDays = {
+                                      Friday: false,
+                                      Saturday: false,
+                                      Sunday: false,
+                                    };
+                                  }
+                                  return next;
+                                });
                               }}
                             >
                               <div className="p-5 flex items-center gap-3">
@@ -1592,16 +1695,34 @@ const RegistrationForm = ({ onClose }) => {
                                   disabled={!isAvailable}
                                   className="w-5 h-5 text-blue-600 disabled:cursor-not-allowed"
                                 />
-                                <div className="flex-1">
-                                  <span
-                                    className={`font-semibold ${
-                                      isAvailable
-                                        ? "text-gray-800"
-                                        : "text-gray-500"
-                                    }`}
-                                  >
-                                    {ticket.label}
-                                  </span>
+                                <div className="flex-1 min-w-0">
+                                  {ticket.id === "korea-day-pass" ? (
+                                    <span
+                                      className={`block leading-snug ${
+                                        isAvailable
+                                          ? "text-gray-800"
+                                          : "text-gray-500"
+                                      }`}
+                                    >
+                                      <span className="text-lg font-bold">
+                                        Daypass
+                                      </span>
+                                      <span className="text-sm font-medium">
+                                        {" "}
+                                        (Korean citizens only)
+                                      </span>
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className={`font-semibold ${
+                                        isAvailable
+                                          ? "text-gray-800"
+                                          : "text-gray-500"
+                                      }`}
+                                    >
+                                      {ticket.label}
+                                    </span>
+                                  )}
                                   {!isAvailable && (
                                     <div className="mt-1 text-xs text-amber-600">
                                       <p>
@@ -1638,9 +1759,8 @@ const RegistrationForm = ({ onClose }) => {
                                     getFinalPrice(
                                       ticket.current_price ||
                                         ticket.early_price,
-                                      formData.country,
                                     ),
-                                    getCurrency(formData.country),
+                                    getCurrency(),
                                   )}
                                 </span>
                               </div>
@@ -1653,17 +1773,15 @@ const RegistrationForm = ({ onClose }) => {
                                   }`}
                                 >
                                   {formatCurrency(
-                                    getFinalPrice(
-                                      ticket.standard_price,
-                                      formData.country,
-                                    ),
-                                    getCurrency(formData.country),
+                                    getFinalPrice(ticket.standard_price),
+                                    getCurrency(),
                                   )}
                                 </span>
                               </div>
                             </div>
                           );
-                        })
+                        });
+                      })()
                     ) : (
                       // Fallback to hardcoded prices if API data not available
                       Object.entries(ticketPrices)
@@ -1705,15 +1823,33 @@ const RegistrationForm = ({ onClose }) => {
                                         disabled={!isAvailable}
                                         className="w-5 h-5 text-blue-600 disabled:cursor-not-allowed"
                                       />
-                                      <span
-                                        className={`font-semibold ${
-                                          isAvailable
-                                            ? "text-gray-800"
-                                            : "text-gray-500"
-                                        }`}
-                                      >
-                                        {label}
-                                      </span>
+                                      {value === "korea-day-pass" ? (
+                                        <span
+                                          className={`${
+                                            isAvailable
+                                              ? "text-gray-800"
+                                              : "text-gray-500"
+                                          }`}
+                                        >
+                                          <span className="text-lg font-bold">
+                                            Daypass
+                                          </span>
+                                          <span className="text-sm font-medium">
+                                            {" "}
+                                            (Korean citizens only)
+                                          </span>
+                                        </span>
+                                      ) : (
+                                        <span
+                                          className={`font-semibold ${
+                                            isAvailable
+                                              ? "text-gray-800"
+                                              : "text-gray-500"
+                                          }`}
+                                        >
+                                          {label}
+                                        </span>
+                                      )}
                                       {!isAvailable && (
                                         <span className="ml-2 text-xs text-amber-600">
                                           ISIR membership required.{" "}
@@ -1737,16 +1873,16 @@ const RegistrationForm = ({ onClose }) => {
                                   style={{ color: "var(--color-primary)" }}
                                 >
                                   {formatCurrency(
-                                    getFinalPrice(early, formData.country),
-                                    getCurrency(formData.country),
+                                    getFinalPrice(early),
+                                    getCurrency(),
                                   )}
                                 </span>
                               </div>
                               <div className="p-5 text-center flex items-center justify-center">
                                 <span className="text-xl font-bold text-gray-500">
                                   {formatCurrency(
-                                    getFinalPrice(standard, formData.country),
-                                    getCurrency(formData.country),
+                                    getFinalPrice(standard),
+                                    getCurrency(),
                                   )}
                                 </span>
                               </div>
@@ -1755,12 +1891,54 @@ const RegistrationForm = ({ onClose }) => {
                         )
                     )}
                   </div>
+                  {formData.ticketType === "korea-day-pass" && (
+                    <div className="mt-6 p-5 rounded-xl border-2 border-purple-200 bg-purple-50/80">
+                      <p className="text-sm font-semibold text-gray-800 mb-2">
+                        <span className="text-base font-bold">Daypass</span> —
+                        select your congress days
+                      </p>
+                      <p className="text-xs text-gray-600 mb-4">
+                        Price is per day (early / standard as shown above).{" "}
+                        <strong className="font-semibold">
+                          Korean citizens only
+                        </strong>
+                        — set Country to South Korea on the details step. Opening
+                        reception if you attend Friday; gala dinner if you attend
+                        Saturday.
+                      </p>
+                      <div className="space-y-2">
+                        {CONGRESS_WEEKEND_MEALS.map(({ key, date }) => (
+                          <label
+                            key={`daypass-step2-${key}`}
+                            className="flex items-center gap-2"
+                          >
+                            <input
+                              type="checkbox"
+                              name={`dayPass_${key}`}
+                              checked={formData.dayPassDays[key]}
+                              onChange={handleChange}
+                              className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            />
+                            <span className="text-sm text-gray-800">
+                              {key}{" "}
+                              <span className="text-gray-500">({date})</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <p className="text-xs text-gray-500 mt-3 italic">
                     *Trainee/Student rate requires proof of status.
+                    <br />
+                    <span className="font-semibold">†</span>{" "}
+                    <span className="font-bold">Daypass</span> (Korean citizens
+                    only): per selected day; South Korea required as country.
                   </p>
                 </div>
 
                 {/* Accompanying Person Tickets */}
+                {formData.ticketType !== "korea-day-pass" && (
                 <div className="border-t-2 border-gray-100 pt-8">
                   <FormLabel className="!text-base mb-3">
                     Accompanying Person Tickets
@@ -1780,7 +1958,7 @@ const RegistrationForm = ({ onClose }) => {
                         <p className="text-sm text-gray-600">
                           {formatCurrency(
                             getAccompanyingPrice(),
-                            getCurrency(formData.country),
+                            getCurrency(),
                           )}{" "}
                           each (
                           {(membershipData?.ticket_options?.is_early_bird ??
@@ -1831,6 +2009,7 @@ const RegistrationForm = ({ onClose }) => {
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Total Summary */}
                 <div
@@ -1845,15 +2024,10 @@ const RegistrationForm = ({ onClose }) => {
                     <span className="text-4xl font-bold">
                       {formatCurrency(
                         getTotalPrice(),
-                        getCurrency(formData.country),
+                        getCurrency(),
                       )}
                     </span>
                   </div>
-                  {isKorea(formData.country) && (
-                    <p className="text-sm text-blue-100 mt-2 italic">
-                      * Includes 10% Korean tax
-                    </p>
-                  )}
                 </div>
 
                 <div className="flex justify-between pt-4">
@@ -2132,15 +2306,28 @@ const RegistrationForm = ({ onClose }) => {
                     <CountrySelect
                       onChange={(e) => {
                         setCountryid(e.id);
-                        setFormData((prev) => ({ ...prev, country: e }));
-                        // Reset state and city when country changes
                         setStateid(0);
                         setCityid(0);
-                        setFormData((prev) => ({
-                          ...prev,
-                          state: null,
-                          city: "",
-                        }));
+                        setFormData((prev) => {
+                          const next = {
+                            ...prev,
+                            country: e,
+                            state: null,
+                            city: "",
+                          };
+                          if (
+                            prev.ticketType === "korea-day-pass" &&
+                            !isSouthKoreaResidenceCountry(e)
+                          ) {
+                            next.ticketType = "";
+                            next.dayPassDays = {
+                              Friday: false,
+                              Saturday: false,
+                              Sunday: false,
+                            };
+                          }
+                          return next;
+                        });
                       }}
                       placeHolder="Select Country"
                       defaultValue={formData.country}
@@ -2245,9 +2432,16 @@ const RegistrationForm = ({ onClose }) => {
                     Meal Attendance
                   </h5>
                   <p className="text-sm text-gray-600 mb-5">
-                    Indicate welcome events and which days you will attend lunch and
-                    breakfast (Friday–Sunday, Nov 6–8, 2026).
+                    {formData.ticketType === "korea-day-pass"
+                      ? `Daypass (Korean citizens only) — you are attending: ${formatCongressMealDayList(
+                          CONGRESS_WEEKEND_MEALS.filter(
+                            ({ key }) => formData.dayPassDays[key],
+                          ).map(({ key }) => key),
+                        )}. Choose breakfast and lunch for those days only. Opening reception applies to Friday; gala dinner to Saturday.`
+                      : "Indicate welcome events and which days you will attend lunch and breakfast (Friday–Sunday, Nov 6–8, 2026)."}
                   </p>
+                  {(formData.ticketType !== "korea-day-pass" ||
+                    formData.dayPassDays[DAY_PASS_OPENING_RECEPTION_DAY]) && (
                   <div className="mb-5">
                     <p className="text-sm font-semibold text-gray-700 mb-2">
                       Opening / Welcome Reception
@@ -2267,22 +2461,28 @@ const RegistrationForm = ({ onClose }) => {
                       <option value="yes">Yes, I will attend</option>
                     </select>
                   </div>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
                       <p className="text-sm font-semibold text-gray-700 mb-3">
                         Breakfast
                       </p>
                       <div className="space-y-2">
-                        {CONGRESS_WEEKEND_MEALS.map(({ key, date }) => (
+                        {CONGRESS_WEEKEND_MEALS.map(({ key, date }) => {
+                          const dayAllowed =
+                            formData.ticketType !== "korea-day-pass" ||
+                            formData.dayPassDays[key];
+                          return (
                           <label
                             key={`breakfast-${key}`}
-                            className="flex items-center gap-2"
+                            className={`flex items-center gap-2 ${!dayAllowed ? "opacity-40 pointer-events-none" : ""}`}
                           >
                             <input
                               type="checkbox"
                               name={`meal_breakfast_${key}`}
                               checked={formData.mealAttendance.breakfast[key]}
                               onChange={handleChange}
+                              disabled={!dayAllowed}
                               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                             <span className="text-sm text-gray-700">
@@ -2290,7 +2490,8 @@ const RegistrationForm = ({ onClose }) => {
                               <span className="text-gray-500">({date})</span>
                             </span>
                           </label>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                     <div>
@@ -2298,16 +2499,21 @@ const RegistrationForm = ({ onClose }) => {
                         Lunch
                       </p>
                       <div className="space-y-2">
-                        {CONGRESS_WEEKEND_MEALS.map(({ key, date }) => (
+                        {CONGRESS_WEEKEND_MEALS.map(({ key, date }) => {
+                          const dayAllowed =
+                            formData.ticketType !== "korea-day-pass" ||
+                            formData.dayPassDays[key];
+                          return (
                           <label
                             key={`lunch-${key}`}
-                            className="flex items-center gap-2"
+                            className={`flex items-center gap-2 ${!dayAllowed ? "opacity-40 pointer-events-none" : ""}`}
                           >
                             <input
                               type="checkbox"
                               name={`meal_lunch_${key}`}
                               checked={formData.mealAttendance.lunch[key]}
                               onChange={handleChange}
+                              disabled={!dayAllowed}
                               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                             <span className="text-sm text-gray-700">
@@ -2315,10 +2521,13 @@ const RegistrationForm = ({ onClose }) => {
                               <span className="text-gray-500">({date})</span>
                             </span>
                           </label>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
+                  {(formData.ticketType !== "korea-day-pass" ||
+                    formData.dayPassDays[DAY_PASS_GALA_DAY]) && (
                   <div className="mt-5">
                     <p className="text-sm font-semibold text-gray-700 mb-2">
                       Gala Dinner
@@ -2338,6 +2547,7 @@ const RegistrationForm = ({ onClose }) => {
                       <option value="yes">Yes, I will attend</option>
                     </select>
                   </div>
+                  )}
                 </div>
 
                 <div className="bg-gradient-to-br from-indigo-50 to-white rounded-xl p-6 border-2 border-indigo-200 mt-8">
@@ -2446,11 +2656,6 @@ const RegistrationForm = ({ onClose }) => {
                           ? "Preview registration: no charge (not your selected list prices)."
                           : "Preview test charge (flat amount — not your selected list prices):"}
                       </p>
-                      {PREVIEW_REGISTRATION_TEST_USD > 0 && isKoreanCustomer && (
-                        <p className="text-xs text-gray-500 italic mb-3">
-                          * Includes 10% Korean tax on the converted test base
-                        </p>
-                      )}
                     </div>
                   ) : (
                     <>
@@ -2509,11 +2714,6 @@ const RegistrationForm = ({ onClose }) => {
                               currency,
                             )}
                           </span>
-                        </div>
-                      )}
-                      {isKoreanCustomer && (
-                        <div className="text-xs text-gray-500 italic pt-2">
-                          * Prices include 10% Korean tax
                         </div>
                       )}
                     </>
@@ -2728,11 +2928,6 @@ const RegistrationForm = ({ onClose }) => {
                         {formatCurrency(getTotalPrice(), currency)}
                       </span>
                     </div>
-                    {isKoreanCustomer && (
-                      <p className="text-xs text-gray-500 italic mt-2">
-                        * Includes 10% Korean tax
-                      </p>
-                    )}
                   </div>
 
                   <div className="border-t border-gray-200 pt-4">

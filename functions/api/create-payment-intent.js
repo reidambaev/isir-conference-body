@@ -47,7 +47,7 @@ export async function onRequestPost(context) {
 
     // Create payment intent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount), // Amount in smallest currency unit (cents for USD, won for KRW)
+      amount: Math.round(amount), // Amount in USD cents
       currency: currency.toLowerCase(),
       metadata: {
         registrationId: registrationId,

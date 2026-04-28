@@ -250,8 +250,7 @@ const RegistrationTab = () => {
           <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
             <p className="text-sm text-gray-600">
               <span className="font-semibold">Note:</span> All fees are charged
-              per participant, in US Dollars ($) for non-Koreans and Korean Won
-              (₩) for Koreans, and include 10% Korean Tax.
+              per participant in US Dollars ($).
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -292,12 +291,19 @@ const RegistrationTab = () => {
               <p className="text-xs text-gray-500">Early Bird / Standard</p>
             </div>
 
-            {/* Visitor */}
+            {/* Daypass */}
             <div className="bg-gradient-to-br from-purple-50 to-white rounded-xl p-5 border-2 border-purple-200 hover:border-purple-400 hover:shadow-md transition-all">
-              <div className="flex items-center justify-between mb-3">
-                <h5 className="font-bold text-gray-900">Visitor</h5>
-                <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">
-                  Day Pass
+              <div className="flex items-center justify-between mb-3 gap-2">
+                <h5 className="font-bold text-gray-900 leading-tight">
+                  <span className="text-xl sm:text-2xl font-extrabold tracking-tight">
+                    Daypass
+                  </span>
+                  <span className="block text-xs sm:text-sm font-semibold text-purple-900 mt-1">
+                    (Korean citizens only)
+                  </span>
+                </h5>
+                <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full shrink-0">
+                  Per day
                 </span>
               </div>
               <div className="flex items-baseline gap-2 mb-2">
@@ -310,7 +316,8 @@ const RegistrationTab = () => {
                 <span className="text-sm text-gray-500 line-through">$200</span>
               </div>
               <p className="text-xs text-gray-500">
-                Early Bird / Standard (per day)
+                Early Bird / Standard (per selected day; register for days &
+                meals)
               </p>
             </div>
 

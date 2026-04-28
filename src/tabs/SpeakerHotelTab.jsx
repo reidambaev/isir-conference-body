@@ -107,9 +107,7 @@ export default function SpeakerHotelTab() {
     }
     const nationalityName = String(nationalityCountry?.name || "").trim();
     if (!nationalityName || !addressPhysical.trim()) {
-      setSubmitError(
-        "Nationality (country) and physical address are required.",
-      );
+      setSubmitError("Nationality and physical address are required.");
       return;
     }
     const phoneStr = String(phone || "").trim();
@@ -340,7 +338,7 @@ export default function SpeakerHotelTab() {
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Nationality (country) <span className="text-red-500">*</span>
+              Nationality <span className="text-red-500">*</span>
             </label>
             <CountrySelect
               onChange={(e) => {
@@ -382,7 +380,7 @@ export default function SpeakerHotelTab() {
               onChange={(e) => setAddressPhysical(e.target.value)}
               rows={4}
               className="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              placeholder="Street, city, postal code, country"
+              placeholder="Street, city, state / province / region, postal code, country"
               required
             />
           </div>

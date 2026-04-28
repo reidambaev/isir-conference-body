@@ -15,6 +15,7 @@ const REGISTRATION_TICKET_LABELS = {
   "trainee-member": "Trainee / Student Member",
   "trainee-non-member": "Trainee / Student Non-Member",
   "invited-speaker": "Invited Speaker",
+  "korea-day-pass": "Daypass (Korean citizens only)",
 };
 
 function parseRegistrationDayList(raw) {
@@ -3613,6 +3614,22 @@ export default function AdminTab() {
                                           Ticket (detail)
                                         </dt>
                                         <dd>{ticketLabel}</dd>
+                                        {reg.ticket_type === "korea-day-pass" &&
+                                          (() => {
+                                            const d = normalizeWeekendMealDayList(
+                                              reg.day_pass_days,
+                                            );
+                                            return d.length ? (
+                                              <>
+                                                <dt className="text-gray-500">
+                                                  Daypass days
+                                                </dt>
+                                                <dd>
+                                                  {formatCongressMealDayList(d)}
+                                                </dd>
+                                              </>
+                                            ) : null;
+                                          })()}
                                         <dt className="text-gray-500">
                                           Ticket price
                                         </dt>

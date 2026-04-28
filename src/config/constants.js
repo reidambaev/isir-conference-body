@@ -42,6 +42,12 @@ export const TICKET_PRICES = {
     standard: 300,
     label: "Trainee (Non-Member)",
   },
+  /** Per congress day (Fri–Sun); total = rate × number of days selected. Korean citizens only (enforced server-side). */
+  "korea-day-pass": {
+    early: 150,
+    standard: 200,
+    label: "Daypass (Korean citizens only)",
+  },
 };
 
 // Early Bird Configuration
@@ -68,6 +74,28 @@ export const CONGRESS_WEEKEND_MEALS = [
 ];
 
 export const CONGRESS_WEEKEND_MEAL_KEYS = CONGRESS_WEEKEND_MEALS.map((m) => m.key);
+
+/** Opening / welcome reception is offered for day-pass holders attending Friday. */
+export const DAY_PASS_OPENING_RECEPTION_DAY = "Friday";
+
+/** Gala dinner is offered for day-pass holders attending Saturday. */
+export const DAY_PASS_GALA_DAY = "Saturday";
+
+/** Country must match for Korean local day pass (name from react-country-state-city / registration form). */
+export function isSouthKoreaResidenceCountry(country) {
+  const name =
+    typeof country === "object" && country != null
+      ? String(country.name || "").trim()
+      : String(country || "").trim();
+  const n = name.toLowerCase();
+  return (
+    n === "south korea" ||
+    n === "republic of korea" ||
+    n === "korea, republic of" ||
+    n === "korea (south)" ||
+    n === "korea, south"
+  );
+}
 
 export function formatCongressMealDayLabel(dayKey) {
   const row = CONGRESS_WEEKEND_MEALS.find((m) => m.key === dayKey);

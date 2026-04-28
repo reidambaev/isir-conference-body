@@ -129,7 +129,7 @@ const PaymentForm = ({
             <p className="text-sm text-gray-600 mt-1">
               Your payment information is encrypted and secure. We accept Visa,
               MasterCard, American Express, and Discover. Processing{" "}
-              {formatCurrency(amount / (currency === "KRW" ? 1 : 100), currency)}.
+              {formatCurrency(amount / 100, "USD")}.
             </p>
             <a
               href="/commercial-disclosure"

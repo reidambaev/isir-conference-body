@@ -9,6 +9,33 @@ const SPEAKER_CV_MAX_BYTES = 10 * 1024 * 1024; // 10 MiB cap for brief CV (PDF/W
 const MAX_SPEAKER_AFFILIATION_CHARS = 90;
 const MAX_SPEAKER_PRESENTATION_TITLE_CHARS = 300;
 
+const CONGRESS_DAY_PASS_KEYS = ["Friday", "Saturday", "Sunday"];
+
+function isSouthKoreaCountryName(countryStr) {
+  const n = String(countryStr || "")
+    .trim()
+    .toLowerCase();
+  return (
+    n === "south korea" ||
+    n === "republic of korea" ||
+    n === "korea, republic of" ||
+    n === "korea (south)" ||
+    n === "korea, south"
+  );
+}
+
+function parseClientDayPassDays(data) {
+  const raw = data?.dayPassDays;
+  if (raw == null) return [];
+  if (Array.isArray(raw)) {
+    return raw.filter((d) => CONGRESS_DAY_PASS_KEYS.includes(String(d)));
+  }
+  if (typeof raw === "object") {
+    return CONGRESS_DAY_PASS_KEYS.filter((d) => Boolean(raw[d]));
+  }
+  return [];
+}
+
 function seedRowBySpeakerKey(speakerKey) {
   if (speakerKey == null || String(speakerKey).trim() === "") return null;
   const k = String(speakerKey).trim();
@@ -1600,6 +1627,11 @@ async function handleRegistration(request, env, corsHeaders) {
       .toUpperCase()}`;
     const registrationDate = Date.now();
 
+    const countryNameRaw =
+      typeof data.country === "object"
+        ? data.country?.name || null
+        : data.country || null;
+
     // Calculate total price
     const ticketPrices = {
       "isir-member": { early: 350, standard: 450 },
@@ -1607,21 +1639,73 @@ async function handleRegistration(request, env, corsHeaders) {
       "trainee-member": { early: 150, standard: 200 },
       "trainee-non-member": { early: 250, standard: 300 },
       "invited-speaker": { early: 0, standard: 0 },
+      "korea-day-pass": { early: 150, standard: 200 },
     };
 
     const earlyBirdDeadline = new Date("2026-07-10").getTime();
     const isEarlyBird = registrationDate < earlyBirdDeadline;
-    const ticketPrice =
-      ticketPrices[data.ticketType]?.[isEarlyBird ? "early" : "standard"] || 0;
-    const accompanyingCount = Number(data.accompanyingPersonCount || 0);
-    const galaDinnerAttending = data.galaDinnerAttending ? 1 : 0;
-    const openingReceptionAttending = data.openingReceptionAttending ? 1 : 0;
-    const lunchDays = Object.entries(data.mealAttendance?.lunch || {})
+
+    let dayPassDayList = [];
+    let dayPassDaysStored = null;
+    if (data.ticketType === "korea-day-pass") {
+      if (!isSouthKoreaCountryName(countryNameRaw)) {
+        return jsonResponse(
+          {
+            success: false,
+            error:
+              "Daypass (Korean citizens only) requires your country to be South Korea.",
+          },
+          400,
+          corsHeaders,
+        );
+      }
+      dayPassDayList = parseClientDayPassDays(data);
+      if (dayPassDayList.length === 0) {
+        return jsonResponse(
+          {
+            success: false,
+            error: "Select at least one congress day for your day pass.",
+          },
+          400,
+          corsHeaders,
+        );
+      }
+      dayPassDaysStored = JSON.stringify(dayPassDayList);
+    }
+
+    const dayPassUnit =
+      ticketPrices["korea-day-pass"]?.[isEarlyBird ? "early" : "standard"] ?? 0;
+    let ticketPrice =
+      data.ticketType === "korea-day-pass"
+        ? dayPassUnit * dayPassDayList.length
+        : ticketPrices[data.ticketType]?.[isEarlyBird ? "early" : "standard"] ||
+          0;
+
+    let accompanyingCount =
+      data.ticketType === "korea-day-pass"
+        ? 0
+        : Number(data.accompanyingPersonCount || 0);
+    let galaDinnerAttending = data.galaDinnerAttending ? 1 : 0;
+    let openingReceptionAttending = data.openingReceptionAttending ? 1 : 0;
+    let lunchDays = Object.entries(data.mealAttendance?.lunch || {})
       .filter(([, attending]) => Boolean(attending))
       .map(([day]) => day);
-    const breakfastDays = Object.entries(data.mealAttendance?.breakfast || {})
+    let breakfastDays = Object.entries(data.mealAttendance?.breakfast || {})
       .filter(([, attending]) => Boolean(attending))
       .map(([day]) => day);
+
+    if (data.ticketType === "korea-day-pass") {
+      const allowed = new Set(dayPassDayList);
+      lunchDays = lunchDays.filter((d) => allowed.has(d));
+      breakfastDays = breakfastDays.filter((d) => allowed.has(d));
+      if (!dayPassDayList.includes("Friday")) {
+        openingReceptionAttending = 0;
+      }
+      if (!dayPassDayList.includes("Saturday")) {
+        galaDinnerAttending = 0;
+      }
+    }
+
     let accompanyingPrice = (isEarlyBird ? 250 : 350) * accompanyingCount;
     let totalPrice = ticketPrice + accompanyingPrice;
 
@@ -1733,13 +1817,13 @@ async function handleRegistration(request, env, corsHeaders) {
         salutation, suffix, institution, credentials, badge_name, pronouns,
         address1, address2, city, state, zip, country, phone, cell_phone,
         is_physician, ticket_type, accompanying_count, gala_dinner, gala_dinner_attending,
-        lunch_days, breakfast_days, opening_reception_attending, ticket_price, total_price,
+        lunch_days, breakfast_days, day_pass_days, opening_reception_attending, ticket_price, total_price,
         is_early_bird, dietary_vegan, dietary_vegetarian, dietary_gluten_free,
         dietary_kosher, dietary_other, special_assistance, policy_agreed,
         privacy_marketing, privacy_app, opt_out_mailing, payment_status,
         is_invited_speaker, invited_speaker_token,
         membership_level, membership_status, trainee_letter_url, trainee_letter_status, trainee_letter_uploaded_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     )
       .bind(
@@ -1765,11 +1849,12 @@ async function handleRegistration(request, env, corsHeaders) {
         data.cellPhone || null,
         data.isPhysician || null,
         data.ticketType,
-        data.accompanyingPersonCount || 0,
+        accompanyingCount,
         galaDinnerAttending,
         galaDinnerAttending,
         JSON.stringify(lunchDays),
         JSON.stringify(breakfastDays),
+        dayPassDaysStored,
         openingReceptionAttending,
         ticketPrice,
         totalPrice,
@@ -3916,12 +4001,8 @@ async function handleCreatePaymentIntent(request, env, corsHeaders) {
       );
     }
 
-    const countryValue = String(registration.country || "").toLowerCase();
-    const isKoreanCustomer = countryValue.includes("korea");
-    const currency = isKoreanCustomer ? "krw" : "usd";
-    const amount = isKoreanCustomer
-      ? Math.round(baseAmountUsd * 1350 * 1.1) // KRW + 10% Korean VAT
-      : Math.round(baseAmountUsd * 100); // USD cents
+    const currency = "usd";
+    const amount = Math.round(baseAmountUsd * 100); // USD cents
 
     // Import Stripe (using dynamic import for Cloudflare Workers)
     const Stripe = (await import("stripe")).default;
@@ -4017,6 +4098,7 @@ function formatTicketLabel(slug) {
     "non-member": "Non-Member",
     "trainee-member": "Trainee (ISIR Member)",
     "trainee-non-member": "Trainee (Non-Member)",
+    "korea-day-pass": "Daypass (Korean citizens only)",
   };
   return (
     labels[slug] ||
@@ -4058,7 +4140,7 @@ async function sendRegistrationConfirmationEmail(env, registrationId) {
     const row = await env.ISIR_DB.prepare(
       `SELECT email, first_name, middle_name, last_name, ticket_type, ticket_price, total_price, currency,
        accompanying_count, gala_dinner, gala_dinner_attending, lunch_days, breakfast_days, dinner_days,
-       opening_reception_attending, institution, badge_name, is_invited_speaker
+       day_pass_days, opening_reception_attending, institution, badge_name, is_invited_speaker
        FROM registrations WHERE id = ?`,
     )
       .bind(registrationId)
@@ -4102,6 +4184,18 @@ async function sendRegistrationConfirmationEmail(env, registrationId) {
       }
     })();
     const invitedSpeaker = Number(row.is_invited_speaker || 0) === 1;
+    const dayPassDays = (() => {
+      try {
+        const parsed = JSON.parse(row.day_pass_days || "[]");
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    })();
+    const dayPassDisplay =
+      dayPassDays.length > 0
+        ? formatCongressMealDayListForEmail(dayPassDays)
+        : "";
     const lunchDisplay =
       lunchDays.length > 0
         ? formatCongressMealDayListForEmail(lunchDays)
@@ -4132,6 +4226,7 @@ async function sendRegistrationConfirmationEmail(env, registrationId) {
     <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
       <tr><td style="padding: 4px 0;">Registration ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(registrationId)}</strong></td></tr>
       <tr><td style="padding: 4px 0;">Ticket type</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(ticketLabel)}</td></tr>
+      ${dayPassDisplay ? `<tr><td style="padding: 4px 0;">Daypass (congress days)</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(dayPassDisplay)}</td></tr>` : ""}
       ${acc > 0 ? `<tr><td style="padding: 4px 0;">Accompanying persons</td><td style="padding: 4px 0; text-align: right;">${acc}</td></tr>` : ""}
       ${gala > 0 ? `<tr><td style="padding: 4px 0;">Gala dinner tickets</td><td style="padding: 4px 0; text-align: right;">${gala}</td></tr>` : ""}
       <tr><td colspan="2" style="padding: 10px 0 6px 0; border-top: 1px solid #ddd; font-weight: 600; color: #1a3a6c;">Meal Attendance</td></tr>

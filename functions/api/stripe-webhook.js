@@ -23,6 +23,7 @@ function formatTicketLabel(slug) {
     "non-member": "Non-Member",
     "trainee-member": "Trainee (ISIR Member)",
     "trainee-non-member": "Trainee (Non-Member)",
+    "korea-day-pass": "Daypass (Korean citizens only)",
   };
   return (
     labels[slug] ||

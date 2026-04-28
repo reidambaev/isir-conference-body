@@ -1,59 +1,6 @@
 /**
- * Currency conversion and formatting utilities
+ * Currency formatting utilities (registration is charged in USD only).
  */
-
-// Exchange rate: 1 USD = ~1350 KRW (approximate, should use real-time API in production)
-const USD_TO_KRW_RATE = 1350;
-const KOREAN_TAX_RATE = 0.1; // 10% Korean tax
-
-/**
- * Check if a country is Korea
- */
-export function isKorea(country) {
-  if (!country) return false;
-  const countryName = typeof country === "string" ? country : country.name;
-  return (
-    countryName?.toLowerCase().includes("korea") ||
-    countryName?.toLowerCase().includes("south korea") ||
-    countryName === "KR" ||
-    countryName === "KOR"
-  );
-}
-
-/**
- * Get currency based on country
- */
-export function getCurrency(country) {
-  return isKorea(country) ? "KRW" : "USD";
-}
-
-/**
- * Convert USD to KRW
- */
-export function usdToKrw(usdAmount) {
-  return Math.round(usdAmount * USD_TO_KRW_RATE);
-}
-
-/**
- * Convert KRW to USD
- */
-export function krwToUsd(krwAmount) {
-  return Math.round((krwAmount / USD_TO_KRW_RATE) * 100) / 100;
-}
-
-/**
- * Calculate price with Korean tax (10%)
- */
-export function applyKoreanTax(amount) {
-  return Math.round(amount * (1 + KOREAN_TAX_RATE));
-}
-
-/**
- * Calculate price without tax (for display purposes)
- */
-export function removeKoreanTax(amountWithTax) {
-  return Math.round(amountWithTax / (1 + KOREAN_TAX_RATE));
-}
 
 /**
  * Format currency for display
@@ -66,16 +13,15 @@ export function formatCurrency(amount, currency = "USD") {
 }
 
 /**
- * Get final price based on country
- * For Koreans: Convert to KRW and apply 10% tax
- * For others: Keep in USD (tax included in base price)
+ * Listed prices are USD; no country-based conversion or surcharges.
  */
-export function getFinalPrice(usdAmount, country) {
-  if (isKorea(country)) {
-    const krwAmount = usdToKrw(usdAmount);
-    return applyKoreanTax(krwAmount);
-  }
+export function getFinalPrice(usdAmount) {
   return usdAmount;
+}
+
+/** Stripe and UI always use USD for new registrations */
+export function getCurrency() {
+  return "USD";
 }
 
 /**
