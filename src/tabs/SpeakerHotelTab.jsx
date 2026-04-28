@@ -194,10 +194,12 @@ export default function SpeakerHotelTab() {
               background: "linear-gradient(135deg, #1a3a6c 0%, #2d5a9e 100%)",
             }}
           >
-            <h1 className="text-2xl font-bold mb-2">Hotel details received</h1>
+            <h1 className="text-2xl font-bold mb-2">
+              Hotel information received
+            </h1>
             <p className="text-blue-100">
-              Thank you. The organizing team will use this information for your
-              stay around the ISIR 2026 World Congress.
+              Thank you. This form collects planning information for the
+              organizers and does not directly book your hotel room.
             </p>
           </div>
           <div className="p-8 bg-white text-center text-gray-600 text-sm">
@@ -205,7 +207,8 @@ export default function SpeakerHotelTab() {
               <p className="mb-4 text-gray-700">
                 {confirmationEmailSent ? (
                   <>
-                    A confirmation email with your submission summary has been
+                    A confirmation email with your submitted hotel information
+                    has been
                     sent to{" "}
                     {confirmationEmails.map((em, i) => (
                       <React.Fragment key={em}>
@@ -217,7 +220,7 @@ export default function SpeakerHotelTab() {
                   </>
                 ) : (
                   <>
-                    Your registration was saved. We could not send a
+                    Your hotel information was saved. We could not send a
                     confirmation email (mail not configured or the send failed).
                     You can keep this page or contact the organizers if you need
                     written confirmation.
@@ -226,7 +229,8 @@ export default function SpeakerHotelTab() {
               </p>
             )}
             <p className="mb-4">
-              If you need to change anything, submit the form again with the
+              If you need to change anything, submit this information form again
+              with the
               same invited-speaker email; your latest submission will be kept.
             </p>
             <a
@@ -251,11 +255,12 @@ export default function SpeakerHotelTab() {
           className="text-2xl font-bold mb-1"
           style={{ color: "var(--color-primary)" }}
         >
-          Invited speaker — hotel registration
+          Invited speaker — hotel information form
         </h1>
         <p className="text-gray-600 text-sm">
-          For ISIR 2026 (Busan). You may choose dates outside congress week.
-          Lodging support only applies to up to 3 nights during{" "}
+          For ISIR 2026 (Busan). This page is for hotel planning information
+          only (not direct hotel booking). You may choose dates outside congress
+          week. Lodging support only applies to up to 3 nights during{" "}
           <strong>
             {CONFERENCE_HOTEL_STAY_DATE_MIN} through{" "}
             {CONFERENCE_HOTEL_STAY_DATE_MAX}
@@ -270,11 +275,11 @@ export default function SpeakerHotelTab() {
           className="space-y-4 p-6 rounded-xl border-2 border-gray-200 bg-gray-50/50"
         >
           <h2 className="text-lg font-semibold text-gray-800">
-            Step 1 — Confirm your invitation email
+            Step 1 — Confirm your invited-speaker email
           </h2>
           <p className="text-sm text-gray-600">
-            We only accept submissions from addresses listed in our invited
-            speaker database (same email your invitation used).
+            We only accept hotel information submissions from addresses listed
+            in our invited speaker database (same email your invitation used).
           </p>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
@@ -349,6 +354,10 @@ export default function SpeakerHotelTab() {
             >
               Use a different email
             </button>
+            <p className="mt-2 text-xs text-green-800/90">
+              This email is used to match your invited-speaker record and to
+              save your hotel information details.
+            </p>
           </div>
 
           <div>
@@ -457,7 +466,8 @@ export default function SpeakerHotelTab() {
             <p>
               Congress lodging support covers up to <strong>3 nights</strong>{" "}
               during the congress window ({CONFERENCE_HOTEL_STAY_DATE_MIN} to{" "}
-              {CONFERENCE_HOTEL_STAY_DATE_MAX}).
+              {CONFERENCE_HOTEL_STAY_DATE_MAX}). Extra nights can still be
+              requested as information, but may not be covered.
             </p>
             <p className="mt-1">
               Nights within congress window for this selection:{" "}
