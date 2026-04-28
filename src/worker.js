@@ -1653,7 +1653,7 @@ async function handleRegistration(request, env, corsHeaders) {
           {
             success: false,
             error:
-              "Daypass (Korean citizens only) requires your country to be South Korea.",
+              "Daypass (Korean locals only) requires your country to be South Korea.",
           },
           400,
           corsHeaders,
@@ -4098,7 +4098,7 @@ function formatTicketLabel(slug) {
     "non-member": "Non-Member",
     "trainee-member": "Trainee (ISIR Member)",
     "trainee-non-member": "Trainee (Non-Member)",
-    "korea-day-pass": "Daypass (Korean citizens only)",
+    "korea-day-pass": "Daypass (Korean locals only)",
   };
   return (
     labels[slug] ||

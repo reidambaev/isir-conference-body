@@ -15,7 +15,7 @@ const REGISTRATION_TICKET_LABELS = {
   "trainee-member": "Trainee / Student Member",
   "trainee-non-member": "Trainee / Student Non-Member",
   "invited-speaker": "Invited Speaker",
-  "korea-day-pass": "Daypass (Korean citizens only)",
+  "korea-day-pass": "Daypass (Korean locals only)",
 };
 
 function parseRegistrationDayList(raw) {

@@ -11,7 +11,8 @@ const RegistrationTab = () => {
       ? new URLSearchParams(window.location.search)
       : null;
   const hasInviteLink = Boolean(params?.get("invite"));
-  const registrationOpen = REGISTRATION_OPEN || isPreviewMode() || hasInviteLink;
+  const registrationOpen =
+    REGISTRATION_OPEN || isPreviewMode() || hasInviteLink;
   const inPreviewMode = isPreviewMode();
 
   // Auto-open form when coming from an invite link
@@ -293,18 +294,13 @@ const RegistrationTab = () => {
 
             {/* Daypass */}
             <div className="bg-gradient-to-br from-purple-50 to-white rounded-xl p-5 border-2 border-purple-200 hover:border-purple-400 hover:shadow-md transition-all">
-              <div className="flex items-center justify-between mb-3 gap-2">
-                <h5 className="font-bold text-gray-900 leading-tight">
-                  <span className="text-xl sm:text-2xl font-extrabold tracking-tight">
-                    Daypass
-                  </span>
-                  <span className="block text-xs sm:text-sm font-semibold text-purple-900 mt-1">
-                    (Korean citizens only)
+              <div className="flex items-center justify-between mb-3">
+                <h5 className="font-bold text-gray-900 leading-snug">
+                  Daypass{" "}
+                  <span className="text-xs sm:text-sm font-medium text-gray-600">
+                    (Korean locals only)
                   </span>
                 </h5>
-                <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full shrink-0">
-                  Per day
-                </span>
               </div>
               <div className="flex items-baseline gap-2 mb-2">
                 <span
@@ -316,8 +312,7 @@ const RegistrationTab = () => {
                 <span className="text-sm text-gray-500 line-through">$200</span>
               </div>
               <p className="text-xs text-gray-500">
-                Early Bird / Standard (per selected day; register for days &
-                meals)
+                Early Bird / Standard (per selected day)
               </p>
             </div>
 
@@ -425,8 +420,8 @@ const RegistrationTab = () => {
                 />
                 <div className="p-3 text-sm text-gray-700">
                   <strong>Complimentary Gala Evening:</strong> All meeting
-                  participants are invited to a complimentary Gala evening at the
-                  iconic Busan Cinema Center, featuring dinner and live
+                  participants are invited to a complimentary Gala evening at
+                  the iconic Busan Cinema Center, featuring dinner and live
                   performances by renowned Korean musicians and artists. Join us
                   for an unforgettable cultural evening in Busan!
                 </div>

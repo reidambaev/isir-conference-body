@@ -42,11 +42,11 @@ export const TICKET_PRICES = {
     standard: 300,
     label: "Trainee (Non-Member)",
   },
-  /** Per congress day (Fri–Sun); total = rate × number of days selected. Korean citizens only (enforced server-side). */
+  /** Per congress day (Fri–Sun); total = rate × number of days selected. Korean locals only (enforced server-side). */
   "korea-day-pass": {
     early: 150,
     standard: 200,
-    label: "Daypass (Korean citizens only)",
+    label: "Daypass (Korean locals only)",
   },
 };
 

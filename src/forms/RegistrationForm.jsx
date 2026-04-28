@@ -665,7 +665,7 @@ const RegistrationForm = ({ onClose }) => {
     if (formData.ticketType === "korea-day-pass") {
       if (!isSouthKoreaResidenceCountry(formData.country)) {
         alert(
-          "Daypass (Korean citizens only) requires Country: South Korea. Please update your country or choose another ticket.",
+          "Daypass (Korean locals only) requires Country: South Korea. Please update your country or choose another ticket.",
         );
         return;
       }
@@ -897,6 +897,22 @@ const RegistrationForm = ({ onClose }) => {
     return ticketPrices[formData.ticketType]?.label || formData.ticketType;
   };
 
+  const renderOrderTicketLabel = () => {
+    if (formData.ticketType === "korea-day-pass") {
+      return (
+        <>
+          Daypass{" "}
+          <span className="text-sm text-gray-600 font-normal">
+            (Korean locals only)
+          </span>
+        </>
+      );
+    }
+    return (
+      ticketPrices[formData.ticketType]?.label || formData.ticketType || ""
+    );
+  };
+
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const handleDownloadPdf = async () => {
     setIsGeneratingPdf(true);
@@ -998,7 +1014,7 @@ const RegistrationForm = ({ onClose }) => {
     "korea-day-pass": {
       early: 150,
       standard: 200,
-      label: "Daypass (Korean citizens only)",
+      label: "Daypass (Korean locals only)",
     },
   };
   const isInvitedSpeakerMode =
@@ -1634,7 +1650,7 @@ const RegistrationForm = ({ onClose }) => {
                               ...filteredApiTickets,
                               {
                                 id: "korea-day-pass",
-                                label: "Daypass (Korean citizens only)",
+                                label: "Daypass (Korean locals only)",
                                 requires_membership: false,
                                 available: true,
                                 current_price: 150,
@@ -1698,18 +1714,17 @@ const RegistrationForm = ({ onClose }) => {
                                 <div className="flex-1 min-w-0">
                                   {ticket.id === "korea-day-pass" ? (
                                     <span
-                                      className={`block leading-snug ${
+                                      className={
                                         isAvailable
                                           ? "text-gray-800"
                                           : "text-gray-500"
-                                      }`}
+                                      }
                                     >
-                                      <span className="text-lg font-bold">
-                                        Daypass
+                                      <span className="font-semibold">
+                                        Daypass{" "}
                                       </span>
-                                      <span className="text-sm font-medium">
-                                        {" "}
-                                        (Korean citizens only)
+                                      <span className="text-xs sm:text-sm text-gray-600 font-normal">
+                                        (Korean locals only)
                                       </span>
                                     </span>
                                   ) : (
@@ -1825,18 +1840,17 @@ const RegistrationForm = ({ onClose }) => {
                                       />
                                       {value === "korea-day-pass" ? (
                                         <span
-                                          className={`${
+                                          className={
                                             isAvailable
                                               ? "text-gray-800"
                                               : "text-gray-500"
-                                          }`}
+                                          }
                                         >
-                                          <span className="text-lg font-bold">
-                                            Daypass
+                                          <span className="font-semibold">
+                                            Daypass{" "}
                                           </span>
-                                          <span className="text-sm font-medium">
-                                            {" "}
-                                            (Korean citizens only)
+                                          <span className="text-xs sm:text-sm text-gray-600 font-normal">
+                                            (Korean locals only)
                                           </span>
                                         </span>
                                       ) : (
@@ -1894,17 +1908,13 @@ const RegistrationForm = ({ onClose }) => {
                   {formData.ticketType === "korea-day-pass" && (
                     <div className="mt-6 p-5 rounded-xl border-2 border-purple-200 bg-purple-50/80">
                       <p className="text-sm font-semibold text-gray-800 mb-2">
-                        <span className="text-base font-bold">Daypass</span> —
-                        select your congress days
+                        Select your congress days
                       </p>
                       <p className="text-xs text-gray-600 mb-4">
-                        Price is per day (early / standard as shown above).{" "}
-                        <strong className="font-semibold">
-                          Korean citizens only
-                        </strong>
-                        — set Country to South Korea on the details step. Opening
-                        reception if you attend Friday; gala dinner if you attend
-                        Saturday.
+                        Price is per day (early / standard as shown above).
+                        Korean locals only — set Country to South Korea on the
+                        details step. Opening reception if you attend Friday;
+                        gala dinner if you attend Saturday.
                       </p>
                       <div className="space-y-2">
                         {CONGRESS_WEEKEND_MEALS.map(({ key, date }) => (
@@ -1932,8 +1942,12 @@ const RegistrationForm = ({ onClose }) => {
                     *Trainee/Student rate requires proof of status.
                     <br />
                     <span className="font-semibold">†</span>{" "}
-                    <span className="font-bold">Daypass</span> (Korean citizens
-                    only): per selected day; South Korea required as country.
+                    <span className="font-semibold">Daypass</span>{" "}
+                    <span className="text-[11px] text-gray-600">
+                      (Korean locals only)
+                    </span>
+                    : per selected day; South Korea required as country on the
+                    registration form.
                   </p>
                 </div>
 
@@ -2433,7 +2447,7 @@ const RegistrationForm = ({ onClose }) => {
                   </h5>
                   <p className="text-sm text-gray-600 mb-5">
                     {formData.ticketType === "korea-day-pass"
-                      ? `Daypass (Korean citizens only) — you are attending: ${formatCongressMealDayList(
+                      ? `Your congress days: ${formatCongressMealDayList(
                           CONGRESS_WEEKEND_MEALS.filter(
                             ({ key }) => formData.dayPassDays[key],
                           ).map(({ key }) => key),
@@ -2681,7 +2695,7 @@ const RegistrationForm = ({ onClose }) => {
                         )}
                       <div className="flex justify-between text-base py-3 border-b border-gray-200">
                         <span className="text-gray-700">
-                          {ticketPrices[formData.ticketType]?.label}{" "}
+                          {renderOrderTicketLabel()}{" "}
                           <span
                             className="text-xs px-2 py-0.5 rounded-full"
                             style={{
@@ -2878,7 +2892,7 @@ const RegistrationForm = ({ onClose }) => {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-gray-700">
-                          {ticketPrices[formData.ticketType]?.label}{" "}
+                          {renderOrderTicketLabel()}{" "}
                           <span
                             className="text-xs px-2 py-0.5 rounded-full"
                             style={{
