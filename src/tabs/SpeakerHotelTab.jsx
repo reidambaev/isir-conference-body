@@ -6,13 +6,31 @@ import "react-country-state-city/dist/react-country-state-city.css";
 import {
   CONFERENCE_HOTEL_STAY_DATE_MAX,
   CONFERENCE_HOTEL_STAY_DATE_MIN,
-  isDateWithinConferenceHotelStay,
 } from "../config/constants";
 
 function normalizeClientEmail(value) {
   return String(value || "")
     .trim()
     .toLowerCase();
+}
+
+function parseIsoDate(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || "").trim())) return null;
+  const d = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function overlapNightsWithinCongress(arrivalIso, departureIso) {
+  const arrival = parseIsoDate(arrivalIso);
+  const departure = parseIsoDate(departureIso);
+  const congressStart = parseIsoDate(CONFERENCE_HOTEL_STAY_DATE_MIN);
+  const congressEnd = parseIsoDate(CONFERENCE_HOTEL_STAY_DATE_MAX);
+  if (!arrival || !departure || !congressStart || !congressEnd) return 0;
+  if (departure <= arrival) return 0;
+  const overlapStart = arrival > congressStart ? arrival : congressStart;
+  const overlapEnd = departure < congressEnd ? departure : congressEnd;
+  if (overlapEnd <= overlapStart) return 0;
+  return Math.floor((overlapEnd - overlapStart) / (1000 * 60 * 60 * 24));
 }
 
 export default function SpeakerHotelTab() {
@@ -23,6 +41,7 @@ export default function SpeakerHotelTab() {
 
   /** Same CountrySelect object shape as RegistrationForm (`country`) */
   const [nationalityCountry, setNationalityCountry] = useState(null);
+  const [passportName, setPassportName] = useState("");
   const [guestCount, setGuestCount] = useState(1);
   const [addressPhysical, setAddressPhysical] = useState("");
   /** E.164 string or undefined (same pattern as RegistrationForm office/cell phone) */
@@ -106,8 +125,11 @@ export default function SpeakerHotelTab() {
       return;
     }
     const nationalityName = String(nationalityCountry?.name || "").trim();
-    if (!nationalityName || !addressPhysical.trim()) {
-      setSubmitError("Nationality and physical address are required.");
+    const passportNameValue = String(passportName || "").trim();
+    if (!passportNameValue || !nationalityName || !addressPhysical.trim()) {
+      setSubmitError(
+        "Name as on passport, nationality, and physical address are required.",
+      );
       return;
     }
     const phoneStr = String(phone || "").trim();
@@ -125,15 +147,6 @@ export default function SpeakerHotelTab() {
       setSubmitError("Arrival and departure dates are required.");
       return;
     }
-    if (
-      !isDateWithinConferenceHotelStay(arrivalDate) ||
-      !isDateWithinConferenceHotelStay(departureDate)
-    ) {
-      setSubmitError(
-        `Stay dates must fall between ${CONFERENCE_HOTEL_STAY_DATE_MIN} and ${CONFERENCE_HOTEL_STAY_DATE_MAX} (conference dates).`,
-      );
-      return;
-    }
     if (departureDate < arrivalDate) {
       setSubmitError("Departure must be on or after arrival.");
       return;
@@ -146,6 +159,7 @@ export default function SpeakerHotelTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           invitedSpeakerEmail: verifiedEmail,
+          passportName: passportNameValue,
           nationality: nationalityName,
           guestCount,
           addressPhysical: addressPhysical.trim(),
@@ -240,8 +254,8 @@ export default function SpeakerHotelTab() {
           Invited speaker — hotel registration
         </h1>
         <p className="text-gray-600 text-sm">
-          For ISIR 2026 (Busan). Arrival and departure must be within the
-          congress dates:{" "}
+          For ISIR 2026 (Busan). You may choose dates outside congress week.
+          Lodging support only applies to up to 3 nights during{" "}
           <strong>
             {CONFERENCE_HOTEL_STAY_DATE_MIN} through{" "}
             {CONFERENCE_HOTEL_STAY_DATE_MAX}
@@ -326,6 +340,7 @@ export default function SpeakerHotelTab() {
                 setVerifiedEmail(null);
                 setDevPreviewBypass(false);
                 setSubmitError(null);
+                setPassportName("");
                 setNationalityCountry(null);
                 setPhone(undefined);
                 setArrivalDate(CONFERENCE_HOTEL_STAY_DATE_MIN);
@@ -334,6 +349,20 @@ export default function SpeakerHotelTab() {
             >
               Use a different email
             </button>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Name as on passport <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={passportName}
+              onChange={(e) => setPassportName(e.target.value)}
+              className="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              placeholder="Enter full name exactly as shown on passport"
+              required
+            />
           </div>
 
           <div>
@@ -405,8 +434,6 @@ export default function SpeakerHotelTab() {
               </label>
               <input
                 type="date"
-                min={CONFERENCE_HOTEL_STAY_DATE_MIN}
-                max={departureDate || CONFERENCE_HOTEL_STAY_DATE_MAX}
                 value={arrivalDate}
                 onChange={(e) => setArrivalDate(e.target.value)}
                 className="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
@@ -419,14 +446,26 @@ export default function SpeakerHotelTab() {
               </label>
               <input
                 type="date"
-                min={arrivalDate || CONFERENCE_HOTEL_STAY_DATE_MIN}
-                max={CONFERENCE_HOTEL_STAY_DATE_MAX}
                 value={departureDate}
                 onChange={(e) => setDepartureDate(e.target.value)}
                 className="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 required
               />
             </div>
+          </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <p>
+              Congress lodging support covers up to <strong>3 nights</strong>{" "}
+              during the congress window ({CONFERENCE_HOTEL_STAY_DATE_MIN} to{" "}
+              {CONFERENCE_HOTEL_STAY_DATE_MAX}).
+            </p>
+            <p className="mt-1">
+              Nights within congress window for this selection:{" "}
+              <strong>
+                {Math.min(3, overlapNightsWithinCongress(arrivalDate, departureDate))}
+              </strong>
+              .
+            </p>
           </div>
 
           {submitError && (

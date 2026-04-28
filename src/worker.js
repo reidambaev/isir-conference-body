@@ -9,7 +9,7 @@ const SPEAKER_CV_MAX_BYTES = 10 * 1024 * 1024; // 10 MiB cap for brief CV (PDF/W
 const MAX_SPEAKER_AFFILIATION_CHARS = 90;
 const MAX_SPEAKER_PRESENTATION_TITLE_CHARS = 300;
 
-const CONGRESS_DAY_PASS_KEYS = ["Friday", "Saturday", "Sunday"];
+const CONGRESS_DAY_PASS_KEYS = ["Thursday", "Friday", "Saturday", "Sunday"];
 
 function isSouthKoreaCountryName(countryStr) {
   const n = String(countryStr || "")
@@ -2742,16 +2742,12 @@ async function handleVisaRequest(request, env, corsHeaders) {
   }
 }
 
-/** Congress on-site dates (Nov 5–8, 2026); arrival/departure must fall in this inclusive range. */
-const SPEAKER_HOTEL_STAY_MIN = "2026-11-05";
-const SPEAKER_HOTEL_STAY_MAX = "2026-11-08";
-
 function isValidSpeakerHotelIsoDate(iso) {
   if (typeof iso !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(iso.trim())) {
     return false;
   }
-  const s = iso.trim();
-  return s >= SPEAKER_HOTEL_STAY_MIN && s <= SPEAKER_HOTEL_STAY_MAX;
+  const d = new Date(`${iso.trim()}T00:00:00`);
+  return !Number.isNaN(d.getTime());
 }
 
 async function handleSpeakerHotelCheckInvite(request, env, url, corsHeaders) {
@@ -2795,6 +2791,7 @@ async function sendSpeakerHotelConfirmationEmail(env, row) {
   const {
     registrationId,
     invitedSpeakerEmail,
+    passportName,
     nationality,
     guestCount,
     arrivalDate,
@@ -2822,6 +2819,7 @@ async function sendSpeakerHotelConfirmationEmail(env, row) {
     <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
       <tr><td style="padding: 4px 0;">Reference</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(registrationId)}</strong></td></tr>
       <tr><td style="padding: 4px 0;">Email</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(invitedSpeakerEmail)}</td></tr>
+      <tr><td style="padding: 4px 0;">Name (passport)</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(passportName)}</td></tr>
       <tr><td style="padding: 4px 0;">Nationality</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(nationality)}</td></tr>
       <tr><td style="padding: 4px 0;">Guests</td><td style="padding: 4px 0; text-align: right;">${guestCount}</td></tr>
       <tr><td style="padding: 4px 0;">Arrival</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(arrivalDate)}</td></tr>
@@ -2881,6 +2879,7 @@ async function handleSpeakerHotelRegistration(request, env, corsHeaders) {
     const invitedSpeakerEmail = normalizeEmail(
       data?.invitedSpeakerEmail ?? data?.invited_speaker_email ?? "",
     );
+    const passportName = maxLen(data?.passportName ?? data?.passport_name, 200);
     const nationality = maxLen(data?.nationality, 120);
     const guestCountRaw = Number(data?.guestCount ?? data?.guest_count);
     const guestCount =
@@ -2921,11 +2920,12 @@ async function handleSpeakerHotelRegistration(request, env, corsHeaders) {
       );
     }
 
-    if (!nationality || !addressPhysical || !phone) {
+    if (!passportName || !nationality || !addressPhysical || !phone) {
       return jsonResponse(
         {
           success: false,
-          error: "Nationality, physical address, and phone are required",
+          error:
+            "Passport name, nationality, physical address, and phone are required",
         },
         400,
         corsHeaders,
@@ -2947,7 +2947,7 @@ async function handleSpeakerHotelRegistration(request, env, corsHeaders) {
       return jsonResponse(
         {
           success: false,
-          error: `Arrival date must be between ${SPEAKER_HOTEL_STAY_MIN} and ${SPEAKER_HOTEL_STAY_MAX}`,
+          error: "Arrival date must be a valid date (YYYY-MM-DD)",
         },
         400,
         corsHeaders,
@@ -2957,7 +2957,7 @@ async function handleSpeakerHotelRegistration(request, env, corsHeaders) {
       return jsonResponse(
         {
           success: false,
-          error: `Departure date must be between ${SPEAKER_HOTEL_STAY_MIN} and ${SPEAKER_HOTEL_STAY_MAX}`,
+          error: "Departure date must be a valid date (YYYY-MM-DD)",
         },
         400,
         corsHeaders,
@@ -2979,10 +2979,11 @@ async function handleSpeakerHotelRegistration(request, env, corsHeaders) {
 
     await env.ISIR_DB.prepare(
       `INSERT INTO speaker_hotel_registrations (
-        id, invited_speaker_email, nationality, guest_count, address_physical,
+        id, invited_speaker_email, passport_name, nationality, guest_count, address_physical,
         contact_email, phone, arrival_date, departure_date, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(invited_speaker_email) DO UPDATE SET
+        passport_name = excluded.passport_name,
         nationality = excluded.nationality,
         guest_count = excluded.guest_count,
         address_physical = excluded.address_physical,
@@ -2995,6 +2996,7 @@ async function handleSpeakerHotelRegistration(request, env, corsHeaders) {
       .bind(
         id,
         invitedSpeakerEmail,
+        passportName,
         nationality,
         guestCount,
         addressPhysical,
@@ -3023,6 +3025,7 @@ async function handleSpeakerHotelRegistration(request, env, corsHeaders) {
       {
         registrationId,
         invitedSpeakerEmail,
+        passportName,
         nationality,
         guestCount,
         arrivalDate,

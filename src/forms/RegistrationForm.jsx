@@ -15,6 +15,7 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import {
+  CONGRESS_DAYPASS_DAYS,
   CONGRESS_WEEKEND_MEALS,
   DAY_PASS_GALA_DAY,
   DAY_PASS_OPENING_RECEPTION_DAY,
@@ -297,6 +298,7 @@ const RegistrationForm = ({ onClose }) => {
       },
     },
     dayPassDays: {
+      Thursday: false,
       Friday: false,
       Saturday: false,
       Sunday: false,
@@ -449,7 +451,7 @@ const RegistrationForm = ({ onClose }) => {
         dayPassDays:
           value === "korea-day-pass"
             ? prev.dayPassDays
-            : { Friday: false, Saturday: false, Sunday: false },
+            : { Thursday: false, Friday: false, Saturday: false, Sunday: false },
       }));
     } else if (type === "checkbox") {
       setFormData((prev) => ({ ...prev, [name]: checked }));
@@ -580,7 +582,7 @@ const RegistrationForm = ({ onClose }) => {
     }
 
     if (formData.ticketType === "korea-day-pass") {
-      const dayCount = CONGRESS_WEEKEND_MEALS.filter(
+      const dayCount = CONGRESS_DAYPASS_DAYS.filter(
         ({ key }) => formData.dayPassDays[key],
       ).length;
       if (dayCount === 0) {
@@ -669,7 +671,7 @@ const RegistrationForm = ({ onClose }) => {
         );
         return;
       }
-      const dayCount = CONGRESS_WEEKEND_MEALS.filter(
+      const dayCount = CONGRESS_DAYPASS_DAYS.filter(
         ({ key }) => formData.dayPassDays[key],
       ).length;
       if (dayCount === 0) {
@@ -1092,7 +1094,7 @@ const RegistrationForm = ({ onClose }) => {
     if (type === "invited-speaker") return 0;
 
     if (type === "korea-day-pass") {
-      const n = CONGRESS_WEEKEND_MEALS.filter(
+      const n = CONGRESS_DAYPASS_DAYS.filter(
         ({ key }) => formData.dayPassDays[key],
       ).length;
       if (n === 0) return 0;
@@ -1692,6 +1694,7 @@ const RegistrationForm = ({ onClose }) => {
                                     next.accompanyingPersonCount = 0;
                                   } else {
                                     next.dayPassDays = {
+                                      Thursday: false,
                                       Friday: false,
                                       Saturday: false,
                                       Sunday: false,
@@ -1913,11 +1916,12 @@ const RegistrationForm = ({ onClose }) => {
                       <p className="text-xs text-gray-600 mb-4">
                         Price is per day (early / standard as shown above).
                         Korean locals only — set Country to South Korea on the
-                        details step. Opening reception if you attend Friday;
-                        gala dinner if you attend Saturday.
+                        details step. Thursday has no breakfast/lunch service.
+                        Opening reception if you attend Friday; gala dinner if
+                        you attend Saturday.
                       </p>
                       <div className="space-y-2">
-                        {CONGRESS_WEEKEND_MEALS.map(({ key, date }) => (
+                        {CONGRESS_DAYPASS_DAYS.map(({ key, date }) => (
                           <label
                             key={`daypass-step2-${key}`}
                             className="flex items-center gap-2"
@@ -2335,6 +2339,7 @@ const RegistrationForm = ({ onClose }) => {
                           ) {
                             next.ticketType = "";
                             next.dayPassDays = {
+                              Thursday: false,
                               Friday: false,
                               Saturday: false,
                               Sunday: false,
@@ -2448,10 +2453,10 @@ const RegistrationForm = ({ onClose }) => {
                   <p className="text-sm text-gray-600 mb-5">
                     {formData.ticketType === "korea-day-pass"
                       ? `Your congress days: ${formatCongressMealDayList(
-                          CONGRESS_WEEKEND_MEALS.filter(
+                          CONGRESS_DAYPASS_DAYS.filter(
                             ({ key }) => formData.dayPassDays[key],
                           ).map(({ key }) => key),
-                        )}. Choose breakfast and lunch for those days only. Opening reception applies to Friday; gala dinner to Saturday.`
+                        )}. Breakfast/lunch choices are Fri-Sun only (no Thursday breakfast/lunch). Opening reception applies to Friday; gala dinner to Saturday.`
                       : "Indicate welcome events and which days you will attend lunch and breakfast (Friday–Sunday, Nov 6–8, 2026)."}
                   </p>
                   {(formData.ticketType !== "korea-day-pass" ||

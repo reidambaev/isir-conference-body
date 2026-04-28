@@ -3250,6 +3250,9 @@ export default function AdminTab() {
                       Invitation email
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Name (passport)
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Nationality
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -3277,6 +3280,9 @@ export default function AdminTab() {
                     <tr key={row.id} className="align-top">
                       <td className="px-4 py-3 text-sm text-gray-900 max-w-[10rem] break-all">
                         {row.invited_speaker_email}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                        {row.passport_name || "—"}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
                         {row.nationality}

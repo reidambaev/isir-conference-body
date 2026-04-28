@@ -115,6 +115,7 @@ CREATE TABLE
     IF NOT EXISTS speaker_hotel_registrations (
         id TEXT PRIMARY KEY,
         invited_speaker_email TEXT NOT NULL UNIQUE,
+        passport_name TEXT,
         nationality TEXT NOT NULL,
         guest_count INTEGER NOT NULL DEFAULT 1,
         address_physical TEXT NOT NULL,

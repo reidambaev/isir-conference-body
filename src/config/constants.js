@@ -42,7 +42,7 @@ export const TICKET_PRICES = {
     standard: 300,
     label: "Trainee (Non-Member)",
   },
-  /** Per congress day (Fri–Sun); total = rate × number of days selected. Korean locals only (enforced server-side). */
+  /** Per congress day (Thu–Sun); total = rate × number of days selected. Korean locals only (enforced server-side). */
   "korea-day-pass": {
     early: 150,
     standard: 200,
@@ -75,6 +75,12 @@ export const CONGRESS_WEEKEND_MEALS = [
 
 export const CONGRESS_WEEKEND_MEAL_KEYS = CONGRESS_WEEKEND_MEALS.map((m) => m.key);
 
+/** Day-pass ticketable dates (Thu–Sun of congress week). */
+export const CONGRESS_DAYPASS_DAYS = [
+  { key: "Thursday", date: "Nov 5, 2026" },
+  ...CONGRESS_WEEKEND_MEALS,
+];
+
 /** Opening / welcome reception is offered for day-pass holders attending Friday. */
 export const DAY_PASS_OPENING_RECEPTION_DAY = "Friday";
 
@@ -98,7 +104,7 @@ export function isSouthKoreaResidenceCountry(country) {
 }
 
 export function formatCongressMealDayLabel(dayKey) {
-  const row = CONGRESS_WEEKEND_MEALS.find((m) => m.key === dayKey);
+  const row = CONGRESS_DAYPASS_DAYS.find((m) => m.key === dayKey);
   return row ? `${row.key} (${row.date})` : String(dayKey || "");
 }
 
