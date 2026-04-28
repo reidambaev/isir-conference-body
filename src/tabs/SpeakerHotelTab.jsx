@@ -462,22 +462,6 @@ export default function SpeakerHotelTab() {
               />
             </div>
           </div>
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            <p>
-              Congress lodging support covers up to <strong>3 nights</strong>{" "}
-              during the congress window ({CONFERENCE_HOTEL_STAY_DATE_MIN} to{" "}
-              {CONFERENCE_HOTEL_STAY_DATE_MAX}). Extra nights can still be
-              requested as information, but may not be covered.
-            </p>
-            <p className="mt-1">
-              Nights within congress window for this selection:{" "}
-              <strong>
-                {Math.min(3, overlapNightsWithinCongress(arrivalDate, departureDate))}
-              </strong>
-              .
-            </p>
-          </div>
-
           {submitError && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
               {submitError}
