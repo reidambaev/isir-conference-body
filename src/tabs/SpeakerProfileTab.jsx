@@ -140,7 +140,7 @@ export default function SpeakerProfileTab() {
           className="text-2xl font-bold mb-2"
           style={{ color: "var(--color-primary)" }}
         >
-          New speaker registration
+          Speaker profile
         </h1>
         <p className="text-gray-600 text-sm leading-relaxed">
           Enter your first, middle (optional), and last name plus affiliation as

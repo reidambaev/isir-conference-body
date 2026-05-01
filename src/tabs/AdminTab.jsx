@@ -4553,7 +4553,7 @@ export default function AdminTab() {
               Speaker Invite Link Generator
             </h2>
             <p className="mt-3 text-sm text-fuchsia-900 bg-fuchsia-50 border border-fuchsia-200 rounded-lg px-3 py-2 max-w-2xl">
-              <span className="font-semibold">New speaker registration:</span>{" "}
+              <span className="font-semibold">Speaker profile:</span>{" "}
               send the public link{" "}
               <code className="text-xs break-all">
                 {typeof window !== "undefined" ? window.location.origin : ""}
@@ -4635,7 +4635,7 @@ export default function AdminTab() {
               Speaker profile queue
             </h2>
             <p className="text-gray-600 text-sm mt-1 max-w-2xl">
-              New speaker registrations (free-text name) from{" "}
+              Speaker profiles (free-text name) from{" "}
               <code className="text-xs">
                 {typeof window !== "undefined" ? window.location.origin : ""}
                 /speaker-profile
