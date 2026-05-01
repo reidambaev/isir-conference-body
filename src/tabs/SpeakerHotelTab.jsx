@@ -208,8 +208,7 @@ export default function SpeakerHotelTab() {
                 {confirmationEmailSent ? (
                   <>
                     A confirmation email with your submitted hotel information
-                    has been
-                    sent to{" "}
+                    has been sent to{" "}
                     {confirmationEmails.map((em, i) => (
                       <React.Fragment key={em}>
                         {i > 0 && " and "}
@@ -230,8 +229,8 @@ export default function SpeakerHotelTab() {
             )}
             <p className="mb-4">
               If you need to change anything, submit this information form again
-              with the
-              same invited-speaker email; your latest submission will be kept.
+              with the same invited-speaker email; your latest submission will
+              be kept.
             </p>
             <a
               href="/"
@@ -260,12 +259,7 @@ export default function SpeakerHotelTab() {
         <p className="text-gray-600 text-sm">
           For ISIR 2026 (Busan). This page is for hotel planning information
           only (not direct hotel booking). You may choose dates outside congress
-          week. Lodging support only applies to up to 3 nights during{" "}
-          <strong>
-            {CONFERENCE_HOTEL_STAY_DATE_MIN} through{" "}
-            {CONFERENCE_HOTEL_STAY_DATE_MAX}
-          </strong>
-          .
+          week.
         </p>
       </div>
 
