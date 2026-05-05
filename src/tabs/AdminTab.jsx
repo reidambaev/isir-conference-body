@@ -1422,6 +1422,14 @@ export default function AdminTab() {
     }
   };
 
+  const openRegistrationQrGenerator = (registrationId) => {
+    if (!registrationId) return;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+      String(registrationId),
+    )}`;
+    window.open(qrUrl, "_blank", "noopener,noreferrer");
+  };
+
   // Start review mode
   const startReviewMode = () => {
     setReviewIndex(0);
@@ -3672,6 +3680,16 @@ export default function AdminTab() {
                                         </dt>
                                         <dd className="font-mono text-xs break-all flex flex-wrap items-center gap-2">
                                           <span>{reg.id}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              openRegistrationQrGenerator(reg.id)
+                                            }
+                                            className="px-2 py-1 rounded-md text-[11px] font-medium bg-emerald-600 text-white hover:bg-emerald-700"
+                                            title="Generate QR code for this registration ID"
+                                          >
+                                            QR
+                                          </button>
                                           <button
                                             type="button"
                                             onClick={() =>

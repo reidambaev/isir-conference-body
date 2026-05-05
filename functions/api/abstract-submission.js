@@ -166,8 +166,10 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Check submission deadline (April 30, 2026)
-    const submissionDeadline = new Date("2026-04-30").getTime();
+    // Check submission window (aligned with SubmissionTab copy)
+    // Open at start of March 15 UTC, close at end of July 1 UTC.
+    const submissionOpens = Date.parse("2026-03-15T00:00:00Z");
+    const submissionDeadline = Date.parse("2026-07-01T23:59:59Z");
     const now = Date.now();
     if (now > submissionDeadline) {
       return new Response(
@@ -181,8 +183,7 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Check if submission window has opened (March 1, 2026)
-    const submissionOpens = new Date("2026-03-01").getTime();
+    // Check if submission window has opened
     if (now < submissionOpens) {
       return new Response(
         JSON.stringify({
