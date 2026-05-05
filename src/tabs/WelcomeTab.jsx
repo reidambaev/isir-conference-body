@@ -2,8 +2,10 @@ import React from "react";
 import presidentHeadshot from "../assets/welcome/welcome-headshot1.jpg";
 import dambaevaHeadshot from "../assets/welcome/welcome-headshot2.jpg";
 import babbetteHeadshot from "../assets/welcome/welcome-headshot3.jpg";
+import sharmaHeadshot from "../assets/welcome/welcome-headshot4.png";
 import presidentSignature from "../assets/welcome/signature1.png";
 import dambaevaSignature from "../assets/welcome/signature2.png";
+import sharmaSignature from "../assets/welcome/signature4.png";
 
 const CHAIRMEN_DATA = [
   {
@@ -72,6 +74,63 @@ const CHAIRMEN_DATA = [
         <br />
         <br />
         With warmest regards,
+      </>
+    ),
+  },
+  {
+    name: "Surendra Sharma",
+    title:
+      "President-Elect, International Society for Immunology of Reproduction",
+    credentials: "MD, PhD",
+    image: sharmaHeadshot,
+    imagePosition: "center 15%",
+    signature: sharmaSignature,
+    message: (
+      <>
+        Dear ISIR Members and Guests,
+        <br />
+        <br />
+        On behalf of the International Society for Immunology of Reproduction
+        (ISIR) and its global members, I welcome you to the 16th World Congress
+        of the Society to be held on November 5-8 in Busan, Korea. The
+        traditional goal of the Congress is to introduce groundbreaking research
+        to young scientists and trainees via their interactions with and
+        lectures by leading investigators and community leaders from across the
+        globe. The ISIR has represented this unique field of reproductive
+        immunology on the global stage for decades, and the theme of the 16th
+        Congress, Global Dialog on Population Balance and Women's Health through
+        Reproductive Immunology, culminates the Society's efforts in the
+        outreach to diverse demographic audiences to highlight the important
+        role of Reproductive Immunology in Women's Health. As several countries
+        face population balance issues, this year's meeting offers a global
+        discussion on this very important topic.
+        <br />
+        <br />
+        Planning such international meetings is time-consuming and requires
+        tremendous commitment and hard work on the part of the Organizing
+        Committee. In this regard, I extend my sincere thanks to the Organizing
+        Committee Chairs Drs. Svetlana Dambaeva, Birdie Lamarca, and Sung-Ki Lee
+        who coordinated with the Scientific Program Organizing Committee and
+        solicited cutting edge themes for scientific sessions with leading
+        investigators as speakers. This has all been possible under the untiring
+        efforts and leadership of the President of ISIR, Dr. Joanne Kwak-Kim.
+        Last but not least, I take this opportunity to thank our Representative
+        Cooperation Directors and local organizers. Their financial and
+        volunteer efforts have set the foundation for an exceptional congress.
+        Because of their leadership, we can expect a scientifically and
+        culturally rich meeting for all global participants.
+        <br />
+        <br />
+        Our organizing committee has been writing to you to mark the important
+        dates in your calendar. We expect robust participation from our global
+        colleagues in Reproductive Medicine/Immunology. The 16th ISIR Congress
+        offers a scientifically rich environment for clinical and scientific
+        interactions, networking, mentorship, and international collaboration.
+        We look forward to welcoming each of you to Busan for a memorable and
+        inspiring world congress.
+        <br />
+        <br />
+        With kind regards,
       </>
     ),
   },

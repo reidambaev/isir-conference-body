@@ -334,6 +334,9 @@ export default function AdminTab() {
   const [inviteFileName, setInviteFileName] = useState("");
   const [inviteCount, setInviteCount] = useState(0);
   const [inviteError, setInviteError] = useState("");
+  const [singleInviteEmail, setSingleInviteEmail] = useState("");
+  const [singleInviteLink, setSingleInviteLink] = useState("");
+  const [singleInviteLoading, setSingleInviteLoading] = useState(false);
   const [envVarsLoading, setEnvVarsLoading] = useState(false);
   const [envVarsError, setEnvVarsError] = useState("");
   const [envBindingNames, setEnvBindingNames] = useState([]);
@@ -799,6 +802,7 @@ export default function AdminTab() {
   const handleInviteFileChange = async (event) => {
     setInviteError("");
     setInviteCount(0);
+    setSingleInviteLink("");
 
     const file = event.target.files?.[0];
     if (!file) return;
@@ -907,6 +911,53 @@ export default function AdminTab() {
     } catch (err) {
       console.error("Failed to generate invite links:", err);
       setInviteError(err?.message || "Failed to process file.");
+    }
+  };
+
+  const handleGenerateSingleInvite = async () => {
+    setInviteError("");
+    setInviteCount(0);
+    setInviteFileName("");
+    setSingleInviteLink("");
+
+    const email = normalizeEmail(singleInviteEmail);
+    if (!email) {
+      setInviteError("Enter a valid speaker email address.");
+      return;
+    }
+    if (!adminToken.trim()) {
+      setInviteError(
+        "Admin token is required to generate speaker invites (stored + validated on the server).",
+      );
+      return;
+    }
+
+    setSingleInviteLoading(true);
+    try {
+      const res = await fetch("/api/admin/speaker-invites/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Token": adminToken.trim(),
+        },
+        body: JSON.stringify({ email }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.success || !json?.token) {
+        throw new Error(
+          json?.error || `Failed to create invite for ${email} (HTTP ${res.status})`,
+        );
+      }
+
+      const base = "https://isir2026.org";
+      setSingleInviteLink(
+        `${base}/registration?invite=${encodeURIComponent(String(json.token))}`,
+      );
+    } catch (err) {
+      console.error("Failed to generate single invite link:", err);
+      setInviteError(err?.message || "Failed to generate invite link.");
+    } finally {
+      setSingleInviteLoading(false);
     }
   };
 
@@ -4581,6 +4632,44 @@ export default function AdminTab() {
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <div className="rounded-lg border border-fuchsia-100 bg-fuchsia-50/40 p-4 space-y-3">
+              <p className="text-sm font-medium text-fuchsia-900">
+                Generate one invite link from just an email
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                <input
+                  type="email"
+                  value={singleInviteEmail}
+                  onChange={(e) => setSingleInviteEmail(e.target.value)}
+                  placeholder="speaker@institution.edu"
+                  className="w-full sm:max-w-md border border-fuchsia-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-200 focus:border-fuchsia-400"
+                />
+                <button
+                  type="button"
+                  onClick={handleGenerateSingleInvite}
+                  disabled={singleInviteLoading}
+                  className="inline-flex justify-center items-center px-4 py-2 rounded-lg bg-fuchsia-700 text-white text-sm font-semibold hover:bg-fuchsia-800 disabled:opacity-60"
+                >
+                  {singleInviteLoading ? "Generating..." : "Generate invite link"}
+                </button>
+              </div>
+              {singleInviteLink && (
+                <div className="text-sm text-fuchsia-900">
+                  <span className="font-semibold">Invite link:</span>{" "}
+                  <a
+                    href={singleInviteLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline break-all"
+                  >
+                    {singleInviteLink}
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-gray-100" />
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Upload speaker file (Excel/CSV)
