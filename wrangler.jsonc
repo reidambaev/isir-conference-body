@@ -17,6 +17,10 @@
   // R2 Storage binding for trainee verification letters
   "r2_buckets": [
     {
+      "binding": "SPEAKER_PHOTOS_BUCKET",
+      "bucket_name": "isir-speaker-photos"
+    },
+    {
       "binding": "TRAINEE_LETTERS_BUCKET",
       "bucket_name": "isir-trainee-letters"
     }

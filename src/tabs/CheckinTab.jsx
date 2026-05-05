@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { CONGRESS_WEEKEND_MEAL_KEYS, formatCongressMealDayList } from "../config/constants";
+import { CONGRESS_WEEKEND_MEAL_KEYS, CONGRESS_WEEKEND_MEALS } from "../config/constants";
 
 const CHECKIN_READER_ID = "checkin-html5-qrcode";
 
@@ -11,6 +11,8 @@ const REGISTRATION_TICKET_LABELS = {
   "invited-speaker": "Invited Speaker",
   "korea-day-pass": "Daypass (Korean locals only)",
 };
+
+const LOCALHOST_NAMES = new Set(["localhost", "127.0.0.1", "::1"]);
 
 function normalizeWeekendMealDayList(raw) {
   const LEGACY = { "Nov 6": "Friday", "Nov 7": "Saturday", "Nov 8": "Sunday" };
@@ -35,6 +37,18 @@ function registrationBreakfastDaysForDisplay(reg) {
   return normalizeWeekendMealDayList(reg.dinner_days);
 }
 
+function getMealDisplayRows(dayKeys) {
+  if (!Array.isArray(dayKeys) || dayKeys.length === 0) return [];
+  return dayKeys.map((key) => {
+    const row = CONGRESS_WEEKEND_MEALS.find((item) => item.key === key);
+    return {
+      key,
+      day: row?.key || key,
+      date: row?.date || "",
+    };
+  });
+}
+
 export default function CheckinTab() {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [scannerStatus, setScannerStatus] = useState("idle");
@@ -43,6 +57,8 @@ export default function CheckinTab() {
   const [scannedValue, setScannedValue] = useState("");
   const [resolvedRegistration, setResolvedRegistration] = useState(null);
   const [lastAttemptedId, setLastAttemptedId] = useState("");
+  const isLocalhost =
+    typeof window !== "undefined" && LOCALHOST_NAMES.has(window.location.hostname);
 
   const html5QrRef = useRef(null);
   const stoppingRef = useRef(false);
@@ -191,6 +207,27 @@ export default function CheckinTab() {
     stopScanner,
   ]);
 
+  const loadLocalExample = useCallback(() => {
+    if (!isLocalhost) return;
+    setLookupLoading(false);
+    setScannerError("");
+    setScannedValue("LOCALHOST_EXAMPLE_DATA");
+    setLastAttemptedId("");
+    setResolvedRegistration({
+      id: "EXAMPLE-0001",
+      first_name: "Taylor",
+      last_name: "Kim",
+      email: "taylor.kim@example.com",
+      ticket_type: "isir-member",
+      accompanying_count: 1,
+      is_invited_speaker: 0,
+      opening_reception_attending: 1,
+      gala_dinner_attending: 0,
+      lunch_days: JSON.stringify(["Friday", "Saturday"]),
+      breakfast_days: JSON.stringify(["Saturday", "Sunday"]),
+    });
+  }, [isLocalhost]);
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div>
@@ -257,6 +294,15 @@ export default function CheckinTab() {
               Find
             </button>
           </div>
+          {isLocalhost ? (
+            <button
+              type="button"
+              onClick={loadLocalExample}
+              className="mt-3 inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+            >
+              Load localhost example
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -266,17 +312,17 @@ export default function CheckinTab() {
           <p className="text-sm text-gray-600">Loading attendee information…</p>
         ) : resolvedRegistration ? (
           <div className="space-y-6 text-sm">
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Attendee name</p>
+              <p className="mt-1 text-3xl font-bold tracking-tight text-gray-900">
+                {`${resolvedRegistration.first_name || ""} ${resolvedRegistration.last_name || ""}`.trim() ||
+                  "—"}
+              </p>
+            </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-x-8">
               <DetailRow
                 label="Registration ID"
                 value={<span className="font-mono text-[13px]">{resolvedRegistration.id || "—"}</span>}
-              />
-              <DetailRow
-                label="Name"
-                value={
-                  `${resolvedRegistration.first_name || ""} ${resolvedRegistration.last_name || ""}`.trim() ||
-                  "—"
-                }
               />
               <DetailRow label="Email" value={resolvedRegistration.email || "—"} />
               <DetailRow
@@ -287,52 +333,46 @@ export default function CheckinTab() {
                   "—"
                 }
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <DetailRow
                 label="Accompanying guests"
                 value={Number(resolvedRegistration.accompanying_count || 0)}
+                emphasized
               />
               <DetailRow
                 label="Invited speaker"
                 value={Number(resolvedRegistration.is_invited_speaker || 0) === 1 ? "Yes" : "No"}
-              />
-              <DetailRow
-                label="Opening reception"
-                value={
-                  Number(resolvedRegistration.opening_reception_attending || 0) === 1
-                    ? "Attending"
-                    : "Not attending"
-                }
-              />
-              <DetailRow
-                label="Gala dinner"
-                value={
-                  Number(resolvedRegistration.gala_dinner_attending || 0) === 1
-                    ? "Attending"
-                    : "Not attending"
-                }
+                emphasized
               />
             </div>
-            <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <DetailRow
-                label="Lunch selections"
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <EventStatusCard
+                title="Welcome reception"
+                attending={Number(resolvedRegistration.opening_reception_attending || 0) === 1}
+              />
+              <EventStatusCard
+                title="Gala dinner"
+                attending={Number(resolvedRegistration.gala_dinner_attending || 0) === 1}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <MealCard
+                title="Lunch selections"
                 value={(() => {
-                  const lunch = normalizeWeekendMealDayList(
+                  const lunch = getMealDisplayRows(normalizeWeekendMealDayList(
                     resolvedRegistration.lunch_days,
-                  );
-                  return lunch.length
-                    ? formatCongressMealDayList(lunch)
-                    : "Not selected";
+                  ));
+                  return lunch;
                 })()}
               />
-              <DetailRow
-                label="Breakfast selections"
+              <MealCard
+                title="Breakfast selections"
                 value={(() => {
-                  const breakfast = registrationBreakfastDaysForDisplay(
+                  const breakfast = getMealDisplayRows(registrationBreakfastDaysForDisplay(
                     resolvedRegistration,
-                  );
-                  return breakfast.length
-                    ? formatCongressMealDayList(breakfast)
-                    : "Not selected";
+                  ));
+                  return breakfast;
                 })()}
               />
             </div>
@@ -349,12 +389,71 @@ export default function CheckinTab() {
   );
 }
 
-function DetailRow({ label, value }) {
+function DetailRow({ label, value, emphasized = false }) {
   return (
-    <p className="leading-relaxed">
-      <span className="block text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</span>
-      <span className="mt-0.5 block text-sm text-gray-900">{value}</span>
+    <p
+      className={`leading-relaxed ${emphasized ? "rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2" : ""}`}
+    >
+      <span
+        className={`block font-semibold uppercase tracking-wide ${emphasized ? "text-sm text-indigo-700" : "text-xs text-gray-500"}`}
+      >
+        {label}
+      </span>
+      <span className={`block text-gray-900 ${emphasized ? "mt-1 text-2xl font-bold" : "mt-0.5 text-sm"}`}>
+        {value}
+      </span>
     </p>
+  );
+}
+
+function MealCard({ title, value }) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</p>
+      {value.length ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {value.map((item) => (
+            <div key={item.key} className="rounded-md border border-indigo-200 bg-white px-3 py-2">
+              <p className="text-sm font-semibold text-gray-900">{item.day}</p>
+              <p className="text-xs text-gray-600">{item.date}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-1 text-sm font-medium text-gray-500">Not selected</p>
+      )}
+    </div>
+  );
+}
+
+function AttendanceBadge({ attending, large = false }) {
+  const sizeClasses = large ? "px-3 py-1.5 text-sm" : "px-2.5 py-1 text-xs";
+  if (attending) {
+    return (
+      <span
+        className={`inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 font-semibold text-emerald-700 ${sizeClasses}`}
+      >
+        Attending
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border border-rose-200 bg-rose-50 font-semibold text-rose-700 ${sizeClasses}`}
+    >
+      Not attending
+    </span>
+  );
+}
+
+function EventStatusCard({ title, attending }) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</p>
+      <p className="mt-2">
+        <AttendanceBadge attending={attending} large />
+      </p>
+    </div>
   );
 }
 
