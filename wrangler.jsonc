@@ -31,5 +31,11 @@
       "enabled": true,
       "invocation_logs": true
     }
+  },
+  // Separate Worker name + URL; inherits D1/R2/bindings from root unless overridden here.
+  "env": {
+    "preview": {
+      "name": "isir-conference-2026-preview"
+    }
   }
 }
