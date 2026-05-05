@@ -238,6 +238,8 @@ const CHAIRMEN_DATA = [
         <br />
         <br />
         Warm regards,
+        <br />
+        Babbette LaMarca
       </>
     ),
   },

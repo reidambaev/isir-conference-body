@@ -192,17 +192,18 @@ export default function CheckinTab() {
   ]);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Badge check-in</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Badge check-in</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-700">
           Scan the QR on the confirmation PDF or type the registration ID below.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="font-semibold text-gray-800 mb-3">Camera</h3>
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-1 text-base font-semibold text-gray-900">Camera scanner</h3>
+          <p className="mb-4 text-sm text-gray-600">Point your camera at the attendee QR code.</p>
           <div
             id={CHECKIN_READER_ID}
             className="rounded-lg overflow-hidden bg-gray-900 min-h-[280px] w-full [&_video]:object-cover [&_video]:w-full [&_video]:h-full"
@@ -225,24 +226,27 @@ export default function CheckinTab() {
             </button>
           </div>
           {scannerError ? (
-            <p className="mt-3 text-sm text-red-600">{scannerError}</p>
+            <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+              {scannerError}
+            </p>
           ) : null}
           {scannedValue ? (
-            <p className="mt-2 text-xs text-gray-500 break-words">
-              Scanned: {scannedValue}
+            <p className="mt-2 break-words rounded-md bg-gray-50 px-3 py-2 font-mono text-xs text-gray-600">
+              Scanned payload: {scannedValue}
             </p>
           ) : null}
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="font-semibold text-gray-800 mb-3">Manual lookup</h3>
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-1 text-base font-semibold text-gray-900">Manual lookup</h3>
+          <p className="mb-4 text-sm text-gray-600">Use this when camera scanning is unavailable.</p>
           <div className="flex gap-2">
             <input
               type="text"
               value={manualRegistrationId}
               onChange={(e) => setManualRegistrationId(e.target.value)}
               placeholder="Paste registration ID or scanned text"
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             />
             <button
               type="button"
@@ -256,86 +260,101 @@ export default function CheckinTab() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
-        <h3 className="font-semibold text-gray-800 mb-3">Result</h3>
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <h3 className="mb-4 text-base font-semibold text-gray-900">Registration details</h3>
         {lookupLoading ? (
-          <p className="text-gray-600">Loading…</p>
+          <p className="text-sm text-gray-600">Loading attendee information…</p>
         ) : resolvedRegistration ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
-            <p>
-              <span className="text-gray-500">Registration ID:</span>{" "}
-              <span className="font-mono">{resolvedRegistration.id}</span>
-            </p>
-            <p>
-              <span className="text-gray-500">Name:</span>{" "}
-              {`${resolvedRegistration.first_name || ""} ${resolvedRegistration.last_name || ""}`.trim() ||
-                "—"}
-            </p>
-            <p>
-              <span className="text-gray-500">Email:</span>{" "}
-              {resolvedRegistration.email || "—"}
-            </p>
-            <p>
-              <span className="text-gray-500">Ticket:</span>{" "}
-              {REGISTRATION_TICKET_LABELS[resolvedRegistration.ticket_type] ||
-                resolvedRegistration.ticket_type ||
-                "—"}
-            </p>
-            <p>
-              <span className="text-gray-500">Accompanying:</span>{" "}
-              {Number(resolvedRegistration.accompanying_count || 0)}
-            </p>
-            <p>
-              <span className="text-gray-500">Invited speaker:</span>{" "}
-              {Number(resolvedRegistration.is_invited_speaker || 0) === 1
-                ? "Yes"
-                : "No"}
-            </p>
-            <p>
-              <span className="text-gray-500">Opening reception:</span>{" "}
-              {Number(resolvedRegistration.opening_reception_attending || 0) ===
-              1
-                ? "Attending"
-                : "Not attending"}
-            </p>
-            <p>
-              <span className="text-gray-500">Gala dinner:</span>{" "}
-              {Number(resolvedRegistration.gala_dinner_attending || 0) === 1
-                ? "Attending"
-                : "Not attending"}
-            </p>
-            <p className="md:col-span-2">
-              <span className="text-gray-500">Lunch:</span>{" "}
-              {(() => {
-                const lunch = normalizeWeekendMealDayList(
-                  resolvedRegistration.lunch_days,
-                );
-                return lunch.length
-                  ? formatCongressMealDayList(lunch)
-                  : "Not selected";
-              })()}
-            </p>
-            <p className="md:col-span-2">
-              <span className="text-gray-500">Breakfast:</span>{" "}
-              {(() => {
-                const breakfast = registrationBreakfastDaysForDisplay(
-                  resolvedRegistration,
-                );
-                return breakfast.length
-                  ? formatCongressMealDayList(breakfast)
-                  : "Not selected";
-              })()}
-            </p>
+          <div className="space-y-6 text-sm">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-x-8">
+              <DetailRow
+                label="Registration ID"
+                value={<span className="font-mono text-[13px]">{resolvedRegistration.id || "—"}</span>}
+              />
+              <DetailRow
+                label="Name"
+                value={
+                  `${resolvedRegistration.first_name || ""} ${resolvedRegistration.last_name || ""}`.trim() ||
+                  "—"
+                }
+              />
+              <DetailRow label="Email" value={resolvedRegistration.email || "—"} />
+              <DetailRow
+                label="Ticket"
+                value={
+                  REGISTRATION_TICKET_LABELS[resolvedRegistration.ticket_type] ||
+                  resolvedRegistration.ticket_type ||
+                  "—"
+                }
+              />
+              <DetailRow
+                label="Accompanying guests"
+                value={Number(resolvedRegistration.accompanying_count || 0)}
+              />
+              <DetailRow
+                label="Invited speaker"
+                value={Number(resolvedRegistration.is_invited_speaker || 0) === 1 ? "Yes" : "No"}
+              />
+              <DetailRow
+                label="Opening reception"
+                value={
+                  Number(resolvedRegistration.opening_reception_attending || 0) === 1
+                    ? "Attending"
+                    : "Not attending"
+                }
+              />
+              <DetailRow
+                label="Gala dinner"
+                value={
+                  Number(resolvedRegistration.gala_dinner_attending || 0) === 1
+                    ? "Attending"
+                    : "Not attending"
+                }
+              />
+            </div>
+            <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <DetailRow
+                label="Lunch selections"
+                value={(() => {
+                  const lunch = normalizeWeekendMealDayList(
+                    resolvedRegistration.lunch_days,
+                  );
+                  return lunch.length
+                    ? formatCongressMealDayList(lunch)
+                    : "Not selected";
+                })()}
+              />
+              <DetailRow
+                label="Breakfast selections"
+                value={(() => {
+                  const breakfast = registrationBreakfastDaysForDisplay(
+                    resolvedRegistration,
+                  );
+                  return breakfast.length
+                    ? formatCongressMealDayList(breakfast)
+                    : "Not selected";
+                })()}
+              />
+            </div>
           </div>
         ) : scannerError || lastAttemptedId ? (
-          <p className="text-red-600">
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
             {scannerError || `Registration "${lastAttemptedId}" not found.`}
           </p>
         ) : (
-          <p className="text-gray-500">Nothing looked up yet.</p>
+          <p className="text-sm text-gray-500">No registration has been looked up yet.</p>
         )}
       </div>
     </div>
+  );
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <p className="leading-relaxed">
+      <span className="block text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</span>
+      <span className="mt-0.5 block text-sm text-gray-900">{value}</span>
+    </p>
   );
 }
 

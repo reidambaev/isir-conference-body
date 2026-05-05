@@ -341,6 +341,12 @@ export default function AdminTab() {
   const [envVarsError, setEnvVarsError] = useState("");
   const [envBindingNames, setEnvBindingNames] = useState([]);
   const [envConfiguredVars, setEnvConfiguredVars] = useState([]);
+  const [discountAdmin, setDiscountAdmin] = useState(null);
+  const [discountLimitInput, setDiscountLimitInput] = useState("");
+  const [discountAdminLoading, setDiscountAdminLoading] = useState(false);
+  const [discountAdminSaving, setDiscountAdminSaving] = useState(false);
+  const [discountAdminError, setDiscountAdminError] = useState("");
+  const [discountAdminSaveMessage, setDiscountAdminSaveMessage] = useState("");
   const [showTestPaymentModal, setShowTestPaymentModal] = useState(false);
   const [testPaymentClientSecret, setTestPaymentClientSecret] = useState("");
   const [testPaymentLoading, setTestPaymentLoading] = useState(false);
@@ -634,11 +640,78 @@ export default function AdminTab() {
     }
   }, [adminToken]);
 
+  const fetchDiscountAdmin = useCallback(async () => {
+    if (!adminToken.trim()) return;
+    setDiscountAdminLoading(true);
+    setDiscountAdminError("");
+    try {
+      const res = await fetch("/api/admin/discount-code", {
+        method: "GET",
+        headers: {
+          "X-Admin-Token": adminToken,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to load discount settings.");
+      }
+      const discount = data?.discount || null;
+      setDiscountAdmin(discount);
+      setDiscountLimitInput(
+        discount?.maxUses == null ? "" : String(discount.maxUses),
+      );
+    } catch (err) {
+      setDiscountAdminError(err?.message || "Failed to load discount settings.");
+    } finally {
+      setDiscountAdminLoading(false);
+    }
+  }, [adminToken]);
+
+  const saveDiscountUsageLimit = useCallback(async () => {
+    if (!adminToken.trim()) return;
+    setDiscountAdminSaving(true);
+    setDiscountAdminError("");
+    setDiscountAdminSaveMessage("");
+    try {
+      const payload = {
+        maxUses:
+          discountLimitInput.trim() === ""
+            ? null
+            : Number(discountLimitInput.trim()),
+      };
+      const res = await fetch("/api/admin/discount-code", {
+        method: "PATCH",
+        headers: {
+          "X-Admin-Token": adminToken,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to save discount settings.");
+      }
+      const discount = data?.discount || null;
+      setDiscountAdmin(discount);
+      setDiscountLimitInput(
+        discount?.maxUses == null ? "" : String(discount.maxUses),
+      );
+      setDiscountAdminSaveMessage("Discount usage limit updated.");
+    } catch (err) {
+      setDiscountAdminError(err?.message || "Failed to save discount settings.");
+    } finally {
+      setDiscountAdminSaving(false);
+    }
+  }, [adminToken, discountLimitInput]);
+
   useEffect(() => {
     if (activeSection === "environment") {
       fetchEnvVars();
     }
-  }, [activeSection, fetchEnvVars]);
+    if (activeSection === "discount") {
+      fetchDiscountAdmin();
+    }
+  }, [activeSection, fetchEnvVars, fetchDiscountAdmin]);
 
   const generateRandomPassword = () => {
     const length = 12;
@@ -1611,6 +1684,16 @@ export default function AdminTab() {
               {pendingSpeakerProfileCount}
             </span>
           ) : null}
+        </button>
+        <button
+          onClick={() => setActiveSection("discount")}
+          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+            activeSection === "discount"
+              ? "bg-lime-600 text-white shadow-md"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Discount
         </button>
         <button
           onClick={() => setActiveSection("environment")}
@@ -4925,6 +5008,119 @@ export default function AdminTab() {
                   )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Discount Section */}
+      {activeSection === "discount" && (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold text-gray-800">
+                Discount Controls
+              </h2>
+              <p className="text-gray-600 text-sm mt-1 max-w-2xl">
+                View current discount availability and enforce a usage limit.
+              </p>
+            </div>
+            <button
+              onClick={fetchDiscountAdmin}
+              disabled={discountAdminLoading || discountAdminSaving}
+              className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors text-sm font-medium"
+            >
+              {discountAdminLoading ? "Loading..." : "Refresh Discount"}
+            </button>
+          </div>
+
+          {(discountAdminError || discountAdminSaveMessage) && (
+            <div
+              className={`text-sm rounded-lg px-3 py-2 border ${
+                discountAdminError
+                  ? "text-red-700 bg-red-50 border-red-200"
+                  : "text-emerald-700 bg-emerald-50 border-emerald-200"
+              }`}
+            >
+              {discountAdminError || discountAdminSaveMessage}
+            </div>
+          )}
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Discount code usage
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Track redemptions and set an optional maximum number of uses.
+                </p>
+              </div>
+            </div>
+
+            {!discountAdmin ? (
+              <p className="text-sm text-gray-500">
+                {discountAdminLoading
+                  ? "Loading discount settings..."
+                  : "Discount settings are unavailable."}
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <div className="text-gray-500">Code configured</div>
+                    <div className="mt-1 font-mono text-xs text-gray-800">
+                      {discountAdmin.code || "-"}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <div className="text-gray-500">Discount amount (USD)</div>
+                    <div className="mt-1 font-semibold text-gray-900">
+                      {Number(discountAdmin.amountUsd || 0)}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <div className="text-gray-500">Times used</div>
+                    <div className="mt-1 font-semibold text-gray-900">
+                      {Number(discountAdmin.usedCount || 0)}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <div className="text-gray-500">Uses remaining</div>
+                    <div className="mt-1 font-semibold text-gray-900">
+                      {discountAdmin.maxUses == null
+                        ? "Unlimited"
+                        : Number(discountAdmin.remainingUses || 0)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="text-sm text-gray-700">
+                    Usage limit (blank = unlimited)
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={discountLimitInput}
+                      onChange={(e) => setDiscountLimitInput(e.target.value)}
+                      className="mt-1 w-56 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block"
+                      disabled={discountAdminSaving || !discountAdmin.enabled}
+                    />
+                  </label>
+                  <button
+                    onClick={saveDiscountUsageLimit}
+                    disabled={
+                      discountAdminSaving ||
+                      discountAdminLoading ||
+                      !discountAdmin.enabled
+                    }
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+                  >
+                    {discountAdminSaving ? "Saving..." : "Save limit"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

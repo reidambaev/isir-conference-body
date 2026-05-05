@@ -190,6 +190,15 @@ async function handleApiRequest(request, env, url) {
   if (url.pathname === "/api/discount-code/verify" && request.method === "GET") {
     return handleVerifyDiscountCode(env, url, corsHeaders);
   }
+  if (url.pathname === "/api/admin/discount-code" && request.method === "GET") {
+    return handleAdminGetDiscountCode(request, env, corsHeaders);
+  }
+  if (
+    url.pathname === "/api/admin/discount-code" &&
+    request.method === "PATCH"
+  ) {
+    return handleAdminUpdateDiscountCode(request, env, corsHeaders);
+  }
 
   // GET /api/checkin/registration/:id — public read for badge booth (no admin token)
   const checkinRegistrationMatch = url.pathname.match(
@@ -600,6 +609,92 @@ function isValidFlatDiscountCode(env, rawCode) {
   const code = typeof rawCode === "string" ? rawCode.trim() : "";
   if (!enabled || code.length === 0) return false;
   return code.toLowerCase() === expectedCode.toLowerCase();
+}
+
+function normalizeDiscountCode(rawCode) {
+  return String(rawCode || "").trim().toLowerCase();
+}
+
+async function ensureDiscountCodeTables(env) {
+  if (!env?.ISIR_DB) return;
+  await env.ISIR_DB.prepare(
+    `CREATE TABLE IF NOT EXISTS discount_code_settings (
+      code TEXT PRIMARY KEY,
+      max_uses INTEGER,
+      updated_at INTEGER NOT NULL,
+      updated_by TEXT
+    )`,
+  ).run();
+  await env.ISIR_DB.prepare(
+    `CREATE TABLE IF NOT EXISTS discount_code_redemptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL,
+      email TEXT NOT NULL,
+      registration_id TEXT,
+      redeemed_at INTEGER NOT NULL,
+      UNIQUE(code, email)
+    )`,
+  ).run();
+  await env.ISIR_DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_discount_redemptions_code
+     ON discount_code_redemptions (code)`,
+  ).run();
+}
+
+async function getDiscountUsage(env, rawCode) {
+  const code = normalizeDiscountCode(rawCode);
+  if (!env?.ISIR_DB || !code) {
+    return { code, maxUses: null, usedCount: 0, remainingUses: null };
+  }
+  await ensureDiscountCodeTables(env);
+  const settings = await env.ISIR_DB.prepare(
+    `SELECT max_uses FROM discount_code_settings WHERE code = ? LIMIT 1`,
+  )
+    .bind(code)
+    .first();
+  const used = await env.ISIR_DB.prepare(
+    `SELECT COUNT(*) AS count FROM discount_code_redemptions WHERE code = ?`,
+  )
+    .bind(code)
+    .first();
+  const maxUses =
+    settings && settings.max_uses != null ? Number(settings.max_uses) : null;
+  const usedCount = Number(used?.count || 0);
+  const remainingUses =
+    maxUses == null ? null : Math.max(0, Number(maxUses) - usedCount);
+  return { code, maxUses, usedCount, remainingUses };
+}
+
+async function upsertDiscountUsageLimit(env, rawCode, maxUses, updatedBy) {
+  const code = normalizeDiscountCode(rawCode);
+  if (!env?.ISIR_DB || !code) return;
+  await ensureDiscountCodeTables(env);
+  await env.ISIR_DB.prepare(
+    `INSERT INTO discount_code_settings (code, max_uses, updated_at, updated_by)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(code) DO UPDATE SET
+       max_uses = excluded.max_uses,
+       updated_at = excluded.updated_at,
+       updated_by = excluded.updated_by`,
+  )
+    .bind(code, maxUses, Date.now(), updatedBy || "admin")
+    .run();
+}
+
+async function upsertDiscountRedemption(env, rawCode, email, registrationId) {
+  const code = normalizeDiscountCode(rawCode);
+  const normalizedEmail = normalizeEmail(email);
+  if (!env?.ISIR_DB || !code || !normalizedEmail) return;
+  await ensureDiscountCodeTables(env);
+  await env.ISIR_DB.prepare(
+    `INSERT INTO discount_code_redemptions (code, email, registration_id, redeemed_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(code, email) DO UPDATE SET
+       registration_id = excluded.registration_id,
+       redeemed_at = excluded.redeemed_at`,
+  )
+    .bind(code, normalizedEmail, registrationId || null, Date.now())
+    .run();
 }
 
 async function handleAdminCreateSpeakerInvite(request, env, corsHeaders) {
@@ -1792,6 +1887,20 @@ async function handleRegistration(request, env, corsHeaders) {
       );
     }
     if (hasValidFlatDiscountCode) {
+      const discountUsage = await getDiscountUsage(env, discountCodeRaw);
+      if (
+        discountUsage.maxUses != null &&
+        Number(discountUsage.remainingUses || 0) <= 0
+      ) {
+        return jsonResponse(
+          {
+            success: false,
+            error: "This discount code has reached its usage limit",
+          },
+          409,
+          corsHeaders,
+        );
+      }
       totalPrice = flatDiscountUsd;
     }
 
@@ -1883,6 +1992,15 @@ async function handleRegistration(request, env, corsHeaders) {
       )
       .run();
 
+    if (hasValidFlatDiscountCode) {
+      await upsertDiscountRedemption(
+        env,
+        discountCodeRaw,
+        normalizedEmail,
+        registrationId,
+      );
+    }
+
     if (isInvitedSpeaker && totalPrice === 0 && env.ISIR_DB) {
       try {
         await env.ISIR_DB.prepare(
@@ -1955,16 +2073,28 @@ async function handleVerifyDiscountCode(env, url, corsHeaders) {
     }
     const { amountUsd, enabled } = getFlatDiscountConfig(env);
     const valid = isValidFlatDiscountCode(env, code);
+    const usage = valid
+      ? await getDiscountUsage(env, code)
+      : { maxUses: null, usedCount: null, remainingUses: null };
+    const isExhausted =
+      valid &&
+      usage.maxUses != null &&
+      Number(usage.remainingUses || 0) <= 0;
     return jsonResponse(
       {
         success: true,
-        valid,
+        valid: valid && !isExhausted,
         amountUsd: valid ? amountUsd : null,
+        maxUses: usage.maxUses,
+        usedCount: usage.usedCount,
+        remainingUses: usage.remainingUses,
         error: !enabled
           ? "Discount code feature is not configured"
-          : valid
-            ? null
-            : "Invalid discount code",
+          : !valid
+            ? "Invalid discount code"
+            : isExhausted
+              ? "This discount code has reached its usage limit"
+              : null,
       },
       200,
       corsHeaders,
@@ -1975,6 +2105,100 @@ async function handleVerifyDiscountCode(env, url, corsHeaders) {
         success: false,
         valid: false,
         error: error?.message || "Failed to verify discount code",
+      },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleAdminGetDiscountCode(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+    const { expectedCode, amountUsd, enabled } = getFlatDiscountConfig(env);
+    const usage = enabled
+      ? await getDiscountUsage(env, expectedCode)
+      : { maxUses: null, usedCount: 0, remainingUses: null };
+    return jsonResponse(
+      {
+        success: true,
+        discount: {
+          code: expectedCode || "",
+          enabled,
+          amountUsd,
+          maxUses: usage.maxUses,
+          usedCount: usage.usedCount,
+          remainingUses: usage.remainingUses,
+        },
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    return jsonResponse(
+      {
+        success: false,
+        error: error?.message || "Failed to load discount details",
+      },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleAdminUpdateDiscountCode(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+    const { expectedCode, enabled, amountUsd } = getFlatDiscountConfig(env);
+    if (!enabled || !expectedCode) {
+      return jsonResponse(
+        { success: false, error: "Discount code feature is not configured" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const rawMaxUses = body?.maxUses;
+    let nextMaxUses = null;
+    if (rawMaxUses == null || rawMaxUses === "") {
+      nextMaxUses = null;
+    } else {
+      const parsed = Number(rawMaxUses);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        return jsonResponse(
+          { success: false, error: "maxUses must be a non-negative number" },
+          400,
+          corsHeaders,
+        );
+      }
+      nextMaxUses = Math.floor(parsed);
+    }
+
+    await upsertDiscountUsageLimit(env, expectedCode, nextMaxUses, "admin");
+    const usage = await getDiscountUsage(env, expectedCode);
+    return jsonResponse(
+      {
+        success: true,
+        discount: {
+          code: expectedCode,
+          enabled: true,
+          amountUsd,
+          maxUses: usage.maxUses,
+          usedCount: usage.usedCount,
+          remainingUses: usage.remainingUses,
+        },
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    return jsonResponse(
+      {
+        success: false,
+        error: error?.message || "Failed to update discount settings",
       },
       500,
       corsHeaders,
