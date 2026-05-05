@@ -2882,6 +2882,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
     if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
       const safeNotes =
         notes && String(notes).trim() ? String(notes).trim() : "";
+      const submittedAt = formatVisaSubmittedAt(timestamp);
       await sendVisaReviewerNotificationEmail(env, {
         visaRequestId,
         name,
