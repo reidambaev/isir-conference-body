@@ -1,7 +1,7 @@
 import React from "react";
 import heroSkyline from "../assets/hero_skyline.jpg";
 
-const HeroSection = ({ onRegisterClick }) => {
+const HeroSection = () => {
   const scrollToNav = () => {
     const navElement = document.getElementById("navigation");
     if (navElement) {
@@ -21,7 +21,7 @@ const HeroSection = ({ onRegisterClick }) => {
           opacity: 0.5,
         }}
       ></div>
-      <div className="items-center relative max-w-7xl mx-auto px-4 py-10 sm:px-6 lg:px-8 text-center flex-1 flex flex-col justify-center">
+      <div className="items-center relative max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 text-center flex-1 flex flex-col justify-center">
         <span
           className="inline-block px-4 py-1 mb-4 text-md font-semibold rounded-full whitespace-nowrap"
           style={{
@@ -83,39 +83,32 @@ const HeroSection = ({ onRegisterClick }) => {
           </div>
         </div>
 
-        <div className="flex flex-wrap justify-center gap-4 mb-10">
+        <div className="flex flex-wrap justify-center gap-4">
           <button
             type="button"
-            onClick={onRegisterClick}
-            className="px-8 py-3 text-xl font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer"
+            onClick={scrollToNav}
+            className="px-8 py-3 text-xl font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer inline-flex items-center gap-2"
             style={{
               backgroundColor: "var(--color-secondary)",
               color: "var(--color-primary)",
             }}
           >
-            Register Now
+            Learn More
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
           </button>
         </div>
-
-        <button
-          onClick={scrollToNav}
-          className="text-white hover:text-blue-200 transition-colors flex items-center gap-2 mx-auto animate-bounce"
-        >
-          <span className="text-lg">Learn More</span>
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-        </button>
       </div>
     </section>
   );

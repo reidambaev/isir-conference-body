@@ -361,17 +361,7 @@ export default function App() {
 
         {/* Hero Section - grows to fill remaining space */}
         <div className="flex-1 flex flex-col">
-          <HeroSection
-            onRegisterClick={() => {
-              setActiveTab("registration");
-              setTimeout(() => {
-                const navElement = document.getElementById("navigation");
-                if (navElement) {
-                  navElement.scrollIntoView({ behavior: "smooth" });
-                }
-              }, 100);
-            }}
-          />
+          <HeroSection />
         </div>
 
         {/* Stats Bar - at bottom of viewport */}
