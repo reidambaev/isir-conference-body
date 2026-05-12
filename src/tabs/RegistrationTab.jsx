@@ -11,14 +11,12 @@ const RegistrationTab = () => {
       ? new URLSearchParams(window.location.search)
       : null;
   const hasInviteLink = Boolean(params?.get("invite"));
-  const registrationOpen =
-    REGISTRATION_OPEN || isPreviewMode() || hasInviteLink;
+  const registrationOpen = REGISTRATION_OPEN || isPreviewMode();
   const inPreviewMode = isPreviewMode();
 
-  // Auto-open form when coming from an invite link
   useEffect(() => {
-    if (hasInviteLink) setShowRegistrationForm(true);
-  }, [hasInviteLink]);
+    if (hasInviteLink && registrationOpen) setShowRegistrationForm(true);
+  }, [hasInviteLink, registrationOpen]);
 
   if (showRegistrationForm && registrationOpen) {
     return <RegistrationForm onClose={() => setShowRegistrationForm(false)} />;
@@ -52,13 +50,12 @@ const RegistrationTab = () => {
           </svg>
           <div>
             <p className="font-semibold">
-              Registration is currently closed and the opening has been delayed
-              due to technical issues.
+              Registration is temporarily closed and will be available again
+              soon.
             </p>
             <p>
-              All details below are for your information. We are working to
-              resolve the issue as quickly as possible—please check back later
-              for updates on when registration will open.
+              All details below are for your information. Please check back
+              shortly—we'll reopen registration as soon as possible.
             </p>
           </div>
         </div>
@@ -217,7 +214,9 @@ const RegistrationTab = () => {
             className="px-8 py-3 rounded-xl font-bold shadow-md transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
             style={{ backgroundColor: "var(--color-primary)", color: "white" }}
           >
-            {registrationOpen ? "Register Now" : "Registration closed"}
+            {registrationOpen
+              ? "Register Now"
+              : "Registration temporarily closed"}
           </button>
         </div>
       </div>
@@ -555,7 +554,9 @@ const RegistrationTab = () => {
                       color: "var(--color-primary)",
                     }}
                   >
-                    {registrationOpen ? "Register Now" : "Registration closed"}
+                    {registrationOpen
+                      ? "Register Now"
+                      : "Registration temporarily closed"}
                     <svg
                       className="w-4 h-4 ml-2"
                       fill="none"
@@ -780,7 +781,9 @@ const RegistrationTab = () => {
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
             />
           </svg>
-          {registrationOpen ? "Start Registration Now" : "Registration closed"}
+          {registrationOpen
+            ? "Start Registration Now"
+            : "Registration temporarily closed"}
           <svg
             className="w-5 h-5 ml-2"
             fill="none"
