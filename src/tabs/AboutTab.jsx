@@ -32,45 +32,6 @@ const AboutTab = () => (
       partners to share the latest advancements in our field.
     </p>
 
-    {/* Venue Photo Gallery */}
-    <div className="mb-8">
-      <h4
-        className="text-xl font-semibold text-blue-800 mb-4"
-        style={{ color: "var(--color-primary)" }}
-      >
-        The Westin Josun Busan - Our Congress Venue
-      </h4>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-        <div className="md:col-span-2 aspect-video rounded-xl overflow-hidden shadow-lg">
-          <img
-            src="https://cache.marriott.com/content/dam/marriott-renditions/PUSWI/puswi-exterior-3080-hor-clsc.jpg?output-quality=70&interpolation=progressive-bilinear&downsize=1336px:*"
-            alt="Luxury Hotel Exterior"
-            className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-          />
-        </div>
-        <div className="grid grid-rows-2 gap-4">
-          <div className="aspect-video rounded-xl overflow-hidden shadow-lg">
-            <img
-              src="https://cache.marriott.com/is/image/marriotts7prod/wi-puswi-ballroom-class-33158:Classic-Hor?wid=1336&fit=constrain"
-              alt="Hotel Conference Room"
-              className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-            />
-          </div>
-          <div className="aspect-video rounded-xl overflow-hidden shadow-lg">
-            <img
-              src="https://cache.marriott.com/is/image/marriotts7prod/wi-puswi-swimming-pool-deck--15722:Classic-Hor?wid=1336&fit=constrain"
-              alt="Hotel Outdoor Lounge Area"
-              className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-            />
-          </div>
-        </div>
-      </div>
-      <p className="text-gray-600 text-sm italic text-center">
-        Experience world-class hospitality at The Westin Josun Busan,
-        overlooking the stunning Haeundae Beach
-      </p>
-    </div>
-
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
       <div className="md:col-span-2">
         <h4
@@ -79,35 +40,58 @@ const AboutTab = () => (
         >
           About the Location
         </h4>
-        <p className="text-gray-700 mb-4">
+        <p className="text-gray-700 mb-6">
           The 16th International Society for Immunology of Reproduction (ISIR)
-          Congress will be held at{" "}
-          <strong className="font-medium">The Westin Josun Busan</strong>, one
-          of Korea's premier seafront conference hotels. Overlooking Haeundae
-          Beach and located adjacent to Dongbaek Island, the venue provides an
-          ideal environment that blends scientific professionalism with
-          outstanding natural beauty.
+          Congress will be held in{" "}
+          <strong className="font-medium">Busan, Korea</strong>, a vibrant
+          coastal city renowned for its stunning beaches, rich cultural
+          heritage, and world-class hospitality. Busan offers an ideal
+          environment that blends scientific professionalism with outstanding
+          natural beauty.
         </p>
 
-        {/* Interactive Google Map */}
-        <div className="bg-gray-100 rounded-xl overflow-hidden shadow-md mb-4">
-          <div className="aspect-video relative">
-            <iframe
-              title="The Westin Josun Busan Location"
-              src="https://maps.google.com/maps?q=The+Westin+Josun+Busan,+67+Dongbaek-ro,+Haeundae-gu,+Busan,+Korea&t=&z=15&ie=UTF8&iwloc=&output=embed"
-              className="w-full h-full border-0"
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6 pointer-events-none">
-              <div className="text-white">
-                <p className="font-semibold text-lg">The Westin Josun Busan</p>
-                <p className="text-sm opacity-90">
-                  67 Dongbaek-ro, Haeundae-gu, Busan, Korea
-                </p>
-              </div>
-            </div>
+        {/* Venue Placeholder Card */}
+        <div
+          className="rounded-xl p-6 border-2 border-dashed flex items-start gap-4"
+          style={{
+            borderColor: "var(--color-primary)",
+            backgroundColor: "rgba(243, 183, 44, 0.08)",
+          }}
+        >
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: "var(--color-primary)" }}
+          >
+            <svg
+              className="w-5 h-5 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+          </div>
+          <div>
+            <p
+              className="font-semibold mb-1"
+              style={{ color: "var(--color-primary)" }}
+            >
+              Conference venue details coming soon.
+            </p>
+            <p className="text-sm text-gray-700">
+              Please check back for updates on the official congress venue.
+            </p>
           </div>
         </div>
       </div>

@@ -23,8 +23,8 @@ const CHAIRMEN_DATA = [
         On behalf of the Executive Board of the International Society for
         Immunology of Reproduction (ISIR), it is my great honor to invite you to
         the <strong>16ᵗʰ ISIR World Congress</strong>, which will be held{" "}
-        <strong>November 5 - 8, 2026, in the Westin Josun, Busan, Korea</strong>
-        . This landmark meeting will bring together our global community of
+        <strong>November 5 - 8, 2026, in Busan, Korea</strong>. This landmark
+        meeting will bring together our global community of
         scientists, clinicians, and trainees to exchange groundbreaking research
         and strengthen the collaborative spirit that defines our Society.
         <br />

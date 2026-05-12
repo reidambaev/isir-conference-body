@@ -136,9 +136,8 @@ const Footer = ({ onNavigateTab }) => (
               </svg>
               <div>
                 <p className="text-sm">Venue</p>
-                <p>The Westin Josun Busan</p>
-                <p className="text-sm">67 Dongbaek-ro, Haeundae-gu</p>
-                <p className="text-sm">Busan, Korea</p>
+                <p>Busan, Korea</p>
+                <p className="text-sm">Details coming soon</p>
               </div>
             </li>
           </ul>

@@ -23,90 +23,47 @@ const TravelTab = () => {
         Travel & Accommodation
       </h3>
 
-      {/* Hotel Hero Section */}
+      {/* Conference Hotel - Coming Soon */}
       <div className="mb-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="aspect-video rounded-xl overflow-hidden shadow-lg">
-            <img
-              src={
-                "https://cache.marriott.com/content/dam/marriott-renditions/PUSWI/puswi-exterior-3080-hor-clsc.jpg?output-quality=70&interpolation=progressive-bilinear&downsize=1336px:*"
-              }
-              alt="The Westin Josun Busan"
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="flex flex-col justify-center">
-            <span
-              className="inline-block px-3 py-1 text-sm font-semibold rounded-full mb-3 w-fit"
-              style={{
-                backgroundColor: "var(--color-secondary)",
-                color: "var(--color-primary)",
-              }}
-            >
-              Official Conference Hotel
-            </span>
-            <h4
-              className="text-xl font-semibold text-blue-800 mb-2"
-              style={{ color: "var(--color-primary)" }}
-            >
-              The Westin Josun Busan
-            </h4>
-            <p className="text-gray-700 mb-4">
-              Experience world-class hospitality at The Westin Josun Busan,
-              overlooking Haeundae Beach. We have secured a block of rooms at a
-              discounted rate. Rates are available on a first-come, first-served
-              basis and must be booked by August 10, 2026. Book early, as rooms
-              will sell out!
-            </p>
-            <p className="text-sm text-gray-600 mb-4">
-              <strong>Invited speakers:</strong> submit your hotel stay details
-              (dates and contact information) on the{" "}
-              <a
-                href="/speaker-hotel"
-                className="text-blue-700 font-semibold hover:underline"
-              >
-                invited speaker hotel registration
-              </a>{" "}
-              page.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <button
-                disabled
-                className="inline-block px-6 py-3 font-semibold rounded-lg opacity-60 cursor-not-allowed"
-                style={{
-                  backgroundColor: "var(--color-secondary)",
-                  color: "var(--color-primary)",
-                }}
-              >
-                Discounted Registration Coming Soon
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Hotel Amenities */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-        {[
-          { icon: "🏖️", label: "Beachfront Location" },
-          { icon: "🍽️", label: "Fine Dining" },
-          { icon: "💆", label: "Spa & Wellness" },
-          { icon: "🏊", label: "Indoor Pool" },
-          { icon: "🏋️", label: "Fitness Center" },
-          { icon: "📶", label: "High-Speed WiFi" },
-          { icon: "🚗", label: "Valet Parking" },
-          { icon: "🛎️", label: "Concierge Service" },
-        ].map((amenity, index) => (
-          <div
-            key={index}
-            className="flex items-center p-4 bg-gray-50 rounded-xl"
+        <div
+          className="rounded-xl p-8 border-2 border-dashed text-center"
+          style={{
+            borderColor: "var(--color-primary)",
+            backgroundColor: "rgba(243, 183, 44, 0.08)",
+          }}
+        >
+          <span
+            className="inline-block px-3 py-1 text-sm font-semibold rounded-full mb-3"
+            style={{
+              backgroundColor: "var(--color-secondary)",
+              color: "var(--color-primary)",
+            }}
           >
-            <span className="text-2xl mr-3">{amenity.icon}</span>
-            <span className="text-sm font-medium text-gray-700">
-              {amenity.label}
-            </span>
-          </div>
-        ))}
+            Conference Hotel
+          </span>
+          <h4
+            className="text-2xl font-semibold mb-3"
+            style={{ color: "var(--color-primary)" }}
+          >
+            Hotel Details Coming Soon
+          </h4>
+          <p className="text-gray-700 max-w-2xl mx-auto mb-2">
+            We are finalizing arrangements for the official conference hotel.
+            Information about discounted room blocks and booking details will be
+            posted here shortly. Please check back soon!
+          </p>
+          <p className="text-sm text-gray-600 max-w-2xl mx-auto">
+            <strong>Invited speakers:</strong> please continue to submit your
+            hotel stay details on the{" "}
+            <a
+              href="/speaker-hotel"
+              className="text-blue-700 font-semibold hover:underline"
+            >
+              invited speaker hotel registration
+            </a>{" "}
+            page.
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
@@ -170,9 +127,10 @@ const TravelTab = () => {
                 <span className="text-white text-sm">🚕</span>
               </div>
               <div>
-                <p className="font-semibold text-gray-800">From PUS to Hotel</p>
+                <p className="font-semibold text-gray-800">From PUS to Busan</p>
                 <p className="text-gray-600 text-sm">
-                  Taxi or airport limousine bus to Haeundae (45-60 minutes).
+                  Taxi or airport limousine bus into central Busan (45-60
+                  minutes).
                 </p>
               </div>
             </div>

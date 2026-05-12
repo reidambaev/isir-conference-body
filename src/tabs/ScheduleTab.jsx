@@ -575,7 +575,7 @@ const ScheduleTab = () => {
               Congress Schedule
             </h3>
             <p className="text-gray-500 text-sm">
-              November 5-8, 2026 • The Westin Josun Busan
+              November 5-8, 2026 • Busan, Korea
             </p>
           </div>
         </div>
