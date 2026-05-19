@@ -29,11 +29,6 @@ const deadlines = [
     actions: [{ label: "Register Now", tab: "registration" }],
   },
   {
-    date: "Oct 1",
-    title: "Hotel Discount Deadline",
-    desc: "Last day to book hotel rooms at the early discounted rate.",
-  },
-  {
     date: "Oct 30",
     title: "Online Registration Closes",
     desc: "Final day for advance registration. On-site registration available November 5-8.",

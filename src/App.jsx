@@ -206,7 +206,8 @@ export default function App() {
         return <CommitteeTab />;
       case "speakers":
         return <SpeakersTab />;
-      // case "schedule": return <ScheduleTab />;   // hidden for now
+      case "schedule":
+        return <ScheduleTab />;
       case "submission":
         return <SubmissionTab />;
       case "registration":

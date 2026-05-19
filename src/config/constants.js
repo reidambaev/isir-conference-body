@@ -113,6 +113,55 @@ export function formatCongressMealDayList(dayKeys) {
   return dayKeys.map((k) => formatCongressMealDayLabel(k)).join(", ");
 }
 
+export function selectedDayPassCongressDayKeys(dayPassDays) {
+  return CONGRESS_DAYPASS_DAYS.filter(({ key }) => Boolean(dayPassDays?.[key])).map(
+    ({ key }) => key,
+  );
+}
+
+/** Fri–Sun breakfast/lunch only apply when that day is on the day pass. */
+export function congressMealDayAllowed(ticketType, dayPassDays, mealDayKey) {
+  if (ticketType !== "korea-day-pass") return true;
+  return Boolean(dayPassDays?.[mealDayKey]);
+}
+
+export function effectiveMealDayKeys(mealByDay, ticketType, dayPassDays) {
+  return CONGRESS_WEEKEND_MEAL_KEYS.filter(
+    (day) =>
+      Boolean(mealByDay?.[day]) &&
+      congressMealDayAllowed(ticketType, dayPassDays, day),
+  );
+}
+
+/** Clear meals and events that are not valid for the current ticket / day-pass days. */
+export function pruneRegistrationMeals({
+  ticketType,
+  dayPassDays,
+  mealAttendance,
+  openingReceptionAttending,
+  galaDinnerAttending,
+}) {
+  const lunch = { ...mealAttendance.lunch };
+  const breakfast = { ...mealAttendance.breakfast };
+  for (const day of CONGRESS_WEEKEND_MEAL_KEYS) {
+    if (!congressMealDayAllowed(ticketType, dayPassDays, day)) {
+      lunch[day] = false;
+      breakfast[day] = false;
+    }
+  }
+  let opening = Boolean(openingReceptionAttending);
+  let gala = Boolean(galaDinnerAttending);
+  if (ticketType === "korea-day-pass") {
+    if (!dayPassDays?.[DAY_PASS_OPENING_RECEPTION_DAY]) opening = false;
+    if (!dayPassDays?.[DAY_PASS_GALA_DAY]) gala = false;
+  }
+  return {
+    mealAttendance: { lunch, breakfast },
+    openingReceptionAttending: opening,
+    galaDinnerAttending: gala,
+  };
+}
+
 // Utility Functions
 export const getAccompanyingPrice = (isEarlyBird) => (isEarlyBird ? 250 : 350);
 

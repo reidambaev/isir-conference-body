@@ -19,10 +19,13 @@ import {
   CONGRESS_WEEKEND_MEALS,
   DAY_PASS_GALA_DAY,
   DAY_PASS_OPENING_RECEPTION_DAY,
+  effectiveMealDayKeys,
   formatCongressMealDayList,
   ISIR_API_CONFIG,
   isPreviewMode,
   isSouthKoreaResidenceCountry,
+  pruneRegistrationMeals,
+  selectedDayPassCongressDayKeys,
   PREVIEW_KEY,
   PREVIEW_REGISTRATION_TEST_USD,
 } from "../config/constants";
@@ -393,6 +396,17 @@ const RegistrationForm = ({ onClose }) => {
     return actualStep;
   };
 
+  const withPrunedMeals = (prev) => ({
+    ...prev,
+    ...pruneRegistrationMeals({
+      ticketType: prev.ticketType,
+      dayPassDays: prev.dayPassDays,
+      mealAttendance: prev.mealAttendance,
+      openingReceptionAttending: prev.openingReceptionAttending,
+      galaDinnerAttending: prev.galaDinnerAttending,
+    }),
+  });
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
@@ -414,7 +428,7 @@ const RegistrationForm = ({ onClose }) => {
         if (day === DAY_PASS_GALA_DAY && !checked) {
           upd.galaDinnerAttending = false;
         }
-        return upd;
+        return withPrunedMeals(upd);
       });
       return;
     }
@@ -443,16 +457,23 @@ const RegistrationForm = ({ onClose }) => {
         },
       }));
     } else if (name === "ticketType") {
-      setFormData((prev) => ({
-        ...prev,
-        ticketType: value,
-        accompanyingPersonCount:
-          value === "korea-day-pass" ? 0 : prev.accompanyingPersonCount,
-        dayPassDays:
-          value === "korea-day-pass"
-            ? prev.dayPassDays
-            : { Thursday: false, Friday: false, Saturday: false, Sunday: false },
-      }));
+      setFormData((prev) =>
+        withPrunedMeals({
+          ...prev,
+          ticketType: value,
+          accompanyingPersonCount:
+            value === "korea-day-pass" ? 0 : prev.accompanyingPersonCount,
+          dayPassDays:
+            value === "korea-day-pass"
+              ? prev.dayPassDays
+              : {
+                  Thursday: false,
+                  Friday: false,
+                  Saturday: false,
+                  Sunday: false,
+                },
+        }),
+      );
     } else if (type === "checkbox") {
       setFormData((prev) => ({ ...prev, [name]: checked }));
     } else {
@@ -920,12 +941,16 @@ const RegistrationForm = ({ onClose }) => {
     setIsGeneratingPdf(true);
     try {
       const ticketLabel = getTicketLabel();
-      const selectedLunchDays = CONGRESS_WEEKEND_MEALS.filter(
-        ({ key }) => formData.mealAttendance.lunch[key],
-      ).map(({ key }) => key);
-      const selectedBreakfastDays = CONGRESS_WEEKEND_MEALS.filter(
-        ({ key }) => formData.mealAttendance.breakfast[key],
-      ).map(({ key }) => key);
+      const selectedLunchDays = effectiveMealDayKeys(
+        formData.mealAttendance.lunch,
+        formData.ticketType,
+        formData.dayPassDays,
+      );
+      const selectedBreakfastDays = effectiveMealDayKeys(
+        formData.mealAttendance.breakfast,
+        formData.ticketType,
+        formData.dayPassDays,
+      );
       const lunchDisplay =
         selectedLunchDays.length > 0
           ? formatCongressMealDayList(selectedLunchDays)
@@ -973,10 +998,20 @@ const RegistrationForm = ({ onClose }) => {
             breakfastDisplay
           }
           openingReceptionAttendanceLabel={
-            formData.openingReceptionAttending ? "Attending" : "Not attending"
+            formData.ticketType === "korea-day-pass" &&
+            !formData.dayPassDays[DAY_PASS_OPENING_RECEPTION_DAY]
+              ? "Not applicable"
+              : formData.openingReceptionAttending
+                ? "Attending"
+                : "Not attending"
           }
           galaDinnerAttendanceLabel={
-            formData.galaDinnerAttending ? "Attending" : "Not attending"
+            formData.ticketType === "korea-day-pass" &&
+            !formData.dayPassDays[DAY_PASS_GALA_DAY]
+              ? "Not applicable"
+              : formData.galaDinnerAttending
+                ? "Attending"
+                : "Not attending"
           }
           qrCodeUrl={qrCodeUrl}
           registrationId={registrationId ?? undefined}
@@ -1700,7 +1735,7 @@ const RegistrationForm = ({ onClose }) => {
                                       Sunday: false,
                                     };
                                   }
-                                  return next;
+                                  return withPrunedMeals(next);
                                 });
                               }}
                             >
@@ -2345,7 +2380,7 @@ const RegistrationForm = ({ onClose }) => {
                               Sunday: false,
                             };
                           }
-                          return next;
+                          return withPrunedMeals(next);
                         });
                       }}
                       placeHolder="Select Country"
@@ -2499,7 +2534,10 @@ const RegistrationForm = ({ onClose }) => {
                             <input
                               type="checkbox"
                               name={`meal_breakfast_${key}`}
-                              checked={formData.mealAttendance.breakfast[key]}
+                              checked={
+                                dayAllowed &&
+                                formData.mealAttendance.breakfast[key]
+                              }
                               onChange={handleChange}
                               disabled={!dayAllowed}
                               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -2530,7 +2568,9 @@ const RegistrationForm = ({ onClose }) => {
                             <input
                               type="checkbox"
                               name={`meal_lunch_${key}`}
-                              checked={formData.mealAttendance.lunch[key]}
+                              checked={
+                                dayAllowed && formData.mealAttendance.lunch[key]
+                              }
                               onChange={handleChange}
                               disabled={!dayAllowed}
                               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -2954,34 +2994,52 @@ const RegistrationForm = ({ onClose }) => {
                       Meal Attendance
                     </p>
                     <div className="space-y-1 text-sm text-gray-700">
+                      {formData.ticketType === "korea-day-pass" && (
+                        <p>
+                          Congress days:{" "}
+                          {formatCongressMealDayList(
+                            selectedDayPassCongressDayKeys(formData.dayPassDays),
+                          ) || "None selected"}
+                        </p>
+                      )}
                       <p>
                         Lunch (Fri–Sun, Nov 6–8):{" "}
                         {formatCongressMealDayList(
-                          CONGRESS_WEEKEND_MEALS.map((m) => m.key).filter(
-                            (day) => formData.mealAttendance.lunch[day],
+                          effectiveMealDayKeys(
+                            formData.mealAttendance.lunch,
+                            formData.ticketType,
+                            formData.dayPassDays,
                           ),
                         ) || "None selected"}
                       </p>
                       <p>
                         Breakfast (Fri–Sun, Nov 6–8):{" "}
                         {formatCongressMealDayList(
-                          CONGRESS_WEEKEND_MEALS.map((m) => m.key).filter(
-                            (day) => formData.mealAttendance.breakfast[day],
+                          effectiveMealDayKeys(
+                            formData.mealAttendance.breakfast,
+                            formData.ticketType,
+                            formData.dayPassDays,
                           ),
                         ) || "None selected"}
                       </p>
-                      <p>
-                        Opening reception:{" "}
-                        {formData.openingReceptionAttending
-                          ? "Attending"
-                          : "Not attending"}
-                      </p>
-                      <p>
-                        Gala dinner:{" "}
-                        {formData.galaDinnerAttending
-                          ? "Attending"
-                          : "Not attending"}
-                      </p>
+                      {(formData.ticketType !== "korea-day-pass" ||
+                        formData.dayPassDays[DAY_PASS_OPENING_RECEPTION_DAY]) && (
+                        <p>
+                          Opening reception:{" "}
+                          {formData.openingReceptionAttending
+                            ? "Attending"
+                            : "Not attending"}
+                        </p>
+                      )}
+                      {(formData.ticketType !== "korea-day-pass" ||
+                        formData.dayPassDays[DAY_PASS_GALA_DAY]) && (
+                        <p>
+                          Gala dinner:{" "}
+                          {formData.galaDinnerAttending
+                            ? "Attending"
+                            : "Not attending"}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

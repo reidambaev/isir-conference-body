@@ -49,8 +49,8 @@ const TravelTab = () => {
           </h4>
           <p className="text-gray-700 max-w-2xl mx-auto mb-2">
             We are finalizing arrangements for the official conference hotel.
-            Information about discounted room blocks and booking details will be
-            posted here shortly. Please check back soon!
+            Information about room blocks and booking details will be posted
+            here shortly. Please check back soon!
           </p>
           <p className="text-sm text-gray-600 max-w-2xl mx-auto">
             <strong>Invited speakers:</strong> please continue to submit your
