@@ -1,10 +1,154 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
+
+const DAY_START = 7 * 60; // 7:00 AM
+const DAY_END = 21 * 60; // 9:00 PM (Award Gala)
+const PX_PER_MIN = 2.1;
+
+/** Shorter visual height for single-line blocks — clock times stay accurate at the top edge */
+function getDisplayDurationMinutes(session, realDuration) {
+  if (session.type === "parallel") {
+    const count = session.sessions?.length ?? 1;
+    if (count >= 3) return realDuration;
+    return Math.max(realDuration * 0.9, realDuration - 8);
+  }
+
+  if (/registration/i.test(session.title || "")) {
+    return Math.min(realDuration, 32);
+  }
+
+  switch (session.type) {
+    case "break":
+      return realDuration <= 20 ? 9 : Math.min(realDuration, 20);
+    case "meeting":
+      return Math.min(realDuration, 14);
+    case "social":
+      if (session.subtitle) return realDuration;
+      return Math.min(realDuration, 20);
+    case "plenary":
+      return realDuration <= 35 ? 18 : realDuration;
+    case "population":
+      return realDuration;
+    case "forum":
+      return Math.min(realDuration, 18);
+    default:
+      return realDuration <= 25 ? 14 : realDuration;
+  }
+}
+
+const BLOCK_GAP_PX = 2;
+
+function formatTimeLabel(totalMinutes) {
+  const h24 = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const h12 = h24 % 12 || 12;
+  const period = h24 >= 12 ? "PM" : "AM";
+  return m === 0
+    ? `${h12} ${period}`
+    : `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+/** Map clock start times → visual Y; spacing follows block heights, not equal hours */
+function buildVisualLayout(enrichedDays) {
+  const starts = new Set();
+  for (const day of enrichedDays) {
+    for (const s of day) {
+      starts.add(s.startMinutes);
+    }
+  }
+  const sortedStarts = [...starts].sort((a, b) => a - b);
+  const topByStart = new Map();
+  const timeLabels = [];
+  let visualY = 0;
+
+  for (let i = 0; i < sortedStarts.length; i++) {
+    const clockStart = sortedStarts[i];
+    topByStart.set(clockStart, visualY);
+    timeLabels.push({ minutes: clockStart, topPx: visualY });
+
+    let segmentMinutes = 6;
+    for (const day of enrichedDays) {
+      const session = day.find((s) => s.startMinutes === clockStart);
+      if (session) {
+        segmentMinutes = Math.max(
+          segmentMinutes,
+          session.displayDurationMinutes ?? session.durationMinutes,
+        );
+      }
+    }
+
+    visualY += segmentMinutes * PX_PER_MIN + BLOCK_GAP_PX;
+  }
+
+  return {
+    topByStart,
+    timeLabels,
+    timelineHeight: visualY + 12,
+    segmentStarts: sortedStarts,
+  };
+}
+
+function withVisualTops(daySchedule, layout) {
+  return daySchedule.map((session) => ({
+    ...session,
+    visualTopPx: layout.topByStart.get(session.startMinutes) ?? 0,
+  }));
+}
+
+function parseTimeToMinutes(timeStr) {
+  const match = String(timeStr)
+    .trim()
+    .match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (!match) return 0;
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const period = (match[3] || "AM").toUpperCase();
+  if (period === "PM" && hours !== 12) hours += 12;
+  if (period === "AM" && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+}
+
+function enrichDaySchedule(daySchedule) {
+  const sorted = [...daySchedule].sort(
+    (a, b) => parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time),
+  );
+  return sorted.map((session, i) => {
+    const start = parseTimeToMinutes(session.time);
+    let end;
+    if (session.endTime) {
+      end = parseTimeToMinutes(session.endTime);
+    } else if (i < sorted.length - 1) {
+      end = parseTimeToMinutes(sorted[i + 1].time);
+    } else {
+      end = Math.min(start + 90, DAY_END);
+    }
+    let duration = end - start;
+    if (session.endTime) {
+      duration = Math.max(duration, 5);
+    } else if (session.type === "break" || session.compact) {
+      duration = Math.max(duration, 10);
+    } else {
+      duration = Math.max(duration, 15);
+    }
+    const displayDurationMinutes = getDisplayDurationMinutes(session, duration);
+    return {
+      ...session,
+      startMinutes: start,
+      endMinutes: start + duration,
+      durationMinutes: duration,
+      displayDurationMinutes,
+    };
+  });
+}
+
+function dayHasForumTrack(daySchedule) {
+  return daySchedule.some((s) => s.forum);
+}
 
 const ScheduleTab = () => {
   const scheduleRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [selectedDay, setSelectedDay] = useState(1); // Start on Friday (first full day)
-  const [viewMode, setViewMode] = useState("single"); // "single" or "all"
+  const [selectedDay, setSelectedDay] = useState(1);
+  const [viewMode, setViewMode] = useState("all"); // "single" or "all"
 
   const handleDownloadPNG = async () => {
     if (!scheduleRef.current) return;
@@ -35,39 +179,53 @@ const ScheduleTab = () => {
     { day: "Sunday", date: "Nov 8", index: 3 },
   ];
 
-  // Schedule data organized by day
+  // ISIR 2026 program at a glance (official schedule)
   const scheduleData = {
     0: [
-      // Thursday
-      { time: "12:00 PM", type: "social", title: "Registration Opens" },
-      { time: "3:00 PM", type: "social", title: "ISIR Council Meeting" },
+      { time: "9:00 AM", endTime: "3:00 PM", type: "social", title: "Registration Opens" },
+      {
+        time: "3:00 PM",
+        endTime: "3:45 PM",
+        type: "meeting",
+        title: "ISIR Council Meeting",
+      },
       {
         time: "5:00 PM",
+        endTime: "5:30 PM",
         type: "plenary",
-        title: "Welcome Address",
-        subtitle:
-          "Building on a Legacy: Generational Foundations and the Evolution of Reproductive Immunology",
+        title: "Welcome Address / President Lecture",
       },
-      { time: "6:30 PM", type: "social", title: "Welcome Reception" },
+      {
+        time: "6:30 PM",
+        endTime: "7:00 PM",
+        type: "social",
+        title: "Welcome Reception",
+      },
     ],
     1: [
-      // Friday
-      { time: "7:30 AM", type: "break", title: "Breakfast", compact: true },
       {
-        time: "8:20 AM",
-        type: "social",
-        title: "Welcome & Announcements",
-        compact: true,
+        time: "7:30 AM",
+        endTime: "8:30 AM",
+        type: "break",
+        title: "Breakfast",
       },
       {
         time: "8:30 AM",
+        endTime: "9:50 AM",
         type: "plenary",
-        title: "Population Insight Lectures 1",
+        title: "President Symposium",
       },
-      { time: "10:20 AM", type: "break", title: "Coffee Break", compact: true },
       {
-        time: "10:35 AM",
+        time: "9:50 AM",
+        endTime: "10:05 AM",
+        type: "break",
+        title: "Coffee Break",
+      },
+      {
+        time: "10:05 AM",
+        endTime: "11:45 AM",
         type: "parallel",
+        forum: { type: "forum", number: "PF I", title: "Public Forum I" },
         sessions: [
           {
             type: "symposium",
@@ -79,117 +237,52 @@ const ScheduleTab = () => {
             number: "S2",
             title: "Early Pregnancy and Placental Development",
           },
-          { type: "symposium", number: "S3", title: "KI Symposium" },
-          { type: "forum", number: "PF1", title: "Public Forum 1" },
+          {
+            type: "symposium",
+            number: "S3",
+            title:
+              "Environmental Exposures and Developmental Origins of Disease",
+          },
         ],
       },
       {
-        time: "12:15 PM",
+        time: "11:45 AM",
+        endTime: "12:45 PM",
         type: "break",
-        title: "Poster Session / Lunch",
-        compact: true,
+        title: "Poster / Lunch",
       },
       {
-        time: "1:30 PM",
+        time: "12:45 PM",
+        endTime: "2:30 PM",
+        type: "population",
+        title: "Population Forum I",
+      },
+      {
+        time: "2:30 PM",
+        endTime: "3:45 PM",
         type: "parallel",
         sessions: [
           {
             type: "symposium",
-            number: "S4",
-            title: "Current Therapeutic Options for Reproductive Health",
+            title: "KAI/KSRI Joint Symposium",
           },
           {
             type: "symposium",
             number: "S5",
-            title: "Exosomes, Mitochondrial Function, and Cell-Based Therapies",
+            title: "Microbiome and Pregnancy",
           },
           { type: "symposium", number: "S6", title: "Male Infertility" },
         ],
       },
-      { time: "2:50 PM", type: "break", title: "Coffee Break", compact: true },
       {
-        time: "3:10 PM",
-        type: "parallel",
-        sessions: [
-          { type: "oral", number: "Oral I", title: "Oral Presentations I" },
-          { type: "oral", number: "Oral II", title: "Oral Presentations II" },
-          {
-            type: "symposium",
-            number: "S7",
-            title: "Fetal Outcome with Inflammatory Insult",
-          },
-        ],
-      },
-      { time: "6:00 PM", type: "social", title: "Trainee Social Event" },
-    ],
-    2: [
-      // Saturday
-      { time: "7:30 AM", type: "break", title: "Breakfast", compact: true },
-      {
-        time: "8:20 AM",
-        type: "social",
-        title: "Welcome & Announcements",
-        compact: true,
-      },
-      {
-        time: "8:30 AM",
-        type: "plenary",
-        title: "Population Insight Lectures 2",
-      },
-      { time: "10:20 AM", type: "break", title: "Coffee Break", compact: true },
-      {
-        time: "10:35 AM",
-        type: "parallel",
-        sessions: [
-          {
-            type: "symposium",
-            number: "S8",
-            title: "Current Immunotherapeutic Options for Reproductive Failure",
-          },
-          {
-            type: "symposium",
-            number: "S9",
-            title:
-              "Environmental Exposures and Developmental Origins of Disease",
-          },
-          {
-            type: "symposium",
-            number: "S10",
-            title: "Preeclampsia and Its Systemic Consequences",
-          },
-          { type: "forum", number: "PF2", title: "Public Forum 2" },
-        ],
-      },
-      {
-        time: "12:15 PM",
+        time: "3:45 PM",
+        endTime: "4:00 PM",
         type: "break",
-        title: "Poster Session / Lunch",
-        compact: true,
+        title: "Coffee Break",
       },
       {
-        time: "1:30 PM",
-        type: "parallel",
-        sessions: [
-          {
-            type: "symposium",
-            number: "S11",
-            title: "Update on Reproductive Disorders and Their Management",
-          },
-          {
-            type: "symposium",
-            number: "S12",
-            title: "Gynecologic Malignancies and Immune Abnormalities",
-          },
-          {
-            type: "symposium",
-            number: "S13",
-            title: "Infection, Vaccination, and Pregnancy",
-          },
-        ],
-      },
-      { time: "2:50 PM", type: "break", title: "Coffee Break", compact: true },
-      {
-        time: "3:10 PM",
+        time: "4:00 PM",
+        endTime: "5:00 PM",
         type: "parallel",
         sessions: [
           {
@@ -197,108 +290,222 @@ const ScheduleTab = () => {
             number: "Awards",
             title: "New Investigator Award Session",
           },
-          { type: "oral", number: "Oral III", title: "Oral Presentations III" },
-          {
-            type: "symposium",
-            number: "S14",
-            title: "Interplay of Hormones and Immune System",
-          },
+          { type: "oral", number: "Oral I", title: "Oral Presentation I" },
+          { type: "oral", number: "Oral II", title: "Oral Presentation II" },
         ],
       },
       {
-        time: "6:00 PM",
+        time: "5:30 PM",
+        endTime: "6:30 PM",
         type: "social",
-        title: "Award Gala",
-        subtitle: "JRI Editorial Meeting",
+        title: "Trainee Social Event",
+      },
+      {
+        time: "7:00 PM",
+        endTime: "9:00 PM",
+        type: "meeting",
+        title: "JRI Editorial Meeting",
       },
     ],
-    3: [
-      // Sunday
+    2: [
       {
         time: "7:30 AM",
-        type: "parallel",
-        sessions: [
-          { type: "break", title: "Breakfast" },
-          { type: "social", title: "ISIR Member Business Meeting" },
-        ],
-        compact: true,
-      },
-      {
-        time: "8:20 AM",
-        type: "social",
-        title: "Welcome & Announcements",
-        compact: true,
+        endTime: "8:30 AM",
+        type: "break",
+        title: "Breakfast",
       },
       {
         time: "8:30 AM",
+        endTime: "9:50 AM",
         type: "plenary",
-        title: "Population Insight Lectures 3",
+        title: "President Symposium",
       },
-      { time: "10:20 AM", type: "break", title: "Coffee Break", compact: true },
       {
-        time: "10:35 AM",
+        time: "9:50 AM",
+        endTime: "10:05 AM",
+        type: "break",
+        title: "Coffee Break",
+      },
+      {
+        time: "10:05 AM",
+        endTime: "11:45 AM",
         type: "parallel",
+        forum: { type: "forum", number: "PF II", title: "Public Forum II" },
         sessions: [
           {
             type: "symposium",
-            number: "S15",
-            title: "Immune Regulation in the Endometrium II",
-          },
-          {
-            type: "symposium",
-            number: "S16",
-            title: "Preeclampsia and Its Systemic Consequences II",
-          },
-          {
-            type: "symposium",
-            number: "S17",
-            title: "T Cell Immunity and Pregnancy",
-          },
-          { type: "forum", number: "PF3", title: "Public Forum 3" },
-        ],
-      },
-      {
-        time: "12:15 PM",
-        type: "symposium",
-        title: "Lunch Symposium",
-        compact: true,
-      },
-      {
-        time: "1:30 PM",
-        type: "parallel",
-        sessions: [
-          {
-            type: "symposium",
-            number: "S18",
+            number: "S7",
             title: "Ovarian Inflammatory Disease and Aging",
           },
           {
             type: "symposium",
-            number: "S19",
-            title: "High Risk OB: 2nd and 3rd Trimester Complications",
+            number: "S8",
+            title: "Current Therapeutic Options for Reproductive Health",
           },
           {
             type: "symposium",
-            number: "S20",
-            title: "Rheumatic Conditions and Reproductive Outcomes",
+            number: "S9",
+            title: "Preeclampsia and Its Systemic Consequences",
           },
         ],
       },
-      { time: "2:50 PM", type: "break", title: "Coffee Break", compact: true },
       {
-        time: "3:10 PM",
+        time: "11:45 AM",
+        endTime: "12:45 PM",
+        type: "break",
+        title: "Poster / Lunch",
+      },
+      {
+        time: "12:45 PM",
+        endTime: "2:30 PM",
+        type: "population",
+        title: "Population Forum II",
+      },
+      {
+        time: "2:30 PM",
+        endTime: "4:00 PM",
         type: "parallel",
         sessions: [
           {
             type: "symposium",
-            number: "S21",
-            title: "Microbiome and Pregnancy Outcomes",
+            number: "S10",
+            title: "Fetal Outcome with Inflammatory Insult",
           },
-          { type: "oral", number: "Oral IV", title: "Oral Presentations IV" },
-          { type: "oral", number: "Oral V", title: "Oral Presentations V" },
+          {
+            type: "symposium",
+            number: "S11",
+            title: "T Cell Immunity and Pregnancy",
+          },
+          {
+            type: "symposium",
+            number: "S12",
+            title: "Gynecologic Malignancies and Immune Abnormalities",
+          },
         ],
       },
-      { time: "5:00 PM", type: "plenary", title: "Closing Ceremony & Adjourn" },
+      {
+        time: "4:00 PM",
+        endTime: "4:15 PM",
+        type: "break",
+        title: "Coffee Break",
+      },
+      {
+        time: "4:15 PM",
+        endTime: "5:30 PM",
+        type: "parallel",
+        sessions: [
+          { type: "oral", number: "Oral III", title: "Oral Presentation III" },
+          { type: "oral", number: "Oral IV", title: "Oral Presentation IV" },
+          { type: "oral", number: "Oral V", title: "Oral Presentation V" },
+        ],
+      },
+    ],
+    3: [
+      {
+        time: "7:30 AM",
+        endTime: "8:30 AM",
+        type: "break",
+        title: "Breakfast",
+      },
+      {
+        time: "8:30 AM",
+        endTime: "10:05 AM",
+        type: "parallel",
+        sessions: [
+          {
+            type: "symposium",
+            number: "S13",
+            title:
+              "Immune Regulation and Therapeutic Application of Human Reproduction",
+          },
+          {
+            type: "symposium",
+            number: "S14",
+            title: "High Risk OB: 2nd and 3rd Trimester Complications",
+          },
+          {
+            type: "symposium",
+            number: "S15",
+            title:
+              "Current Immunotherapeutic Options for Reproductive Failure",
+          },
+        ],
+      },
+      {
+        time: "10:05 AM",
+        endTime: "10:25 AM",
+        type: "break",
+        title: "Coffee Break",
+      },
+      {
+        time: "10:25 AM",
+        endTime: "11:45 AM",
+        type: "parallel",
+        forum: { type: "forum", number: "PF III", title: "Public Forum III" },
+        sessions: [
+          {
+            type: "symposium",
+            number: "S16",
+            title:
+              "Exosomes, Mitochondrial Function, and Cell-Based Therapies",
+          },
+          {
+            type: "symposium",
+            number: "S17",
+            title: "Preeclampsia and Its Systemic Consequences",
+          },
+          {
+            type: "symposium",
+            number: "S18",
+            title: "Rheumatic Conditions and Reproductive Outcomes",
+          },
+        ],
+      },
+      {
+        time: "11:45 AM",
+        endTime: "12:45 PM",
+        type: "parallel",
+        sessions: [
+          { type: "break", title: "Lunch" },
+          { type: "meeting", title: "ISIR Member Business Meeting" },
+        ],
+      },
+      {
+        time: "12:45 PM",
+        endTime: "2:30 PM",
+        type: "parallel",
+        sessions: [
+          {
+            type: "symposium",
+            number: "S19",
+            title: "Update on Reproductive Disorders and Their Management",
+          },
+          {
+            type: "symposium",
+            number: "S20",
+            title:
+              "Interplay Between Hormones, Immune System and Vascular Dysfunction in Women's Health",
+          },
+          {
+            type: "symposium",
+            number: "S21",
+            title: "Infection, Vaccination, and Pregnancy",
+          },
+        ],
+      },
+      {
+        time: "2:30 PM",
+        endTime: "5:00 PM",
+        type: "social",
+        title: "Bus Tour",
+      },
+      {
+        time: "6:30 PM",
+        endTime: "9:00 PM",
+        type: "social",
+        title: "Award Gala",
+        subtitle: "Celebration at Busan Cinema Center",
+      },
     ],
   };
 
@@ -344,8 +551,54 @@ const ScheduleTab = () => {
         border: "border-gray-200",
         cardBg: "bg-gray-100",
       },
+      population: {
+        bg: "bg-gradient-to-r from-indigo-50 to-indigo-100",
+        text: "text-indigo-900",
+        border: "border-indigo-300",
+        cardBg: "bg-indigo-100",
+        accent: "bg-indigo-500",
+      },
+      meeting: {
+        bg: "bg-gradient-to-r from-violet-100 to-violet-200",
+        text: "text-violet-950",
+        border: "border-violet-400",
+        cardBg: "bg-violet-200",
+        accent: "bg-violet-600",
+      },
     };
     return styles[type] || styles.break;
+  };
+
+  const renderForumCard = (forum, compact = false) => {
+    const fStyle = getSessionStyle(forum.type);
+    if (compact) {
+      return (
+        <div
+          className={`text-[9px] px-1.5 py-0.5 rounded ${fStyle.cardBg} ${fStyle.text} border ${fStyle.border} font-medium shrink-0`}
+        >
+          {forum.number || forum.title}
+        </div>
+      );
+    }
+    return (
+      <div
+        className={`rounded-lg border ${fStyle.border} ${fStyle.cardBg} overflow-hidden min-w-[140px] shrink-0`}
+      >
+        {fStyle.accent && <div className={`h-1 ${fStyle.accent}`} />}
+        <div className="p-3">
+          {forum.number && (
+            <div
+              className={`text-xs font-bold ${fStyle.text} opacity-75 mb-1`}
+            >
+              {forum.number}
+            </div>
+          )}
+          <div className={`font-semibold text-sm ${fStyle.text}`}>
+            {forum.title}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderSession = (session, compact = false) => {
@@ -368,13 +621,17 @@ const ScheduleTab = () => {
                   </div>
                 );
               })}
+              {session.forum && renderForumCard(session.forum, true)}
             </div>
           </div>
         );
       }
       return (
         <div className={`p-3 ${session.compact ? "py-2" : "py-4"}`}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div
+            className={`flex flex-col gap-3 ${session.forum ? "lg:flex-row lg:items-start" : ""}`}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 flex-1">
             {session.sessions.map((s, idx) => {
               const sStyle = getSessionStyle(s.type);
               const isSymposium = s.type === "symposium";
@@ -408,6 +665,8 @@ const ScheduleTab = () => {
                 </div>
               );
             })}
+            </div>
+            {session.forum && renderForumCard(session.forum)}
           </div>
         </div>
       );
@@ -450,99 +709,246 @@ const ScheduleTab = () => {
     );
   };
 
-  // Get all unique times across all days for "at a glance" view
-  const getAllTimes = () => {
-    const timeSet = new Set();
-    Object.values(scheduleData).forEach((daySchedule) => {
-      daySchedule.forEach((session) => {
-        timeSet.add(session.time);
-      });
-    });
-    return Array.from(timeSet).sort((a, b) => {
-      // Convert time to comparable format
-      const parseTime = (timeStr) => {
-        const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-        if (!match) return { hours: 0, minutes: 0 };
-        let hours = parseInt(match[1]);
-        const minutes = parseInt(match[2]);
-        const period = match[3].toUpperCase();
+  const enrichedByDay = useMemo(
+    () => days.map((d) => enrichDaySchedule(scheduleData[d.index] || [])),
+    [],
+  );
 
-        if (period === "PM" && hours !== 12) hours += 12;
-        if (period === "AM" && hours === 12) hours = 0;
+  const renderTimelineBlockContent = (session, blockHeight) => {
+    const compact = blockHeight < 36;
+    const tight = blockHeight < 56;
 
-        return { hours, minutes };
-      };
+    if (session.type === "parallel") {
+      // Lunch + business meeting, etc.: two distinct parallel tracks
+      const isDualTrack =
+        session.sessions.length === 2 &&
+        session.sessions.some(
+          (s) =>
+            s.type === "break" || s.type === "social" || s.type === "meeting",
+        );
 
-      const timeA = parseTime(a);
-      const timeB = parseTime(b);
-
-      if (timeA.hours !== timeB.hours) {
-        return timeA.hours - timeB.hours;
+      if (isDualTrack) {
+        return (
+          <div className="h-full flex flex-row gap-2 p-1.5 overflow-hidden">
+            {session.sessions.map((s, idx) => {
+              const sStyle = getSessionStyle(s.type);
+              return (
+                <div
+                  key={idx}
+                  className={`flex-1 min-h-0 rounded border ${sStyle.border} ${sStyle.cardBg} px-1 py-0.5 overflow-hidden flex flex-col justify-center`}
+                >
+                  <span
+                    className={`${compact ? "text-[8px]" : "text-[9px]"} font-semibold ${sStyle.text} leading-tight text-center line-clamp-4`}
+                  >
+                    {s.title}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        );
       }
-      return timeA.minutes - timeB.minutes;
-    });
+
+      // Concurrent symposia / orals in one time slot — single shared block
+      const blockType = session.sessions.some((s) => s.type === "plenary")
+        ? "plenary"
+        : session.sessions.some((s) => s.type === "oral")
+          ? "oral"
+          : "symposium";
+      const style = getSessionStyle(blockType);
+      const textSize =
+        blockType === "symposium"
+          ? compact
+            ? "text-[7px]"
+            : tight
+              ? "text-[8px]"
+              : "text-[9px]"
+          : compact
+            ? "text-[9px]"
+            : tight
+              ? "text-[10px]"
+              : "text-xs";
+
+      return (
+        <div
+          className={`h-full w-full ${style.bg} border ${style.border} rounded px-2 py-2 overflow-y-auto flex flex-col justify-center gap-2`}
+        >
+          {session.sessions.map((s, idx) => (
+            <p
+              key={idx}
+              className={`${textSize} font-semibold ${style.text} leading-snug text-center m-0`}
+            >
+              {s.number ? (
+                <>
+                  <span className="opacity-80">{s.number}:</span>{" "}
+                  {s.title}
+                </>
+              ) : (
+                s.title
+              )}
+            </p>
+          ))}
+        </div>
+      );
+    }
+
+    const style = getSessionStyle(session.type);
+    return (
+      <div
+        className={`h-full w-full ${style.bg} border ${style.border} rounded flex flex-col justify-center overflow-hidden ${compact ? "px-1 py-0.5" : tight ? "px-1.5 py-1" : "px-2 py-2"}`}
+      >
+        <span
+          className={`font-semibold ${style.text} ${compact ? "text-[9px] leading-tight" : tight ? "text-[10px] leading-snug" : "text-sm leading-relaxed"} text-center`}
+        >
+          {session.title}
+        </span>
+        {session.subtitle && !compact && !tight && (
+          <span
+            className={`text-[9px] mt-0.5 text-center opacity-80 ${session.type === "plenary" ? "text-white/80" : "text-gray-600"}`}
+          >
+            {session.subtitle}
+          </span>
+        )}
+      </div>
+    );
   };
 
-  const renderAtAGlanceView = () => {
-    const allTimes = getAllTimes();
+  const renderTimelineDayColumn = (
+    daySchedule,
+    dayIdx,
+    layout,
+    isWide = false,
+  ) => {
+    const hasForum = dayHasForumTrack(daySchedule);
+    const positioned = withVisualTops(daySchedule, layout);
+
+    return (
+      <div
+        key={dayIdx}
+        className={`relative border-l border-gray-200 ${isWide ? "min-w-[280px]" : "min-w-[140px] flex-1"}`}
+        style={{ height: layout.timelineHeight }}
+      >
+        {layout.segmentStarts.map((m) => (
+          <div
+            key={m}
+            className="absolute left-0 right-0 border-t border-gray-100 pointer-events-none"
+            style={{ top: layout.topByStart.get(m) }}
+          />
+        ))}
+
+        {positioned.map((session, idx) => {
+          const top = session.visualTopPx;
+          const height =
+            (session.displayDurationMinutes ?? session.durationMinutes) *
+            PX_PER_MIN;
+          const mainWidth = hasForum && session.forum ? "68%" : "98%";
+
+          return (
+            <React.Fragment key={`${session.time}-${idx}`}>
+              <div
+                className="absolute z-10 overflow-hidden"
+                style={{ top, height, left: "1%", width: mainWidth }}
+              >
+                {renderTimelineBlockContent(session, height)}
+              </div>
+              {session.forum && (
+                <div
+                  className="absolute z-10 overflow-hidden"
+                  style={{ top, height, left: "70%", width: "29%" }}
+                >
+                  {(() => {
+                    const fStyle = getSessionStyle("forum");
+                    return (
+                      <div
+                        className={`h-full w-full ${fStyle.bg} border ${fStyle.border} rounded flex flex-col justify-center overflow-hidden ${height < 36 ? "px-1 py-0.5" : "px-1.5 py-1"}`}
+                      >
+                        {session.forum.number && height >= 32 && (
+                          <span
+                            className={`${height < 36 ? "text-[8px]" : "text-[9px]"} font-bold ${fStyle.text} opacity-70 text-center`}
+                          >
+                            {session.forum.number}
+                          </span>
+                        )}
+                        <span
+                          className={`${height < 36 ? "text-[8px]" : "text-[9px]"} font-semibold ${fStyle.text} text-center leading-tight line-clamp-4`}
+                        >
+                          {session.forum.title}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderTimelineView = (dayIndices) => {
+    const cols = dayIndices.length;
+    const gridCols =
+      cols === 1 ? "64px 1fr" : `64px repeat(${cols}, minmax(0, 1fr))`;
+    const daysForView = dayIndices.map((i) => enrichedByDay[i]);
+    const layout = buildVisualLayout(daysForView);
 
     return (
       <div
         ref={scheduleRef}
         className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm"
       >
-        {/* Header Row */}
-        <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] bg-gray-900 text-white">
-          <div className="p-3 text-center border-r border-gray-700">
-            <div className="font-bold text-xs">Time</div>
-          </div>
-          {days.map((day, idx) => (
+        <div
+          className="grid bg-gray-900 text-white border-b border-gray-700"
+          style={{ gridTemplateColumns: gridCols }}
+        >
+          <div className="p-2 border-r border-gray-700" />
+          {dayIndices.map((dayIdx) => (
             <div
-              key={idx}
-              className="p-3 text-center border-r border-gray-700 last:border-r-0"
+              key={dayIdx}
+              className="p-2 text-center border-r border-gray-700 last:border-r-0"
             >
-              <div className="font-bold text-xs">{day.day}</div>
-              <div className="text-[10px] text-gray-400">{day.date}</div>
+              <div className="font-bold text-xs">{days[dayIdx].day}</div>
+              <div className="text-[10px] text-gray-400">
+                {days[dayIdx].date}
+              </div>
             </div>
           ))}
         </div>
 
-        {/* Schedule Rows */}
-        <div className="divide-y divide-gray-100">
-          {allTimes.map((time, timeIdx) => (
+        <div className="overflow-x-auto overflow-y-auto max-h-[min(85vh,900px)]">
+          <div
+            className="grid min-w-[640px]"
+            style={{ gridTemplateColumns: gridCols }}
+          >
             <div
-              key={timeIdx}
-              className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] divide-x divide-gray-100"
+              className="relative bg-gray-50 border-r border-gray-200"
+              style={{ height: layout.timelineHeight }}
             >
-              {/* Time Column */}
-              <div className="bg-gray-50 flex items-center justify-center p-2 border-r border-gray-100">
-                <span className="text-[10px] font-bold text-gray-500">
-                  {time}
-                </span>
-              </div>
-              {/* Content for each day */}
-              {days.map((day, dayIdx) => {
-                const daySchedule = scheduleData[dayIdx] || [];
-                const session = daySchedule.find((s) => s.time === time);
-
-                if (!session) {
-                  return <div key={dayIdx} className="p-1 bg-gray-50"></div>;
-                }
-
-                return (
-                  <div key={dayIdx} className="min-w-0">
-                    {renderSession(session, true)}
-                  </div>
-                );
-              })}
+              {layout.timeLabels.map(({ minutes, topPx }) => (
+                <div
+                  key={minutes}
+                  className="absolute right-0.5 -translate-y-1/2 text-[8px] font-medium text-gray-500 tabular-nums leading-none text-right pr-0.5"
+                  style={{ top: topPx }}
+                >
+                  {formatTimeLabel(minutes)}
+                </div>
+              ))}
             </div>
-          ))}
+
+            {dayIndices.map((dayIdx) =>
+              renderTimelineDayColumn(
+                enrichedByDay[dayIdx],
+                dayIdx,
+                layout,
+                cols === 1,
+              ),
+            )}
+          </div>
         </div>
       </div>
     );
   };
-
-  const currentSchedule = scheduleData[selectedDay] || [];
 
   return (
     <div role="tabpanel">
@@ -631,6 +1037,16 @@ const ScheduleTab = () => {
             Social/Special
           </span>
         </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-indigo-200 border-2 border-indigo-400"></div>
+          <span className="text-sm font-medium text-gray-700">
+            Population Forum
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-violet-300 border-2 border-violet-500"></div>
+          <span className="text-sm font-medium text-gray-700">Meetings</span>
+        </div>
       </div>
 
       {/* View Mode Toggle */}
@@ -689,52 +1105,15 @@ const ScheduleTab = () => {
       )}
 
       {/* Schedule Grid */}
-      {viewMode === "all" ? (
-        renderAtAGlanceView()
-      ) : (
-        <div
-          ref={scheduleRef}
-          className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm"
-        >
-          {/* Header Row */}
-          <div className="bg-gray-900 text-white p-4">
-            <div className="font-bold text-lg">{days[selectedDay].day}</div>
-            <div className="text-sm text-gray-400">
-              {days[selectedDay].date}, 2026
-            </div>
-          </div>
-
-          {/* Schedule Items */}
-          <div className="divide-y divide-gray-100">
-            {currentSchedule.map((session, idx) => (
-              <div
-                key={idx}
-                className={`grid grid-cols-[80px_1fr] ${session.compact ? "" : ""}`}
-              >
-                {/* Time Column */}
-                <div
-                  className={`bg-gray-50 flex items-center justify-center border-r border-gray-100 ${session.compact ? "py-2" : "py-4"}`}
-                >
-                  <span
-                    className={`font-bold text-gray-500 ${session.compact ? "text-[10px]" : "text-xs"}`}
-                  >
-                    {session.time}
-                  </span>
-                </div>
-                {/* Content Column */}
-                <div className="min-w-0">{renderSession(session)}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {viewMode === "all"
+        ? renderTimelineView([0, 1, 2, 3])
+        : renderTimelineView([selectedDay])}
 
       {/* Note about schedule */}
       <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100">
         <p className="text-sm text-blue-800">
-          <strong>Note:</strong> This is a preliminary schedule. Session times
-          and topics are subject to change. The final program will be available
-          closer to the congress date.
+          <strong>Note:</strong> Program at a glance — session times and topics
+          may be updated. Check back for the detailed final program.
         </p>
       </div>
     </div>

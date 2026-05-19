@@ -169,6 +169,8 @@ export default function App() {
         url.pathname === "/terms-of-service/";
       const wantsAccessibility =
         url.pathname === "/accessibility" || url.pathname === "/accessibility/";
+      const wantsSchedule =
+        url.pathname === "/schedule" || url.pathname === "/schedule/";
 
       if (wantsDisclosure) {
         setActiveTab("commerce-disclosure");
@@ -178,6 +180,8 @@ export default function App() {
         setActiveTab("terms-of-service");
       } else if (wantsAccessibility) {
         setActiveTab("accessibility");
+      } else if (wantsSchedule) {
+        setActiveTab("schedule");
       } else if (wantsRegistration) {
         setActiveTab("registration");
       } else {

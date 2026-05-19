@@ -17,8 +17,6 @@ import {
 import {
   CONGRESS_DAYPASS_DAYS,
   CONGRESS_WEEKEND_MEALS,
-  DAY_PASS_GALA_DAY,
-  DAY_PASS_OPENING_RECEPTION_DAY,
   effectiveMealDayKeys,
   formatCongressMealDayList,
   ISIR_API_CONFIG,
@@ -421,12 +419,6 @@ const RegistrationForm = ({ onClose }) => {
             lunch: { ...prev.mealAttendance.lunch, [day]: false },
             breakfast: { ...prev.mealAttendance.breakfast, [day]: false },
           };
-        }
-        if (day === DAY_PASS_OPENING_RECEPTION_DAY && !checked) {
-          upd.openingReceptionAttending = false;
-        }
-        if (day === DAY_PASS_GALA_DAY && !checked) {
-          upd.galaDinnerAttending = false;
         }
         return withPrunedMeals(upd);
       });
@@ -998,20 +990,10 @@ const RegistrationForm = ({ onClose }) => {
             breakfastDisplay
           }
           openingReceptionAttendanceLabel={
-            formData.ticketType === "korea-day-pass" &&
-            !formData.dayPassDays[DAY_PASS_OPENING_RECEPTION_DAY]
-              ? "Not applicable"
-              : formData.openingReceptionAttending
-                ? "Attending"
-                : "Not attending"
+            formData.openingReceptionAttending ? "Attending" : "Not attending"
           }
           galaDinnerAttendanceLabel={
-            formData.ticketType === "korea-day-pass" &&
-            !formData.dayPassDays[DAY_PASS_GALA_DAY]
-              ? "Not applicable"
-              : formData.galaDinnerAttending
-                ? "Attending"
-                : "Not attending"
+            formData.galaDinnerAttending ? "Attending" : "Not attending"
           }
           qrCodeUrl={qrCodeUrl}
           registrationId={registrationId ?? undefined}
@@ -1049,8 +1031,8 @@ const RegistrationForm = ({ onClose }) => {
     },
     "invited-speaker": { early: 0, standard: 0, label: "Invited Speaker" },
     "korea-day-pass": {
-      early: 150,
-      standard: 200,
+      early: 200,
+      standard: 250,
       label: "Daypass (Korean locals only)",
     },
   };
@@ -1690,9 +1672,9 @@ const RegistrationForm = ({ onClose }) => {
                                 label: "Daypass (Korean locals only)",
                                 requires_membership: false,
                                 available: true,
-                                current_price: 150,
-                                early_price: 150,
-                                standard_price: 200,
+                                current_price: 200,
+                                early_price: 200,
+                                standard_price: 250,
                               },
                             ];
                         return apiTicketsWithDayPass.map((ticket, index) => {
@@ -1952,8 +1934,8 @@ const RegistrationForm = ({ onClose }) => {
                         Price is per day (early / standard as shown above).
                         Korean locals only — set Country to South Korea on the
                         details step. Thursday has no breakfast/lunch service.
-                        Opening reception if you attend Friday; gala dinner if
-                        you attend Saturday.
+                        You may also sign up for the welcome reception and gala
+                        evening regardless of which congress days you select.
                       </p>
                       <div className="space-y-2">
                         {CONGRESS_DAYPASS_DAYS.map(({ key, date }) => (
@@ -1998,8 +1980,7 @@ const RegistrationForm = ({ onClose }) => {
                   </FormLabel>
                   <p className="text-sm text-gray-600 mb-5">
                     Accompanying person fee includes Welcome Reception and the
-                    complimentary Gala evening (dinner and live performances at
-                    Busan Cinema Center).
+                    Gala evening (live performances at Busan Cinema Center).
                   </p>
 
                   <div className="bg-gradient-to-br from-amber-50 to-white rounded-xl p-5 border-2 border-amber-200">
@@ -2491,11 +2472,9 @@ const RegistrationForm = ({ onClose }) => {
                           CONGRESS_DAYPASS_DAYS.filter(
                             ({ key }) => formData.dayPassDays[key],
                           ).map(({ key }) => key),
-                        )}. Breakfast/lunch choices are Fri-Sun only (no Thursday breakfast/lunch). Opening reception applies to Friday; gala dinner to Saturday.`
+                        )}. Breakfast/lunch choices are Fri-Sun only (no Thursday breakfast/lunch). Welcome reception and gala evening are optional for all day-pass holders.`
                       : "Indicate welcome events and which days you will attend lunch and breakfast (Friday–Sunday, Nov 6–8, 2026)."}
                   </p>
-                  {(formData.ticketType !== "korea-day-pass" ||
-                    formData.dayPassDays[DAY_PASS_OPENING_RECEPTION_DAY]) && (
                   <div className="mb-5">
                     <p className="text-sm font-semibold text-gray-700 mb-2">
                       Opening / Welcome Reception
@@ -2515,7 +2494,6 @@ const RegistrationForm = ({ onClose }) => {
                       <option value="yes">Yes, I will attend</option>
                     </select>
                   </div>
-                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
                       <p className="text-sm font-semibold text-gray-700 mb-3">
@@ -2585,11 +2563,9 @@ const RegistrationForm = ({ onClose }) => {
                       </div>
                     </div>
                   </div>
-                  {(formData.ticketType !== "korea-day-pass" ||
-                    formData.dayPassDays[DAY_PASS_GALA_DAY]) && (
                   <div className="mt-5">
                     <p className="text-sm font-semibold text-gray-700 mb-2">
-                      Gala Dinner
+                      Gala Evening
                     </p>
                     <select
                       name="galaDinnerAttending"
@@ -2606,7 +2582,6 @@ const RegistrationForm = ({ onClose }) => {
                       <option value="yes">Yes, I will attend</option>
                     </select>
                   </div>
-                  )}
                 </div>
 
                 <div className="bg-gradient-to-br from-indigo-50 to-white rounded-xl p-6 border-2 border-indigo-200 mt-8">
@@ -3022,24 +2997,18 @@ const RegistrationForm = ({ onClose }) => {
                           ),
                         ) || "None selected"}
                       </p>
-                      {(formData.ticketType !== "korea-day-pass" ||
-                        formData.dayPassDays[DAY_PASS_OPENING_RECEPTION_DAY]) && (
-                        <p>
-                          Opening reception:{" "}
-                          {formData.openingReceptionAttending
-                            ? "Attending"
-                            : "Not attending"}
-                        </p>
-                      )}
-                      {(formData.ticketType !== "korea-day-pass" ||
-                        formData.dayPassDays[DAY_PASS_GALA_DAY]) && (
-                        <p>
-                          Gala dinner:{" "}
-                          {formData.galaDinnerAttending
-                            ? "Attending"
-                            : "Not attending"}
-                        </p>
-                      )}
+                      <p>
+                        Opening reception:{" "}
+                        {formData.openingReceptionAttending
+                          ? "Attending"
+                          : "Not attending"}
+                      </p>
+                      <p>
+                        Gala evening:{" "}
+                        {formData.galaDinnerAttending
+                          ? "Attending"
+                          : "Not attending"}
+                      </p>
                     </div>
                   </div>
                 </div>

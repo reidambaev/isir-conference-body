@@ -306,9 +306,9 @@ const RegistrationTab = () => {
                   className="text-3xl font-bold"
                   style={{ color: "var(--color-primary)" }}
                 >
-                  $150
+                  $200
                 </span>
-                <span className="text-sm text-gray-500 line-through">$200</span>
+                <span className="text-sm text-gray-500 line-through">$250</span>
               </div>
               <p className="text-xs text-gray-500">
                 Early Bird / Standard (per selected day)
@@ -377,7 +377,7 @@ const RegistrationTab = () => {
               requires proof of current enrollment status.
               <br />
               <span className="font-semibold">**</span> Accompanying person fee
-              includes Welcome Reception and Gala Dinner only.
+              includes Welcome Reception and the Gala evening only.
             </p>
           </div>
         </div>
@@ -418,9 +418,9 @@ const RegistrationTab = () => {
                   className="w-full h-40 md:h-48 object-cover"
                 />
                 <div className="p-3 text-sm text-gray-700">
-                  <strong>Complimentary Gala Evening:</strong> All meeting
-                  participants are invited to a complimentary Gala evening at
-                  the iconic Busan Cinema Center, featuring dinner and live
+                  <strong>Gala Evening:</strong> All meeting
+                  participants are invited to a Gala evening at
+                  the iconic Busan Cinema Center, featuring live
                   performances by renowned Korean musicians and artists. Join us
                   for an unforgettable cultural evening in Busan!
                 </div>
@@ -638,7 +638,7 @@ const RegistrationTab = () => {
                   Admission to the main scientific programme and the exhibition
                 </li>
                 <li>Access to the sponsored sessions or booth onsite</li>
-                <li>Gala dinner</li>
+                <li>Gala evening</li>
                 <li>
                   A certificate of attendance after completion of an evaluation
                 </li>

@@ -44,8 +44,8 @@ export const TICKET_PRICES = {
   },
   /** Per congress day (Thu–Sun); total = rate × number of days selected. Korean locals only (enforced server-side). */
   "korea-day-pass": {
-    early: 150,
-    standard: 200,
+    early: 200,
+    standard: 250,
     label: "Daypass (Korean locals only)",
   },
 };
@@ -81,10 +81,10 @@ export const CONGRESS_DAYPASS_DAYS = [
   ...CONGRESS_WEEKEND_MEALS,
 ];
 
-/** Opening / welcome reception is offered for day-pass holders attending Friday. */
+/** Congress day when the opening / welcome reception is held (all day-pass holders may opt in). */
 export const DAY_PASS_OPENING_RECEPTION_DAY = "Friday";
 
-/** Gala dinner is offered for day-pass holders attending Saturday. */
+/** Congress day when the gala evening is held (all day-pass holders may opt in). */
 export const DAY_PASS_GALA_DAY = "Saturday";
 
 /** Country must match for Korean local day pass (name from react-country-state-city / registration form). */
@@ -149,16 +149,10 @@ export function pruneRegistrationMeals({
       breakfast[day] = false;
     }
   }
-  let opening = Boolean(openingReceptionAttending);
-  let gala = Boolean(galaDinnerAttending);
-  if (ticketType === "korea-day-pass") {
-    if (!dayPassDays?.[DAY_PASS_OPENING_RECEPTION_DAY]) opening = false;
-    if (!dayPassDays?.[DAY_PASS_GALA_DAY]) gala = false;
-  }
   return {
     mealAttendance: { lunch, breakfast },
-    openingReceptionAttending: opening,
-    galaDinnerAttending: gala,
+    openingReceptionAttending: Boolean(openingReceptionAttending),
+    galaDinnerAttending: Boolean(galaDinnerAttending),
   };
 }
 

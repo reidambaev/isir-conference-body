@@ -61,6 +61,7 @@ export default function CheckinTab() {
     typeof window !== "undefined" && LOCALHOST_NAMES.has(window.location.hostname);
 
   const html5QrRef = useRef(null);
+  const photoInputRef = useRef(null);
   const stoppingRef = useRef(false);
   /** Ignore rapid repeats of the same registration id while the camera stays on. */
   const lookupInFlightRef = useRef(false);
@@ -160,13 +161,10 @@ export default function CheckinTab() {
       html5QrRef.current = html5QrCode;
       setScannerStatus("running");
 
+      const cameraConfig = await resolveCameraConfig(Html5Qrcode);
       await html5QrCode.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: minQrBoxSize(), height: minQrBoxSize() },
-          aspectRatio: 1.777,
-        },
+        cameraConfig,
+        buildScannerConfig(),
         async (decodedText) => {
           if (stoppingRef.current) return;
           const extractedId = extractRegistrationIdFromScan(decodedText);
@@ -192,11 +190,10 @@ export default function CheckinTab() {
           /* per-frame scan errors — ignore */
         },
       );
+      ensureInlineVideoPlayback(CHECKIN_READER_ID);
     } catch (err) {
       setScannerStatus("error");
-      setScannerError(
-        err?.message || "Camera failed to start. Allow camera access and retry.",
-      );
+      setScannerError(formatScannerStartError(err, isIOSDevice()));
       html5QrRef.current = null;
       setScannerStatus("idle");
     }
@@ -206,6 +203,29 @@ export default function CheckinTab() {
     scannerStatus,
     stopScanner,
   ]);
+
+  const handlePhotoQrUpload = useCallback(
+    async (event) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file) return;
+
+      setScannerError("");
+      try {
+        await stopScanner();
+        const { Html5Qrcode } = await import("html5-qrcode");
+        const html5QrCode = new Html5Qrcode(CHECKIN_READER_ID);
+        const decodedText = await html5QrCode.scanFile(file, false);
+        html5QrCode.clear();
+        await fetchCheckinById(decodedText);
+      } catch (err) {
+        setScannerError(
+          err?.message || "Could not read a QR code from that photo. Try a clearer image.",
+        );
+      }
+    },
+    [fetchCheckinById, stopScanner],
+  );
 
   const loadLocalExample = useCallback(() => {
     if (!isLocalhost) return;
@@ -240,10 +260,23 @@ export default function CheckinTab() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
           <h3 className="mb-1 text-base font-semibold text-gray-900">Camera scanner</h3>
-          <p className="mb-4 text-sm text-gray-600">Point your camera at the attendee QR code.</p>
+          <p className="mb-4 text-sm text-gray-600">
+            Point your camera at the attendee QR code.
+            {typeof window !== "undefined" && isIOSDevice()
+              ? " On iPhone, tap Start and allow camera access; if the preview stays blank, use Upload QR photo."
+              : ""}
+          </p>
           <div
             id={CHECKIN_READER_ID}
-            className="rounded-lg overflow-hidden bg-gray-900 min-h-[280px] w-full [&_video]:object-cover [&_video]:w-full [&_video]:h-full"
+            className="rounded-lg overflow-hidden bg-gray-900 min-h-[320px] w-full [&_video]:object-cover [&_video]:w-full [&_video]:max-h-[70vh]"
+          />
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => void handlePhotoQrUpload(e)}
           />
           <div className="flex flex-wrap gap-2 mt-3">
             <button
@@ -260,6 +293,14 @@ export default function CheckinTab() {
               className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
             >
               Stop
+            </button>
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={lookupLoading}
+              className="px-4 py-2 bg-white text-gray-800 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-60"
+            >
+              Upload QR photo
             </button>
           </div>
           {scannerError ? (
@@ -457,8 +498,69 @@ function EventStatusCard({ title, attending }) {
   );
 }
 
-function minQrBoxSize() {
-  if (typeof window === "undefined") return 250;
-  const w = Math.min(window.innerWidth - 64, 400);
-  return Math.max(200, Math.floor(w * 0.75));
+function isIOSDevice() {
+  if (typeof navigator === "undefined") return false;
+  return (
+    /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+/** iOS Safari often rejects aspectRatio constraints (OverconstrainedError). */
+function buildScannerConfig() {
+  const config = {
+    fps: 10,
+    qrbox: (viewfinderWidth, viewfinderHeight) => {
+      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+      const size = Math.max(50, Math.floor(Math.min(280, minEdge * 0.75)));
+      return { width: size, height: size };
+    },
+  };
+  if (!isIOSDevice()) {
+    config.aspectRatio = 1.777;
+  }
+  return config;
+}
+
+async function resolveCameraConfig(Html5Qrcode) {
+  if (!isIOSDevice()) {
+    return { facingMode: "environment" };
+  }
+  try {
+    const cameras = await Html5Qrcode.getCameras();
+    if (!cameras?.length) return { facingMode: "environment" };
+    const back = cameras.find((camera) =>
+      /back|rear|environment/i.test(camera.label || ""),
+    );
+    if (back?.id) return back.id;
+    return cameras[cameras.length - 1].id;
+  } catch {
+    return { facingMode: "environment" };
+  }
+}
+
+function formatScannerStartError(err, isIOS) {
+  const msg = err?.message || String(err || "");
+  if (/NotAllowedError|Permission/i.test(msg)) {
+    return isIOS
+      ? "Camera access was denied. Open Settings → Safari → Camera, allow access for this site, then reload."
+      : "Camera access was denied. Allow camera access in your browser and try again.";
+  }
+  if (/NotFoundError|DevicesNotFound/i.test(msg)) {
+    return "No camera was found. Use manual lookup or upload a photo of the QR code.";
+  }
+  if (/OverconstrainedError|ConstraintNotSatisfied/i.test(msg)) {
+    return "Could not start the camera. Try again, or use manual lookup / upload a QR photo.";
+  }
+  return msg || "Camera failed to start. Allow camera access and retry.";
+}
+
+function ensureInlineVideoPlayback(containerId) {
+  const root = document.getElementById(containerId);
+  if (!root) return;
+  root.querySelectorAll("video").forEach((video) => {
+    video.setAttribute("playsinline", "true");
+    video.setAttribute("webkit-playsinline", "true");
+    video.muted = true;
+  });
 }

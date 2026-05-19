@@ -1734,7 +1734,7 @@ async function handleRegistration(request, env, corsHeaders) {
       "trainee-member": { early: 150, standard: 200 },
       "trainee-non-member": { early: 250, standard: 300 },
       "invited-speaker": { early: 0, standard: 0 },
-      "korea-day-pass": { early: 150, standard: 200 },
+      "korea-day-pass": { early: 200, standard: 250 },
     };
 
     const earlyBirdDeadline = new Date("2026-07-10").getTime();
@@ -1793,12 +1793,6 @@ async function handleRegistration(request, env, corsHeaders) {
       const allowed = new Set(dayPassDayList);
       lunchDays = lunchDays.filter((d) => allowed.has(d));
       breakfastDays = breakfastDays.filter((d) => allowed.has(d));
-      if (!dayPassDayList.includes("Friday")) {
-        openingReceptionAttending = 0;
-      }
-      if (!dayPassDayList.includes("Saturday")) {
-        galaDinnerAttending = 0;
-      }
     }
 
     let accompanyingPrice = (isEarlyBird ? 250 : 350) * accompanyingCount;

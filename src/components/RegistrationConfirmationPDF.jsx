@@ -208,7 +208,7 @@ const RegistrationConfirmationPDF = ({
         <Text style={styles.value}>{openingReceptionAttendanceLabel}</Text>
       </View>
       <View style={styles.lineItem}>
-        <Text>Gala dinner</Text>
+        <Text>Gala evening</Text>
         <Text style={styles.value}>{galaDinnerAttendanceLabel}</Text>
       </View>
 
