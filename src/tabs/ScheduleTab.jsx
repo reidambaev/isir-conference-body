@@ -4,38 +4,23 @@ const DAY_START = 7 * 60; // 7:00 AM
 const DAY_END = 21 * 60; // 9:00 PM (Award Gala)
 const PX_PER_MIN = 2.1;
 
-/** Shorter visual height for single-line blocks — clock times stay accurate at the top edge */
-function getDisplayDurationMinutes(session, realDuration) {
-  if (session.type === "parallel") {
-    const count = session.sessions?.length ?? 1;
-    if (count >= 3) return realDuration;
-    return Math.max(realDuration * 0.9, realDuration - 8);
-  }
-
-  if (/registration/i.test(session.title || "")) {
-    return Math.min(realDuration, 32);
-  }
-
-  switch (session.type) {
-    case "break":
-      return realDuration <= 20 ? 9 : Math.min(realDuration, 20);
-    case "meeting":
-      return Math.min(realDuration, 14);
-    case "social":
-      if (session.subtitle) return realDuration;
-      return Math.min(realDuration, 20);
-    case "plenary":
-      return realDuration <= 35 ? 18 : realDuration;
-    case "population":
-      return realDuration;
-    case "forum":
-      return Math.min(realDuration, 18);
-    default:
-      return realDuration <= 25 ? 14 : realDuration;
-  }
+function blockHeightMinutes(session) {
+  return session.durationMinutes;
 }
 
-const BLOCK_GAP_PX = 2;
+function forumHeightMinutes(session, forum) {
+  if (forum?.endTime) {
+    return Math.max(
+      parseTimeToMinutes(forum.endTime) - session.startMinutes,
+      10,
+    );
+  }
+  return session.durationMinutes;
+}
+
+function minutesToTopPx(startMinutes) {
+  return (startMinutes - DAY_START) * PX_PER_MIN;
+}
 
 function formatTimeLabel(totalMinutes) {
   const h24 = Math.floor(totalMinutes / 60);
@@ -47,51 +32,32 @@ function formatTimeLabel(totalMinutes) {
     : `${h12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
-/** Map clock start times → visual Y; spacing follows block heights, not equal hours */
-function buildVisualLayout(enrichedDays) {
+function computeTimelineHeight(enrichedDays) {
+  let maxEnd = DAY_START + 60;
+  for (const day of enrichedDays) {
+    for (const s of day) {
+      maxEnd = Math.max(maxEnd, s.endMinutes);
+      if (s.forum?.endTime) {
+        maxEnd = Math.max(maxEnd, parseTimeToMinutes(s.forum.endTime));
+      }
+    }
+  }
+  return (maxEnd - DAY_START + 15) * PX_PER_MIN;
+}
+
+function buildTimeLabels(enrichedDays) {
   const starts = new Set();
   for (const day of enrichedDays) {
     for (const s of day) {
       starts.add(s.startMinutes);
     }
   }
-  const sortedStarts = [...starts].sort((a, b) => a - b);
-  const topByStart = new Map();
-  const timeLabels = [];
-  let visualY = 0;
-
-  for (let i = 0; i < sortedStarts.length; i++) {
-    const clockStart = sortedStarts[i];
-    topByStart.set(clockStart, visualY);
-    timeLabels.push({ minutes: clockStart, topPx: visualY });
-
-    let segmentMinutes = 6;
-    for (const day of enrichedDays) {
-      const session = day.find((s) => s.startMinutes === clockStart);
-      if (session) {
-        segmentMinutes = Math.max(
-          segmentMinutes,
-          session.displayDurationMinutes ?? session.durationMinutes,
-        );
-      }
-    }
-
-    visualY += segmentMinutes * PX_PER_MIN + BLOCK_GAP_PX;
-  }
-
-  return {
-    topByStart,
-    timeLabels,
-    timelineHeight: visualY + 12,
-    segmentStarts: sortedStarts,
-  };
-}
-
-function withVisualTops(daySchedule, layout) {
-  return daySchedule.map((session) => ({
-    ...session,
-    visualTopPx: layout.topByStart.get(session.startMinutes) ?? 0,
-  }));
+  return [...starts]
+    .sort((a, b) => a - b)
+    .map((minutes) => ({
+      minutes,
+      topPx: minutesToTopPx(minutes),
+    }));
 }
 
 function parseTimeToMinutes(timeStr) {
@@ -129,13 +95,11 @@ function enrichDaySchedule(daySchedule) {
     } else {
       duration = Math.max(duration, 15);
     }
-    const displayDurationMinutes = getDisplayDurationMinutes(session, duration);
     return {
       ...session,
       startMinutes: start,
       endMinutes: start + duration,
       durationMinutes: duration,
-      displayDurationMinutes,
     };
   });
 }
@@ -225,7 +189,12 @@ const ScheduleTab = () => {
         time: "10:05 AM",
         endTime: "11:45 AM",
         type: "parallel",
-        forum: { type: "forum", number: "PF I", title: "Public Forum I" },
+        forum: {
+          type: "forum",
+          number: "PF I",
+          title: "Public Forum I",
+          endTime: "11:45 AM",
+        },
         sessions: [
           {
             type: "symposium",
@@ -247,12 +216,12 @@ const ScheduleTab = () => {
       },
       {
         time: "11:45 AM",
-        endTime: "12:45 PM",
+        endTime: "1:00 PM",
         type: "break",
         title: "Poster / Lunch",
       },
       {
-        time: "12:45 PM",
+        time: "1:00 PM",
         endTime: "2:30 PM",
         type: "population",
         title: "Population Forum I",
@@ -330,7 +299,12 @@ const ScheduleTab = () => {
         time: "10:05 AM",
         endTime: "11:45 AM",
         type: "parallel",
-        forum: { type: "forum", number: "PF II", title: "Public Forum II" },
+        forum: {
+          type: "forum",
+          number: "PF II",
+          title: "Public Forum II",
+          endTime: "11:45 AM",
+        },
         sessions: [
           {
             type: "symposium",
@@ -351,12 +325,12 @@ const ScheduleTab = () => {
       },
       {
         time: "11:45 AM",
-        endTime: "12:45 PM",
+        endTime: "1:00 PM",
         type: "break",
         title: "Poster / Lunch",
       },
       {
-        time: "12:45 PM",
+        time: "1:00 PM",
         endTime: "2:30 PM",
         type: "population",
         title: "Population Forum II",
@@ -495,7 +469,7 @@ const ScheduleTab = () => {
       },
       {
         time: "2:30 PM",
-        endTime: "5:00 PM",
+        endTime: "4:15 PM",
         type: "social",
         title: "Bus Tour",
       },
@@ -816,32 +790,33 @@ const ScheduleTab = () => {
   const renderTimelineDayColumn = (
     daySchedule,
     dayIdx,
-    layout,
+    timelineHeight,
+    timeLabels,
     isWide = false,
   ) => {
     const hasForum = dayHasForumTrack(daySchedule);
-    const positioned = withVisualTops(daySchedule, layout);
 
     return (
       <div
         key={dayIdx}
         className={`relative border-l border-gray-200 ${isWide ? "min-w-[280px]" : "min-w-[140px] flex-1"}`}
-        style={{ height: layout.timelineHeight }}
+        style={{ height: timelineHeight }}
       >
-        {layout.segmentStarts.map((m) => (
+        {timeLabels.map(({ minutes, topPx }) => (
           <div
-            key={m}
+            key={minutes}
             className="absolute left-0 right-0 border-t border-gray-100 pointer-events-none"
-            style={{ top: layout.topByStart.get(m) }}
+            style={{ top: topPx }}
           />
         ))}
 
-        {positioned.map((session, idx) => {
-          const top = session.visualTopPx;
-          const height =
-            (session.displayDurationMinutes ?? session.durationMinutes) *
-            PX_PER_MIN;
+        {daySchedule.map((session, idx) => {
+          const top = minutesToTopPx(session.startMinutes);
+          const height = blockHeightMinutes(session) * PX_PER_MIN;
           const mainWidth = hasForum && session.forum ? "68%" : "98%";
+          const forumHeightPx = session.forum
+            ? forumHeightMinutes(session, session.forum) * PX_PER_MIN
+            : height;
 
           return (
             <React.Fragment key={`${session.time}-${idx}`}>
@@ -854,23 +829,28 @@ const ScheduleTab = () => {
               {session.forum && (
                 <div
                   className="absolute z-10 overflow-hidden"
-                  style={{ top, height, left: "70%", width: "29%" }}
+                  style={{
+                    top,
+                    height: forumHeightPx,
+                    left: "70%",
+                    width: "29%",
+                  }}
                 >
                   {(() => {
                     const fStyle = getSessionStyle("forum");
                     return (
                       <div
-                        className={`h-full w-full ${fStyle.bg} border ${fStyle.border} rounded flex flex-col justify-center overflow-hidden ${height < 36 ? "px-1 py-0.5" : "px-1.5 py-1"}`}
+                        className={`h-full w-full ${fStyle.bg} border ${fStyle.border} rounded flex flex-col justify-center overflow-hidden ${forumHeightPx < 36 ? "px-1 py-0.5" : "px-1.5 py-1"}`}
                       >
-                        {session.forum.number && height >= 32 && (
+                        {session.forum.number && forumHeightPx >= 32 && (
                           <span
-                            className={`${height < 36 ? "text-[8px]" : "text-[9px]"} font-bold ${fStyle.text} opacity-70 text-center`}
+                            className={`${forumHeightPx < 36 ? "text-[8px]" : "text-[9px]"} font-bold ${fStyle.text} opacity-70 text-center`}
                           >
                             {session.forum.number}
                           </span>
                         )}
                         <span
-                          className={`${height < 36 ? "text-[8px]" : "text-[9px]"} font-semibold ${fStyle.text} text-center leading-tight line-clamp-4`}
+                          className={`${forumHeightPx < 36 ? "text-[8px]" : "text-[9px]"} font-semibold ${fStyle.text} text-center leading-tight line-clamp-4`}
                         >
                           {session.forum.title}
                         </span>
@@ -891,7 +871,8 @@ const ScheduleTab = () => {
     const gridCols =
       cols === 1 ? "64px 1fr" : `64px repeat(${cols}, minmax(0, 1fr))`;
     const daysForView = dayIndices.map((i) => enrichedByDay[i]);
-    const layout = buildVisualLayout(daysForView);
+    const timelineHeight = computeTimelineHeight(daysForView);
+    const timeLabels = buildTimeLabels(daysForView);
 
     return (
       <div
@@ -923,9 +904,9 @@ const ScheduleTab = () => {
           >
             <div
               className="relative bg-gray-50 border-r border-gray-200"
-              style={{ height: layout.timelineHeight }}
+              style={{ height: timelineHeight }}
             >
-              {layout.timeLabels.map(({ minutes, topPx }) => (
+              {timeLabels.map(({ minutes, topPx }) => (
                 <div
                   key={minutes}
                   className="absolute right-0.5 -translate-y-1/2 text-[8px] font-medium text-gray-500 tabular-nums leading-none text-right pr-0.5"
@@ -940,7 +921,8 @@ const ScheduleTab = () => {
               renderTimelineDayColumn(
                 enrichedByDay[dayIdx],
                 dayIdx,
-                layout,
+                timelineHeight,
+                timeLabels,
                 cols === 1,
               ),
             )}
