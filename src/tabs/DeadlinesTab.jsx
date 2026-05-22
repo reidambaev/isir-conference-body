@@ -5,9 +5,10 @@ const deadlines = [
   {
     date: "Mar 15",
     title: "Abstract Submission Opens",
-    desc: "Abstract submission opens. Registration opening has been delayed due to technical issues; please check back here for updates.",
+    desc: "Abstract submission and conference registration open.",
     actions: [
       { label: "Submit Abstract", tab: "submission" },
+      { label: "Register Now", tab: "registration" },
     ],
   },
   {
