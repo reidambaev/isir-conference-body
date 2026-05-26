@@ -7,8 +7,8 @@ const VisaRequestForm = ({ onClose }) => {
   const [formData, setFormData] = useState({
     email: "",
     name: "",
-    country: "",
-    notes: "",
+    affiliation: "",
+    nationality: "",
   });
 
   const handleChange = (e) => {
@@ -19,7 +19,12 @@ const VisaRequestForm = ({ onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.email || !formData.name || !formData.country) {
+    if (
+      !formData.email ||
+      !formData.name ||
+      !formData.affiliation ||
+      !formData.nationality
+    ) {
       setError("Please fill in all required fields");
       return;
     }
@@ -71,13 +76,15 @@ const VisaRequestForm = ({ onClose }) => {
             </div>
             <h3 className="text-3xl font-bold mb-2">Request Submitted!</h3>
             <p className="text-green-100 text-lg">
-              We will contact you shortly with visa support documents
+              Your information has been forwarded to our visa coordinator
             </p>
           </div>
           <div className="p-8 text-center">
             <p className="text-gray-600 mb-6">
-              You will receive a confirmation email at{" "}
-              <strong>{formData.email}</strong>
+              A confirmation email will be sent to{" "}
+              <strong>{formData.email}</strong>. Ms. Lee will prepare your
+              invitation letter using the standard template and follow up if
+              needed.
             </p>
             <button
               onClick={onClose}
@@ -121,10 +128,10 @@ const VisaRequestForm = ({ onClose }) => {
                 className="text-2xl font-bold"
                 style={{ color: "var(--color-primary)" }}
               >
-                Visa Support Request
+                Visa Invitation Letter Request
               </h2>
               <p className="text-gray-600 text-sm">
-                For ISIR 2026 World Congress
+                ISIR 2026 World Congress
               </p>
             </div>
           </div>
@@ -149,10 +156,17 @@ const VisaRequestForm = ({ onClose }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-8">
+          <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+            Please enter your details exactly as they should appear on your visa
+            invitation letter. We use a standard template for all attendees—no
+            special wording is required. Our coordinator will prepare your letter
+            from this information.
+          </p>
+
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Full Name <span className="text-red-500">*</span>
+                Formal Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -161,7 +175,37 @@ const VisaRequestForm = ({ onClose }) => {
                 onChange={handleChange}
                 required
                 className="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                placeholder="Enter your full name"
+                placeholder="Full legal name as on passport"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Affiliation <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="affiliation"
+                value={formData.affiliation}
+                onChange={handleChange}
+                required
+                className="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                placeholder="Institution or organization"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Nationality <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="nationality"
+                value={formData.nationality}
+                onChange={handleChange}
+                required
+                className="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                placeholder="e.g. United States, Japan, Germany"
               />
             </div>
 
@@ -178,35 +222,9 @@ const VisaRequestForm = ({ onClose }) => {
                 className="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                 placeholder="your.email@example.com"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Country <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="country"
-                value={formData.country}
-                onChange={handleChange}
-                required
-                className="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                placeholder="Your country of residence"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Additional Notes
-              </label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                rows={4}
-                className="w-full border-2 border-gray-200 p-3 text-sm rounded-xl bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                placeholder="Any special requirements or additional information..."
-              />
+              <p className="text-xs text-gray-500 mt-1">
+                Used to send your invitation letter and any follow-up
+              </p>
             </div>
 
             {error && (

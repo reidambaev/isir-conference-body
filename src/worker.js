@@ -2754,11 +2754,10 @@ function buildVisaReviewerNotificationHtml({
   visaRequestId,
   name,
   email,
-  country,
-  notes,
+  affiliation,
+  nationality,
   timestamp,
 }) {
-  const safeNotes = notes && String(notes).trim() ? String(notes).trim() : "";
   const submittedAt = formatVisaSubmittedAt(timestamp);
   return `
 <!DOCTYPE html>
@@ -2767,22 +2766,21 @@ function buildVisaReviewerNotificationHtml({
 <body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
   <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
     <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
-    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">New visa support request</p>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">New visa invitation letter request</p>
   </div>
   <p>Dear ${escapeHtml(VISA_NOTIFY_SALUTATION)},</p>
-  <p>A new visa support request has been submitted for the ISIR 2026 World Congress.</p>
+  <p>A new visa invitation letter request has been submitted. Please prepare the standard invitation letter using the details below.</p>
   <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
-    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Request details</p>
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Applicant details (for template)</p>
     <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
       <tr><td style="padding: 4px 0;">Request ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(visaRequestId)}</strong></td></tr>
-      <tr><td style="padding: 4px 0;">Name</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(name)}</td></tr>
+      <tr><td style="padding: 4px 0;">Formal name</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(name)}</td></tr>
+      <tr><td style="padding: 4px 0;">Affiliation</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(affiliation)}</td></tr>
+      <tr><td style="padding: 4px 0;">Nationality</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(nationality)}</td></tr>
       <tr><td style="padding: 4px 0;">Email</td><td style="padding: 4px 0; text-align: right;"><a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></td></tr>
-      <tr><td style="padding: 4px 0;">Country</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(country)}</td></tr>
       <tr><td style="padding: 4px 0;">Submitted</td><td style="padding: 4px 0; text-align: right;">${submittedAt}</td></tr>
     </table>
-    <p style="margin: 12px 0 0 0; font-size: 0.9rem; color: #555;"><strong>Additional notes:</strong><br/>${safeNotes ? escapeHtml(safeNotes) : "None provided"}</p>
   </div>
-  <p>Please review and process this request at your earliest convenience.</p>
   <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 System</strong></p>
 </body>
 </html>`;
@@ -2808,7 +2806,7 @@ async function sendVisaReviewerNotificationEmail(env, visaRequest) {
       body: JSON.stringify({
         from: env.CONFIRMATION_FROM_EMAIL,
         to: VISA_NOTIFY_EMAILS,
-        subject: `ISIR 2026 – Visa request from ${visaRequest.name} (${visaRequest.country})`,
+        subject: `ISIR 2026 – Visa letter request: ${visaRequest.name} (${visaRequest.nationality})`,
         html,
       }),
     });
@@ -2838,14 +2836,17 @@ async function sendVisaReviewerNotificationEmail(env, visaRequest) {
 async function handleVisaRequest(request, env, corsHeaders) {
   try {
     const data = await request.json();
-    const { email, name, country, notes } = data;
+    const { email, name, affiliation, nationality, country } = data;
+    const nationalityValue = String(nationality || country || "").trim();
+    const affiliationValue = String(affiliation || "").trim();
 
     // Validate required fields
-    if (!email || !name || !country) {
+    if (!email || !name || !affiliationValue || !nationalityValue) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Email, name, and country are required",
+          error:
+            "Email, formal name, affiliation, and nationality are required",
         }),
         { status: 400, headers: corsHeaders },
       );
@@ -2855,17 +2856,17 @@ async function handleVisaRequest(request, env, corsHeaders) {
     const visaRequestId = crypto.randomUUID();
     const timestamp = Date.now();
 
-    // Insert visa request
+    // Insert visa request (country column stores nationality)
     await env.ISIR_DB.prepare(
-      `INSERT INTO visa_requests (id, email, name, country, notes, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      `INSERT INTO visa_requests (id, email, name, affiliation, country, notes, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, NULL, 'pending', ?, ?)`,
     )
       .bind(
         visaRequestId,
         email,
         name,
-        country,
-        notes || null,
+        affiliationValue,
+        nationalityValue,
         timestamp,
         timestamp,
       )
@@ -2874,15 +2875,13 @@ async function handleVisaRequest(request, env, corsHeaders) {
     // Send notification and requester confirmation emails
     // (Non-blocking: DB insert succeeds even if email fails)
     if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
-      const safeNotes =
-        notes && String(notes).trim() ? String(notes).trim() : "";
       const submittedAt = formatVisaSubmittedAt(timestamp);
       await sendVisaReviewerNotificationEmail(env, {
         visaRequestId,
         name,
         email,
-        country,
-        notes: safeNotes,
+        affiliation: affiliationValue,
+        nationality: nationalityValue,
         timestamp,
       });
 
@@ -2893,22 +2892,22 @@ async function handleVisaRequest(request, env, corsHeaders) {
 <body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
   <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
     <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
-    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Visa support request received</p>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Visa invitation letter request received</p>
   </div>
   <p>Dear ${escapeHtml(name)},</p>
-  <p>Thank you for submitting your visa support request. We have received your request and our team will follow up with you.</p>
+  <p>Thank you for submitting your visa invitation letter request. Our coordinator will prepare your letter using the standard template and send it to this email address.</p>
   <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
-    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Your request summary</p>
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Your submission</p>
     <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
       <tr><td style="padding: 4px 0;">Request ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(visaRequestId)}</strong></td></tr>
-      <tr><td style="padding: 4px 0;">Name</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(name)}</td></tr>
+      <tr><td style="padding: 4px 0;">Formal name</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(name)}</td></tr>
+      <tr><td style="padding: 4px 0;">Affiliation</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(affiliationValue)}</td></tr>
+      <tr><td style="padding: 4px 0;">Nationality</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(nationalityValue)}</td></tr>
       <tr><td style="padding: 4px 0;">Email</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(email)}</td></tr>
-      <tr><td style="padding: 4px 0;">Country</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(country)}</td></tr>
       <tr><td style="padding: 4px 0;">Submitted</td><td style="padding: 4px 0; text-align: right;">${submittedAt}</td></tr>
     </table>
-    <p style="margin: 12px 0 0 0; font-size: 0.9rem; color: #555;"><strong>Additional notes:</strong><br/>${safeNotes ? escapeHtml(safeNotes) : "None provided"}</p>
   </div>
-  <p>If you need to update anything, please reply to this email or contact the organizers.</p>
+  <p>If any detail is incorrect, please reply to this email promptly so we can update your letter.</p>
   <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
 </body>
 </html>`;
@@ -2923,7 +2922,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
           body: JSON.stringify({
             from: env.CONFIRMATION_FROM_EMAIL,
             to: [email],
-            subject: "ISIR 2026 – Visa support request received",
+            subject: "ISIR 2026 – Visa invitation letter request received",
             html: requesterHtml,
           }),
         });
@@ -5088,10 +5087,10 @@ async function handleResendVisaReviewerEmails(request, env, corsHeaders) {
 
     const query = visaRequestId
       ? env.ISIR_DB.prepare(
-          `SELECT id, email, name, country, notes, created_at FROM visa_requests WHERE id = ? LIMIT 1`,
+          `SELECT id, email, name, affiliation, country, created_at FROM visa_requests WHERE id = ? LIMIT 1`,
         ).bind(visaRequestId)
       : env.ISIR_DB.prepare(
-          `SELECT id, email, name, country, notes, created_at FROM visa_requests ORDER BY created_at DESC LIMIT ?`,
+          `SELECT id, email, name, affiliation, country, created_at FROM visa_requests ORDER BY created_at DESC LIMIT ?`,
         ).bind(limit);
 
     const rowsResult = visaRequestId ? await query.first() : await query.all();
@@ -5123,8 +5122,8 @@ async function handleResendVisaReviewerEmails(request, env, corsHeaders) {
         visaRequestId: row.id,
         name: row.name,
         email: row.email,
-        country: row.country,
-        notes: row.notes || "",
+        affiliation: row.affiliation || "",
+        nationality: row.country || "",
         timestamp: Number(row.created_at) || Date.now(),
       });
       if (emailResult.success) sent += 1;

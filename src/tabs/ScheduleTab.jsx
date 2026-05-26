@@ -45,19 +45,36 @@ function computeTimelineHeight(enrichedDays) {
   return (maxEnd - DAY_START + 15) * PX_PER_MIN;
 }
 
+const END_TIME_AXIS_EVENTS = new Set([
+  "JRI Editorial Meeting",
+  "Award Gala",
+]);
+
 function buildTimeLabels(enrichedDays) {
-  const starts = new Set();
-  for (const day of enrichedDays) {
-    for (const s of day) {
-      starts.add(s.startMinutes);
-    }
-  }
-  return [...starts]
-    .sort((a, b) => a - b)
-    .map((minutes) => ({
+  const labels = [];
+  const seen = new Set();
+
+  const addLabel = (minutes, isEnd) => {
+    const key = `${isEnd ? "e" : "s"}-${minutes}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    labels.push({
       minutes,
       topPx: minutesToTopPx(minutes),
-    }));
+      isEnd,
+    });
+  };
+
+  for (const day of enrichedDays) {
+    for (const s of day) {
+      addLabel(s.startMinutes, false);
+      if (END_TIME_AXIS_EVENTS.has(s.title) && s.endTime) {
+        addLabel(parseTimeToMinutes(s.endTime), true);
+      }
+    }
+  }
+
+  return labels.sort((a, b) => a.topPx - b.topPx);
 }
 
 function parseTimeToMinutes(timeStr) {
@@ -802,9 +819,9 @@ const ScheduleTab = () => {
         className={`relative border-l border-gray-200 ${isWide ? "min-w-[280px]" : "min-w-[140px] flex-1"}`}
         style={{ height: timelineHeight }}
       >
-        {timeLabels.map(({ minutes, topPx }) => (
+        {timeLabels.map(({ minutes, topPx, isEnd }) => (
           <div
-            key={minutes}
+            key={`grid-${isEnd ? "end" : "start"}-${minutes}`}
             className="absolute left-0 right-0 border-t border-gray-100 pointer-events-none"
             style={{ top: topPx }}
           />
@@ -906,10 +923,10 @@ const ScheduleTab = () => {
               className="relative bg-gray-50 border-r border-gray-200"
               style={{ height: timelineHeight }}
             >
-              {timeLabels.map(({ minutes, topPx }) => (
+              {timeLabels.map(({ minutes, topPx, isEnd }) => (
                 <div
-                  key={minutes}
-                  className="absolute right-0.5 -translate-y-1/2 text-[8px] font-medium text-gray-500 tabular-nums leading-none text-right pr-0.5"
+                  key={`axis-${isEnd ? "end" : "start"}-${minutes}`}
+                  className={`absolute right-0.5 text-[8px] font-medium text-gray-500 tabular-nums leading-none text-right pr-0.5 ${isEnd ? "-translate-y-full" : "-translate-y-1/2"}`}
                   style={{ top: topPx }}
                 >
                   {formatTimeLabel(minutes)}

@@ -103,6 +103,7 @@ CREATE TABLE
         id TEXT PRIMARY KEY,
         email TEXT NOT NULL,
         name TEXT NOT NULL,
+        affiliation TEXT NOT NULL,
         country TEXT NOT NULL,
         notes TEXT,
         status TEXT DEFAULT 'pending',

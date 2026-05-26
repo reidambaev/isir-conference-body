@@ -165,13 +165,16 @@ const TravelTab = () => {
           </p>
           <div className="bg-white p-4 rounded-lg border border-yellow-300 mb-4">
             <p className="text-sm text-gray-600 mb-3">
-              <strong>Need an invitation letter?</strong> We offer an invitation
-              letter per request. Please click here (available soon).
+              <strong>Need an invitation letter?</strong> Submit the form below
+              with your formal name, affiliation, and nationality exactly as they
+              should appear on the letter. We use a standard template for all
+              attendees—no special wording is needed. Our coordinator will prepare
+              and send your letter by email.
             </p>
             <p className="text-sm text-gray-600">
               We do NOT contact or intervene with Embassy and/or Consulate
-              matters as this is the responsibility of the participant to obtain
-              their VISA approval to travel. If you require a visa or{" "}
+              matters; obtaining visa approval is the participant&apos;s
+              responsibility. If you require a visa or{" "}
               <a
                 href="https://www.k-eta.go.kr"
                 target="_blank"
