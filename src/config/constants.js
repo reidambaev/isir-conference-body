@@ -23,8 +23,7 @@ export const isSubmissionAccessible = () => SUBMISSION_OPEN || isPreviewMode();
 
 // API Configuration for ISIR Member Verification
 export const ISIR_API_CONFIG = {
-  endpoint:
-    import.meta.env.VITE_ISIR_API_ENDPOINT || "/api/check-member",
+  endpoint: import.meta.env.VITE_ISIR_API_ENDPOINT || "/api/check-member",
   apiKey: import.meta.env.VITE_ISIR_API_KEY || "",
 };
 
@@ -73,7 +72,9 @@ export const CONGRESS_WEEKEND_MEALS = [
   { key: "Sunday", date: "Nov 8, 2026" },
 ];
 
-export const CONGRESS_WEEKEND_MEAL_KEYS = CONGRESS_WEEKEND_MEALS.map((m) => m.key);
+export const CONGRESS_WEEKEND_MEAL_KEYS = CONGRESS_WEEKEND_MEALS.map(
+  (m) => m.key,
+);
 
 /** Day-pass ticketable dates (Thu–Sun of congress week). */
 export const CONGRESS_DAYPASS_DAYS = [
@@ -114,9 +115,9 @@ export function formatCongressMealDayList(dayKeys) {
 }
 
 export function selectedDayPassCongressDayKeys(dayPassDays) {
-  return CONGRESS_DAYPASS_DAYS.filter(({ key }) => Boolean(dayPassDays?.[key])).map(
-    ({ key }) => key,
-  );
+  return CONGRESS_DAYPASS_DAYS.filter(({ key }) =>
+    Boolean(dayPassDays?.[key]),
+  ).map(({ key }) => key);
 }
 
 /** Fri–Sun breakfast/lunch only apply when that day is on the day pass. */
@@ -175,4 +176,29 @@ export const calculateTotalPrice = (
     getAccompanyingPrice(isEarlyBird) * accompanyingCount;
   const galaDinnerPrice = galaDinner ? GALA_DINNER_PRICE : 0;
   return ticketPrice + accompanyingPrice + galaDinnerPrice;
+};
+
+export const BEXCO_VENUE = {
+  website: "https://www.bexco.co.kr/eng/Main.do",
+  parking: "https://www.bexco.co.kr/eng/CMS/Contents/Contents.do?mCode=MN023",
+  map: "https://www.google.com/maps/search/?api=1&query=BEXCO+Busan",
+  photos: [
+    {
+      href: "https://commons.wikimedia.org/wiki/File:Busan_BEXCO.jpg",
+      src: "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/0d/92/38/4f/photo0jpg.jpg?w=1400&h=800&s=1",
+      alt: "BEXCO exterior, Busan",
+    },
+    {
+      href: "https://commons.wikimedia.org/wiki/File:BEXCO_in_Busan,_South_Korea_(iau2207a).jpg",
+      src: "https://upload.wikimedia.org/wikipedia/commons/0/00/BEXCO_in_Busan%2C_South_Korea_%28iau2207a%29.jpg",
+      alt: "BEXCO convention center, Busan",
+    },
+    {
+      href: "https://commons.wikimedia.org/wiki/File:BEXCO_and_Plaza.jpg",
+      src: "https://aipc.org/wp-content/uploads/2020/08/BEXCO_8-scaled.jpg",
+      alt: "BEXCO plaza, Busan",
+    },
+  ],
+  mapEmbed:
+    "https://maps.google.com/maps?q=BEXCO+Busan,+55+APEC-ro,+Haeundae-gu,+Busan,+Korea&t=&z=15&ie=UTF8&iwloc=&output=embed",
 };

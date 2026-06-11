@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { BEXCO_VENUE } from "../config/constants";
 import VisaRequestForm from "../forms/VisaRequestForm";
 import beach from "../assets/beach.jpg";
 import village from "../assets/village.jpg";
@@ -6,6 +7,7 @@ import market from "../assets/market.jpg";
 import temple2 from "../assets/temple2.jpg";
 import beach3 from "../assets/beach3.jpg";
 import food from "../assets/food.jpg";
+import bexcoFloorplan from "../assets/bexco-floorplan.png";
 
 const TravelTab = () => {
   const [showVisaForm, setShowVisaForm] = useState(false);
@@ -22,6 +24,148 @@ const TravelTab = () => {
       >
         Travel & Accommodation
       </h3>
+
+      {/* Venue Hero Section */}
+      <div className="mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="aspect-video rounded-xl overflow-hidden shadow-lg">
+            <img
+              src={BEXCO_VENUE.photos[0].src}
+              alt={BEXCO_VENUE.photos[0].alt}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="flex flex-col justify-center">
+            <span
+              className="inline-block px-3 py-1 text-sm font-semibold rounded-full mb-3 w-fit"
+              style={{
+                backgroundColor: "var(--color-secondary)",
+                color: "var(--color-primary)",
+              }}
+            >
+              Congress Venue
+            </span>
+            <h4
+              className="text-xl font-semibold text-blue-800 mb-2"
+              style={{ color: "var(--color-primary)" }}
+            >
+              BEXCO — Exhibition Center II
+            </h4>
+            <p className="text-gray-700 mb-4">
+              The congress will be held at the{" "}
+              <a
+                href={BEXCO_VENUE.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-700 font-semibold hover:underline"
+              >
+                Busan Exhibition and Convention Center (BEXCO)
+              </a>
+              , in the new <strong>Exhibition Center II</strong> building.
+              Scientific sessions will take place in Meeting Rooms{" "}
+              <strong>320–326</strong> and <strong>121–124</strong>.
+            </p>
+            <p className="text-sm text-gray-600">
+              55 APEC-ro, Haeundae-gu, Busan, Korea
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Venue Amenities */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        {[
+          { icon: "🏛️", label: "Exhibition Halls" },
+          { icon: "🎤", label: "Meeting Rooms" },
+          { icon: "📶", label: "High-Speed WiFi" },
+          { icon: "🚇", label: "Metro Access" },
+          { icon: "🍽️", label: "On-site Dining" },
+          { icon: "♿", label: "Accessibility" },
+          { icon: "🅿️", label: "Parking" },
+          { icon: "🏖️", label: "Haeundae District" },
+        ].map((amenity, index) => (
+          <div
+            key={index}
+            className="flex items-center p-4 bg-gray-50 rounded-xl"
+          >
+            <span className="text-2xl mr-3">{amenity.icon}</span>
+            <span className="text-sm font-medium text-gray-700">
+              {amenity.label}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Floor Plan & Getting to BEXCO */}
+      <div className="mb-10">
+        <h4
+          className="text-xl font-semibold text-blue-800 mb-4"
+          style={{ color: "var(--color-primary)" }}
+        >
+          Getting there / Parking / Directions / Transportation
+        </h4>
+        <div className="rounded-xl overflow-hidden shadow-lg mb-6 bg-white">
+          <img
+            src={bexcoFloorplan}
+            alt="BEXCO floor plan showing Exhibition Centers I and II, meeting rooms, and parking areas"
+            className="w-full h-auto"
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-gray-50 p-6 rounded-xl">
+            <h5
+              className="text-lg font-semibold mb-3 flex items-center"
+              style={{ color: "var(--color-primary)" }}
+            >
+              <span className="text-2xl mr-2">🅿️</span>
+              Parking
+            </h5>
+            <p className="text-gray-700">
+              BEXCO provides access to on-site parking. The fees start from 400
+              KRW per 10 min (
+              <a
+                href={BEXCO_VENUE.parking}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-700 font-semibold hover:underline"
+              >
+                more info here
+              </a>
+              ).
+            </p>
+          </div>
+          <div className="bg-gray-50 p-6 rounded-xl">
+            <h5
+              className="text-lg font-semibold mb-3 flex items-center"
+              style={{ color: "var(--color-primary)" }}
+            >
+              <span className="text-2xl mr-2">🚇</span>
+              Public Transportation
+            </h5>
+            <p className="text-gray-700 mb-3">
+              There are several ways to reach BEXCO:
+            </p>
+            <div className="space-y-3">
+              <div>
+                <p className="font-semibold text-gray-800">By subway</p>
+                <p className="text-gray-600 text-sm">
+                  There are two stations next to the center:{" "}
+                  <strong>Centum City</strong> and <strong>BEXCO</strong>.
+                </p>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-800">By bus</p>
+                <p className="text-gray-600 text-sm">
+                  The center can be reached by buses № 5-1, 39, 40, 63, 100,
+                  100-1, 107, 115, 115-1, 139, 141, 141(심야), 155, 181, 200,
+                  307, 1001, 1001(심야), 1002, 1006, 1011, 수영구2-1,
+                  해운대구3-1, 해운대구3-2.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Conference Hotel - Coming Soon */}
       <div className="mb-10">
@@ -127,10 +271,9 @@ const TravelTab = () => {
                 <span className="text-white text-sm">🚕</span>
               </div>
               <div>
-                <p className="font-semibold text-gray-800">From PUS to Busan</p>
+                <p className="font-semibold text-gray-800">From PUS to BEXCO</p>
                 <p className="text-gray-600 text-sm">
-                  Taxi or airport limousine bus into central Busan (45-60
-                  minutes).
+                  Taxi or airport limousine bus to Haeundae (45-60 minutes).
                 </p>
               </div>
             </div>

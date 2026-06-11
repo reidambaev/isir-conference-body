@@ -32,7 +32,7 @@ function formatTimeLabel(totalMinutes) {
     : `${h12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
-function computeTimelineHeight(enrichedDays) {
+function computeTimelineHeight(enrichedDays, enrichedOverlays = []) {
   let maxEnd = DAY_START + 60;
   for (const day of enrichedDays) {
     for (const s of day) {
@@ -42,15 +42,21 @@ function computeTimelineHeight(enrichedDays) {
       }
     }
   }
+  for (const overlays of enrichedOverlays) {
+    for (const o of overlays) {
+      maxEnd = Math.max(maxEnd, o.endMinutes);
+    }
+  }
   return (maxEnd - DAY_START + 15) * PX_PER_MIN;
 }
 
 const END_TIME_AXIS_EVENTS = new Set([
   "JRI Editorial Meeting",
   "Award Gala",
+  "Trainee Social Event",
 ]);
 
-function buildTimeLabels(enrichedDays) {
+function buildTimeLabels(enrichedDays, enrichedOverlays = []) {
   const labels = [];
   const seen = new Set();
 
@@ -65,12 +71,23 @@ function buildTimeLabels(enrichedDays) {
     });
   };
 
+  const addEndLabel = (title, endTime) => {
+    if (END_TIME_AXIS_EVENTS.has(title) && endTime) {
+      addLabel(parseTimeToMinutes(endTime), true);
+    }
+  };
+
   for (const day of enrichedDays) {
     for (const s of day) {
       addLabel(s.startMinutes, false);
-      if (END_TIME_AXIS_EVENTS.has(s.title) && s.endTime) {
-        addLabel(parseTimeToMinutes(s.endTime), true);
-      }
+      addEndLabel(s.title, s.endTime);
+    }
+  }
+
+  for (const overlays of enrichedOverlays) {
+    for (const o of overlays) {
+      addLabel(o.startMinutes, false);
+      addEndLabel(o.title, o.endTime);
     }
   }
 
@@ -121,8 +138,43 @@ function enrichDaySchedule(daySchedule) {
   });
 }
 
-function dayHasForumTrack(daySchedule) {
-  return daySchedule.some((s) => s.forum);
+function enrichOverlays(overlays) {
+  return overlays.map((overlay) => {
+    const start = parseTimeToMinutes(overlay.time);
+    const end = parseTimeToMinutes(overlay.endTime);
+    const duration = Math.max(end - start, 10);
+    return {
+      ...overlay,
+      startMinutes: start,
+      endMinutes: start + duration,
+      durationMinutes: duration,
+    };
+  });
+}
+
+function sessionOverlapsOverlay(session, overlay) {
+  return (
+    session.startMinutes < overlay.endMinutes &&
+    session.endMinutes > overlay.startMinutes
+  );
+}
+
+function sessionHasSideTrack(session, overlays) {
+  if (session.forum) return true;
+  return overlays.some(
+    (o) =>
+      sessionOverlapsOverlay(session, o) &&
+      o.startMinutes <= session.startMinutes &&
+      o.endMinutes >= session.endMinutes,
+  );
+}
+
+function sessionContainsOverlay(session, overlays) {
+  return overlays.some(
+    (o) =>
+      session.startMinutes <= o.startMinutes &&
+      session.endMinutes >= o.endMinutes,
+  );
 }
 
 const ScheduleTab = () => {
@@ -163,7 +215,7 @@ const ScheduleTab = () => {
   // ISIR 2026 program at a glance (official schedule)
   const scheduleData = {
     0: [
-      { time: "9:00 AM", endTime: "3:00 PM", type: "social", title: "Registration Opens" },
+      { time: "1:00 PM", endTime: "3:00 PM", type: "social", title: "Registration Opens" },
       {
         time: "3:00 PM",
         endTime: "3:45 PM",
@@ -174,27 +226,27 @@ const ScheduleTab = () => {
         time: "5:00 PM",
         endTime: "5:30 PM",
         type: "plenary",
-        title: "Welcome Address / President Lecture",
+        title: "Welcome Address",
       },
       {
-        time: "6:30 PM",
-        endTime: "7:00 PM",
+        time: "5:30 PM",
+        endTime: "6:00 PM",
+        type: "plenary",
+        title: "President Lecture",
+      },
+      {
+        time: "6:00 PM",
+        endTime: "8:00 PM",
         type: "social",
         title: "Welcome Reception",
       },
     ],
     1: [
       {
-        time: "7:30 AM",
-        endTime: "8:30 AM",
-        type: "break",
-        title: "Breakfast",
-      },
-      {
         time: "8:30 AM",
         endTime: "9:50 AM",
         type: "plenary",
-        title: "President Symposium",
+        title: "President Symposium I",
       },
       {
         time: "9:50 AM",
@@ -204,13 +256,13 @@ const ScheduleTab = () => {
       },
       {
         time: "10:05 AM",
-        endTime: "11:45 AM",
+        endTime: "11:20 AM",
         type: "parallel",
         forum: {
           type: "forum",
           number: "PF I",
           title: "Public Forum I",
-          endTime: "11:45 AM",
+          endTime: "11:20 AM",
         },
         sessions: [
           {
@@ -235,7 +287,7 @@ const ScheduleTab = () => {
         time: "11:45 AM",
         endTime: "1:00 PM",
         type: "break",
-        title: "Poster / Lunch",
+        title: "Lunch",
       },
       {
         time: "1:00 PM",
@@ -276,57 +328,27 @@ const ScheduleTab = () => {
             number: "Awards",
             title: "New Investigator Award Session",
           },
-          { type: "oral", number: "Oral I", title: "Oral Presentation I" },
           { type: "oral", number: "Oral II", title: "Oral Presentation II" },
+          { type: "oral", number: "Oral III", title: "Oral Presentation III" },
         ],
       },
       {
         time: "5:30 PM",
-        endTime: "6:30 PM",
+        endTime: "8:30 PM",
         type: "social",
         title: "Trainee Social Event",
-      },
-      {
-        time: "7:00 PM",
-        endTime: "9:00 PM",
-        type: "meeting",
-        title: "JRI Editorial Meeting",
       },
     ],
     2: [
       {
-        time: "7:30 AM",
-        endTime: "8:30 AM",
-        type: "break",
-        title: "Breakfast",
-      },
-      {
         time: "8:30 AM",
         endTime: "9:50 AM",
-        type: "plenary",
-        title: "President Symposium",
-      },
-      {
-        time: "9:50 AM",
-        endTime: "10:05 AM",
-        type: "break",
-        title: "Coffee Break",
-      },
-      {
-        time: "10:05 AM",
-        endTime: "11:45 AM",
         type: "parallel",
-        forum: {
-          type: "forum",
-          number: "PF II",
-          title: "Public Forum II",
-          endTime: "11:45 AM",
-        },
         sessions: [
           {
             type: "symposium",
-            number: "S7",
-            title: "Ovarian Inflammatory Disease and Aging",
+            number: "S14",
+            title: "High Risk OB: 2nd and 3rd Trimester Complications",
           },
           {
             type: "symposium",
@@ -341,21 +363,21 @@ const ScheduleTab = () => {
         ],
       },
       {
-        time: "11:45 AM",
-        endTime: "1:00 PM",
+        time: "9:50 AM",
+        endTime: "10:05 AM",
         type: "break",
-        title: "Poster / Lunch",
+        title: "Coffee Break",
       },
       {
-        time: "1:00 PM",
-        endTime: "2:30 PM",
-        type: "population",
-        title: "Population Forum II",
-      },
-      {
-        time: "2:30 PM",
-        endTime: "4:00 PM",
+        time: "10:05 AM",
+        endTime: "11:20 AM",
         type: "parallel",
+        forum: {
+          type: "forum",
+          number: "PF II",
+          title: "Public Forum II",
+          endTime: "11:20 AM",
+        },
         sessions: [
           {
             type: "symposium",
@@ -364,13 +386,66 @@ const ScheduleTab = () => {
           },
           {
             type: "symposium",
-            number: "S11",
-            title: "T Cell Immunity and Pregnancy",
+            number: "S12",
+            title: "Gynecologic Malignancies and Immune Abnormalities",
           },
           {
             type: "symposium",
-            number: "S12",
-            title: "Gynecologic Malignancies and Immune Abnormalities",
+            number: "S11",
+            title: "T Cell Immunity and Pregnancy",
+          },
+        ],
+      },
+      {
+        time: "11:45 AM",
+        endTime: "1:00 PM",
+        type: "break",
+        title: "Lunch",
+      },
+      {
+        time: "1:00 PM",
+        endTime: "2:30 PM",
+        type: "parallel",
+        sessions: [
+          {
+            type: "symposium",
+            number: "S7",
+            title: "Ovarian Inflammatory Disease and Aging",
+          },
+          {
+            type: "symposium",
+            number: "S15",
+            title:
+              "Current Immunotherapeutic Options for Reproductive Failure",
+          },
+          {
+            type: "symposium",
+            number: "S13",
+            title:
+              "Immune Regulation and Therapeutic Application of Human Reproduction",
+          },
+        ],
+      },
+      {
+        time: "2:30 PM",
+        endTime: "4:00 PM",
+        type: "parallel",
+        sessions: [
+          {
+            type: "symposium",
+            number: "S17",
+            title: "Preeclampsia and Its Systemic Consequences",
+          },
+          {
+            type: "symposium",
+            number: "S16",
+            title:
+              "Exosomes, Mitochondrial Function, and Cell-Based Therapies",
+          },
+          {
+            type: "symposium",
+            number: "S2",
+            title: "Early Pregnancy and Placental Development",
           },
         ],
       },
@@ -382,89 +457,38 @@ const ScheduleTab = () => {
       },
       {
         time: "4:15 PM",
-        endTime: "5:30 PM",
+        endTime: "5:00 PM",
         type: "parallel",
         sessions: [
-          { type: "oral", number: "Oral III", title: "Oral Presentation III" },
           { type: "oral", number: "Oral IV", title: "Oral Presentation IV" },
           { type: "oral", number: "Oral V", title: "Oral Presentation V" },
+          { type: "oral", number: "Oral VI", title: "Oral Presentation VI" },
         ],
       },
     ],
     3: [
       {
-        time: "7:30 AM",
-        endTime: "8:30 AM",
-        type: "break",
-        title: "Breakfast",
-      },
-      {
         time: "8:30 AM",
-        endTime: "10:05 AM",
-        type: "parallel",
-        sessions: [
-          {
-            type: "symposium",
-            number: "S13",
-            title:
-              "Immune Regulation and Therapeutic Application of Human Reproduction",
-          },
-          {
-            type: "symposium",
-            number: "S14",
-            title: "High Risk OB: 2nd and 3rd Trimester Complications",
-          },
-          {
-            type: "symposium",
-            number: "S15",
-            title:
-              "Current Immunotherapeutic Options for Reproductive Failure",
-          },
-        ],
+        endTime: "9:50 AM",
+        type: "plenary",
+        title: "President Symposium II",
       },
       {
-        time: "10:05 AM",
-        endTime: "10:25 AM",
+        time: "9:50 AM",
+        endTime: "10:05 AM",
         type: "break",
         title: "Coffee Break",
       },
       {
-        time: "10:25 AM",
-        endTime: "11:45 AM",
+        time: "10:05 AM",
+        endTime: "11:20 AM",
         type: "parallel",
-        forum: { type: "forum", number: "PF III", title: "Public Forum III" },
-        sessions: [
-          {
-            type: "symposium",
-            number: "S16",
-            title:
-              "Exosomes, Mitochondrial Function, and Cell-Based Therapies",
-          },
-          {
-            type: "symposium",
-            number: "S17",
-            title: "Preeclampsia and Its Systemic Consequences",
-          },
-          {
-            type: "symposium",
-            number: "S18",
-            title: "Rheumatic Conditions and Reproductive Outcomes",
-          },
-        ],
-      },
-      {
-        time: "11:45 AM",
-        endTime: "12:45 PM",
-        type: "parallel",
-        sessions: [
-          { type: "break", title: "Lunch" },
-          { type: "meeting", title: "ISIR Member Business Meeting" },
-        ],
-      },
-      {
-        time: "12:45 PM",
-        endTime: "2:30 PM",
-        type: "parallel",
+        forum: {
+          type: "forum",
+          number: "PF II",
+          title: "Public Forum II",
+          endTime: "11:20 AM",
+        },
         sessions: [
           {
             type: "symposium",
@@ -485,17 +509,57 @@ const ScheduleTab = () => {
         ],
       },
       {
-        time: "2:30 PM",
-        endTime: "4:15 PM",
-        type: "social",
-        title: "Bus Tour",
+        time: "11:45 AM",
+        endTime: "1:00 PM",
+        type: "parallel",
+        sessions: [
+          { type: "break", title: "Lunch" },
+          { type: "meeting", title: "ISIR Business Meeting" },
+        ],
       },
       {
-        time: "6:30 PM",
-        endTime: "9:00 PM",
+        time: "1:00 PM",
+        endTime: "2:30 PM",
+        type: "population",
+        title: "Population Forum II",
+      },
+      {
+        time: "2:30 PM",
+        endTime: "5:00 PM",
+        type: "social",
+        title: "Transportation to Gala",
+      },
+      {
+        time: "6:00 PM",
+        endTime: "8:30 PM",
         type: "social",
         title: "Award Gala",
         subtitle: "Celebration at Busan Cinema Center",
+      },
+    ],
+  };
+
+  const dayOverlays = {
+    1: [
+      {
+        time: "1:00 PM",
+        endTime: "5:00 PM",
+        type: "social",
+        title: "Poster Session I",
+      },
+      {
+        time: "6:00 PM",
+        endTime: "7:00 PM",
+        type: "meeting",
+        title: "JRI Editorial Meeting",
+      },
+    ],
+    2: [
+      {
+        time: "1:00 PM",
+        endTime: "5:00 PM",
+        type: "social",
+        title: "Poster Session II",
       },
     ],
   };
@@ -705,7 +769,17 @@ const ScheduleTab = () => {
     [],
   );
 
-  const renderTimelineBlockContent = (session, blockHeight) => {
+  const enrichedOverlaysByDay = useMemo(
+    () => days.map((d) => enrichOverlays(dayOverlays[d.index] || [])),
+    [],
+  );
+
+  const renderTimelineBlockContent = (
+    session,
+    blockHeight,
+    overlays = [],
+    isNarrow = false,
+  ) => {
     const compact = blockHeight < 36;
     const tight = blockHeight < 56;
 
@@ -748,26 +822,21 @@ const ScheduleTab = () => {
           : "symposium";
       const style = getSessionStyle(blockType);
       const textSize =
-        blockType === "symposium"
-          ? compact
-            ? "text-[7px]"
-            : tight
-              ? "text-[8px]"
-              : "text-[9px]"
-          : compact
-            ? "text-[9px]"
-            : tight
-              ? "text-[10px]"
-              : "text-xs";
+        isNarrow || compact
+          ? "text-[7px]"
+          : tight
+            ? "text-[8px]"
+            : "text-[9px]";
+      const lineClamp = isNarrow ? "line-clamp-2" : "line-clamp-3";
 
       return (
         <div
-          className={`h-full w-full ${style.bg} border ${style.border} rounded px-2 py-2 overflow-y-auto flex flex-col justify-center gap-2`}
+          className={`h-full w-full ${style.bg} border ${style.border} rounded px-1 py-0.5 overflow-hidden flex flex-col justify-center items-center gap-0.5`}
         >
           {session.sessions.map((s, idx) => (
             <p
               key={idx}
-              className={`${textSize} font-semibold ${style.text} leading-snug text-center m-0`}
+              className={`${textSize} font-semibold ${style.text} leading-tight text-center m-0 w-full ${lineClamp}`}
             >
               {s.number ? (
                 <>
@@ -784,12 +853,20 @@ const ScheduleTab = () => {
     }
 
     const style = getSessionStyle(session.type);
+    const singleTextSize = isNarrow
+      ? "text-[9px] leading-tight"
+      : compact
+        ? "text-[9px] leading-tight"
+        : tight
+          ? "text-[10px] leading-snug"
+          : "text-sm leading-relaxed";
+
     return (
       <div
-        className={`h-full w-full ${style.bg} border ${style.border} rounded flex flex-col justify-center overflow-hidden ${compact ? "px-1 py-0.5" : tight ? "px-1.5 py-1" : "px-2 py-2"}`}
+        className={`h-full w-full ${style.bg} border ${style.border} rounded flex flex-col justify-center items-center overflow-hidden ${compact ? "px-1 py-0.5" : "px-1.5 py-1"}`}
       >
         <span
-          className={`font-semibold ${style.text} ${compact ? "text-[9px] leading-tight" : tight ? "text-[10px] leading-snug" : "text-sm leading-relaxed"} text-center`}
+          className={`font-semibold ${style.text} ${singleTextSize} text-center line-clamp-3 w-full`}
         >
           {session.title}
         </span>
@@ -809,10 +886,9 @@ const ScheduleTab = () => {
     dayIdx,
     timelineHeight,
     timeLabels,
+    overlays = [],
     isWide = false,
   ) => {
-    const hasForum = dayHasForumTrack(daySchedule);
-
     return (
       <div
         key={dayIdx}
@@ -830,7 +906,10 @@ const ScheduleTab = () => {
         {daySchedule.map((session, idx) => {
           const top = minutesToTopPx(session.startMinutes);
           const height = blockHeightMinutes(session) * PX_PER_MIN;
-          const mainWidth = hasForum && session.forum ? "68%" : "98%";
+          const isNarrow =
+            sessionHasSideTrack(session, overlays) ||
+            sessionContainsOverlay(session, overlays);
+          const mainWidth = isNarrow ? "68%" : "98%";
           const forumHeightPx = session.forum
             ? forumHeightMinutes(session, session.forum) * PX_PER_MIN
             : height;
@@ -841,7 +920,7 @@ const ScheduleTab = () => {
                 className="absolute z-10 overflow-hidden"
                 style={{ top, height, left: "1%", width: mainWidth }}
               >
-                {renderTimelineBlockContent(session, height)}
+                {renderTimelineBlockContent(session, height, overlays, isNarrow)}
               </div>
               {session.forum && (
                 <div
@@ -879,6 +958,30 @@ const ScheduleTab = () => {
             </React.Fragment>
           );
         })}
+
+        {overlays.map((overlay, idx) => {
+          const top = minutesToTopPx(overlay.startMinutes);
+          const height = overlay.durationMinutes * PX_PER_MIN;
+          const style = getSessionStyle(overlay.type);
+          const overlayZ = overlay.type === "meeting" ? "z-20" : "z-[5]";
+          return (
+            <div
+              key={`overlay-${idx}`}
+              className={`absolute ${overlayZ} overflow-hidden`}
+              style={{ top, height, left: "70%", width: "29%" }}
+            >
+              <div
+                className={`h-full w-full ${style.bg} border ${style.border} rounded flex flex-col justify-center overflow-hidden ${height < 36 ? "px-1 py-0.5" : "px-1.5 py-1"}`}
+              >
+                <span
+                  className={`${height < 36 ? "text-[8px]" : "text-[9px]"} font-semibold ${style.text} text-center leading-tight line-clamp-4`}
+                >
+                  {overlay.title}
+                </span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -888,8 +991,9 @@ const ScheduleTab = () => {
     const gridCols =
       cols === 1 ? "64px 1fr" : `64px repeat(${cols}, minmax(0, 1fr))`;
     const daysForView = dayIndices.map((i) => enrichedByDay[i]);
-    const timelineHeight = computeTimelineHeight(daysForView);
-    const timeLabels = buildTimeLabels(daysForView);
+    const overlaysForView = dayIndices.map((i) => enrichedOverlaysByDay[i]);
+    const timelineHeight = computeTimelineHeight(daysForView, overlaysForView);
+    const timeLabels = buildTimeLabels(daysForView, overlaysForView);
 
     return (
       <div
@@ -940,6 +1044,7 @@ const ScheduleTab = () => {
                 dayIdx,
                 timelineHeight,
                 timeLabels,
+                enrichedOverlaysByDay[dayIdx],
                 cols === 1,
               ),
             )}

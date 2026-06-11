@@ -1,4 +1,5 @@
 import React from "react";
+import { BEXCO_VENUE } from "../config/constants";
 
 const Footer = ({ onNavigateTab }) => (
   <footer className="bg-gray-900 text-white">
@@ -136,8 +137,17 @@ const Footer = ({ onNavigateTab }) => (
               </svg>
               <div>
                 <p className="text-sm">Venue</p>
-                <p>Busan, Korea</p>
-                <p className="text-sm">Details coming soon</p>
+                <p>
+                  <a
+                    href={BEXCO_VENUE.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-white hover:underline"
+                  >
+                    BEXCO, Exhibition Center II
+                  </a>
+                </p>
+                <p className="text-sm">Rooms 320–326 &amp; 121–124</p>
               </div>
             </li>
           </ul>

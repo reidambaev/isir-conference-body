@@ -1,4 +1,5 @@
 import React from "react";
+import { BEXCO_VENUE } from "../config/constants";
 import heroSkyline from "../assets/hero_skyline.jpg";
 
 const HeroSection = () => {
@@ -72,13 +73,21 @@ const HeroSection = () => {
               className="font-bold text-base uppercase tracking-wide"
               style={{ color: "var(--color-secondary)" }}
             >
-              Venue Update
+              Venue Announced
             </p>
             <p className="text-sm md:text-base text-blue-50">
-              Due to overwhelming interest and an expanded attendee list, we are
-              restructuring our venue locations to accommodate everyone.
-              Updated venue details will be announced soon — thank you for your
-              patience!
+              The congress will be held at{" "}
+              <a
+                href={BEXCO_VENUE.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold underline hover:text-white"
+                style={{ color: "var(--color-secondary)" }}
+              >
+                BEXCO
+              </a>{" "}
+              (Busan Exhibition and Convention Center),{" "}
+              <strong>Exhibition Center II</strong>.
             </p>
           </div>
         </div>
