@@ -1737,7 +1737,7 @@ async function handleRegistration(request, env, corsHeaders) {
       "korea-day-pass": { early: 200, standard: 250 },
     };
 
-    const earlyBirdDeadline = new Date("2026-07-10").getTime();
+    const earlyBirdDeadline = new Date("2026-09-01").getTime();
     const isEarlyBird = registrationDate < earlyBirdDeadline;
 
     let dayPassDayList = [];
@@ -2378,9 +2378,9 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
     }
 
     // Check submission window (aligned with SubmissionTab copy)
-    // Open at start of March 15 UTC, close at end of July 1 UTC.
+    // Open at start of March 15 UTC, close at end of July 31 UTC.
     const submissionOpens = Date.parse("2026-03-15T00:00:00Z");
-    const submissionDeadline = Date.parse("2026-07-01T23:59:59Z");
+    const submissionDeadline = Date.parse("2026-07-31T23:59:59Z");
     const now = Date.now();
 
     if (now > submissionDeadline) {

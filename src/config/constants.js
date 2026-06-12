@@ -50,7 +50,7 @@ export const TICKET_PRICES = {
 };
 
 // Early Bird Configuration
-export const EARLY_BIRD_DEADLINE = new Date("2026-07-31");
+export const EARLY_BIRD_DEADLINE = new Date("2026-09-01");
 export const GALA_DINNER_PRICE = 100;
 
 /** Inclusive ISO dates for the on-site congress (invited speaker hotel dates must fall in this range). */

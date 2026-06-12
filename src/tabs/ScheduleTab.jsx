@@ -1,8 +1,8 @@
 import React, { useState, useRef, useMemo } from "react";
 
-const DAY_START = 7 * 60; // 7:00 AM
+const DAY_START = 8 * 60; // 8:00 AM
 const DAY_END = 21 * 60; // 9:00 PM (Award Gala)
-const PX_PER_MIN = 2.1;
+const PX_PER_MIN = 1.05;
 
 function blockHeightMinutes(session) {
   return session.durationMinutes;
@@ -47,7 +47,7 @@ function computeTimelineHeight(enrichedDays, enrichedOverlays = []) {
       maxEnd = Math.max(maxEnd, o.endMinutes);
     }
   }
-  return (maxEnd - DAY_START + 15) * PX_PER_MIN;
+  return (maxEnd - DAY_START + 5) * PX_PER_MIN;
 }
 
 const END_TIME_AXIS_EVENTS = new Set([
@@ -177,6 +177,171 @@ function sessionContainsOverlay(session, overlays) {
   );
 }
 
+const THREE_COL_DAY_INDICES = new Set([1, 2]); // Friday, Saturday
+const DAY_GRID_FRACTION = { 0: "1fr", 1: "1.75fr", 2: "1.75fr", 3: "1fr" };
+
+function dayUsesThreeCol(dayIdx, overlays) {
+  return THREE_COL_DAY_INDICES.has(dayIdx) && overlays.length > 0;
+}
+
+function sessionInThreeColLayout(dayIdx, session, overlays) {
+  if (!dayUsesThreeCol(dayIdx, overlays)) return false;
+  return (
+    !!session.forum ||
+    sessionHasSideTrack(session, overlays) ||
+    sessionContainsOverlay(session, overlays)
+  );
+}
+
+function getTrackPositions(dayIdx, session, overlays) {
+  if (sessionInThreeColLayout(dayIdx, session, overlays)) {
+    return {
+      main: { left: "1%", width: "53%" },
+      forum: { left: "55%", width: "21%" },
+      overlay: { left: "77%", width: "22%" },
+    };
+  }
+
+  const hasSide =
+    sessionHasSideTrack(session, overlays) ||
+    sessionContainsOverlay(session, overlays) ||
+    !!session.forum;
+
+  if (hasSide) {
+    return {
+      main: { left: "1%", width: "76%" },
+      forum: { left: "78%", width: "21%" },
+      overlay: { left: "78%", width: "21%" },
+    };
+  }
+
+  return {
+    main: { left: "1%", width: "98%" },
+    forum: { left: "78%", width: "21%" },
+    overlay: { left: "78%", width: "21%" },
+  };
+}
+
+function buildGridCols(dayIndices) {
+  if (dayIndices.length === 1) return "64px 1fr";
+  return `64px ${dayIndices.map((i) => DAY_GRID_FRACTION[i] || "1fr").join(" ")}`;
+}
+
+function formatSessionLabel(s, showSymposiumTitles = false) {
+  if (s.type === "symposium" && s.number) {
+    return showSymposiumTitles ? `${s.number}: ${s.title}` : s.number;
+  }
+  if (s.type === "oral") return s.title;
+  if (s.number) return `${s.number}: ${s.title}`;
+  return s.title;
+}
+
+function formatOralGroupLabel(orals) {
+  if (orals.length === 0) return "";
+  if (orals.length === 1) return orals[0].title;
+
+  const prefix = "Oral Presentation ";
+  if (orals.every((o) => o.title.startsWith(prefix))) {
+    const suffixes = orals.map((o) => o.title.slice(prefix.length));
+    return `${prefix}${suffixes.join(" & ")}`;
+  }
+
+  return orals.map((o) => o.title).join(" & ");
+}
+
+function formatParallelLines(sessions, showSymposiumTitles = false) {
+  const allSymposiumCodes = sessions.every(
+    (s) => s.type === "symposium" && s.number,
+  );
+  if (allSymposiumCodes) {
+    if (showSymposiumTitles) {
+      return sessions.map((s) => `${s.number}: ${s.title}`);
+    }
+    return [sessions.map((s) => s.number).join("   ")];
+  }
+
+  const orals = sessions.filter((s) => s.type === "oral");
+  const nonOrals = sessions.filter((s) => s.type !== "oral");
+
+  if (orals.length > 0 && nonOrals.length > 0) {
+    return [
+      ...nonOrals.map((s) => formatSessionLabel(s, showSymposiumTitles)),
+      formatOralGroupLabel(orals),
+    ];
+  }
+
+  if (orals.length === sessions.length) {
+    return [formatOralGroupLabel(orals)];
+  }
+
+  return [
+    sessions.map((s) => formatSessionLabel(s, showSymposiumTitles)).join("   "),
+  ];
+}
+
+function getBlockTypography(blockHeight) {
+  if (blockHeight < 20) {
+    return {
+      text: "text-[7px]",
+      leading: "leading-none",
+      pad: "px-0.5 py-0",
+      gap: "gap-0",
+    };
+  }
+  if (blockHeight < 36) {
+    return {
+      text: "text-[7px]",
+      leading: "leading-none",
+      pad: "px-0.5 py-0",
+      gap: "gap-0",
+    };
+  }
+  if (blockHeight < 56) {
+    return {
+      text: "text-[8px]",
+      leading: "leading-tight",
+      pad: "px-0.5 py-0",
+      gap: "gap-0",
+    };
+  }
+  return {
+    text: "text-[9px]",
+    leading: "leading-tight",
+    pad: "px-1 py-0",
+    gap: "gap-0",
+  };
+}
+
+function renderTrackLabel({
+  style,
+  blockHeight,
+  label,
+  sublabel,
+  bold = false,
+  clamp = "line-clamp-2",
+  lightSublabel = false,
+}) {
+  const t = getBlockTypography(blockHeight);
+  return (
+    <div
+      className={`h-full w-full ${style.bg} border ${style.border} rounded-sm flex flex-col justify-center items-center overflow-hidden ${t.pad}`}
+    >
+      <span
+        className={`${t.text} ${t.leading} ${bold ? "font-bold" : "font-semibold"} ${style.text} text-center w-full ${clamp}`}
+      >
+        {label}
+      </span>
+      {sublabel && blockHeight >= 40 && (
+        <span
+          className={`text-[7px] leading-none mt-px text-center line-clamp-1 w-full ${lightSublabel ? "text-white/75" : `opacity-75 ${style.text}`}`}
+        >
+          {sublabel}
+        </span>
+      )}
+    </div>
+  );
+}
+
 const ScheduleTab = () => {
   const scheduleRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -215,9 +380,9 @@ const ScheduleTab = () => {
   // ISIR 2026 program at a glance (official schedule)
   const scheduleData = {
     0: [
-      { time: "1:00 PM", endTime: "3:00 PM", type: "social", title: "Registration Opens" },
+      { time: "1:00 PM", endTime: "2:15 PM", type: "social", title: "Registration Opens" },
       {
-        time: "3:00 PM",
+        time: "2:15 PM",
         endTime: "3:45 PM",
         type: "meeting",
         title: "ISIR Council Meeting",
@@ -256,7 +421,7 @@ const ScheduleTab = () => {
       },
       {
         time: "10:05 AM",
-        endTime: "11:20 AM",
+        endTime: "11:45 AM",
         type: "parallel",
         forum: {
           type: "forum",
@@ -291,13 +456,19 @@ const ScheduleTab = () => {
       },
       {
         time: "1:00 PM",
-        endTime: "2:30 PM",
+        endTime: "2:00 PM",
         type: "population",
         title: "Population Forum I",
       },
       {
-        time: "2:30 PM",
-        endTime: "3:45 PM",
+        time: "2:00 PM",
+        endTime: "2:15 PM",
+        type: "break",
+        title: "Intermission",
+      },
+      {
+        time: "2:15 PM",
+        endTime: "3:30 PM",
         type: "parallel",
         sessions: [
           {
@@ -313,14 +484,14 @@ const ScheduleTab = () => {
         ],
       },
       {
-        time: "3:45 PM",
-        endTime: "4:00 PM",
+        time: "3:30 PM",
+        endTime: "3:45 PM",
         type: "break",
         title: "Coffee Break",
       },
       {
-        time: "4:00 PM",
-        endTime: "5:00 PM",
+        time: "3:45 PM",
+        endTime: "4:51 PM",
         type: "parallel",
         sessions: [
           {
@@ -334,7 +505,7 @@ const ScheduleTab = () => {
       },
       {
         time: "5:30 PM",
-        endTime: "8:30 PM",
+        endTime: "8:00 PM",
         type: "social",
         title: "Trainee Social Event",
       },
@@ -342,13 +513,13 @@ const ScheduleTab = () => {
     2: [
       {
         time: "8:30 AM",
-        endTime: "9:50 AM",
+        endTime: "9:45 AM",
         type: "parallel",
         sessions: [
           {
             type: "symposium",
-            number: "S14",
-            title: "High Risk OB: 2nd and 3rd Trimester Complications",
+            number: "S7",
+            title: "Ovarian Inflammatory Disease and Aging",
           },
           {
             type: "symposium",
@@ -370,7 +541,7 @@ const ScheduleTab = () => {
       },
       {
         time: "10:05 AM",
-        endTime: "11:20 AM",
+        endTime: "11:45 AM",
         type: "parallel",
         forum: {
           type: "forum",
@@ -386,13 +557,13 @@ const ScheduleTab = () => {
           },
           {
             type: "symposium",
-            number: "S12",
-            title: "Gynecologic Malignancies and Immune Abnormalities",
+            number: "S11",
+            title: "T Cell Immunity and Pregnancy",
           },
           {
             type: "symposium",
-            number: "S11",
-            title: "T Cell Immunity and Pregnancy",
+            number: "S12",
+            title: "Gynecologic Malignancies and Immune Abnormalities",
           },
         ],
       },
@@ -404,13 +575,19 @@ const ScheduleTab = () => {
       },
       {
         time: "1:00 PM",
-        endTime: "2:30 PM",
+        endTime: "2:15 PM",
         type: "parallel",
         sessions: [
           {
             type: "symposium",
-            number: "S7",
-            title: "Ovarian Inflammatory Disease and Aging",
+            number: "S13",
+            title:
+              "Immune Regulation and Therapeutic Application of Human Reproduction",
+          },
+          {
+            type: "symposium",
+            number: "S14",
+            title: "High Risk OB: 2nd and 3rd Trimester Complications",
           },
           {
             type: "symposium",
@@ -418,24 +595,13 @@ const ScheduleTab = () => {
             title:
               "Current Immunotherapeutic Options for Reproductive Failure",
           },
-          {
-            type: "symposium",
-            number: "S13",
-            title:
-              "Immune Regulation and Therapeutic Application of Human Reproduction",
-          },
         ],
       },
       {
-        time: "2:30 PM",
-        endTime: "4:00 PM",
+        time: "2:15 PM",
+        endTime: "3:55 PM",
         type: "parallel",
         sessions: [
-          {
-            type: "symposium",
-            number: "S17",
-            title: "Preeclampsia and Its Systemic Consequences",
-          },
           {
             type: "symposium",
             number: "S16",
@@ -444,19 +610,24 @@ const ScheduleTab = () => {
           },
           {
             type: "symposium",
-            number: "S2",
-            title: "Early Pregnancy and Placental Development",
+            number: "S17",
+            title: "Preeclampsia and Its Systemic Consequences",
+          },
+          {
+            type: "symposium",
+            number: "S18",
+            title: "Rheumatic Conditions and Reproductive Outcomes",
           },
         ],
       },
       {
-        time: "4:00 PM",
-        endTime: "4:15 PM",
+        time: "3:55 PM",
+        endTime: "4:05 PM",
         type: "break",
         title: "Coffee Break",
       },
       {
-        time: "4:15 PM",
+        time: "4:05 PM",
         endTime: "5:00 PM",
         type: "parallel",
         sessions: [
@@ -481,12 +652,12 @@ const ScheduleTab = () => {
       },
       {
         time: "10:05 AM",
-        endTime: "11:20 AM",
+        endTime: "11:45 AM",
         type: "parallel",
         forum: {
           type: "forum",
-          number: "PF II",
-          title: "Public Forum II",
+          number: "PF III",
+          title: "Public Forum III",
           endTime: "11:20 AM",
         },
         sessions: [
@@ -519,19 +690,19 @@ const ScheduleTab = () => {
       },
       {
         time: "1:00 PM",
-        endTime: "2:30 PM",
+        endTime: "2:00 PM",
         type: "population",
         title: "Population Forum II",
       },
       {
-        time: "2:30 PM",
+        time: "2:15 PM",
         endTime: "5:00 PM",
         type: "social",
         title: "Transportation to Gala",
       },
       {
         time: "6:00 PM",
-        endTime: "8:30 PM",
+        endTime: "8:00 PM",
         type: "social",
         title: "Award Gala",
         subtitle: "Celebration at Busan Cinema Center",
@@ -542,21 +713,15 @@ const ScheduleTab = () => {
   const dayOverlays = {
     1: [
       {
-        time: "1:00 PM",
-        endTime: "5:00 PM",
+        time: "10:05 AM",
+        endTime: "8:00 PM",
         type: "social",
         title: "Poster Session I",
-      },
-      {
-        time: "6:00 PM",
-        endTime: "7:00 PM",
-        type: "meeting",
-        title: "JRI Editorial Meeting",
       },
     ],
     2: [
       {
-        time: "1:00 PM",
+        time: "8:30 AM",
         endTime: "5:00 PM",
         type: "social",
         title: "Poster Session II",
@@ -777,75 +942,37 @@ const ScheduleTab = () => {
   const renderTimelineBlockContent = (
     session,
     blockHeight,
-    overlays = [],
-    isNarrow = false,
+    showSymposiumTitles = false,
   ) => {
-    const compact = blockHeight < 36;
-    const tight = blockHeight < 56;
+    const t = getBlockTypography(blockHeight);
 
     if (session.type === "parallel") {
-      // Lunch + business meeting, etc.: two distinct parallel tracks
-      const isDualTrack =
-        session.sessions.length === 2 &&
-        session.sessions.some(
-          (s) =>
-            s.type === "break" || s.type === "social" || s.type === "meeting",
-        );
-
-      if (isDualTrack) {
-        return (
-          <div className="h-full flex flex-row gap-2 p-1.5 overflow-hidden">
-            {session.sessions.map((s, idx) => {
-              const sStyle = getSessionStyle(s.type);
-              return (
-                <div
-                  key={idx}
-                  className={`flex-1 min-h-0 rounded border ${sStyle.border} ${sStyle.cardBg} px-1 py-0.5 overflow-hidden flex flex-col justify-center`}
-                >
-                  <span
-                    className={`${compact ? "text-[8px]" : "text-[9px]"} font-semibold ${sStyle.text} leading-tight text-center line-clamp-4`}
-                  >
-                    {s.title}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        );
-      }
-
-      // Concurrent symposia / orals in one time slot — single shared block
       const blockType = session.sessions.some((s) => s.type === "plenary")
         ? "plenary"
         : session.sessions.some((s) => s.type === "oral")
           ? "oral"
-          : "symposium";
+          : session.sessions.some((s) => s.type === "meeting")
+            ? "meeting"
+            : session.sessions.some((s) => s.type === "break")
+              ? "break"
+              : "symposium";
       const style = getSessionStyle(blockType);
-      const textSize =
-        isNarrow || compact
-          ? "text-[7px]"
-          : tight
-            ? "text-[8px]"
-            : "text-[9px]";
-      const lineClamp = isNarrow ? "line-clamp-2" : "line-clamp-3";
+      const lines = formatParallelLines(session.sessions, showSymposiumTitles);
+      const allSymposiumCodes = session.sessions.every(
+        (s) => s.type === "symposium" && s.number,
+      );
+      const showSymposiumDetail = showSymposiumTitles && allSymposiumCodes;
 
       return (
         <div
-          className={`h-full w-full ${style.bg} border ${style.border} rounded px-1 py-0.5 overflow-hidden flex flex-col justify-center items-center gap-0.5`}
+          className={`h-full w-full ${style.bg} border ${style.border} rounded-sm ${t.pad} overflow-hidden flex flex-col ${showSymposiumDetail ? "items-start justify-start" : "items-center justify-center"} ${t.gap}`}
         >
-          {session.sessions.map((s, idx) => (
+          {lines.map((line, idx) => (
             <p
               key={idx}
-              className={`${textSize} font-semibold ${style.text} leading-tight text-center m-0 w-full ${lineClamp}`}
+              className={`${t.text} ${t.leading} font-semibold ${style.text} m-0 w-full px-0.5 break-words whitespace-normal ${showSymposiumDetail ? "text-left line-clamp-2" : "text-center"} ${allSymposiumCodes && !showSymposiumTitles ? "whitespace-nowrap" : ""}`}
             >
-              {s.number ? (
-                <>
-                  <span className="opacity-80">{s.number}:</span>{" "}
-                  {s.title}
-                </>
-              ) : (
-                s.title
-              )}
+              {line}
             </p>
           ))}
         </div>
@@ -853,32 +980,17 @@ const ScheduleTab = () => {
     }
 
     const style = getSessionStyle(session.type);
-    const singleTextSize = isNarrow
-      ? "text-[9px] leading-tight"
-      : compact
-        ? "text-[9px] leading-tight"
-        : tight
-          ? "text-[10px] leading-snug"
-          : "text-sm leading-relaxed";
+    const isPlenary = session.type === "plenary";
 
-    return (
-      <div
-        className={`h-full w-full ${style.bg} border ${style.border} rounded flex flex-col justify-center items-center overflow-hidden ${compact ? "px-1 py-0.5" : "px-1.5 py-1"}`}
-      >
-        <span
-          className={`font-semibold ${style.text} ${singleTextSize} text-center line-clamp-3 w-full`}
-        >
-          {session.title}
-        </span>
-        {session.subtitle && !compact && !tight && (
-          <span
-            className={`text-[9px] mt-0.5 text-center opacity-80 ${session.type === "plenary" ? "text-white/80" : "text-gray-600"}`}
-          >
-            {session.subtitle}
-          </span>
-        )}
-      </div>
-    );
+    return renderTrackLabel({
+      style,
+      blockHeight,
+      label: session.title,
+      sublabel: session.subtitle,
+      bold: isPlenary,
+      lightSublabel: isPlenary,
+      clamp: session.subtitle ? "line-clamp-2" : "line-clamp-3",
+    });
   };
 
   const renderTimelineDayColumn = (
@@ -888,11 +1000,21 @@ const ScheduleTab = () => {
     timeLabels,
     overlays = [],
     isWide = false,
+    showSymposiumTitles = false,
   ) => {
+    const threeCol = dayUsesThreeCol(dayIdx, overlays);
+    const columnMinW = isWide
+      ? threeCol
+        ? "min-w-[360px]"
+        : "min-w-[280px]"
+      : threeCol
+        ? "min-w-[220px]"
+        : "min-w-[140px] flex-1";
+
     return (
       <div
         key={dayIdx}
-        className={`relative border-l border-gray-200 ${isWide ? "min-w-[280px]" : "min-w-[140px] flex-1"}`}
+        className={`relative border-l border-gray-200 ${columnMinW}`}
         style={{ height: timelineHeight }}
       >
         {timeLabels.map(({ minutes, topPx, isEnd }) => (
@@ -906,10 +1028,7 @@ const ScheduleTab = () => {
         {daySchedule.map((session, idx) => {
           const top = minutesToTopPx(session.startMinutes);
           const height = blockHeightMinutes(session) * PX_PER_MIN;
-          const isNarrow =
-            sessionHasSideTrack(session, overlays) ||
-            sessionContainsOverlay(session, overlays);
-          const mainWidth = isNarrow ? "68%" : "98%";
+          const tracks = getTrackPositions(dayIdx, session, overlays);
           const forumHeightPx = session.forum
             ? forumHeightMinutes(session, session.forum) * PX_PER_MIN
             : height;
@@ -918,9 +1037,18 @@ const ScheduleTab = () => {
             <React.Fragment key={`${session.time}-${idx}`}>
               <div
                 className="absolute z-10 overflow-hidden"
-                style={{ top, height, left: "1%", width: mainWidth }}
+                style={{
+                  top,
+                  height,
+                  left: tracks.main.left,
+                  width: tracks.main.width,
+                }}
               >
-                {renderTimelineBlockContent(session, height, overlays, isNarrow)}
+                {renderTimelineBlockContent(
+                  session,
+                  height,
+                  showSymposiumTitles,
+                )}
               </div>
               {session.forum && (
                 <div
@@ -928,31 +1056,16 @@ const ScheduleTab = () => {
                   style={{
                     top,
                     height: forumHeightPx,
-                    left: "70%",
-                    width: "29%",
+                    left: tracks.forum.left,
+                    width: tracks.forum.width,
                   }}
                 >
-                  {(() => {
-                    const fStyle = getSessionStyle("forum");
-                    return (
-                      <div
-                        className={`h-full w-full ${fStyle.bg} border ${fStyle.border} rounded flex flex-col justify-center overflow-hidden ${forumHeightPx < 36 ? "px-1 py-0.5" : "px-1.5 py-1"}`}
-                      >
-                        {session.forum.number && forumHeightPx >= 32 && (
-                          <span
-                            className={`${forumHeightPx < 36 ? "text-[8px]" : "text-[9px]"} font-bold ${fStyle.text} opacity-70 text-center`}
-                          >
-                            {session.forum.number}
-                          </span>
-                        )}
-                        <span
-                          className={`${forumHeightPx < 36 ? "text-[8px]" : "text-[9px]"} font-semibold ${fStyle.text} text-center leading-tight line-clamp-4`}
-                        >
-                          {session.forum.title}
-                        </span>
-                      </div>
-                    );
-                  })()}
+                  {renderTrackLabel({
+                    style: getSessionStyle("forum"),
+                    blockHeight: forumHeightPx,
+                    label: session.forum.title,
+                    clamp: "line-clamp-3",
+                  })}
                 </div>
               )}
             </React.Fragment>
@@ -962,23 +1075,23 @@ const ScheduleTab = () => {
         {overlays.map((overlay, idx) => {
           const top = minutesToTopPx(overlay.startMinutes);
           const height = overlay.durationMinutes * PX_PER_MIN;
-          const style = getSessionStyle(overlay.type);
           const overlayZ = overlay.type === "meeting" ? "z-20" : "z-[5]";
+          const overlayPos = threeCol
+            ? { left: "77%", width: "22%" }
+            : { left: "78%", width: "21%" };
+
           return (
             <div
               key={`overlay-${idx}`}
               className={`absolute ${overlayZ} overflow-hidden`}
-              style={{ top, height, left: "70%", width: "29%" }}
+              style={{ top, height, ...overlayPos }}
             >
-              <div
-                className={`h-full w-full ${style.bg} border ${style.border} rounded flex flex-col justify-center overflow-hidden ${height < 36 ? "px-1 py-0.5" : "px-1.5 py-1"}`}
-              >
-                <span
-                  className={`${height < 36 ? "text-[8px]" : "text-[9px]"} font-semibold ${style.text} text-center leading-tight line-clamp-4`}
-                >
-                  {overlay.title}
-                </span>
-              </div>
+              {renderTrackLabel({
+                style: getSessionStyle(overlay.type),
+                blockHeight: height,
+                label: overlay.title,
+                clamp: "line-clamp-4",
+              })}
             </div>
           );
         })}
@@ -986,10 +1099,10 @@ const ScheduleTab = () => {
     );
   };
 
-  const renderTimelineView = (dayIndices) => {
+  const renderTimelineView = (dayIndices, showSymposiumTitles = false) => {
     const cols = dayIndices.length;
-    const gridCols =
-      cols === 1 ? "64px 1fr" : `64px repeat(${cols}, minmax(0, 1fr))`;
+    const gridCols = buildGridCols(dayIndices);
+    const gridMinW = cols >= 4 ? "min-w-[960px]" : cols === 1 ? "min-w-[640px]" : "min-w-[720px]";
     const daysForView = dayIndices.map((i) => enrichedByDay[i]);
     const overlaysForView = dayIndices.map((i) => enrichedOverlaysByDay[i]);
     const timelineHeight = computeTimelineHeight(daysForView, overlaysForView);
@@ -1020,7 +1133,7 @@ const ScheduleTab = () => {
 
         <div className="overflow-x-auto overflow-y-auto max-h-[min(85vh,900px)]">
           <div
-            className="grid min-w-[640px]"
+            className={`grid ${gridMinW}`}
             style={{ gridTemplateColumns: gridCols }}
           >
             <div
@@ -1030,7 +1143,7 @@ const ScheduleTab = () => {
               {timeLabels.map(({ minutes, topPx, isEnd }) => (
                 <div
                   key={`axis-${isEnd ? "end" : "start"}-${minutes}`}
-                  className={`absolute right-0.5 text-[8px] font-medium text-gray-500 tabular-nums leading-none text-right pr-0.5 ${isEnd ? "-translate-y-full" : "-translate-y-1/2"}`}
+                  className={`absolute right-0.5 text-[9px] font-medium text-gray-500 tabular-nums leading-none text-right pr-0.5 ${isEnd ? "-translate-y-full" : "-translate-y-1/2"}`}
                   style={{ top: topPx }}
                 >
                   {formatTimeLabel(minutes)}
@@ -1046,6 +1159,7 @@ const ScheduleTab = () => {
                 timeLabels,
                 enrichedOverlaysByDay[dayIdx],
                 cols === 1,
+                showSymposiumTitles,
               ),
             )}
           </div>
@@ -1210,8 +1324,8 @@ const ScheduleTab = () => {
 
       {/* Schedule Grid */}
       {viewMode === "all"
-        ? renderTimelineView([0, 1, 2, 3])
-        : renderTimelineView([selectedDay])}
+        ? renderTimelineView([0, 1, 2, 3], false)
+        : renderTimelineView([selectedDay], true)}
 
       {/* Note about schedule */}
       <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100">

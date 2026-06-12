@@ -203,7 +203,7 @@ const RegistrationTab = () => {
                 Early Bird Discount!
               </h4>
               <p className="text-gray-700">
-                Register by <strong>July 10, 2026</strong> and save up to{" "}
+                Register by <strong>September 1, 2026</strong> and save up to{" "}
                 <strong>$100</strong>
               </p>
             </div>

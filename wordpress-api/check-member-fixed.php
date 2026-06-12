@@ -226,7 +226,7 @@ function isir_check_member_registration($request) {
  */
 function isir_get_ticket_options($membership_data) {
     // Early bird deadline
-    $early_bird_deadline = strtotime('2026-07-10');
+    $early_bird_deadline = strtotime('2026-09-01');
     $is_early_bird = time() < $early_bird_deadline;
     
     // FIXED: Check if user has actual membership (not "Non-Member" level)

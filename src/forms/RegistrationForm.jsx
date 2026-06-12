@@ -26,6 +26,7 @@ import {
   selectedDayPassCongressDayKeys,
   PREVIEW_KEY,
   PREVIEW_REGISTRATION_TEST_USD,
+  EARLY_BIRD_DEADLINE,
 } from "../config/constants";
 import {
   getCurrency,
@@ -239,8 +240,8 @@ const RegistrationForm = ({ onClose }) => {
     [membershipData],
   );
 
-  // Auto-detect early bird period (before July 10, 2026)
-  const earlyBirdDeadline = new Date("2026-07-10");
+  // Auto-detect early bird period (before September 1, 2026)
+  const earlyBirdDeadline = EARLY_BIRD_DEADLINE;
   const currentDate = new Date();
   const isEarlyBirdPeriod = currentDate < earlyBirdDeadline;
 
@@ -1459,7 +1460,7 @@ const RegistrationForm = ({ onClose }) => {
                   isEarlyBirdPeriod;
                 const earlyBirdDeadline =
                   membershipData?.ticket_options?.early_bird_deadline ||
-                  "July 10, 2026";
+                  "September 1, 2026";
 
                 return (
                   <div

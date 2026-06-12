@@ -404,7 +404,7 @@ add_action( 'wp_ajax_nopriv_' . ISIR_CHECK_MEMBER_ACTION, 'isir_ajax_check_membe
  * @return array
  */
 function isir_get_ticket_options( $membership_data ) {
-	$early_bird_deadline = strtotime( '2026-07-10' );
+	$early_bird_deadline = strtotime( '2026-09-01' );
 	$is_early_bird       = time() < $early_bird_deadline;
 
 	$has_active_membership = null !== $membership_data &&

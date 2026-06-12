@@ -158,7 +158,7 @@ const AboutTab = () => (
               <div>
                 <strong>Abstract Deadline:</strong>
                 <br />
-                July 1, 2026
+                July 31, 2026
               </div>
             </li>
             <li className="flex items-start">
@@ -169,7 +169,7 @@ const AboutTab = () => (
               <div>
                 <strong>Notification of Acceptance:</strong>
                 <br />
-                August 1, 2026
+                August 15, 2026
               </div>
             </li>
             <li className="flex items-start">

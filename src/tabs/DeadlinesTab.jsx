@@ -12,13 +12,13 @@ const deadlines = [
     ],
   },
   {
-    date: "Jul 1",
+    date: "Jul 31",
     title: "Abstract Submission Deadline",
     desc: "Final day to submit abstracts for consideration.",
     actions: [{ label: "Submit Abstract", tab: "submission" }],
   },
   {
-    date: "Aug 1",
+    date: "Aug 15",
     title: "Notification of Acceptance",
     desc: "Authors will be notified of their abstract status.",
   },
