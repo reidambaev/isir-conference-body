@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import {
@@ -769,6 +769,8 @@ const RegistrationForm = ({ onClose }) => {
   const [registrationId, setRegistrationId] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
   const [paymentIntent, setPaymentIntent] = useState(null);
+  const [paymentSetupError, setPaymentSetupError] = useState(null);
+  const paymentSetupInFlight = useRef(false);
 
   // Clear member ticket selection for non-members when entering ticket selection step
   useEffect(() => {
@@ -796,12 +798,23 @@ const RegistrationForm = ({ onClose }) => {
 
   // Create payment intent when entering payment step (step 5 in new flow)
   useEffect(() => {
-    if (step === 5 && !clientSecret && formData.country) {
+    if (step === 5 && !clientSecret) {
+      if (!formData.country) {
+        // Should not happen, but without a country the server rejects the
+        // registration — surface it instead of spinning forever.
+        setPaymentSetupError(
+          "Your country is missing. Please go back and complete your registration details.",
+        );
+        return;
+      }
       createPaymentIntent();
     }
   }, [step, formData.country]);
 
   const createPaymentIntent = async () => {
+    if (paymentSetupInFlight.current) return;
+    paymentSetupInFlight.current = true;
+    setPaymentSetupError(null);
     try {
       // First, save registration to get registration ID
       const registerResponse = await fetch("/api/register", {
@@ -866,13 +879,13 @@ const RegistrationForm = ({ onClose }) => {
     } catch (error) {
       console.error("Payment setup error:", error);
       const msg = String(error?.message || "");
-      if (msg.toLowerCase().includes("already exists")) {
-        alert(msg);
-        return;
-      }
-      alert(
-        "There was an error setting up payment. Please try again or contact support@isir2026.org",
+      setPaymentSetupError(
+        msg.toLowerCase().includes("already exists")
+          ? msg
+          : "There was an error setting up payment. Please try again or contact support@isir2026.org",
       );
+    } finally {
+      paymentSetupInFlight.current = false;
     }
   };
 
@@ -2824,6 +2837,41 @@ const RegistrationForm = ({ onClose }) => {
                       setIsProcessing={setIsProcessingPayment}
                     />
                   </Elements>
+                ) : paymentSetupError ? (
+                  <div className="text-center py-8">
+                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg
+                        className="w-6 h-6 text-red-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                    </div>
+                    <p className="text-gray-800 font-semibold mb-2">
+                      Payment setup failed
+                    </p>
+                    <p className="text-gray-600 max-w-md mx-auto mb-6">
+                      {paymentSetupError}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={createPaymentIntent}
+                      className="px-8 py-3 text-white rounded-xl shadow-lg hover:shadow-xl font-bold transition-all"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, #1a3a6c 0%, #2d5a9e 100%)",
+                      }}
+                    >
+                      Try Again
+                    </button>
+                  </div>
                 ) : (
                   <div className="text-center py-8">
                     <svg
