@@ -81,6 +81,8 @@ export default function AdminTab() {
   const [speakerHotelRegistrations, setSpeakerHotelRegistrations] = useState(
     [],
   );
+  /** null = original order, "asc"/"desc" = sorted by passport name */
+  const [speakerHotelNameSort, setSpeakerHotelNameSort] = useState(null);
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState("abstracts");
@@ -3392,7 +3394,25 @@ export default function AdminTab() {
                       Invitation email
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Name (passport)
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSpeakerHotelNameSort((prev) =>
+                            prev === "asc" ? "desc" : "asc",
+                          )
+                        }
+                        className="inline-flex items-center gap-1 uppercase tracking-wider hover:text-gray-700"
+                        title="Sort by name"
+                      >
+                        Name (passport)
+                        <span aria-hidden="true">
+                          {speakerHotelNameSort === "asc"
+                            ? "▲"
+                            : speakerHotelNameSort === "desc"
+                              ? "▼"
+                              : "↕"}
+                        </span>
+                      </button>
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Nationality
@@ -3418,7 +3438,17 @@ export default function AdminTab() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {speakerHotelRegistrations.map((row) => (
+                  {(speakerHotelNameSort
+                    ? [...speakerHotelRegistrations].sort((a, b) => {
+                        const cmp = String(a.passport_name || "").localeCompare(
+                          String(b.passport_name || ""),
+                          undefined,
+                          { sensitivity: "base" },
+                        );
+                        return speakerHotelNameSort === "asc" ? cmp : -cmp;
+                      })
+                    : speakerHotelRegistrations
+                  ).map((row) => (
                     <tr key={row.id} className="align-top">
                       <td className="px-4 py-3 text-sm text-gray-900 max-w-[10rem] break-all">
                         {row.invited_speaker_email}
