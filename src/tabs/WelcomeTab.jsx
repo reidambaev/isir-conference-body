@@ -3,8 +3,10 @@ import presidentHeadshot from "../assets/welcome/welcome-headshot1.jpg";
 import dambaevaHeadshot from "../assets/welcome/welcome-headshot2.jpg";
 import babbetteHeadshot from "../assets/welcome/welcome-headshot3.jpg";
 import sharmaHeadshot from "../assets/welcome/welcome-headshot4.png";
+import leeHeadshot from "../assets/welcome/welcome-headshot5.jpg";
 import presidentSignature from "../assets/welcome/signature1.png";
 import dambaevaSignature from "../assets/welcome/signature2.png";
+import leeSignature from "../assets/welcome/signature3.png";
 import sharmaSignature from "../assets/welcome/signature4.png";
 
 const CHAIRMEN_DATA = [
@@ -243,6 +245,74 @@ const CHAIRMEN_DATA = [
       </>
     ),
   },
+  {
+    name: "Sung Ki Lee",
+    title: "Local Congress Chair, ISIR 2026 World Congress",
+    credentials: "M.D., Ph.D.",
+    image: leeHeadshot,
+    imagePosition: "center 12%",
+    signature: leeSignature,
+    footer: (
+      <>
+        Local Congress Chair, ISIR 2026
+        <br />
+        Professor, Department of Obstetrics and Gynecology
+        <br />
+        Konyang University, Daejeon, Republic of Korea
+      </>
+    ),
+    message: (
+      <>
+        <strong>Dear Colleagues and Friends,</strong>
+        <br />
+        <br />
+        On behalf of the Local Organizing Committee, it is my great honor and
+        pleasure to welcome you to the{" "}
+        <strong>
+          16th Congress of the International Society for Immunology of
+          Reproduction (ISIR 2026)
+        </strong>
+        . This prestigious gathering will be held from{" "}
+        <strong>November 5 to 8, 2026</strong>, in the dynamic and beautiful
+        coastal city of <strong>Busan, South Korea</strong>.
+        <br />
+        <br />
+        Since its inception, the ISIR Congress has served as a premier global
+        platform for scientists, clinicians, and researchers to share
+        groundbreaking discoveries and foster interdisciplinary collaborations.
+        As we gather for this 16th edition, our program is meticulously designed
+        to spotlight the latest advancements in reproductive immunology—ranging
+        from fundamental mechanisms at the maternal-fetal interface to
+        innovative translational applications in clinical practice.
+        <br />
+        <br />
+        <strong>Why Busan?</strong> Busan is Korea's second-largest metropolis
+        and a world-class convention hub where stunning natural beauty meets
+        cutting-edge urbanity. Known for its picturesque coastlines, including
+        the iconic Haeundae Beach, and its rich cultural heritage, Busan offers
+        a unique and inspiring backdrop for academic exchange. Between sessions,
+        I encourage you to experience the city's vibrant energy, explore its
+        historic temples, and savor its world-renowned local cuisine.
+        <br />
+        <br />
+        <strong>The Spirit of "Jeong" (Korean Hospitality)</strong> Beyond the
+        scientific sessions, we are preparing a warm and inclusive social
+        program rooted in the Korean sentiment of <strong>"Jeong" (정)</strong>
+        —a deep sense of connection, affection, and hospitality. We are
+        committed to ensuring that every participant feels at home and leaves
+        Busan with not only new academic insights but also lasting friendships
+        and cherished memories of Korea.
+        <br />
+        <br />
+        Your expertise and participation are what make this congress truly
+        exceptional. We look forward to welcoming you to Busan this November for
+        what promises to be a rewarding and unforgettable experience.
+        <br />
+        <br />
+        Warmest regards,
+      </>
+    ),
+  },
 ];
 
 const getInitials = (name) =>
@@ -326,7 +396,7 @@ const WelcomeTab = () => {
 
                 <div className="pl-8 pr-4">
                   <div className="prose prose-lg max-w-none">
-                    <div className="text-gray-800 leading-[1.9] text-[17px] font-light tracking-wide">
+                    <div className="text-gray-800 leading-[1.9] text-[17px] font-light tracking-wide [&_strong]:font-semibold [&_strong]:text-[#1a3a6c]">
                       {chair.message}
                     </div>
                     {chair.signature && (
