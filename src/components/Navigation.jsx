@@ -7,6 +7,7 @@ const Navigation = ({ activeTab, onTabClick }) => {
     { id: "welcome", label: "Welcome" },
     { id: "committee", label: "Committee" },
     { id: "speakers", label: "Speakers" },
+    { id: "schedule", label: "Schedule" },
     { id: "submission", label: "Submission" },
     { id: "registration", label: "Registration" },
     { id: "deadlines", label: "Deadlines" },

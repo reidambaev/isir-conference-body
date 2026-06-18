@@ -377,7 +377,9 @@ export default function App() {
       <Navigation activeTab={activeTab} onTabClick={setActiveTab} />
 
       {/* Main Content Area */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main
+        className={`mx-auto px-4 sm:px-6 lg:px-8 py-8 ${activeTab === "schedule" ? "max-w-screen-2xl" : "max-w-6xl"}`}
+      >
         <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
           {renderTabContent()}
         </div>

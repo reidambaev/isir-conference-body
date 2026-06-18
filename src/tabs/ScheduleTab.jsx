@@ -1,98 +1,6 @@
 import React, { useState, useRef, useMemo } from "react";
 
-const DAY_START = 8 * 60; // 8:00 AM
-const DAY_END = 21 * 60; // 9:00 PM (Award Gala)
-const PX_PER_MIN = 1.05;
-
-function blockHeightMinutes(session) {
-  return session.durationMinutes;
-}
-
-function forumHeightMinutes(session, forum) {
-  if (forum?.endTime) {
-    return Math.max(
-      parseTimeToMinutes(forum.endTime) - session.startMinutes,
-      10,
-    );
-  }
-  return session.durationMinutes;
-}
-
-function minutesToTopPx(startMinutes) {
-  return (startMinutes - DAY_START) * PX_PER_MIN;
-}
-
-function formatTimeLabel(totalMinutes) {
-  const h24 = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  const h12 = h24 % 12 || 12;
-  const period = h24 >= 12 ? "PM" : "AM";
-  return m === 0
-    ? `${h12} ${period}`
-    : `${h12}:${String(m).padStart(2, "0")} ${period}`;
-}
-
-function computeTimelineHeight(enrichedDays, enrichedOverlays = []) {
-  let maxEnd = DAY_START + 60;
-  for (const day of enrichedDays) {
-    for (const s of day) {
-      maxEnd = Math.max(maxEnd, s.endMinutes);
-      if (s.forum?.endTime) {
-        maxEnd = Math.max(maxEnd, parseTimeToMinutes(s.forum.endTime));
-      }
-    }
-  }
-  for (const overlays of enrichedOverlays) {
-    for (const o of overlays) {
-      maxEnd = Math.max(maxEnd, o.endMinutes);
-    }
-  }
-  return (maxEnd - DAY_START + 5) * PX_PER_MIN;
-}
-
-const END_TIME_AXIS_EVENTS = new Set([
-  "JRI Editorial Meeting",
-  "Award Gala",
-  "Trainee Social Event",
-]);
-
-function buildTimeLabels(enrichedDays, enrichedOverlays = []) {
-  const labels = [];
-  const seen = new Set();
-
-  const addLabel = (minutes, isEnd) => {
-    const key = `${isEnd ? "e" : "s"}-${minutes}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    labels.push({
-      minutes,
-      topPx: minutesToTopPx(minutes),
-      isEnd,
-    });
-  };
-
-  const addEndLabel = (title, endTime) => {
-    if (END_TIME_AXIS_EVENTS.has(title) && endTime) {
-      addLabel(parseTimeToMinutes(endTime), true);
-    }
-  };
-
-  for (const day of enrichedDays) {
-    for (const s of day) {
-      addLabel(s.startMinutes, false);
-      addEndLabel(s.title, s.endTime);
-    }
-  }
-
-  for (const overlays of enrichedOverlays) {
-    for (const o of overlays) {
-      addLabel(o.startMinutes, false);
-      addEndLabel(o.title, o.endTime);
-    }
-  }
-
-  return labels.sort((a, b) => a.topPx - b.topPx);
-}
+const DAY_END = 21 * 60; // 9:00 PM fallback
 
 function parseTimeToMinutes(timeStr) {
   const match = String(timeStr)
@@ -105,6 +13,13 @@ function parseTimeToMinutes(timeStr) {
   if (period === "PM" && hours !== 12) hours += 12;
   if (period === "AM" && hours === 12) hours = 0;
   return hours * 60 + minutes;
+}
+
+function formatClock(totalMinutes) {
+  const h24 = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const h12 = h24 % 12 || 12;
+  return `${h12}:${String(m).padStart(2, "0")}`;
 }
 
 function enrichDaySchedule(daySchedule) {
@@ -121,226 +36,127 @@ function enrichDaySchedule(daySchedule) {
     } else {
       end = Math.min(start + 90, DAY_END);
     }
-    let duration = end - start;
-    if (session.endTime) {
-      duration = Math.max(duration, 5);
-    } else if (session.type === "break" || session.compact) {
-      duration = Math.max(duration, 10);
-    } else {
-      duration = Math.max(duration, 15);
-    }
     return {
       ...session,
       startMinutes: start,
-      endMinutes: start + duration,
-      durationMinutes: duration,
+      endMinutes: Math.max(end, start + 5),
     };
   });
 }
 
 function enrichOverlays(overlays) {
-  return overlays.map((overlay) => {
-    const start = parseTimeToMinutes(overlay.time);
-    const end = parseTimeToMinutes(overlay.endTime);
-    const duration = Math.max(end - start, 10);
-    return {
-      ...overlay,
-      startMinutes: start,
-      endMinutes: start + duration,
-      durationMinutes: duration,
-    };
+  return overlays.map((overlay) => ({
+    ...overlay,
+    startMinutes: parseTimeToMinutes(overlay.time),
+    endMinutes: parseTimeToMinutes(overlay.endTime),
+  }));
+}
+
+function rowOverlapsOverlay(row, overlay) {
+  return (
+    row.startMinutes < overlay.endMinutes &&
+    row.endMinutes > overlay.startMinutes
+  );
+}
+
+// Builds the right-hand side column (Public Forum + Poster Session) aligned to
+// the table rows. Returns one entry per row:
+//   undefined -> render an empty side cell
+//   null      -> skip (covered by a rowSpan above)
+//   object    -> render a side cell with the given rowSpan
+function buildSideColumn(rows, overlays) {
+  const side = new Array(rows.length).fill(undefined);
+
+  rows.forEach((row, i) => {
+    if (row.forum) {
+      side[i] = { kind: "forum", data: row.forum, rowSpan: 1 };
+    }
   });
+
+  overlays.forEach((overlay) => {
+    let i = 0;
+    while (i < rows.length) {
+      if (side[i] === undefined && rowOverlapsOverlay(rows[i], overlay)) {
+        let j = i;
+        while (
+          j + 1 < rows.length &&
+          side[j + 1] === undefined &&
+          rowOverlapsOverlay(rows[j + 1], overlay)
+        ) {
+          j++;
+        }
+        side[i] = { kind: "overlay", data: overlay, rowSpan: j - i + 1 };
+        for (let k = i + 1; k <= j; k++) side[k] = null;
+        i = j + 1;
+      } else {
+        i++;
+      }
+    }
+  });
+
+  return side;
 }
 
-function sessionOverlapsOverlay(session, overlay) {
-  return (
-    session.startMinutes < overlay.endMinutes &&
-    session.endMinutes > overlay.startMinutes
-  );
-}
-
-function sessionHasSideTrack(session, overlays) {
-  if (session.forum) return true;
-  return overlays.some(
-    (o) =>
-      sessionOverlapsOverlay(session, o) &&
-      o.startMinutes <= session.startMinutes &&
-      o.endMinutes >= session.endMinutes,
-  );
-}
-
-function sessionContainsOverlay(session, overlays) {
-  return overlays.some(
-    (o) =>
-      session.startMinutes <= o.startMinutes &&
-      session.endMinutes >= o.endMinutes,
-  );
-}
-
-const THREE_COL_DAY_INDICES = new Set([1, 2]); // Friday, Saturday
-const DAY_GRID_FRACTION = { 0: "1fr", 1: "1.75fr", 2: "1.75fr", 3: "1fr" };
-
-function dayUsesThreeCol(dayIdx, overlays) {
-  return THREE_COL_DAY_INDICES.has(dayIdx) && overlays.length > 0;
-}
-
-function sessionInThreeColLayout(dayIdx, session, overlays) {
-  if (!dayUsesThreeCol(dayIdx, overlays)) return false;
-  return (
-    !!session.forum ||
-    sessionHasSideTrack(session, overlays) ||
-    sessionContainsOverlay(session, overlays)
-  );
-}
-
-function getTrackPositions(dayIdx, session, overlays) {
-  if (sessionInThreeColLayout(dayIdx, session, overlays)) {
-    return {
-      main: { left: "1%", width: "53%" },
-      forum: { left: "55%", width: "21%" },
-      overlay: { left: "77%", width: "22%" },
-    };
+function cellStyleFor(session) {
+  const type = session.type;
+  const title = (session.title || "").toLowerCase();
+  if (title.includes("gala")) return { bg: "bg-blue-900", text: "text-white" };
+  if (title.includes("transportation"))
+    return { bg: "bg-sky-100", text: "text-sky-900" };
+  if (title.includes("registration"))
+    return { bg: "bg-amber-200", text: "text-amber-950" };
+  if (title.includes("reception"))
+    return { bg: "bg-orange-300", text: "text-orange-950" };
+  switch (type) {
+    case "plenary":
+      return { bg: "bg-orange-400", text: "text-white" };
+    case "population":
+      return { bg: "bg-orange-300", text: "text-orange-950" };
+    case "symposium":
+      return { bg: "bg-amber-200", text: "text-amber-950" };
+    case "oral":
+      return { bg: "bg-amber-50", text: "text-amber-900" };
+    case "forum":
+      return { bg: "bg-sky-300", text: "text-sky-950" };
+    case "meeting":
+      return { bg: "bg-green-200", text: "text-green-950" };
+    case "social":
+      return { bg: "bg-emerald-200", text: "text-emerald-900" };
+    case "break":
+      return { bg: "bg-gray-100", text: "text-gray-500" };
+    default:
+      return { bg: "bg-gray-100", text: "text-gray-600" };
   }
-
-  const hasSide =
-    sessionHasSideTrack(session, overlays) ||
-    sessionContainsOverlay(session, overlays) ||
-    !!session.forum;
-
-  if (hasSide) {
-    return {
-      main: { left: "1%", width: "76%" },
-      forum: { left: "78%", width: "21%" },
-      overlay: { left: "78%", width: "21%" },
-    };
-  }
-
-  return {
-    main: { left: "1%", width: "98%" },
-    forum: { left: "78%", width: "21%" },
-    overlay: { left: "78%", width: "21%" },
-  };
 }
 
-function buildGridCols(dayIndices) {
-  if (dayIndices.length === 1) return "64px 1fr";
-  return `64px ${dayIndices.map((i) => DAY_GRID_FRACTION[i] || "1fr").join(" ")}`;
-}
-
-function formatSessionLabel(s, showSymposiumTitles = false) {
+function cellLabel(s, showTitles = false) {
   if (s.type === "symposium" && s.number) {
-    return showSymposiumTitles ? `${s.number}: ${s.title}` : s.number;
+    return showTitles
+      ? `${s.number}: ${s.title}`
+      : `Session ${s.number.replace(/^S/i, "")}`;
   }
-  if (s.type === "oral") return s.title;
-  if (s.number) return `${s.number}: ${s.title}`;
   return s.title;
 }
 
-function formatOralGroupLabel(orals) {
-  if (orals.length === 0) return "";
-  if (orals.length === 1) return orals[0].title;
+const dayThemes = {
+  0: "Arrivals & Welcome",
+  1: "Discovering the Immune Foundations of Reproductive Health",
+  2: "Translating Science into Care",
+  3: "Shaping Population Health through Reproductive Innovation",
+};
 
-  const prefix = "Oral Presentation ";
-  if (orals.every((o) => o.title.startsWith(prefix))) {
-    const suffixes = orals.map((o) => o.title.slice(prefix.length));
-    return `${prefix}${suffixes.join(" & ")}`;
-  }
-
-  return orals.map((o) => o.title).join(" & ");
-}
-
-function formatParallelLines(sessions, showSymposiumTitles = false) {
-  const allSymposiumCodes = sessions.every(
-    (s) => s.type === "symposium" && s.number,
-  );
-  if (allSymposiumCodes) {
-    if (showSymposiumTitles) {
-      return sessions.map((s) => `${s.number}: ${s.title}`);
-    }
-    return [sessions.map((s) => s.number).join("   ")];
-  }
-
-  const orals = sessions.filter((s) => s.type === "oral");
-  const nonOrals = sessions.filter((s) => s.type !== "oral");
-
-  if (orals.length > 0 && nonOrals.length > 0) {
-    return [
-      ...nonOrals.map((s) => formatSessionLabel(s, showSymposiumTitles)),
-      formatOralGroupLabel(orals),
-    ];
-  }
-
-  if (orals.length === sessions.length) {
-    return [formatOralGroupLabel(orals)];
-  }
-
-  return [
-    sessions.map((s) => formatSessionLabel(s, showSymposiumTitles)).join("   "),
-  ];
-}
-
-function getBlockTypography(blockHeight) {
-  if (blockHeight < 20) {
-    return {
-      text: "text-[7px]",
-      leading: "leading-none",
-      pad: "px-0.5 py-0",
-      gap: "gap-0",
-    };
-  }
-  if (blockHeight < 36) {
-    return {
-      text: "text-[7px]",
-      leading: "leading-none",
-      pad: "px-0.5 py-0",
-      gap: "gap-0",
-    };
-  }
-  if (blockHeight < 56) {
-    return {
-      text: "text-[8px]",
-      leading: "leading-tight",
-      pad: "px-0.5 py-0",
-      gap: "gap-0",
-    };
-  }
-  return {
-    text: "text-[9px]",
-    leading: "leading-tight",
-    pad: "px-1 py-0",
-    gap: "gap-0",
-  };
-}
-
-function renderTrackLabel({
-  style,
-  blockHeight,
-  label,
-  sublabel,
-  bold = false,
-  clamp = "line-clamp-2",
-  lightSublabel = false,
-}) {
-  const t = getBlockTypography(blockHeight);
-  return (
-    <div
-      className={`h-full w-full ${style.bg} border ${style.border} rounded-sm flex flex-col justify-center items-center overflow-hidden ${t.pad}`}
-    >
-      <span
-        className={`${t.text} ${t.leading} ${bold ? "font-bold" : "font-semibold"} ${style.text} text-center w-full ${clamp}`}
-      >
-        {label}
-      </span>
-      {sublabel && blockHeight >= 40 && (
-        <span
-          className={`text-[7px] leading-none mt-px text-center line-clamp-1 w-full ${lightSublabel ? "text-white/75" : `opacity-75 ${style.text}`}`}
-        >
-          {sublabel}
-        </span>
-      )}
-    </div>
-  );
-}
+const legendItems = [
+  { label: "Plenary / Lecture", cls: "bg-orange-400" },
+  { label: "Symposium", cls: "bg-amber-200" },
+  { label: "Oral Presentations", cls: "bg-amber-50 border border-amber-300" },
+  { label: "Public Forum", cls: "bg-sky-300" },
+  { label: "Population Forum", cls: "bg-orange-300" },
+  { label: "Poster Session", cls: "bg-emerald-50 border border-emerald-300" },
+  { label: "Social / Reception", cls: "bg-emerald-200" },
+  { label: "Meeting", cls: "bg-green-200" },
+  { label: "Award Gala", cls: "bg-blue-900" },
+  { label: "Break", cls: "bg-gray-100 border border-gray-300" },
+];
 
 const ScheduleTab = () => {
   const scheduleRef = useRef(null);
@@ -369,7 +185,6 @@ const ScheduleTab = () => {
     }
   };
 
-  // Days configuration
   const days = [
     { day: "Thursday", date: "Nov 5", index: 0 },
     { day: "Friday", date: "Nov 6", index: 1 },
@@ -377,30 +192,22 @@ const ScheduleTab = () => {
     { day: "Sunday", date: "Nov 8", index: 3 },
   ];
 
-  // ISIR 2026 program at a glance (official schedule)
   const scheduleData = {
     0: [
-      { time: "1:00 PM", endTime: "2:15 PM", type: "social", title: "Registration Opens" },
       {
-        time: "2:15 PM",
-        endTime: "3:45 PM",
+        time: "1:00 PM",
+        endTime: "5:00 PM",
+        type: "social",
+        title: "Registration Open",
+      },
+      {
+        time: "2:30 PM",
+        endTime: "4:00 PM",
         type: "meeting",
         title: "ISIR Council Meeting",
       },
       {
         time: "5:00 PM",
-        endTime: "5:30 PM",
-        type: "plenary",
-        title: "Welcome Address",
-      },
-      {
-        time: "5:30 PM",
-        endTime: "6:00 PM",
-        type: "plenary",
-        title: "President Lecture",
-      },
-      {
-        time: "6:00 PM",
         endTime: "8:00 PM",
         type: "social",
         title: "Welcome Reception",
@@ -427,7 +234,7 @@ const ScheduleTab = () => {
           type: "forum",
           number: "PF I",
           title: "Public Forum I",
-          endTime: "11:20 AM",
+          endTime: "11:45 AM",
         },
         sessions: [
           {
@@ -456,23 +263,24 @@ const ScheduleTab = () => {
       },
       {
         time: "1:00 PM",
-        endTime: "2:00 PM",
-        type: "population",
-        title: "Population Forum I",
-      },
-      {
-        time: "2:00 PM",
         endTime: "2:15 PM",
-        type: "break",
-        title: "Intermission",
+        type: "population",
+        title: "Population & Aging I",
       },
       {
         time: "2:15 PM",
-        endTime: "3:30 PM",
+        endTime: "2:30 PM",
+        type: "break",
+        title: "Break",
+      },
+      {
+        time: "2:30 PM",
+        endTime: "3:45 PM",
         type: "parallel",
         sessions: [
           {
             type: "symposium",
+            number: "S4",
             title: "KAI/KSRI Joint Symposium",
           },
           {
@@ -484,36 +292,38 @@ const ScheduleTab = () => {
         ],
       },
       {
-        time: "3:30 PM",
-        endTime: "3:45 PM",
+        time: "3:45 PM",
+        endTime: "4:00 PM",
         type: "break",
         title: "Coffee Break",
       },
       {
-        time: "3:45 PM",
-        endTime: "4:51 PM",
+        time: "4:00 PM",
+        endTime: "5:06 PM",
         type: "parallel",
         sessions: [
           {
-            type: "plenary",
-            number: "Awards",
-            title: "New Investigator Award Session",
+            type: "oral",
+            title: "Young Investigator Session",
           },
           { type: "oral", number: "Oral II", title: "Oral Presentation II" },
           { type: "oral", number: "Oral III", title: "Oral Presentation III" },
         ],
       },
       {
-        time: "5:30 PM",
+        time: "6:00 PM",
         endTime: "8:00 PM",
-        type: "social",
-        title: "Trainee Social Event",
+        type: "parallel",
+        sessions: [
+          { type: "meeting", title: "JRI Editorial Meeting" },
+          { type: "social", title: "Trainee Social Event" },
+        ],
       },
     ],
     2: [
       {
         time: "8:30 AM",
-        endTime: "9:45 AM",
+        endTime: "9:50 AM",
         type: "parallel",
         sessions: [
           {
@@ -547,7 +357,7 @@ const ScheduleTab = () => {
           type: "forum",
           number: "PF II",
           title: "Public Forum II",
-          endTime: "11:20 AM",
+          endTime: "11:45 AM",
         },
         sessions: [
           {
@@ -685,24 +495,30 @@ const ScheduleTab = () => {
         type: "parallel",
         sessions: [
           { type: "break", title: "Lunch" },
-          { type: "meeting", title: "ISIR Business Meeting" },
+          { type: "meeting", title: "Business Meeting" },
         ],
       },
       {
         time: "1:00 PM",
-        endTime: "2:00 PM",
+        endTime: "2:15 PM",
         type: "population",
         title: "Population Forum II",
       },
       {
         time: "2:15 PM",
-        endTime: "5:00 PM",
+        endTime: "2:30 PM",
+        type: "break",
+        title: "Ready for Transportation",
+      },
+      {
+        time: "2:30 PM",
+        endTime: "6:00 PM",
         type: "social",
-        title: "Transportation to Gala",
+        title: "Transportation to the Gala",
       },
       {
         time: "6:00 PM",
-        endTime: "8:00 PM",
+        endTime: "9:00 PM",
         type: "social",
         title: "Award Gala",
         subtitle: "Celebration at Busan Cinema Center",
@@ -713,220 +529,20 @@ const ScheduleTab = () => {
   const dayOverlays = {
     1: [
       {
-        time: "10:05 AM",
-        endTime: "8:00 PM",
+        time: "11:45 AM",
+        endTime: "1:00 PM",
         type: "social",
         title: "Poster Session I",
       },
     ],
     2: [
       {
-        time: "8:30 AM",
-        endTime: "5:00 PM",
+        time: "11:45 AM",
+        endTime: "1:00 PM",
         type: "social",
         title: "Poster Session II",
       },
     ],
-  };
-
-  // Style configurations
-  const getSessionStyle = (type) => {
-    const styles = {
-      plenary: {
-        bg: "bg-gradient-to-r from-blue-600 to-blue-700",
-        text: "text-white",
-        border: "border-blue-800",
-        cardBg: "bg-blue-600",
-      },
-      symposium: {
-        bg: "bg-gradient-to-r from-amber-50 to-amber-100",
-        text: "text-amber-900",
-        border: "border-amber-300",
-        cardBg: "bg-amber-100",
-        accent: "bg-amber-500",
-      },
-      oral: {
-        bg: "bg-gradient-to-r from-purple-50 to-purple-100",
-        text: "text-purple-900",
-        border: "border-purple-300",
-        cardBg: "bg-purple-100",
-        accent: "bg-purple-500",
-      },
-      forum: {
-        bg: "bg-gradient-to-r from-teal-50 to-teal-100",
-        text: "text-teal-900",
-        border: "border-teal-300",
-        cardBg: "bg-teal-100",
-        accent: "bg-teal-500",
-      },
-      social: {
-        bg: "bg-emerald-50",
-        text: "text-emerald-800",
-        border: "border-emerald-200",
-        cardBg: "bg-emerald-100",
-      },
-      break: {
-        bg: "bg-gray-50",
-        text: "text-gray-500",
-        border: "border-gray-200",
-        cardBg: "bg-gray-100",
-      },
-      population: {
-        bg: "bg-gradient-to-r from-indigo-50 to-indigo-100",
-        text: "text-indigo-900",
-        border: "border-indigo-300",
-        cardBg: "bg-indigo-100",
-        accent: "bg-indigo-500",
-      },
-      meeting: {
-        bg: "bg-gradient-to-r from-violet-100 to-violet-200",
-        text: "text-violet-950",
-        border: "border-violet-400",
-        cardBg: "bg-violet-200",
-        accent: "bg-violet-600",
-      },
-    };
-    return styles[type] || styles.break;
-  };
-
-  const renderForumCard = (forum, compact = false) => {
-    const fStyle = getSessionStyle(forum.type);
-    if (compact) {
-      return (
-        <div
-          className={`text-[9px] px-1.5 py-0.5 rounded ${fStyle.cardBg} ${fStyle.text} border ${fStyle.border} font-medium shrink-0`}
-        >
-          {forum.number || forum.title}
-        </div>
-      );
-    }
-    return (
-      <div
-        className={`rounded-lg border ${fStyle.border} ${fStyle.cardBg} overflow-hidden min-w-[140px] shrink-0`}
-      >
-        {fStyle.accent && <div className={`h-1 ${fStyle.accent}`} />}
-        <div className="p-3">
-          {forum.number && (
-            <div
-              className={`text-xs font-bold ${fStyle.text} opacity-75 mb-1`}
-            >
-              {forum.number}
-            </div>
-          )}
-          <div className={`font-semibold text-sm ${fStyle.text}`}>
-            {forum.title}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderSession = (session, compact = false) => {
-    const style = getSessionStyle(session.type);
-
-    if (session.type === "parallel") {
-      if (compact) {
-        // Compact view for "at a glance" - show abbreviated info
-        return (
-          <div className="p-1.5">
-            <div className="flex flex-wrap gap-1">
-              {session.sessions.map((s, idx) => {
-                const sStyle = getSessionStyle(s.type);
-                return (
-                  <div
-                    key={idx}
-                    className={`text-[9px] px-1.5 py-0.5 rounded ${sStyle.cardBg} ${sStyle.text} border ${sStyle.border} font-medium`}
-                  >
-                    {s.number || s.title.substring(0, 20)}
-                  </div>
-                );
-              })}
-              {session.forum && renderForumCard(session.forum, true)}
-            </div>
-          </div>
-        );
-      }
-      return (
-        <div className={`p-3 ${session.compact ? "py-2" : "py-4"}`}>
-          <div
-            className={`flex flex-col gap-3 ${session.forum ? "lg:flex-row lg:items-start" : ""}`}
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 flex-1">
-            {session.sessions.map((s, idx) => {
-              const sStyle = getSessionStyle(s.type);
-              const isSymposium = s.type === "symposium";
-              return (
-                <div
-                  key={idx}
-                  className={`rounded-lg border ${sStyle.border} ${sStyle.cardBg} overflow-hidden ${
-                    isSymposium
-                      ? "shadow-md hover:shadow-lg transition-shadow"
-                      : ""
-                  }`}
-                >
-                  {/* Accent bar for symposiums */}
-                  {sStyle.accent && (
-                    <div className={`h-1 ${sStyle.accent}`}></div>
-                  )}
-                  <div className={`p-3 ${isSymposium ? "p-4" : ""}`}>
-                    {s.number && (
-                      <div
-                        className={`text-xs font-bold ${sStyle.text} opacity-75 mb-1`}
-                      >
-                        {s.number}
-                      </div>
-                    )}
-                    <div
-                      className={`font-semibold ${sStyle.text} ${isSymposium ? "text-sm leading-snug" : "text-xs"}`}
-                    >
-                      {s.title}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            </div>
-            {session.forum && renderForumCard(session.forum)}
-          </div>
-        </div>
-      );
-    }
-
-    if (session.compact || compact) {
-      return (
-        <div className={`px-2 py-1 ${style.bg} flex items-center`}>
-          <div className={`text-[10px] ${style.text} truncate`}>
-            {session.title}
-          </div>
-        </div>
-      );
-    }
-
-    if (session.type === "plenary") {
-      return (
-        <div className={`p-4 ${style.bg}`}>
-          <div className={`font-bold ${style.text} text-sm`}>
-            {session.title}
-          </div>
-          {session.subtitle && (
-            <div className="text-white/80 text-xs mt-1 leading-relaxed">
-              {session.subtitle}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    return (
-      <div className={`p-3 ${style.bg} border-l-4 ${style.border}`}>
-        <div className={`text-sm font-semibold ${style.text}`}>
-          {session.title}
-        </div>
-        {session.subtitle && (
-          <div className="text-xs text-gray-500 mt-0.5">{session.subtitle}</div>
-        )}
-      </div>
-    );
   };
 
   const enrichedByDay = useMemo(
@@ -939,231 +555,122 @@ const ScheduleTab = () => {
     [],
   );
 
-  const renderTimelineBlockContent = (
-    session,
-    blockHeight,
-    showSymposiumTitles = false,
-  ) => {
-    const t = getBlockTypography(blockHeight);
-
+  const renderRowContent = (session, showTitles = false) => {
     if (session.type === "parallel") {
-      const blockType = session.sessions.some((s) => s.type === "plenary")
-        ? "plenary"
-        : session.sessions.some((s) => s.type === "oral")
-          ? "oral"
-          : session.sessions.some((s) => s.type === "meeting")
-            ? "meeting"
-            : session.sessions.some((s) => s.type === "break")
-              ? "break"
-              : "symposium";
-      const style = getSessionStyle(blockType);
-      const lines = formatParallelLines(session.sessions, showSymposiumTitles);
-      const allSymposiumCodes = session.sessions.every(
-        (s) => s.type === "symposium" && s.number,
-      );
-      const showSymposiumDetail = showSymposiumTitles && allSymposiumCodes;
-
       return (
-        <div
-          className={`h-full w-full ${style.bg} border ${style.border} rounded-sm ${t.pad} overflow-hidden flex flex-col ${showSymposiumDetail ? "items-start justify-start" : "items-center justify-center"} ${t.gap}`}
-        >
-          {lines.map((line, idx) => (
-            <p
-              key={idx}
-              className={`${t.text} ${t.leading} font-semibold ${style.text} m-0 w-full px-0.5 break-words whitespace-normal ${showSymposiumDetail ? "text-left line-clamp-2" : "text-center"} ${allSymposiumCodes && !showSymposiumTitles ? "whitespace-nowrap" : ""}`}
-            >
-              {line}
-            </p>
-          ))}
+        <div className="flex gap-0.5 h-full">
+          {session.sessions.map((s, idx) => {
+            const st = cellStyleFor(s);
+            return (
+              <div
+                key={idx}
+                className={`flex-1 min-w-0 rounded-sm ${st.bg} ${st.text} px-1 py-3 text-[10px] font-semibold leading-tight flex items-center justify-center text-center`}
+              >
+                {cellLabel(s, showTitles)}
+              </div>
+            );
+          })}
         </div>
       );
     }
 
-    const style = getSessionStyle(session.type);
-    const isPlenary = session.type === "plenary";
+    if (session.type === "break") {
+      return (
+        <div className="h-full min-h-[2.75rem] rounded-sm bg-gray-100 text-gray-500 px-1 py-1.5 text-[9px] font-semibold uppercase tracking-wide text-center flex items-center justify-center">
+          {session.title}
+        </div>
+      );
+    }
 
-    return renderTrackLabel({
-      style,
-      blockHeight,
-      label: session.title,
-      sublabel: session.subtitle,
-      bold: isPlenary,
-      lightSublabel: isPlenary,
-      clamp: session.subtitle ? "line-clamp-2" : "line-clamp-3",
-    });
-  };
-
-  const renderTimelineDayColumn = (
-    daySchedule,
-    dayIdx,
-    timelineHeight,
-    timeLabels,
-    overlays = [],
-    isWide = false,
-    showSymposiumTitles = false,
-  ) => {
-    const threeCol = dayUsesThreeCol(dayIdx, overlays);
-    const columnMinW = isWide
-      ? threeCol
-        ? "min-w-[360px]"
-        : "min-w-[280px]"
-      : threeCol
-        ? "min-w-[220px]"
-        : "min-w-[140px] flex-1";
-
+    const st = cellStyleFor(session);
     return (
       <div
-        key={dayIdx}
-        className={`relative border-l border-gray-200 ${columnMinW}`}
-        style={{ height: timelineHeight }}
+        className={`h-full min-h-[2.75rem] rounded-sm ${st.bg} ${st.text} px-1.5 py-3 text-[10px] font-semibold leading-tight flex flex-col justify-center`}
       >
-        {timeLabels.map(({ minutes, topPx, isEnd }) => (
-          <div
-            key={`grid-${isEnd ? "end" : "start"}-${minutes}`}
-            className="absolute left-0 right-0 border-t border-gray-100 pointer-events-none"
-            style={{ top: topPx }}
-          />
-        ))}
-
-        {daySchedule.map((session, idx) => {
-          const top = minutesToTopPx(session.startMinutes);
-          const height = blockHeightMinutes(session) * PX_PER_MIN;
-          const tracks = getTrackPositions(dayIdx, session, overlays);
-          const forumHeightPx = session.forum
-            ? forumHeightMinutes(session, session.forum) * PX_PER_MIN
-            : height;
-
-          return (
-            <React.Fragment key={`${session.time}-${idx}`}>
-              <div
-                className="absolute z-10 overflow-hidden"
-                style={{
-                  top,
-                  height,
-                  left: tracks.main.left,
-                  width: tracks.main.width,
-                }}
-              >
-                {renderTimelineBlockContent(
-                  session,
-                  height,
-                  showSymposiumTitles,
-                )}
-              </div>
-              {session.forum && (
-                <div
-                  className="absolute z-10 overflow-hidden"
-                  style={{
-                    top,
-                    height: forumHeightPx,
-                    left: tracks.forum.left,
-                    width: tracks.forum.width,
-                  }}
-                >
-                  {renderTrackLabel({
-                    style: getSessionStyle("forum"),
-                    blockHeight: forumHeightPx,
-                    label: session.forum.title,
-                    clamp: "line-clamp-3",
-                  })}
-                </div>
-              )}
-            </React.Fragment>
-          );
-        })}
-
-        {overlays.map((overlay, idx) => {
-          const top = minutesToTopPx(overlay.startMinutes);
-          const height = overlay.durationMinutes * PX_PER_MIN;
-          const overlayZ = overlay.type === "meeting" ? "z-20" : "z-[5]";
-          const overlayPos = threeCol
-            ? { left: "77%", width: "22%" }
-            : { left: "78%", width: "21%" };
-
-          return (
-            <div
-              key={`overlay-${idx}`}
-              className={`absolute ${overlayZ} overflow-hidden`}
-              style={{ top, height, ...overlayPos }}
-            >
-              {renderTrackLabel({
-                style: getSessionStyle(overlay.type),
-                blockHeight: height,
-                label: overlay.title,
-                clamp: "line-clamp-4",
-              })}
-            </div>
-          );
-        })}
+        <div>{session.title}</div>
+        {session.subtitle && (
+          <div className="text-[8px] font-normal opacity-80 mt-0.5">
+            {session.subtitle}
+          </div>
+        )}
       </div>
     );
   };
 
-  const renderTimelineView = (dayIndices, showSymposiumTitles = false) => {
-    const cols = dayIndices.length;
-    const gridCols = buildGridCols(dayIndices);
-    const gridMinW = cols >= 4 ? "min-w-[960px]" : cols === 1 ? "min-w-[640px]" : "min-w-[720px]";
-    const daysForView = dayIndices.map((i) => enrichedByDay[i]);
-    const overlaysForView = dayIndices.map((i) => enrichedOverlaysByDay[i]);
-    const timelineHeight = computeTimelineHeight(daysForView, overlaysForView);
-    const timeLabels = buildTimeLabels(daysForView, overlaysForView);
+  const renderSideCell = (sc) => {
+    if (sc.kind === "forum") {
+      const st = cellStyleFor({ type: "forum" });
+      return (
+        <div
+          className={`h-full rounded-sm ${st.bg} ${st.text} px-1 py-1 text-[9px] font-semibold leading-tight text-center flex items-center justify-center`}
+        >
+          {sc.data.title}
+        </div>
+      );
+    }
+    return (
+      <div className="h-full rounded-sm bg-emerald-50 text-emerald-800 border border-emerald-200 px-1 py-2 text-[10px] font-semibold leading-tight text-center flex items-center justify-center">
+        {sc.data.title}
+      </div>
+    );
+  };
+
+  const renderDayTable = (dayIdx, fill = true, showTitles = false) => {
+    const rows = enrichedByDay[dayIdx];
+    const overlays = enrichedOverlaysByDay[dayIdx];
+    const side = buildSideColumn(rows, overlays);
+    const hasSideCol = rows.some((r) => r.forum) || overlays.length > 0;
 
     return (
       <div
-        ref={scheduleRef}
-        className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm"
+        className={`${fill ? "h-full" : ""} border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm flex flex-col`}
       >
-        <div
-          className="grid bg-gray-900 text-white border-b border-gray-700"
-          style={{ gridTemplateColumns: gridCols }}
-        >
-          <div className="p-2 border-r border-gray-700" />
-          {dayIndices.map((dayIdx) => (
-            <div
-              key={dayIdx}
-              className="p-2 text-center border-r border-gray-700 last:border-r-0"
-            >
-              <div className="font-bold text-xs">{days[dayIdx].day}</div>
-              <div className="text-[10px] text-gray-400">
-                {days[dayIdx].date}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="overflow-x-auto overflow-y-auto max-h-[min(85vh,900px)]">
-          <div
-            className={`grid ${gridMinW}`}
-            style={{ gridTemplateColumns: gridCols }}
-          >
-            <div
-              className="relative bg-gray-50 border-r border-gray-200"
-              style={{ height: timelineHeight }}
-            >
-              {timeLabels.map(({ minutes, topPx, isEnd }) => (
-                <div
-                  key={`axis-${isEnd ? "end" : "start"}-${minutes}`}
-                  className={`absolute right-0.5 text-[9px] font-medium text-gray-500 tabular-nums leading-none text-right pr-0.5 ${isEnd ? "-translate-y-full" : "-translate-y-1/2"}`}
-                  style={{ top: topPx }}
-                >
-                  {formatTimeLabel(minutes)}
-                </div>
-              ))}
-            </div>
-
-            {dayIndices.map((dayIdx) =>
-              renderTimelineDayColumn(
-                enrichedByDay[dayIdx],
-                dayIdx,
-                timelineHeight,
-                timeLabels,
-                enrichedOverlaysByDay[dayIdx],
-                cols === 1,
-                showSymposiumTitles,
-              ),
-            )}
+        <div className="px-2 py-1.5 border-b border-gray-300 bg-gray-50 text-center">
+          <div className="font-bold text-sm text-gray-900">
+            {days[dayIdx].date} · {days[dayIdx].day}
+          </div>
+          <div className="text-[10px] text-gray-500 italic leading-tight mt-0.5">
+            {dayThemes[dayIdx]}
           </div>
         </div>
+        <table className="w-full border-collapse table-fixed">
+          <colgroup>
+            <col style={{ width: "32px" }} />
+            <col style={{ width: "32px" }} />
+            <col />
+            {hasSideCol && <col style={{ width: "84px" }} />}
+          </colgroup>
+          <tbody>
+            {rows.map((session, i) => {
+              const sc = side[i];
+              return (
+                <tr key={i} className="align-top">
+                  <td className="text-[9px] text-gray-500 tabular-nums text-right px-1 py-1 border-t border-gray-100 whitespace-nowrap">
+                    {formatClock(session.startMinutes)}
+                  </td>
+                  <td className="text-[9px] text-gray-400 tabular-nums text-right px-1 py-1 border-t border-gray-100 whitespace-nowrap">
+                    {formatClock(session.endMinutes)}
+                  </td>
+                  <td className="p-0.5 border-t border-gray-100 h-full">
+                    {renderRowContent(session, showTitles)}
+                  </td>
+                  {hasSideCol &&
+                    sc !== null &&
+                    (sc === undefined ? (
+                      <td className="p-0.5 border-t border-gray-100" />
+                    ) : (
+                      <td
+                        className="p-0.5 border-t border-gray-100 h-full"
+                        rowSpan={sc.rowSpan}
+                      >
+                        {renderSideCell(sc)}
+                      </td>
+                    ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     );
   };
@@ -1226,45 +733,15 @@ const ScheduleTab = () => {
       </header>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 rounded-xl">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-blue-600"></div>
-          <span className="text-sm font-medium text-gray-700">
-            Plenary/Lectures
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-amber-200 border-2 border-amber-400"></div>
-          <span className="text-sm font-medium text-gray-700">Symposium</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-purple-200 border-2 border-purple-400"></div>
-          <span className="text-sm font-medium text-gray-700">
-            Oral Presentations
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-teal-200 border-2 border-teal-400"></div>
-          <span className="text-sm font-medium text-gray-700">
-            Public Forum
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-emerald-200 border-2 border-emerald-300"></div>
-          <span className="text-sm font-medium text-gray-700">
-            Social/Special
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-indigo-200 border-2 border-indigo-400"></div>
-          <span className="text-sm font-medium text-gray-700">
-            Population Forum
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-violet-300 border-2 border-violet-500"></div>
-          <span className="text-sm font-medium text-gray-700">Meetings</span>
-        </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-2 mb-6 p-4 bg-gray-50 rounded-xl">
+        {legendItems.map((item) => (
+          <div key={item.label} className="flex items-center gap-2">
+            <div className={`w-4 h-4 rounded ${item.cls}`}></div>
+            <span className="text-xs font-medium text-gray-700">
+              {item.label}
+            </span>
+          </div>
+        ))}
       </div>
 
       {/* View Mode Toggle */}
@@ -1274,7 +751,7 @@ const ScheduleTab = () => {
             onClick={() => setViewMode("single")}
             className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
               viewMode === "single"
-                ? "bg-white text-blue-600 shadow-sm"
+                ? "bg-white shadow-sm"
                 : "text-gray-600 hover:text-gray-900"
             }`}
             style={
@@ -1287,7 +764,7 @@ const ScheduleTab = () => {
             onClick={() => setViewMode("all")}
             className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
               viewMode === "all"
-                ? "bg-white text-blue-600 shadow-sm"
+                ? "bg-white shadow-sm"
                 : "text-gray-600 hover:text-gray-900"
             }`}
             style={viewMode === "all" ? { color: "var(--color-primary)" } : {}}
@@ -1306,7 +783,7 @@ const ScheduleTab = () => {
               onClick={() => setSelectedDay(index)}
               className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all ${
                 selectedDay === index
-                  ? "bg-blue-600 text-white shadow-lg"
+                  ? "text-white shadow-lg"
                   : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
               }`}
               style={
@@ -1322,10 +799,25 @@ const ScheduleTab = () => {
         </div>
       )}
 
-      {/* Schedule Grid */}
-      {viewMode === "all"
-        ? renderTimelineView([0, 1, 2, 3], false)
-        : renderTimelineView([selectedDay], true)}
+      {/* Schedule */}
+      <div ref={scheduleRef} className="bg-white">
+        {viewMode === "all" ? (
+          <div className="overflow-x-auto pb-2">
+            <div className="flex gap-3 items-stretch min-w-[920px]">
+              <div className="w-[210px] flex-none flex flex-col justify-end">
+                {renderDayTable(0, false)}
+              </div>
+              <div className="flex-1 min-w-[260px]">{renderDayTable(1)}</div>
+              <div className="flex-1 min-w-[260px]">{renderDayTable(2)}</div>
+              <div className="flex-1 min-w-[260px]">{renderDayTable(3)}</div>
+            </div>
+          </div>
+        ) : (
+          <div className="max-w-2xl">
+            {renderDayTable(selectedDay, true, true)}
+          </div>
+        )}
+      </div>
 
       {/* Note about schedule */}
       <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100">
