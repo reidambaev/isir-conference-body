@@ -25,6 +25,26 @@ export default [
     sortOrder: 1,
   },
   {
+    tier: "plenary",
+    key: "joanne-kwak-kim",
+    name: "Joanne Kwak-Kim",
+    affiliation:
+      "President, International Society for Immunology of Reproduction (MD, MPH, FCRI ASRI)",
+    image: "joanne-kwak-kim.jpg",
+    imagePosition: "center 25%",
+    sortOrder: 2,
+  },
+  {
+    tier: "plenary",
+    key: "surendra-sharma",
+    name: "Surendra Sharma",
+    affiliation:
+      "President-Elect, International Society for Immunology of Reproduction (MD, PhD)",
+    image: "surendra-sharma.png",
+    imagePosition: "center 15%",
+    sortOrder: 3,
+  },
+  {
     tier: "congress",
     key: "ricardo-barini",
     name: "Ricardo Barini",
