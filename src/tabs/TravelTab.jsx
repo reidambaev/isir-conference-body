@@ -57,7 +57,6 @@ const TravelTab = () => {
                 href={BEXCO_VENUE.website}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-700 font-semibold hover:underline"
               >
                 Busan Exhibition and Convention Center (BEXCO)
               </a>
@@ -127,7 +126,6 @@ const TravelTab = () => {
                 href={BEXCO_VENUE.parking}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-700 font-semibold hover:underline"
               >
                 more info here
               </a>
@@ -322,7 +320,6 @@ const TravelTab = () => {
                 href="https://www.k-eta.go.kr"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
               >
                 K-ETA
               </a>

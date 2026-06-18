@@ -72,7 +72,6 @@ const AboutTab = () => (
           href={BEXCO_VENUE.website}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-700 hover:underline not-italic font-medium"
         >
           BEXCO Exhibition Center II
         </a>
@@ -95,7 +94,6 @@ const AboutTab = () => (
             href={BEXCO_VENUE.website}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-blue-700 hover:underline"
           >
             <strong>BEXCO</strong> (Busan Exhibition and Convention Center)
           </a>

@@ -1392,7 +1392,7 @@ const RegistrationForm = ({ onClose }) => {
                           href="https://theisir.org/membership/"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-red-600 underline text-sm mt-2 inline-block hover:text-red-800"
+                          className="text-sm mt-2 inline-block"
                         >
                           Join or renew ISIR membership →
                         </a>
@@ -1784,7 +1784,7 @@ const RegistrationForm = ({ onClose }) => {
                                         href="https://theisir.org/membership-account/membership-levels/"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-blue-600 hover:text-blue-800 underline font-semibold mt-1 inline-block"
+                                        className="mt-1 inline-block"
                                         onClick={(e) => e.stopPropagation()}
                                       >
                                         Join ISIR →
@@ -1905,7 +1905,6 @@ const RegistrationForm = ({ onClose }) => {
                                             href="https://theisir.org/membership-account/membership-levels/"
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-800 underline font-semibold"
                                           >
                                             Join ISIR →
                                           </a>

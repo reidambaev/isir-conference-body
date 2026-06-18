@@ -81,8 +81,6 @@ const HeroSection = () => {
                 href={BEXCO_VENUE.website}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-semibold underline hover:text-white"
-                style={{ color: "var(--color-secondary)" }}
               >
                 BEXCO
               </a>{" "}

@@ -16,23 +16,13 @@ export default [
   },
   {
     tier: "plenary",
-    key: "melinda-mills",
-    name: "Melinda Mills",
-    affiliation:
-      "Professor of Demography and Population Health, University of Oxford; Nuffield College; Director, Leverhulme Centre for Demographic Science",
-    image: "melinda-mills.png",
-    imagePosition: "center 0%",
-    sortOrder: 1,
-  },
-  {
-    tier: "plenary",
     key: "sam-richards",
     name: "Sam Richards",
     affiliation:
       "Professor at Penn State University and a Distinguished Professor at Konkuk University in Seoul, Korea",
     image: "sam-richards.png",
     imagePosition: "center 30%",
-    sortOrder: 2,
+    sortOrder: 1,
   },
   {
     tier: "congress",

@@ -68,7 +68,7 @@ const Footer = ({ onNavigateTab }) => (
             href="https://theisir.org"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-400 hover:text-blue-300 transition-colors text-sm flex items-center"
+            className="text-sm flex items-center"
           >
             <svg
               className="w-4 h-4 mr-2"
@@ -142,7 +142,6 @@ const Footer = ({ onNavigateTab }) => (
                     href={BEXCO_VENUE.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-white hover:underline"
                   >
                     BEXCO, Exhibition Center II
                   </a>
