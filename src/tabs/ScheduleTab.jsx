@@ -629,9 +629,6 @@ const ScheduleTab = () => {
           <div className="font-bold text-sm text-gray-900">
             {days[dayIdx].date} · {days[dayIdx].day}
           </div>
-          <div className="text-[10px] text-gray-500 italic leading-tight mt-0.5">
-            {dayThemes[dayIdx]}
-          </div>
         </div>
         <table className="w-full border-collapse table-fixed">
           <colgroup>
