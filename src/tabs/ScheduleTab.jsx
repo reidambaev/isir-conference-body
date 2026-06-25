@@ -1,4 +1,5 @@
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
+import scheduleOverview from "../assets/schedule-overview.png";
 
 const DAY_END = 21 * 60; // 9:00 PM fallback
 
@@ -138,6 +139,45 @@ function cellLabel(s, showTitles = false) {
   return s.title;
 }
 
+// Build a single compact label for a group of parallel sessions that share a
+// color/track, e.g. "Sessions 1, 2, 3" or "Oral Presentations IV, V, VI".
+function combinedParallelLabel(items) {
+  if (items.length === 1) return cellLabel(items[0], false);
+
+  if (items.every((s) => s.type === "symposium" && s.number)) {
+    const nums = items.map((s) => s.number.replace(/^S/i, "")).join(", ");
+    return `Sessions ${nums}`;
+  }
+
+  if (items.every((s) => s.type === "oral")) {
+    const named = items.filter((s) => !s.number).map((s) => s.title);
+    const nums = items
+      .filter((s) => s.number)
+      .map((s) => s.number.replace(/^Oral\s*/i, ""));
+    const parts = [...named];
+    if (nums.length) parts.push(`Oral Presentations ${nums.join(", ")}`);
+    return parts.join(" · ");
+  }
+
+  return items.map((s) => s.title).join(" · ");
+}
+
+// Group adjacent parallel sessions that share the same background color so
+// same-track sessions can be merged into one cell.
+function groupParallelByColor(sessions) {
+  const groups = [];
+  sessions.forEach((s) => {
+    const st = cellStyleFor(s);
+    const last = groups[groups.length - 1];
+    if (last && last.bg === st.bg) {
+      last.items.push(s);
+    } else {
+      groups.push({ bg: st.bg, text: st.text, items: [s] });
+    }
+  });
+  return groups;
+}
+
 const dayThemes = {
   0: "Arrivals & Welcome",
   1: "Discovering the Immune Foundations of Reproductive Health",
@@ -160,29 +200,23 @@ const legendItems = [
 
 const ScheduleTab = () => {
   const scheduleRef = useRef(null);
-  const [isExporting, setIsExporting] = useState(false);
   const [selectedDay, setSelectedDay] = useState(1);
-  const [viewMode, setViewMode] = useState("all"); // "single" or "all"
+  const isNarrowInitial =
+    typeof window !== "undefined" && window.innerWidth < 768;
+  const [viewMode, setViewMode] = useState(isNarrowInitial ? "single" : "all"); // "single" or "all"
+  const [isNarrow, setIsNarrow] = useState(isNarrowInitial);
 
-  const handleDownloadPNG = async () => {
-    if (!scheduleRef.current) return;
-    setIsExporting(true);
-    try {
-      const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(scheduleRef.current, {
-        backgroundColor: "#ffffff",
-        scale: 2,
-        useCORS: true,
-      });
-      const link = document.createElement("a");
-      link.download = "ISIR-2026-Schedule.png";
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    } catch (error) {
-      console.error("Failed to generate PNG:", error);
-    } finally {
-      setIsExporting(false);
-    }
+  useEffect(() => {
+    const onResize = () => setIsNarrow(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const handleDownloadPNG = () => {
+    const link = document.createElement("a");
+    link.download = "ISIR-2026-Schedule.png";
+    link.href = scheduleOverview;
+    link.click();
   };
 
   const days = [
@@ -557,6 +591,21 @@ const ScheduleTab = () => {
 
   const renderRowContent = (session, showTitles = false) => {
     if (session.type === "parallel") {
+      if (!showTitles) {
+        const groups = groupParallelByColor(session.sessions);
+        return (
+          <div className="flex gap-0.5 h-full">
+            {groups.map((g, gi) => (
+              <div
+                key={gi}
+                className={`flex-1 min-w-0 rounded-sm ${g.bg} ${g.text} px-1 py-3 text-[10px] font-semibold leading-tight flex items-center justify-center text-center`}
+              >
+                {combinedParallelLabel(g.items)}
+              </div>
+            ))}
+          </div>
+        );
+      }
       return (
         <div className="flex gap-0.5 h-full">
           {session.sessions.map((s, idx) => {
@@ -632,10 +681,12 @@ const ScheduleTab = () => {
         </div>
         <table className="w-full border-collapse table-fixed">
           <colgroup>
-            <col style={{ width: "32px" }} />
-            <col style={{ width: "32px" }} />
+            <col style={{ width: isNarrow ? "28px" : "32px" }} />
+            <col style={{ width: isNarrow ? "28px" : "32px" }} />
             <col />
-            {hasSideCol && <col style={{ width: "84px" }} />}
+            {hasSideCol && (
+              <col style={{ width: isNarrow ? "62px" : "84px" }} />
+            )}
           </colgroup>
           <tbody>
             {rows.map((session, i) => {
@@ -709,8 +760,7 @@ const ScheduleTab = () => {
         </div>
         <button
           onClick={handleDownloadPNG}
-          disabled={isExporting}
-          className="flex items-center bg-white border border-gray-200 px-4 py-2 rounded-lg font-semibold text-sm text-gray-700 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+          className="flex items-center bg-white border border-gray-200 px-4 py-2 rounded-lg font-semibold text-sm text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
         >
           <svg
             className="w-4 h-4 mr-2"
@@ -725,7 +775,7 @@ const ScheduleTab = () => {
               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
             />
           </svg>
-          {isExporting ? "Exporting..." : "Download PNG"}
+          Download PNG
         </button>
       </header>
 
@@ -773,12 +823,12 @@ const ScheduleTab = () => {
 
       {/* Day Selector Tabs - Only show in single day mode */}
       {viewMode === "single" && (
-        <div className="mb-6 flex flex-wrap gap-2">
+        <div className="mb-6 flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible sm:mx-0 sm:px-0">
           {days.map((day, index) => (
             <button
               key={index}
               onClick={() => setSelectedDay(index)}
-              className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all ${
+              className={`flex-none px-4 py-2 sm:px-6 sm:py-3 rounded-lg font-semibold text-sm transition-all ${
                 selectedDay === index
                   ? "text-white shadow-lg"
                   : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
@@ -796,6 +846,25 @@ const ScheduleTab = () => {
         </div>
       )}
 
+      {viewMode === "all" && isNarrow && (
+        <p className="mb-2 text-xs text-gray-400 flex items-center gap-1">
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 7l-4 5 4 5m8-10l4 5-4 5"
+            />
+          </svg>
+          Swipe sideways to see all days
+        </p>
+      )}
+
       {/* Schedule */}
       <div ref={scheduleRef} className="bg-white">
         {viewMode === "all" ? (
@@ -811,7 +880,7 @@ const ScheduleTab = () => {
           </div>
         ) : (
           <div className="max-w-2xl">
-            {renderDayTable(selectedDay, true, true)}
+            {renderDayTable(selectedDay, true, !isNarrow)}
           </div>
         )}
       </div>
