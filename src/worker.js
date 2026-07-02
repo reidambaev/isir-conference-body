@@ -4450,10 +4450,10 @@ async function sendRegistrationConfirmationEmail(env, registrationId) {
       <tr><td style="padding: 4px 0;">Ticket type</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(ticketLabel)}</td></tr>
       ${dayPassDisplay ? `<tr><td style="padding: 4px 0;">Daypass (congress days)</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(dayPassDisplay)}</td></tr>` : ""}
       ${acc > 0 ? `<tr><td style="padding: 4px 0;">Accompanying persons</td><td style="padding: 4px 0; text-align: right;">${acc}</td></tr>` : ""}
-      ${gala > 0 ? `<tr><td style="padding: 4px 0;">Gala dinner tickets</td><td style="padding: 4px 0; text-align: right;">${gala}</td></tr>` : ""}
+      ${gala > 0 ? `<tr><td style="padding: 4px 0;">Award Gala tickets</td><td style="padding: 4px 0; text-align: right;">${gala}</td></tr>` : ""}
       <tr><td colspan="2" style="padding: 10px 0 6px 0; border-top: 1px solid #ddd; font-weight: 600; color: #1a3a6c;">Meal Attendance</td></tr>
       <tr><td style="padding: 4px 0;">Opening reception</td><td style="padding: 4px 0; text-align: right;">${openingReception ? "Attending" : "Not attending"}</td></tr>
-      <tr><td style="padding: 4px 0;">Gala dinner</td><td style="padding: 4px 0; text-align: right;">${galaAttending ? "Attending" : "Not attending"}</td></tr>
+      <tr><td style="padding: 4px 0;">Award Gala</td><td style="padding: 4px 0; text-align: right;">${galaAttending ? "Attending" : "Not attending"}</td></tr>
       <tr><td style="padding: 4px 0;">Lunch (Fri-Sun, Nov 6-8)</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(lunchDisplay)}</td></tr>
       <tr><td style="padding: 4px 0;">Breakfast (Fri-Sun, Nov 6-8)</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(breakfastDisplay)}</td></tr>
       <tr><td style="padding: 4px 0;">Invited speaker</td><td style="padding: 4px 0; text-align: right;">${invitedSpeaker ? "Yes" : "No"}</td></tr>
