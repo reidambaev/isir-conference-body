@@ -230,6 +230,14 @@ async function handleApiRequest(request, env, url) {
     return handleVisaRequest(request, env, corsHeaders);
   }
 
+  // POST /api/sponsorship-inquiry
+  if (
+    url.pathname === "/api/sponsorship-inquiry" &&
+    request.method === "POST"
+  ) {
+    return handleSponsorshipInquiry(request, env, corsHeaders);
+  }
+
   // GET /api/speaker-hotel/check-invite?email= — row exists in speaker_invites (any token state)
   if (
     url.pathname === "/api/speaker-hotel/check-invite" &&
@@ -2955,6 +2963,282 @@ async function handleVisaRequest(request, env, corsHeaders) {
       JSON.stringify({
         success: false,
         error: "Failed to submit visa request",
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+const SPONSORSHIP_NOTIFY_EMAILS = ["info@isir2026.org"];
+
+const SPONSORSHIP_INTEREST_LABELS = {
+  sponsorship: "Sponsorship package",
+  exhibition: "Exhibition / Booth",
+  both: "Sponsorship & Exhibition",
+  undecided: "Not sure yet",
+};
+
+const SPONSORSHIP_PACKAGE_LABELS = {
+  platinum: "Platinum Sponsor (USD 30,000)",
+  gold: "Gold Sponsor (USD 20,000)",
+  silver: "Silver Sponsor (USD 10,000)",
+  bronze: "Bronze Sponsor (USD 5,000)",
+  exhibitor: "Exhibitor (USD 2,500)",
+  gala_dinner: "Gala Dinner Sponsor (USD 20,000)",
+  luncheon_symposium: "Luncheon Symposium (USD 15,000)",
+  welcome_reception: "Welcome Reception Sponsor (USD 10,000)",
+  congress_bag: "Congress Bag Sponsor (USD 10,000)",
+  young_investigator_award: "Young Investigator Award Sponsor (USD 7,500)",
+  lanyard: "Lanyard Sponsor (USD 7,500)",
+  travel_award: "Travel Award Sponsor (USD 5,000)",
+  coffee_break: "Coffee Break Sponsor (USD 5,000)",
+  wifi: "Wi-Fi Sponsor (USD 5,000)",
+  mobile_app: "Mobile Application Sponsor (USD 5,000)",
+  charging_station: "Charging Station Sponsor (USD 3,000)",
+  custom: "Customized package",
+  not_sure: "Not sure yet",
+  // Legacy values from earlier form versions
+  principal: "Principal Sponsor",
+  exhibition_booth: "Exhibition Booth",
+};
+
+function formatSponsorshipInterest(value) {
+  return SPONSORSHIP_INTEREST_LABELS[value] || value || "—";
+}
+
+function formatSponsorshipPackage(value) {
+  if (!value) return "—";
+  return SPONSORSHIP_PACKAGE_LABELS[value] || value;
+}
+
+function buildSponsorshipTeamNotificationHtml({
+  inquiryId,
+  company,
+  name,
+  email,
+  phone,
+  interest,
+  packageInterest,
+  message,
+  timestamp,
+}) {
+  const submittedAt = formatVisaSubmittedAt(timestamp);
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>New Sponsorship Inquiry – ISIR 2026</title></head>
+<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
+  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
+    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">New sponsorship inquiry</p>
+  </div>
+  <p>A new sponsorship inquiry has been submitted via the congress website.</p>
+  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Inquiry details</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+      <tr><td style="padding: 4px 0;">Inquiry ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(inquiryId)}</strong></td></tr>
+      <tr><td style="padding: 4px 0;">Company</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(company)}</td></tr>
+      <tr><td style="padding: 4px 0;">Contact</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(name)}</td></tr>
+      <tr><td style="padding: 4px 0;">Email</td><td style="padding: 4px 0; text-align: right;"><a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></td></tr>
+      <tr><td style="padding: 4px 0;">Phone</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(phone || "—")}</td></tr>
+      <tr><td style="padding: 4px 0;">Interest</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(formatSponsorshipInterest(interest))}</td></tr>
+      <tr><td style="padding: 4px 0;">Package</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(formatSponsorshipPackage(packageInterest))}</td></tr>
+      <tr><td style="padding: 4px 0; vertical-align: top;">Message</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(message || "—")}</td></tr>
+      <tr><td style="padding: 4px 0;">Submitted</td><td style="padding: 4px 0; text-align: right;">${submittedAt}</td></tr>
+    </table>
+  </div>
+  <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 System</strong></p>
+</body>
+</html>`;
+}
+
+async function sendSponsorshipTeamNotificationEmail(env, inquiry) {
+  if (!env.RESEND_API_KEY || !env.CONFIRMATION_FROM_EMAIL) {
+    return {
+      success: false,
+      skipped: true,
+      error: "Resend not configured",
+    };
+  }
+
+  const html = buildSponsorshipTeamNotificationHtml(inquiry);
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: env.CONFIRMATION_FROM_EMAIL,
+        to: SPONSORSHIP_NOTIFY_EMAILS,
+        subject: `ISIR 2026 – Sponsorship inquiry: ${inquiry.company}`,
+        html,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      console.error("Sponsorship notification email failed:", res.status, err);
+      return {
+        success: false,
+        error: `Resend ${res.status}: ${err || "email send failed"}`,
+      };
+    }
+
+    console.log(
+      `Sponsorship notification email sent to ${SPONSORSHIP_NOTIFY_EMAILS.join(", ")}`,
+    );
+    return { success: true };
+  } catch (emailError) {
+    console.error("Sponsorship notification email error:", emailError);
+    return {
+      success: false,
+      error: String(emailError?.message || emailError),
+    };
+  }
+}
+
+async function handleSponsorshipInquiry(request, env, corsHeaders) {
+  try {
+    const data = await request.json();
+    const company = String(data?.company || "").trim();
+    const name = String(data?.name || "").trim();
+    const email = normalizeEmail(data?.email);
+    const phone = String(data?.phone || "").trim();
+    const interest = String(data?.interest || "").trim();
+    const packageInterest = String(
+      data?.packageInterest || data?.package_interest || "",
+    ).trim();
+    const message = String(data?.message || "").trim();
+
+    if (!company || !name || !email || !interest) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            "Company, contact name, email, and interest type are required",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid email format" }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const inquiryId = crypto.randomUUID();
+    const timestamp = Date.now();
+
+    await env.ISIR_DB.prepare(
+      `INSERT INTO sponsorship_inquiries (
+        id, company, name, email, phone, interest, package_interest, message, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+    )
+      .bind(
+        inquiryId,
+        company,
+        name,
+        email,
+        phone || null,
+        interest,
+        packageInterest || null,
+        message || null,
+        timestamp,
+        timestamp,
+      )
+      .run();
+
+    if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
+      const submittedAt = formatVisaSubmittedAt(timestamp);
+      await sendSponsorshipTeamNotificationEmail(env, {
+        inquiryId,
+        company,
+        name,
+        email,
+        phone,
+        interest,
+        packageInterest,
+        message,
+        timestamp,
+      });
+
+      const requesterHtml = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Sponsorship Inquiry Received – ISIR 2026</title></head>
+<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
+  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
+    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Sponsorship inquiry received</p>
+  </div>
+  <p>Dear ${escapeHtml(name)},</p>
+  <p>Thank you for your interest in sponsoring or exhibiting at ISIR 2026. Our sponsorship team has received your inquiry and will respond within 2–3 business days.</p>
+  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Your submission</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+      <tr><td style="padding: 4px 0;">Inquiry ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(inquiryId)}</strong></td></tr>
+      <tr><td style="padding: 4px 0;">Company</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(company)}</td></tr>
+      <tr><td style="padding: 4px 0;">Interest</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(formatSponsorshipInterest(interest))}</td></tr>
+      <tr><td style="padding: 4px 0;">Package</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(formatSponsorshipPackage(packageInterest))}</td></tr>
+      <tr><td style="padding: 4px 0;">Submitted</td><td style="padding: 4px 0; text-align: right;">${submittedAt}</td></tr>
+    </table>
+  </div>
+  <p>If you have additional questions in the meantime, you can reply to this email or contact us at <a href="mailto:info@isir2026.org">info@isir2026.org</a>.</p>
+  <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Sponsorship Team</strong></p>
+</body>
+</html>`;
+
+      try {
+        const requesterRes = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: env.CONFIRMATION_FROM_EMAIL,
+            to: [email],
+            subject: "ISIR 2026 – Sponsorship inquiry received",
+            html: requesterHtml,
+          }),
+        });
+        if (!requesterRes.ok) {
+          const err = await requesterRes.text();
+          console.error(
+            "Sponsorship requester confirmation email failed:",
+            requesterRes.status,
+            err,
+          );
+        } else {
+          console.log(`Sponsorship requester confirmation email sent to ${email}`);
+        }
+      } catch (emailError) {
+        console.error(
+          "Sponsorship requester confirmation email error:",
+          emailError,
+        );
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        inquiryId,
+        message: "Sponsorship inquiry submitted successfully",
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Sponsorship inquiry error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Failed to submit sponsorship inquiry",
       }),
       { status: 500, headers: corsHeaders },
     );

@@ -227,6 +227,28 @@ CREATE INDEX IF NOT EXISTS idx_visa_requests_status ON visa_requests (status);
 
 CREATE INDEX IF NOT EXISTS idx_visa_requests_date ON visa_requests (created_at);
 
+-- Sponsorship inquiry contact form submissions
+CREATE TABLE
+    IF NOT EXISTS sponsorship_inquiries (
+        id TEXT PRIMARY KEY,
+        company TEXT NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        phone TEXT,
+        interest TEXT NOT NULL,
+        package_interest TEXT,
+        message TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000),
+        updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)
+    );
+
+CREATE INDEX IF NOT EXISTS idx_sponsorship_inquiries_email ON sponsorship_inquiries (email);
+
+CREATE INDEX IF NOT EXISTS idx_sponsorship_inquiries_status ON sponsorship_inquiries (status);
+
+CREATE INDEX IF NOT EXISTS idx_sponsorship_inquiries_date ON sponsorship_inquiries (created_at);
+
 -- Speaker profiles (D1 + R2 under speaker-photos/). speaker_key null = self-registered (congress grid).
 -- tier: plenary | congress | NULL (NULL treated as congress on the public page). static_image: filename under /speakers/.
 CREATE TABLE

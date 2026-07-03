@@ -1,4 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
+import SponsorshipContactForm from "../forms/SponsorshipContactForm";
+import {
+  ADDITIONAL_SPONSORSHIP_OPPORTUNITIES,
+  SPONSORSHIP_CONTACT_EMAIL,
+  SPONSORSHIP_TIERS,
+  formatSponsorshipPrice,
+} from "../config/sponsorship";
 import logo1 from "../assets/logo1.png";
 import logo2 from "../assets/logo2.png";
 import logo3 from "../assets/logo3.png";
@@ -6,7 +13,16 @@ import logo4 from "../assets/logo4.png";
 import logo5 from "../assets/logo5.png";
 import logo6 from "../assets/logo6.jpg";
 
-const SponsorsTab = () => (
+const SponsorsTab = () => {
+  const [showContactForm, setShowContactForm] = useState(false);
+
+  if (showContactForm) {
+    return (
+      <SponsorshipContactForm onClose={() => setShowContactForm(false)} />
+    );
+  }
+
+  return (
   <div role="tabpanel">
     <h3
       className="text-2xl font-bold text-blue-900 mb-4"
@@ -16,9 +32,9 @@ const SponsorsTab = () => (
     </h3>
     <p className="text-gray-700 mb-6">
       We are grateful for the support of our sponsors and exhibitors, who make
-      this congress possible. Visit their booths in the main exhibit hall to
-      learn about the latest technologies and services in reproductive
-      immunology.
+      this congress possible. Partner with ISIR 2026 and connect with global
+      leaders in reproductive immunology, women&apos;s health, and reproductive
+      medicine at BEXCO, Busan, November 5–8, 2026.
     </p>
 
     {/* Principal Sponsor - Kang Wha, Inc */}
@@ -191,12 +207,84 @@ const SponsorsTab = () => (
       </div>
     </div>
 
+    {/* Sponsorship Packages */}
+    <div className="mt-10">
+      <h4
+        className="text-xl font-semibold text-blue-800 mb-4"
+        style={{ color: "var(--color-primary)" }}
+      >
+        Sponsorship Packages
+      </h4>
+      <p className="text-gray-700 mb-6">
+        Multiple sponsorship levels are available to showcase your products,
+        technologies, and services to clinicians, scientists, and
+        decision-makers in reproductive healthcare. Customized opportunities are
+        also available upon request.
+      </p>
+
+      <div className="overflow-x-auto rounded-xl border-2 border-gray-200 mb-8">
+        <table className="w-full text-sm">
+          <thead>
+            <tr
+              className="text-left text-white"
+              style={{ backgroundColor: "var(--color-primary)" }}
+            >
+              <th className="px-4 py-3 font-semibold">Package</th>
+              <th className="px-4 py-3 font-semibold text-right">Investment</th>
+            </tr>
+          </thead>
+          <tbody>
+            {SPONSORSHIP_TIERS.map((tier, index) => (
+              <tr
+                key={tier.value}
+                className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+              >
+                <td className="px-4 py-3 font-medium text-gray-800">
+                  {tier.label}
+                </td>
+                <td className="px-4 py-3 text-right text-gray-700">
+                  {formatSponsorshipPrice(tier.price)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <h5 className="text-lg font-semibold text-gray-800 mb-3">
+        Additional Sponsorship Opportunities
+      </h5>
+      <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        {ADDITIONAL_SPONSORSHIP_OPPORTUNITIES.map((item) => (
+          <li
+            key={item.value}
+            className="flex items-center justify-between bg-white rounded-lg border border-gray-200 px-4 py-3"
+          >
+            <span className="text-gray-800">{item.label}</span>
+            <span className="text-gray-600 font-medium ml-4 shrink-0">
+              {formatSponsorshipPrice(item.price)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-sm text-gray-500 italic">
+        *Customized sponsorship opportunities are available upon request.
+      </p>
+    </div>
+
     <div className="mt-10 bg-gradient-to-r from-blue-900 to-blue-800 rounded-xl p-8 text-center text-white">
       <h4 className="text-2xl font-bold mb-3">Become a Sponsor</h4>
       <p className="text-blue-200 mb-6 max-w-2xl mx-auto">
         Partner with ISIR 2026 and gain unparalleled exposure to the global
-        reproductive immunology community. Multiple sponsorship packages
-        available to fit your goals.
+        reproductive immunology community. Download the full prospectus for
+        benefit details, or contact the organizing committee at{" "}
+        <a
+          href={`mailto:${SPONSORSHIP_CONTACT_EMAIL}`}
+          className="underline hover:text-white"
+        >
+          {SPONSORSHIP_CONTACT_EMAIL}
+        </a>
+        .
       </p>
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
         <a
@@ -220,8 +308,9 @@ const SponsorsTab = () => (
           </svg>
           Download Sponsorship Prospectus
         </a>
-        <a
-          href="mailto:sponsors@isir2026.org"
+        <button
+          type="button"
+          onClick={() => setShowContactForm(true)}
           className="inline-block px-8 py-3 font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300"
           style={{
             backgroundColor: "var(--color-secondary)",
@@ -229,10 +318,11 @@ const SponsorsTab = () => (
           }}
         >
           Contact Us for Sponsorship
-        </a>
+        </button>
       </div>
     </div>
   </div>
-);
+  );
+};
 
 export default SponsorsTab;

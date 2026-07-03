@@ -21,4 +21,5 @@ export { default as CheckinTab } from "./CheckinTab";
 
 // Form exports
 export { default as VisaRequestForm } from "../forms/VisaRequestForm";
+export { default as SponsorshipContactForm } from "../forms/SponsorshipContactForm";
 export { default as RegistrationForm } from "../forms/RegistrationForm";
