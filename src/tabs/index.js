@@ -7,6 +7,8 @@ export { default as SubmissionTab } from "./SubmissionTab";
 export { default as RegistrationTab } from "./RegistrationTab";
 export { default as DeadlinesTab } from "./DeadlinesTab";
 export { default as TravelTab } from "./TravelTab";
+export { default as TravelTabUpdated } from "./TravelTabUpdated";
+export { default as HotelTab } from "./HotelTab";
 export { default as SponsorsTab } from "./SponsorsTab";
 export { default as WelcomeTab } from "./WelcomeTab";
 export { default as CommerceDisclosureTab } from "./CommerceDisclosureTab";
