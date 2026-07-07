@@ -1517,6 +1517,65 @@ export default function AdminTab() {
     link.click();
   };
 
+  const exportSpeakerHotelToCSV = () => {
+    const esc = (v) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+
+    const headers = [
+      "invited_speaker_email",
+      "passport_name",
+      "nationality",
+      "guest_count",
+      "address_physical",
+      "contact_email",
+      "phone",
+      "arrival_date",
+      "departure_date",
+      "created_at",
+      "updated_at",
+    ];
+
+    const rows = (
+      speakerHotelNameSort
+        ? [...speakerHotelRegistrations].sort((a, b) => {
+            const cmp = String(a.passport_name || "").localeCompare(
+              String(b.passport_name || ""),
+              undefined,
+              { sensitivity: "base" },
+            );
+            return speakerHotelNameSort === "asc" ? cmp : -cmp;
+          })
+        : speakerHotelRegistrations
+    ).map((row) =>
+      [
+        row.invited_speaker_email,
+        row.passport_name,
+        row.nationality,
+        row.guest_count,
+        row.address_physical,
+        row.contact_email,
+        row.phone,
+        row.arrival_date,
+        row.departure_date,
+        formatDate(row.created_at),
+        formatDate(row.updated_at),
+      ].map(esc),
+    );
+
+    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join(
+      "\n",
+    );
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `speaker-hotel-registrations-${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -3368,21 +3427,46 @@ export default function AdminTab() {
       {/* Speaker hotel registrations */}
       {activeSection === "speakerHotel" && (
         <div className="space-y-4">
-          <h2 className="text-2xl font-semibold text-gray-800">
-            Invited speaker — hotel registrations
-          </h2>
-          <p className="text-sm text-gray-600 max-w-3xl">
-            Submissions from{" "}
-            <a
-              href="/speaker-hotel"
-              className="text-cyan-700 font-medium hover:underline"
-              target="_blank"
-              rel="noopener noreferrer"
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-semibold text-gray-800">
+                Invited speaker — hotel registrations
+              </h2>
+              <p className="text-sm text-gray-600 max-w-3xl mt-1">
+                Submissions from{" "}
+                <a
+                  href="/speaker-hotel"
+                  className="text-cyan-700 font-medium hover:underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  /speaker-hotel
+                </a>
+                . One row per invitation email (latest update wins).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={exportSpeakerHotelToCSV}
+              disabled={speakerHotelRegistrations.length === 0}
+              className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              /speaker-hotel
-            </a>
-            . One row per invitation email (latest update wins).
-          </p>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              Export CSV
+            </button>
+          </div>
           {speakerHotelRegistrations.length === 0 ? (
             <p className="text-gray-500">No speaker hotel registrations yet.</p>
           ) : (
