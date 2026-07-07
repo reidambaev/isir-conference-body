@@ -43,6 +43,19 @@ const TravelHotelsSection = () => (
       Metro Line 2), although there are many other choices you may find. These
       stations provide direct subway access to BEXCO.
     </p>
+
+    <div
+      className="rounded-xl p-5 mb-6 border border-blue-100 bg-blue-50/60"
+      role="note"
+    >
+      <p className="text-sm text-gray-700 leading-relaxed">
+        <strong>Please note:</strong> The hotels below are recommendations only
+        to help you plan your trip. Attendees are welcome to book any
+        accommodation they prefer and are <strong>not required</strong> to stay
+        at any of the properties listed here.
+      </p>
+    </div>
+
     <p className="text-sm text-gray-600 mb-8">
       <strong>Invited speakers:</strong> please continue to submit your hotel
       stay details on the{" "}
