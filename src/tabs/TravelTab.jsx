@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { BEXCO_VENUE } from "../config/constants";
 import VisaRequestForm from "../forms/VisaRequestForm";
+import TravelHotelsSection from "../components/TravelHotelsSection";
 import beach from "../assets/beach.jpg";
 import village from "../assets/village.jpg";
 import market from "../assets/market.jpg";
@@ -165,48 +166,7 @@ const TravelTab = () => {
         </div>
       </div>
 
-      {/* Conference Hotel - Coming Soon */}
-      <div className="mb-10">
-        <div
-          className="rounded-xl p-8 border-2 border-dashed text-center"
-          style={{
-            borderColor: "var(--color-primary)",
-            backgroundColor: "rgba(243, 183, 44, 0.08)",
-          }}
-        >
-          <span
-            className="inline-block px-3 py-1 text-sm font-semibold rounded-full mb-3"
-            style={{
-              backgroundColor: "var(--color-secondary)",
-              color: "var(--color-primary)",
-            }}
-          >
-            Conference Hotel
-          </span>
-          <h4
-            className="text-2xl font-semibold mb-3"
-            style={{ color: "var(--color-primary)" }}
-          >
-            Hotel Details Coming Soon
-          </h4>
-          <p className="text-gray-700 max-w-2xl mx-auto mb-2">
-            We are finalizing arrangements for the official conference hotel.
-            Information about room blocks and booking details will be posted
-            here shortly. Please check back soon!
-          </p>
-          <p className="text-sm text-gray-600 max-w-2xl mx-auto">
-            <strong>Invited speakers:</strong> please continue to submit your
-            hotel stay details on the{" "}
-            <a
-              href="/speaker-hotel"
-              className="text-blue-700 font-semibold hover:underline"
-            >
-              invited speaker hotel registration
-            </a>{" "}
-            page.
-          </p>
-        </div>
-      </div>
+      <TravelHotelsSection />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
         {/* Getting to Busan */}

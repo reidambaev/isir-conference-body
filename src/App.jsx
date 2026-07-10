@@ -18,7 +18,6 @@ import {
   RegistrationTab,
   DeadlinesTab,
   TravelTab,
-  TravelTabUpdated,
   SponsorsTab,
   WelcomeTab,
   CommerceDisclosureTab,
@@ -172,10 +171,13 @@ export default function App() {
         url.pathname === "/accessibility" || url.pathname === "/accessibility/";
       const wantsSchedule =
         url.pathname === "/schedule" || url.pathname === "/schedule/";
-      const wantsHotel =
-        url.pathname === "/hotel" || url.pathname === "/hotel/";
-      const wantsTravelUpdated =
-        url.pathname === "/travel-v2" || url.pathname === "/travel-v2/";
+      const wantsTravel =
+        url.pathname === "/travel" ||
+        url.pathname === "/travel/" ||
+        url.pathname === "/hotel" ||
+        url.pathname === "/hotel/" ||
+        url.pathname === "/travel-v2" ||
+        url.pathname === "/travel-v2/";
 
       if (wantsDisclosure) {
         setActiveTab("commerce-disclosure");
@@ -187,8 +189,8 @@ export default function App() {
         setActiveTab("accessibility");
       } else if (wantsSchedule) {
         setActiveTab("schedule");
-      } else if (wantsHotel || wantsTravelUpdated) {
-        setActiveTab("travel-updated");
+      } else if (wantsTravel) {
+        setActiveTab("travel");
       } else if (wantsRegistration) {
         setActiveTab("registration");
       } else {
@@ -235,8 +237,6 @@ export default function App() {
         return <DeadlinesTab onTabChange={setActiveTab} />;
       case "travel":
         return <TravelTab />;
-      case "travel-updated":
-        return <TravelTabUpdated />;
       case "sponsors":
         return <SponsorsTab />;
       default:
