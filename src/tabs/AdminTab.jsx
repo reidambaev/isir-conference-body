@@ -129,6 +129,8 @@ export default function AdminTab() {
   const [sendingDecisionId, setSendingDecisionId] = useState(null);
   const [bulkSendingDecisions, setBulkSendingDecisions] = useState(false);
   const [decisionSendSummary, setDecisionSendSummary] = useState(null);
+  const [updatingInvitedSpeakerId, setUpdatingInvitedSpeakerId] =
+    useState(null);
 
   // Reviewer overview state
   const [reviewerOverview, setReviewerOverview] = useState(null);
@@ -1364,6 +1366,52 @@ export default function AdminTab() {
       alert("Failed to update abstract status");
     } finally {
       setReviewUpdating(false);
+    }
+  };
+
+  const updateAbstractInvitedSpeaker = async (abstractId, isInvitedSpeaker) => {
+    if (!adminToken) {
+      alert("Admin access token is missing.");
+      return;
+    }
+    const nextValue = isInvitedSpeaker ? 1 : 0;
+    const confirmMsg = isInvitedSpeaker
+      ? "Mark this abstract as an invited speaker submission? It will move to Invited Speakers Abstracts."
+      : "Remove invited speaker status? This abstract will move back to Abstract Submissions.";
+    if (!window.confirm(confirmMsg)) return;
+
+    setUpdatingInvitedSpeakerId(abstractId);
+    try {
+      const response = await fetch(
+        `/api/admin/abstracts/${abstractId}/invited-speaker`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Token": adminToken,
+          },
+          body: JSON.stringify({ isInvitedSpeaker: nextValue }),
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(
+          result?.error || "Failed to update invited speaker status",
+        );
+      }
+
+      setAbstracts((prev) =>
+        prev.map((a) =>
+          a.id === abstractId
+            ? { ...a, is_invited_speaker: nextValue }
+            : a,
+        ),
+      );
+    } catch (err) {
+      console.error("Error updating invited speaker status:", err);
+      alert(err.message || "Failed to update invited speaker status");
+    } finally {
+      setUpdatingInvitedSpeakerId(null);
     }
   };
 
@@ -3388,6 +3436,34 @@ export default function AdminTab() {
                                   </div>
                                 </div>
                               )}
+                              <div className="mt-3 p-3 bg-white rounded-lg border border-gray-100">
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                  <div className="text-xs text-gray-600">
+                                    <span className="font-semibold text-gray-700">
+                                      Invited speaker:
+                                    </span>{" "}
+                                    <span className="text-gray-500">No</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      updateAbstractInvitedSpeaker(
+                                        abstract.id,
+                                        true,
+                                      );
+                                    }}
+                                    disabled={
+                                      updatingInvitedSpeakerId === abstract.id
+                                    }
+                                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                  >
+                                    {updatingInvitedSpeakerId === abstract.id
+                                      ? "Updating…"
+                                      : "Mark as invited speaker"}
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                           </div>
 
@@ -3477,7 +3553,7 @@ export default function AdminTab() {
         </div>
       )}
 
-      {/* Invited Speakers Abstracts — view only */}
+      {/* Invited Speakers Abstracts */}
       {activeSection === "invitedSpeakerAbstracts" && (
         <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -3486,8 +3562,9 @@ export default function AdminTab() {
                 Invited Speakers Abstracts
               </h2>
               <p className="text-gray-500 text-sm mt-1 max-w-2xl">
-                View-only list of abstracts submitted as invited speaker talks.
-                Accept/reject and confirmation emails stay under{" "}
+                Abstracts marked as invited speaker talks. You can move an
+                abstract back to general submissions from here. Accept/reject
+                and confirmation emails stay under{" "}
                 <button
                   type="button"
                   onClick={() => setActiveSection("abstracts")}
@@ -3749,6 +3826,37 @@ export default function AdminTab() {
                                   </div>
                                 ),
                               )}
+                            </div>
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <div className="p-3 bg-white rounded-lg border border-gray-100">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <div className="text-xs text-gray-600">
+                                  <span className="font-semibold text-gray-700">
+                                    Invited speaker:
+                                  </span>{" "}
+                                  <span className="text-orange-700">Yes</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updateAbstractInvitedSpeaker(
+                                      abstract.id,
+                                      false,
+                                    );
+                                  }}
+                                  disabled={
+                                    updatingInvitedSpeakerId === abstract.id
+                                  }
+                                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                                >
+                                  {updatingInvitedSpeakerId === abstract.id
+                                    ? "Updating…"
+                                    : "Move to general submissions"}
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>

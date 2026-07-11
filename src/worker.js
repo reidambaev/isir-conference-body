@@ -369,6 +369,19 @@ async function handleApiRequest(request, env, url) {
     );
   }
 
+  // PATCH /api/admin/abstracts/:id/invited-speaker - Toggle invited speaker flag
+  const abstractInvitedMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)\/invited-speaker$/,
+  );
+  if (abstractInvitedMatch && request.method === "PATCH") {
+    return handleUpdateAbstractInvitedSpeaker(
+      request,
+      env,
+      corsHeaders,
+      abstractInvitedMatch[1],
+    );
+  }
+
   // GET /api/admin/visa-requests
   if (url.pathname === "/api/admin/visa-requests" && request.method === "GET") {
     return handleGetVisaRequests(request, env, corsHeaders);
@@ -5534,6 +5547,78 @@ async function handleUpdateAbstractStatus(
     );
   } catch (error) {
     console.error("Update abstract status error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+// Admin endpoint: Set whether an abstract is an invited speaker submission
+async function handleUpdateAbstractInvitedSpeaker(
+  request,
+  env,
+  corsHeaders,
+  abstractId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!abstractId) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing abstract id" }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const data = await request.json();
+    const raw = data?.isInvitedSpeaker ?? data?.is_invited_speaker;
+    if (raw === undefined || raw === null) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "isInvitedSpeaker is required (true/false or 1/0)",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const isInvitedSpeaker =
+      raw === true || raw === 1 || raw === "1" || raw === "true" ? 1 : 0;
+
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT id FROM abstractions WHERE id = ?`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!existing) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Abstract not found" }),
+        { status: 404, headers: corsHeaders },
+      );
+    }
+
+    await env.ISIR_DB.prepare(
+      `UPDATE abstractions SET is_invited_speaker = ? WHERE id = ?`,
+    )
+      .bind(isInvitedSpeaker, abstractId)
+      .run();
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Abstract ${abstractId} invited speaker flag set to ${isInvitedSpeaker}`,
+        isInvitedSpeaker,
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Update abstract invited speaker error:", error);
     return new Response(
       JSON.stringify({
         success: false,
