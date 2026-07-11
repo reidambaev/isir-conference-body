@@ -1850,10 +1850,13 @@ export default function AdminTab() {
 
   // Start review mode for one pool only (general or invited)
   const startReviewMode = (pool = "general") => {
-    setReviewPool(pool === "invited" ? "invited" : "general");
+    const nextPool = pool === "invited" ? "invited" : "general";
+    setReviewPool(nextPool);
     setReviewIndex(0);
     setAbstractViewMode("review");
-    setActiveSection("abstracts");
+    setActiveSection(
+      nextPool === "invited" ? "invitedSpeakerAbstracts" : "abstracts",
+    );
   };
 
   // Keyboard navigation for review mode
@@ -2064,9 +2067,15 @@ export default function AdminTab() {
       {/* Navigation Tabs */}
       <div className="bg-white rounded-xl shadow-md border border-gray-100 p-1 inline-flex flex-wrap gap-1">
         <button
-          onClick={() => setActiveSection("abstracts")}
+          onClick={() => {
+            setActiveSection("abstracts");
+            if (abstractViewMode === "review" && reviewPool === "invited") {
+              setAbstractViewMode("cards");
+            }
+          }}
           className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "abstracts"
+            activeSection === "abstracts" &&
+            !(abstractViewMode === "review" && reviewPool === "invited")
               ? "bg-blue-600 text-white shadow-md"
               : "text-gray-600 hover:bg-gray-100"
           }`}
@@ -2074,9 +2083,15 @@ export default function AdminTab() {
           Abstract Submissions
         </button>
         <button
-          onClick={() => setActiveSection("invitedSpeakerAbstracts")}
+          onClick={() => {
+            setActiveSection("invitedSpeakerAbstracts");
+            if (abstractViewMode === "review" && reviewPool === "general") {
+              setAbstractViewMode("cards");
+            }
+          }}
           className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "invitedSpeakerAbstracts"
+            activeSection === "invitedSpeakerAbstracts" ||
+            (abstractViewMode === "review" && reviewPool === "invited")
               ? "bg-orange-600 text-white shadow-md"
               : "text-gray-600 hover:bg-gray-100"
           }`}
@@ -2210,9 +2225,14 @@ export default function AdminTab() {
         </button>
       </div>
 
-      {/* Abstract Submissions Section */}
-      {activeSection === "abstracts" && (
+      {/* Abstract Submissions Section (+ invited review mode reuses review UI) */}
+      {(activeSection === "abstracts" ||
+        (activeSection === "invitedSpeakerAbstracts" &&
+          abstractViewMode === "review" &&
+          reviewPool === "invited")) && (
         <div className="space-y-6">
+          {!(abstractViewMode === "review" && reviewPool === "invited") && (
+          <>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
@@ -2722,6 +2742,9 @@ export default function AdminTab() {
             </div>
           </div>
 
+          </>
+          )}
+
           {/* Review Mode UI */}
           {abstractViewMode === "review" ? (
             <div className="space-y-6">
@@ -2764,6 +2787,7 @@ export default function AdminTab() {
                         onClick={() => {
                           setReviewPool("general");
                           setReviewIndex(0);
+                          setActiveSection("abstracts");
                         }}
                         className={`px-3 py-2 font-medium transition-colors ${
                           reviewPool === "general"
@@ -2778,6 +2802,7 @@ export default function AdminTab() {
                         onClick={() => {
                           setReviewPool("invited");
                           setReviewIndex(0);
+                          setActiveSection("invitedSpeakerAbstracts");
                         }}
                         className={`px-3 py-2 font-medium transition-colors ${
                           reviewPool === "invited"
@@ -3886,7 +3911,8 @@ export default function AdminTab() {
       )}
 
       {/* Invited Speakers Abstracts */}
-      {activeSection === "invitedSpeakerAbstracts" && (
+      {activeSection === "invitedSpeakerAbstracts" &&
+        !(abstractViewMode === "review" && reviewPool === "invited") && (
         <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -3895,24 +3921,41 @@ export default function AdminTab() {
               </h2>
               <p className="text-gray-500 text-sm mt-1 max-w-2xl">
                 Abstracts marked as invited speaker talks. Use{" "}
+                <span className="font-medium text-gray-700">Review</span> to
+                accept or reject them one by one (with reviewer scores), or{" "}
                 <span className="font-medium text-gray-700">
                   Accept all invited speakers
                 </span>{" "}
-                to mark every non-accepted one as accepted (does not send
-                emails). You can also move an abstract back to general
-                submissions from here.
+                to mark every non-accepted one as accepted.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              {pendingInvitedReviewAbstracts.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => startReviewMode("invited")}
-                  className="px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+              <button
+                type="button"
+                onClick={() => startReviewMode("invited")}
+                disabled={pendingInvitedReviewAbstracts.length === 0}
+                className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                title={
+                  pendingInvitedReviewAbstracts.length === 0
+                    ? "No submitted invited abstracts to review"
+                    : "Review invited speaker abstracts only"
+                }
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  Review invited ({pendingInvitedReviewAbstracts.length})
-                </button>
-              )}
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                  />
+                </svg>
+                Review ({pendingInvitedReviewAbstracts.length})
+              </button>
               <button
                 type="button"
                 onClick={acceptAllInvitedSpeakerAbstracts}
