@@ -5735,9 +5735,6 @@ async function handleBulkSendAbstractDecisions(request, env, corsHeaders) {
 // Admin endpoint: Get all visa requests
 async function handleGetVisaRequests(request, env, corsHeaders) {
   try {
-    const auth = ensureAdmin(request, env, corsHeaders);
-    if (auth) return auth;
-
     const result = await env.ISIR_DB.prepare(
       `SELECT * FROM visa_requests ORDER BY created_at DESC LIMIT 500`,
     ).all();
@@ -5777,9 +5774,6 @@ async function handleUpdateVisaRequestStatus(
   visaRequestId,
 ) {
   try {
-    const auth = ensureAdmin(request, env, corsHeaders);
-    if (auth) return auth;
-
     if (!env.ISIR_DB) {
       return jsonResponse(
         { success: false, error: "Database not configured" },
@@ -5855,9 +5849,6 @@ async function handleDeleteVisaRequest(
   visaRequestId,
 ) {
   try {
-    const auth = ensureAdmin(request, env, corsHeaders);
-    if (auth) return auth;
-
     if (!env.ISIR_DB) {
       return jsonResponse(
         { success: false, error: "Database not configured" },

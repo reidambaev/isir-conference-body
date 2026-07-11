@@ -1144,20 +1144,28 @@ export default function AdminTab() {
   };
 
   // Get unique categories from abstracts
-  const abstractCategories = useMemo(() => {
-    const cats = new Set(abstracts.map((a) => a.category).filter(Boolean));
-    return Array.from(cats).sort();
+  const generalAbstracts = useMemo(() => {
+    return abstracts.filter((a) => Number(a.is_invited_speaker || 0) !== 1);
   }, [abstracts]);
+
+  const abstractCategories = useMemo(() => {
+    const cats = new Set(
+      generalAbstracts.map((a) => a.category).filter(Boolean),
+    );
+    return Array.from(cats).sort();
+  }, [generalAbstracts]);
 
   // Get unique statuses from abstracts
   const abstractStatuses = useMemo(() => {
-    const stats = new Set(abstracts.map((a) => a.status).filter(Boolean));
+    const stats = new Set(
+      generalAbstracts.map((a) => a.status).filter(Boolean),
+    );
     return Array.from(stats).sort();
-  }, [abstracts]);
+  }, [generalAbstracts]);
 
-  // Filtered and sorted abstracts
+  // Filtered and sorted abstracts (general submissions only — no invited speakers)
   const filteredAbstracts = useMemo(() => {
-    let result = [...abstracts];
+    let result = [...generalAbstracts];
 
     // Search filter
     if (abstractSearch.trim()) {
@@ -1206,7 +1214,7 @@ export default function AdminTab() {
 
     return result;
   }, [
-    abstracts,
+    generalAbstracts,
     abstractSearch,
     abstractCategoryFilter,
     abstractStatusFilter,
@@ -1239,13 +1247,13 @@ export default function AdminTab() {
     return result;
   }, [abstracts, invitedAbstractSearch]);
 
-  // Abstract statistics
+  // Abstract statistics (general submissions only)
   const abstractStats = useMemo(() => {
     const byCategory = {};
     const byStatus = {};
     const byPreference = { oral: 0, poster: 0, either: 0 };
 
-    abstracts.forEach((a) => {
+    generalAbstracts.forEach((a) => {
       byCategory[a.category] = (byCategory[a.category] || 0) + 1;
       byStatus[a.status] = (byStatus[a.status] || 0) + 1;
       if (a.presentation_preference) {
@@ -1254,13 +1262,18 @@ export default function AdminTab() {
       }
     });
 
-    return { byCategory, byStatus, byPreference, total: abstracts.length };
-  }, [abstracts]);
+    return {
+      byCategory,
+      byStatus,
+      byPreference,
+      total: generalAbstracts.length,
+    };
+  }, [generalAbstracts]);
 
-  // Pending review abstracts (submitted status only)
+  // Pending review abstracts (submitted status only, general submissions)
   const pendingReviewAbstracts = useMemo(() => {
-    return abstracts.filter((a) => a.status === "submitted");
-  }, [abstracts]);
+    return generalAbstracts.filter((a) => a.status === "submitted");
+  }, [generalAbstracts]);
 
   // Current abstract being reviewed
   const currentReviewAbstract = pendingReviewAbstracts[reviewIndex] || null;
@@ -1356,13 +1369,13 @@ export default function AdminTab() {
   };
 
   const decidedAbstractsNeedingEmail = useMemo(() => {
-    return abstracts.filter((a) => {
+    return generalAbstracts.filter((a) => {
       const s = String(a.status || "").toLowerCase();
       return (
         (s === "accepted" || s === "rejected") && !a.decision_email_sent_at
       );
     });
-  }, [abstracts]);
+  }, [generalAbstracts]);
 
   // Manually notify author of accept/reject (not automatic on status change).
   const sendAbstractDecision = async (abstractId) => {
@@ -1429,7 +1442,7 @@ export default function AdminTab() {
       alert("Admin access token is missing.");
       return;
     }
-    const decided = abstracts.filter((a) => {
+    const decided = generalAbstracts.filter((a) => {
       const s = String(a.status || "").toLowerCase();
       return s === "accepted" || s === "rejected";
     });
@@ -1471,7 +1484,10 @@ export default function AdminTab() {
           "Content-Type": "application/json",
           "X-Admin-Token": adminToken,
         },
-        body: JSON.stringify({ onlyMissing }),
+        body: JSON.stringify({
+          onlyMissing,
+          abstractIds: decided.map((a) => a.id),
+        }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.success) {
@@ -1522,10 +1538,10 @@ export default function AdminTab() {
       alert("Admin access token is missing.");
       return;
     }
-    const missingCount = abstracts.filter(
+    const missingCount = generalAbstracts.filter(
       (a) => !a.confirmation_sent_at,
     ).length;
-    const targetCount = onlyMissing ? missingCount : abstracts.length;
+    const targetCount = onlyMissing ? missingCount : generalAbstracts.length;
 
     if (targetCount === 0) {
       alert(
@@ -1539,7 +1555,7 @@ export default function AdminTab() {
     const verb = onlyMissing ? "send" : "resend";
     const noun = onlyMissing
       ? `the ${missingCount} abstract${missingCount === 1 ? "" : "s"} missing a confirmation`
-      : `all ${abstracts.length} abstract${abstracts.length === 1 ? "" : "s"}`;
+      : `all ${generalAbstracts.length} abstract${generalAbstracts.length === 1 ? "" : "s"}`;
     if (
       !window.confirm(
         `About to ${verb} confirmation emails to ${noun}. Continue?`,
@@ -1557,7 +1573,10 @@ export default function AdminTab() {
           "Content-Type": "application/json",
           "X-Admin-Token": adminToken,
         },
-        body: JSON.stringify({ onlyMissing }),
+        body: JSON.stringify({
+          onlyMissing,
+          abstractIds: generalAbstracts.map((a) => a.id),
+        }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.success) {
@@ -1822,7 +1841,13 @@ export default function AdminTab() {
           <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
             <span className="text-slate-300 text-sm">Abstracts</span>
             <span className="text-white font-bold ml-2">
-              {abstracts.length}
+              {generalAbstracts.length}
+            </span>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
+            <span className="text-slate-300 text-sm">Invited abstracts</span>
+            <span className="text-white font-bold ml-2">
+              {abstracts.length - generalAbstracts.length}
             </span>
           </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
@@ -2004,7 +2029,16 @@ export default function AdminTab() {
                 Abstract Submissions
               </h2>
               <p className="text-gray-500 text-sm mt-1 max-w-2xl">
-                Browse full text, keywords, and author details; update
+                General abstract submissions only (invited speaker talks are
+                under{" "}
+                <button
+                  type="button"
+                  onClick={() => setActiveSection("invitedSpeakerAbstracts")}
+                  className="text-orange-700 font-semibold hover:underline"
+                >
+                  Invited Speakers Abstracts
+                </button>
+                ). Browse full text, keywords, and author details; update
                 acceptance status; export a list. For Gusdon reviewer scores,
                 category averages, notes, and COI details, open{" "}
                 <button
@@ -2082,7 +2116,8 @@ export default function AdminTab() {
                 {bulkSendingConfirmations
                   ? "Sending…"
                   : `Send missing confirmations (${
-                      abstracts.filter((a) => !a.confirmation_sent_at).length
+                      generalAbstracts.filter((a) => !a.confirmation_sent_at)
+                        .length
                     })`}
               </button>
               <button
@@ -2435,7 +2470,7 @@ export default function AdminTab() {
                 </span>{" "}
                 of{" "}
                 <span className="font-bold text-gray-900">
-                  {abstracts.length}
+                  {generalAbstracts.length}
                 </span>{" "}
                 abstracts
               </div>
@@ -2537,13 +2572,20 @@ export default function AdminTab() {
                       <div
                         className="bg-white h-full transition-all duration-300"
                         style={{
-                          width: `${((abstracts.length - pendingReviewAbstracts.length) / abstracts.length) * 100}%`,
+                          width: `${
+                            generalAbstracts.length > 0
+                              ? ((generalAbstracts.length -
+                                  pendingReviewAbstracts.length) /
+                                  generalAbstracts.length) *
+                                100
+                              : 0
+                          }%`,
                         }}
                       />
                     </div>
                     <p className="text-blue-100 text-sm mt-2">
-                      {abstracts.length - pendingReviewAbstracts.length} of{" "}
-                      {abstracts.length} abstracts reviewed
+                      {generalAbstracts.length - pendingReviewAbstracts.length}{" "}
+                      of {generalAbstracts.length} abstracts reviewed
                     </p>
                   </div>
                 )}

@@ -14,7 +14,6 @@ function formatDate(timestamp) {
 }
 
 export default function VisaAdminTab() {
-  const [adminToken, setAdminToken] = useState("");
   const [visaRequests, setVisaRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -23,55 +22,14 @@ export default function VisaAdminTab() {
   const [actionId, setActionId] = useState(null);
 
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const urlAdminToken = params.get("admin");
-      let token =
-        (urlAdminToken && String(urlAdminToken).trim()) ||
-        (typeof window !== "undefined"
-          ? String(localStorage.getItem("isir_admin_token") || "").trim()
-          : "");
-
-      if (!token) {
-        setLoading(false);
-        setError(
-          "Admin access token is required. Open this page with ?admin=YOUR_TOKEN in the URL.",
-        );
-        return;
-      }
-
-      try {
-        localStorage.setItem("isir_admin_token", token);
-      } catch {
-        // ignore
-      }
-
-      if (!urlAdminToken) {
-        try {
-          const nextParams = new URLSearchParams(window.location.search);
-          nextParams.set("admin", token);
-          const nextUrl = `${window.location.pathname}?${nextParams.toString()}${window.location.hash || ""}`;
-          window.history.replaceState({}, "", nextUrl);
-        } catch {
-          // ignore
-        }
-      }
-
-      setAdminToken(token);
-      fetchVisaRequests(token);
-    } catch {
-      setLoading(false);
-      setError("Failed to read admin access token from URL.");
-    }
+    fetchVisaRequests();
   }, []);
 
-  const fetchVisaRequests = async (token) => {
+  const fetchVisaRequests = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/visa-requests", {
-        headers: { "X-Admin-Token": token },
-      });
+      const res = await fetch("/api/admin/visa-requests");
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
         throw new Error(
@@ -117,7 +75,7 @@ export default function VisaAdminTab() {
   }, [visaRequests]);
 
   const updateStatus = async (id, status) => {
-    if (!adminToken?.trim() || !id) return;
+    if (!id) return;
     setActionId(id);
     setError(null);
     try {
@@ -125,10 +83,7 @@ export default function VisaAdminTab() {
         `/api/admin/visa-requests/${encodeURIComponent(id)}/status`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Admin-Token": adminToken,
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status }),
         },
       );
@@ -157,7 +112,7 @@ export default function VisaAdminTab() {
   };
 
   const deleteRequest = async (id, name) => {
-    if (!adminToken?.trim() || !id) return;
+    if (!id) return;
     const ok = window.confirm(
       `Delete visa request for ${name || "this person"}? This cannot be undone.`,
     );
@@ -168,10 +123,7 @@ export default function VisaAdminTab() {
     try {
       const res = await fetch(
         `/api/admin/visa-requests/${encodeURIComponent(id)}/delete`,
-        {
-          method: "POST",
-          headers: { "X-Admin-Token": adminToken },
-        },
+        { method: "POST" },
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
@@ -199,15 +151,13 @@ export default function VisaAdminTab() {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <div className="text-red-600 mb-4">Error: {error}</div>
-        {adminToken ? (
-          <button
-            type="button"
-            onClick={() => fetchVisaRequests(adminToken)}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Retry
-          </button>
-        ) : null}
+        <button
+          type="button"
+          onClick={fetchVisaRequests}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -296,7 +246,7 @@ export default function VisaAdminTab() {
         </div>
         <button
           type="button"
-          onClick={() => fetchVisaRequests(adminToken)}
+          onClick={fetchVisaRequests}
           className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 text-sm font-medium"
         >
           Refresh
