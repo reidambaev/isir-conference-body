@@ -3032,7 +3032,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
         JSON.stringify({
           success: false,
           error:
-            "Please submit the form with an abstract acceptance or congress registration proof file (PDF, JPG, or PNG).",
+            "Please submit the visa request form (multipart). Include proof unless you are an invited speaker/chair.",
         }),
         { status: 400, headers: corsHeaders },
       );
@@ -3047,7 +3047,15 @@ async function handleVisaRequest(request, env, corsHeaders) {
     const nationalityValue = String(
       formData.get("nationality") || formData.get("country") || "",
     ).trim();
+    const isInvitedRaw = String(formData.get("isInvited") || "")
+      .trim()
+      .toLowerCase();
+    const isInvited =
+      isInvitedRaw === "true" ||
+      isInvitedRaw === "1" ||
+      isInvitedRaw === "yes";
     const file = formData.get("registrationProof") || formData.get("file");
+    const hasFile = Boolean(file && typeof file !== "string" && file.size);
 
     if (!email || !name || !affiliationValue || !nationalityValue) {
       return new Response(
@@ -3060,7 +3068,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
       );
     }
 
-    if (!file || typeof file === "string" || !file.size) {
+    if (!isInvited && !hasFile) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -3071,73 +3079,79 @@ async function handleVisaRequest(request, env, corsHeaders) {
       );
     }
 
-    if (!env.TRAINEE_LETTERS_BUCKET) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "File storage not configured. Please contact support.",
-        }),
-        { status: 500, headers: corsHeaders },
-      );
-    }
-
-    const allowedTypes = [
-      "application/pdf",
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-    ];
-    const fileType = String(file.type || "").toLowerCase();
-    if (!allowedTypes.includes(fileType)) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Invalid file type. Please upload a PDF, JPG, or PNG file.",
-        }),
-        { status: 400, headers: corsHeaders },
-      );
-    }
-
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "File size exceeds 5MB limit.",
-        }),
-        { status: 400, headers: corsHeaders },
-      );
-    }
-
     const visaRequestId = crypto.randomUUID();
     const timestamp = Date.now();
-    const randomId = Math.random().toString(36).substr(2, 9).toUpperCase();
-    const sanitizedEmail = email.replace(/[^a-zA-Z0-9]/g, "_");
-    const mimeToExt = {
-      "application/pdf": "pdf",
-      "image/jpeg": "jpg",
-      "image/jpg": "jpg",
-      "image/png": "png",
-    };
-    const extension = mimeToExt[fileType] || "file";
-    const originalFilename = String(file.name || `registration-proof.${extension}`)
-      .trim()
-      .slice(0, 200);
-    const r2Key = `visa-registration-proofs/${sanitizedEmail}_${timestamp}_${randomId}.${extension}`;
+    let r2Key = null;
+    let originalFilename = null;
+    const notes = isInvited ? "Invited speaker/chair" : null;
 
-    const fileBuffer = await file.arrayBuffer();
-    await env.TRAINEE_LETTERS_BUCKET.put(r2Key, fileBuffer, {
-      httpMetadata: {
-        contentType: fileType,
-      },
-      customMetadata: {
-        email,
-        visaRequestId,
-        uploadedAt: new Date().toISOString(),
-        originalName: originalFilename,
-      },
-    });
-    uploadedR2Key = r2Key;
+    if (hasFile) {
+      if (!env.TRAINEE_LETTERS_BUCKET) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "File storage not configured. Please contact support.",
+          }),
+          { status: 500, headers: corsHeaders },
+        );
+      }
+
+      const allowedTypes = [
+        "application/pdf",
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+      ];
+      const fileType = String(file.type || "").toLowerCase();
+      if (!allowedTypes.includes(fileType)) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Invalid file type. Please upload a PDF, JPG, or PNG file.",
+          }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSize) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "File size exceeds 5MB limit.",
+          }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+
+      const randomId = Math.random().toString(36).substr(2, 9).toUpperCase();
+      const sanitizedEmail = email.replace(/[^a-zA-Z0-9]/g, "_");
+      const mimeToExt = {
+        "application/pdf": "pdf",
+        "image/jpeg": "jpg",
+        "image/jpg": "jpg",
+        "image/png": "png",
+      };
+      const extension = mimeToExt[fileType] || "file";
+      originalFilename = String(file.name || `registration-proof.${extension}`)
+        .trim()
+        .slice(0, 200);
+      r2Key = `visa-registration-proofs/${sanitizedEmail}_${timestamp}_${randomId}.${extension}`;
+
+      const fileBuffer = await file.arrayBuffer();
+      await env.TRAINEE_LETTERS_BUCKET.put(r2Key, fileBuffer, {
+        httpMetadata: {
+          contentType: fileType,
+        },
+        customMetadata: {
+          email,
+          visaRequestId,
+          uploadedAt: new Date().toISOString(),
+          originalName: originalFilename,
+        },
+      });
+      uploadedR2Key = r2Key;
+    }
 
     try {
       await env.ISIR_DB.prepare(
@@ -3145,7 +3159,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
           id, email, name, affiliation, country, notes, status,
           registration_proof_r2_key, registration_proof_filename,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
       )
         .bind(
           visaRequestId,
@@ -3153,6 +3167,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
           name,
           affiliationValue,
           nationalityValue,
+          notes,
           r2Key,
           originalFilename,
           timestamp,
@@ -3160,13 +3175,15 @@ async function handleVisaRequest(request, env, corsHeaders) {
         )
         .run();
     } catch (dbError) {
-      await safeDeleteR2Object(env, r2Key);
-      uploadedR2Key = null;
+      if (r2Key) {
+        await safeDeleteR2Object(env, r2Key);
+        uploadedR2Key = null;
+      }
       throw dbError;
     }
 
     const requestOrigin = new URL(request.url).origin;
-    const registrationProofUrl = `${requestOrigin}/${r2Key}`;
+    const registrationProofUrl = r2Key ? `${requestOrigin}/${r2Key}` : null;
 
     if (env.RESEND_API_KEY && env.CONFIRMATION_FROM_EMAIL) {
       const submittedAt = formatVisaSubmittedAt(timestamp);
@@ -3178,7 +3195,16 @@ async function handleVisaRequest(request, env, corsHeaders) {
         nationality: nationalityValue,
         timestamp,
         registrationProofUrl,
+        isInvited,
       });
+
+      const proofRow = isInvited
+        ? `<tr><td style="padding: 4px 0;">Eligibility</td><td style="padding: 4px 0; text-align: right;">Invited speaker/chair</td></tr>`
+        : `<tr><td style="padding: 4px 0;">Abstract / registration proof</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(originalFilename || "—")}</td></tr>`;
+
+      const thankYouLine = isInvited
+        ? "Thank you for submitting your visa invitation letter request as an invited speaker/chair. Our coordinator will prepare your letter using the standard template and send it to this email address."
+        : "Thank you for submitting your visa invitation letter request and abstract/registration proof. Our coordinator will prepare your letter using the standard template and send it to this email address.";
 
       const requesterHtml = `
 <!DOCTYPE html>
@@ -3190,7 +3216,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
     <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Visa invitation letter request received</p>
   </div>
   <p>Dear ${escapeHtml(name)},</p>
-  <p>Thank you for submitting your visa invitation letter request and abstract/registration proof. Our coordinator will prepare your letter using the standard template and send it to this email address.</p>
+  <p>${thankYouLine}</p>
   <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
     <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Your submission</p>
     <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
@@ -3199,7 +3225,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
       <tr><td style="padding: 4px 0;">Affiliation</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(affiliationValue)}</td></tr>
       <tr><td style="padding: 4px 0;">Nationality</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(nationalityValue)}</td></tr>
       <tr><td style="padding: 4px 0;">Email</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(email)}</td></tr>
-      <tr><td style="padding: 4px 0;">Abstract / registration proof</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(originalFilename)}</td></tr>
+      ${proofRow}
       <tr><td style="padding: 4px 0;">Submitted</td><td style="padding: 4px 0; text-align: right;">${submittedAt}</td></tr>
     </table>
   </div>
@@ -6083,10 +6109,10 @@ async function handleResendVisaReviewerEmails(request, env, corsHeaders) {
 
     const query = visaRequestId
       ? env.ISIR_DB.prepare(
-          `SELECT id, email, name, affiliation, country, registration_proof_r2_key, created_at FROM visa_requests WHERE id = ? LIMIT 1`,
+          `SELECT id, email, name, affiliation, country, notes, registration_proof_r2_key, created_at FROM visa_requests WHERE id = ? LIMIT 1`,
         ).bind(visaRequestId)
       : env.ISIR_DB.prepare(
-          `SELECT id, email, name, affiliation, country, registration_proof_r2_key, created_at FROM visa_requests ORDER BY created_at DESC LIMIT ?`,
+          `SELECT id, email, name, affiliation, country, notes, registration_proof_r2_key, created_at FROM visa_requests ORDER BY created_at DESC LIMIT ?`,
         ).bind(limit);
 
     const rowsResult = visaRequestId ? await query.first() : await query.all();
@@ -6118,6 +6144,9 @@ async function handleResendVisaReviewerEmails(request, env, corsHeaders) {
       const registrationProofUrl = row.registration_proof_r2_key
         ? `${requestOrigin}/${row.registration_proof_r2_key}`
         : null;
+      const isInvited = /invited speaker\/chair/i.test(
+        String(row.notes || ""),
+      );
       const emailResult = await sendVisaReviewerNotificationEmail(env, {
         visaRequestId: row.id,
         name: row.name,
@@ -6126,6 +6155,7 @@ async function handleResendVisaReviewerEmails(request, env, corsHeaders) {
         nationality: row.country || "",
         timestamp: Number(row.created_at) || Date.now(),
         registrationProofUrl,
+        isInvited,
       });
       if (emailResult.success) sent += 1;
       else failed += 1;
