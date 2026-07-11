@@ -382,6 +382,14 @@ async function handleApiRequest(request, env, url) {
     );
   }
 
+  // POST /api/admin/abstracts/accept-invited-speakers - Accept all invited speaker abstracts
+  if (
+    url.pathname === "/api/admin/abstracts/accept-invited-speakers" &&
+    request.method === "POST"
+  ) {
+    return handleAcceptAllInvitedSpeakerAbstracts(request, env, corsHeaders);
+  }
+
   // GET /api/admin/visa-requests
   if (url.pathname === "/api/admin/visa-requests" && request.method === "GET") {
     return handleGetVisaRequests(request, env, corsHeaders);
@@ -1197,9 +1205,14 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
       );
     }
 
-    // Ensure exactly 5 assigned abstracts (persisted)
+    // Ensure exactly 5 assigned abstracts (persisted) — general submissions only
     const existing = await env.ISIR_DB.prepare(
-      `SELECT abstract_id FROM reviewer_assignments WHERE reviewer_email = ?`,
+      `SELECT ra.abstract_id
+       FROM reviewer_assignments ra
+       JOIN abstractions a ON a.id = ra.abstract_id
+       WHERE ra.reviewer_email = ?
+         AND COALESCE(a.is_invited_speaker, 0) != 1
+       ORDER BY ra.assigned_at ASC`,
     )
       .bind(reviewer.email)
       .all();
@@ -1207,8 +1220,13 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
     let assignedIds = (existing.results || []).map((r) => r.abstract_id);
 
     if (assignedIds.length < 5) {
+      // Only assign general (non–invited speaker) abstracts to reviewers
       const allAbstracts = await env.ISIR_DB.prepare(
-        `SELECT id FROM abstractions WHERE status = 'submitted' ORDER BY submission_date DESC LIMIT 1000`,
+        `SELECT id FROM abstractions
+         WHERE status = 'submitted'
+           AND COALESCE(is_invited_speaker, 0) != 1
+         ORDER BY submission_date DESC
+         LIMIT 1000`,
       ).all();
 
       const pool = (allAbstracts.results || [])
@@ -1230,14 +1248,9 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
       }
     }
 
-    // If there are more than 5 (legacy/manual), only return first 5 by assigned time
+    // Cap at 5 (legacy/manual extras)
     if (assignedIds.length > 5) {
-      const five = await env.ISIR_DB.prepare(
-        `SELECT abstract_id FROM reviewer_assignments WHERE reviewer_email = ? ORDER BY assigned_at ASC LIMIT 5`,
-      )
-        .bind(reviewer.email)
-        .all();
-      assignedIds = (five.results || []).map((r) => r.abstract_id);
+      assignedIds = assignedIds.slice(0, 5);
     }
 
     if (assignedIds.length === 0) {
@@ -5619,6 +5632,65 @@ async function handleUpdateAbstractInvitedSpeaker(
     );
   } catch (error) {
     console.error("Update abstract invited speaker error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+// Admin endpoint: Accept all invited speaker abstracts that are not already accepted
+async function handleAcceptAllInvitedSpeakerAbstracts(
+  request,
+  env,
+  corsHeaders,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    const pending = await env.ISIR_DB.prepare(
+      `SELECT id FROM abstractions
+       WHERE is_invited_speaker = 1
+         AND LOWER(COALESCE(status, '')) != 'accepted'`,
+    ).all();
+
+    const ids = (pending.results || []).map((row) => row.id);
+    if (ids.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          updated: 0,
+          message: "All invited speaker abstracts are already accepted",
+        }),
+        { status: 200, headers: corsHeaders },
+      );
+    }
+
+    const reviewedAt = Date.now();
+    const placeholders = ids.map(() => "?").join(",");
+    await env.ISIR_DB.prepare(
+      `UPDATE abstractions
+       SET status = 'accepted', rejection_reason = NULL, reviewed_at = ?
+       WHERE id IN (${placeholders})`,
+    )
+      .bind(reviewedAt, ...ids)
+      .run();
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        updated: ids.length,
+        ids,
+        message: `Accepted ${ids.length} invited speaker abstract${ids.length === 1 ? "" : "s"}`,
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Accept all invited speaker abstracts error:", error);
     return new Response(
       JSON.stringify({
         success: false,

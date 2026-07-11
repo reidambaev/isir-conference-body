@@ -116,6 +116,8 @@ export default function AdminTab() {
   const [reviewUpdating, setReviewUpdating] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectionModal, setShowRejectionModal] = useState(false);
+  /** Which queue review mode uses: general submissions or invited speakers (never mixed). */
+  const [reviewPool, setReviewPool] = useState("general"); // "general" | "invited"
 
   // Confirmation-email sending state (retroactive single + bulk)
   const [sendingConfirmationId, setSendingConfirmationId] = useState(null);
@@ -131,6 +133,8 @@ export default function AdminTab() {
   const [decisionSendSummary, setDecisionSendSummary] = useState(null);
   const [updatingInvitedSpeakerId, setUpdatingInvitedSpeakerId] =
     useState(null);
+  const [acceptingAllInvitedSpeakers, setAcceptingAllInvitedSpeakers] =
+    useState(false);
 
   // Reviewer overview state
   const [reviewerOverview, setReviewerOverview] = useState(null);
@@ -1311,13 +1315,43 @@ export default function AdminTab() {
     };
   }, [generalAbstracts]);
 
-  // Pending review abstracts (submitted status only, general submissions)
-  const pendingReviewAbstracts = useMemo(() => {
+  // Pending review abstracts — one pool at a time (general XOR invited)
+  const allInvitedAbstracts = useMemo(() => {
+    return abstracts.filter((a) => Number(a.is_invited_speaker || 0) === 1);
+  }, [abstracts]);
+
+  const pendingGeneralReviewAbstracts = useMemo(() => {
     return generalAbstracts.filter((a) => a.status === "submitted");
   }, [generalAbstracts]);
 
+  const pendingInvitedReviewAbstracts = useMemo(() => {
+    return allInvitedAbstracts.filter((a) => a.status === "submitted");
+  }, [allInvitedAbstracts]);
+
+  const pendingReviewAbstracts = useMemo(() => {
+    return reviewPool === "invited"
+      ? pendingInvitedReviewAbstracts
+      : pendingGeneralReviewAbstracts;
+  }, [
+    reviewPool,
+    pendingInvitedReviewAbstracts,
+    pendingGeneralReviewAbstracts,
+  ]);
+
+  const reviewPoolAbstracts =
+    reviewPool === "invited" ? allInvitedAbstracts : generalAbstracts;
+
   // Current abstract being reviewed
   const currentReviewAbstract = pendingReviewAbstracts[reviewIndex] || null;
+
+  const currentReviewScoreData = useMemo(() => {
+    if (!currentReviewAbstract?.id) return null;
+    return (
+      (reviewerAbstractScores || []).find(
+        (item) => item.id === currentReviewAbstract.id,
+      ) || null
+    );
+  }, [currentReviewAbstract, reviewerAbstractScores]);
 
   // Update abstract status
   const updateAbstractStatus = async (abstractId, status, reason = null) => {
@@ -1412,6 +1446,73 @@ export default function AdminTab() {
       alert(err.message || "Failed to update invited speaker status");
     } finally {
       setUpdatingInvitedSpeakerId(null);
+    }
+  };
+
+  const acceptAllInvitedSpeakerAbstracts = async () => {
+    if (!adminToken) {
+      alert("Admin access token is missing.");
+      return;
+    }
+
+    const pending = abstracts.filter(
+      (a) =>
+        Number(a.is_invited_speaker || 0) === 1 &&
+        String(a.status || "").toLowerCase() !== "accepted",
+    );
+
+    if (pending.length === 0) {
+      alert("All invited speaker abstracts are already accepted.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Accept all ${pending.length} invited speaker abstract${
+          pending.length === 1 ? "" : "s"
+        } that are not already accepted? This does not send decision emails.`,
+      )
+    ) {
+      return;
+    }
+
+    setAcceptingAllInvitedSpeakers(true);
+    try {
+      const response = await fetch(
+        "/api/admin/abstracts/accept-invited-speakers",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Token": adminToken,
+          },
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(
+          result?.error || "Failed to accept invited speaker abstracts",
+        );
+      }
+
+      const updatedIds = new Set(result.ids || pending.map((a) => a.id));
+      setAbstracts((prev) =>
+        prev.map((a) =>
+          updatedIds.has(a.id)
+            ? { ...a, status: "accepted", rejection_reason: null }
+            : a,
+        ),
+      );
+
+      alert(
+        result.message ||
+          `Accepted ${result.updated ?? pending.length} invited speaker abstract(s).`,
+      );
+    } catch (err) {
+      console.error("Error accepting invited speaker abstracts:", err);
+      alert(err.message || "Failed to accept invited speaker abstracts");
+    } finally {
+      setAcceptingAllInvitedSpeakers(false);
     }
   };
 
@@ -1747,10 +1848,12 @@ export default function AdminTab() {
     window.open(qrUrl, "_blank", "noopener,noreferrer");
   };
 
-  // Start review mode
-  const startReviewMode = () => {
+  // Start review mode for one pool only (general or invited)
+  const startReviewMode = (pool = "general") => {
+    setReviewPool(pool === "invited" ? "invited" : "general");
     setReviewIndex(0);
     setAbstractViewMode("review");
+    setActiveSection("abstracts");
   };
 
   // Keyboard navigation for review mode
@@ -2160,9 +2263,9 @@ export default function AdminTab() {
                 Reviewer scores ({abstractReviewRollupStats.withReviews}/
                 {abstractReviewRollupStats.total})
               </button>
-              {pendingReviewAbstracts.length > 0 && (
+              {pendingGeneralReviewAbstracts.length > 0 && (
                 <button
-                  onClick={startReviewMode}
+                  onClick={() => startReviewMode("general")}
                   className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2 font-medium"
                 >
                   <svg
@@ -2178,7 +2281,7 @@ export default function AdminTab() {
                       d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
                     />
                   </svg>
-                  Review ({pendingReviewAbstracts.length})
+                  Review general ({pendingGeneralReviewAbstracts.length})
                 </button>
               )}
               <button
@@ -2623,35 +2726,93 @@ export default function AdminTab() {
           {abstractViewMode === "review" ? (
             <div className="space-y-6">
               {/* Review Mode Header */}
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 text-white">
-                <div className="flex items-center justify-between">
+              <div
+                className={`rounded-xl p-6 text-white ${
+                  reviewPool === "invited"
+                    ? "bg-gradient-to-r from-orange-600 to-amber-600"
+                    : "bg-gradient-to-r from-blue-600 to-indigo-600"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-4 flex-wrap">
                   <div>
-                    <h3 className="text-xl font-bold">Review Mode</h3>
-                    <p className="text-blue-100 mt-1">
+                    <h3 className="text-xl font-bold">
+                      Review Mode —{" "}
+                      {reviewPool === "invited"
+                        ? "Invited speakers"
+                        : "General submissions"}
+                    </h3>
+                    <p
+                      className={`mt-1 ${
+                        reviewPool === "invited"
+                          ? "text-orange-100"
+                          : "text-blue-100"
+                      }`}
+                    >
                       {pendingReviewAbstracts.length === 0
-                        ? "All abstracts have been reviewed!"
-                        : `${reviewIndex + 1} of ${pendingReviewAbstracts.length} pending abstracts`}
+                        ? `All ${
+                            reviewPool === "invited" ? "invited" : "general"
+                          } abstracts have been reviewed!`
+                        : `${reviewIndex + 1} of ${pendingReviewAbstracts.length} pending ${
+                            reviewPool === "invited" ? "invited" : "general"
+                          } abstracts`}
                     </p>
                   </div>
-                  <button
-                    onClick={() => setAbstractViewMode("cards")}
-                    className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex rounded-lg overflow-hidden border border-white/30 text-sm">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReviewPool("general");
+                          setReviewIndex(0);
+                        }}
+                        className={`px-3 py-2 font-medium transition-colors ${
+                          reviewPool === "general"
+                            ? "bg-white text-blue-700"
+                            : "bg-white/15 hover:bg-white/25 text-white"
+                        }`}
+                      >
+                        General ({pendingGeneralReviewAbstracts.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReviewPool("invited");
+                          setReviewIndex(0);
+                        }}
+                        className={`px-3 py-2 font-medium transition-colors ${
+                          reviewPool === "invited"
+                            ? "bg-white text-orange-700"
+                            : "bg-white/15 hover:bg-white/25 text-white"
+                        }`}
+                      >
+                        Invited ({pendingInvitedReviewAbstracts.length})
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setAbstractViewMode("cards");
+                        if (reviewPool === "invited") {
+                          setActiveSection("invitedSpeakerAbstracts");
+                        }
+                      }}
+                      className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors flex items-center gap-2"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                    Exit Review
-                  </button>
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                      Exit Review
+                    </button>
+                  </div>
                 </div>
                 {pendingReviewAbstracts.length > 0 && (
                   <div className="mt-4">
@@ -2660,19 +2821,28 @@ export default function AdminTab() {
                         className="bg-white h-full transition-all duration-300"
                         style={{
                           width: `${
-                            generalAbstracts.length > 0
-                              ? ((generalAbstracts.length -
+                            reviewPoolAbstracts.length > 0
+                              ? ((reviewPoolAbstracts.length -
                                   pendingReviewAbstracts.length) /
-                                  generalAbstracts.length) *
+                                  reviewPoolAbstracts.length) *
                                 100
                               : 0
                           }%`,
                         }}
                       />
                     </div>
-                    <p className="text-blue-100 text-sm mt-2">
-                      {generalAbstracts.length - pendingReviewAbstracts.length}{" "}
-                      of {generalAbstracts.length} abstracts reviewed
+                    <p
+                      className={`text-sm mt-2 ${
+                        reviewPool === "invited"
+                          ? "text-orange-100"
+                          : "text-blue-100"
+                      }`}
+                    >
+                      {reviewPoolAbstracts.length -
+                        pendingReviewAbstracts.length}{" "}
+                      of {reviewPoolAbstracts.length}{" "}
+                      {reviewPool === "invited" ? "invited" : "general"}{" "}
+                      abstracts reviewed
                     </p>
                   </div>
                 )}
@@ -2711,6 +2881,11 @@ export default function AdminTab() {
                   {/* Abstract Header */}
                   <div className="p-6 border-b border-gray-100">
                     <div className="flex flex-wrap gap-2 mb-4">
+                      {reviewPool === "invited" && (
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 ring-1 ring-orange-200">
+                          Invited speaker
+                        </span>
+                      )}
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
                         {currentReviewAbstract.category}
                       </span>
@@ -2857,6 +3032,141 @@ export default function AdminTab() {
                           ),
                         )}
                       </div>
+                    </div>
+
+                    {/* Reviewer scores */}
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                        Reviewer scores
+                      </h4>
+                      {(() => {
+                        const summary =
+                          currentReviewScoreData?.review_summary || {};
+                        const reviewCount = Number(summary.review_count || 0);
+                        const avgValue = (v) =>
+                          v != null && !Number.isNaN(Number(v))
+                            ? Number(v).toFixed(2)
+                            : "—";
+                        if (reviewCount === 0) {
+                          return (
+                            <p className="text-sm text-gray-500 bg-gray-50 rounded-lg px-4 py-3">
+                              No reviewer scores submitted for this abstract
+                              yet.
+                            </p>
+                          );
+                        }
+                        return (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+                              <div className="bg-indigo-50 rounded-lg border border-indigo-100 p-3">
+                                <p className="text-indigo-600 font-medium">
+                                  Reviews
+                                </p>
+                                <p className="text-lg font-bold text-indigo-900 mt-1">
+                                  {reviewCount}
+                                </p>
+                              </div>
+                              <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
+                                <p className="text-gray-500">Originality</p>
+                                <p className="text-base font-semibold text-gray-900 mt-1">
+                                  {avgValue(summary.avg_originality)}
+                                </p>
+                              </div>
+                              <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
+                                <p className="text-gray-500">Clarity</p>
+                                <p className="text-base font-semibold text-gray-900 mt-1">
+                                  {avgValue(summary.avg_clarity)}
+                                </p>
+                              </div>
+                              <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
+                                <p className="text-gray-500">Study design</p>
+                                <p className="text-base font-semibold text-gray-900 mt-1">
+                                  {avgValue(summary.avg_study_design)}
+                                </p>
+                              </div>
+                              <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
+                                <p className="text-gray-500">Data analysis</p>
+                                <p className="text-base font-semibold text-gray-900 mt-1">
+                                  {avgValue(summary.avg_data_analysis)}
+                                </p>
+                              </div>
+                              <div className="bg-emerald-50 rounded-lg border border-emerald-100 p-3">
+                                <p className="text-emerald-700 font-medium">
+                                  Avg total
+                                </p>
+                                <p className="text-lg font-bold text-emerald-900 mt-1">
+                                  {avgValue(summary.avg_total)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full text-xs bg-white border border-gray-200 rounded-lg overflow-hidden">
+                                <thead className="bg-gray-100 text-gray-600">
+                                  <tr>
+                                    <th className="text-left px-3 py-2">
+                                      Reviewer
+                                    </th>
+                                    <th className="text-left px-3 py-2">
+                                      Scores
+                                    </th>
+                                    <th className="text-left px-3 py-2">
+                                      Notes
+                                    </th>
+                                    <th className="text-left px-3 py-2">
+                                      COI
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(
+                                    currentReviewScoreData?.reviewer_reviews ||
+                                    []
+                                  ).map((rev, idx) => {
+                                    const coiFlags = [];
+                                    if (rev.coi_mentor_pi)
+                                      coiFlags.push("Mentor/PI");
+                                    if (rev.coi_same_lab)
+                                      coiFlags.push("Same lab");
+                                    if (rev.coi_other)
+                                      coiFlags.push("Other COI");
+                                    return (
+                                      <tr
+                                        key={`${currentReviewAbstract.id}-${rev.reviewer_email}-${idx}`}
+                                        className="border-t border-gray-100 align-top"
+                                      >
+                                        <td className="px-3 py-2 text-gray-800">
+                                          {rev.reviewer_email}
+                                        </td>
+                                        <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
+                                          O:{rev.originality ?? "—"} C:
+                                          {rev.clarity ?? "—"} SD:
+                                          {rev.study_design ?? "—"} DA:
+                                          {rev.data_analysis ?? "—"} S:
+                                          {rev.significance ?? "—"}{" "}
+                                          <span className="font-semibold">
+                                            T:{rev.total ?? "—"}
+                                          </span>
+                                        </td>
+                                        <td className="px-3 py-2 text-gray-700 max-w-sm whitespace-pre-wrap">
+                                          {rev.previous_study_notes || "—"}
+                                        </td>
+                                        <td className="px-3 py-2 text-gray-700 max-w-xs whitespace-pre-wrap">
+                                          {coiFlags.length > 0
+                                            ? coiFlags.join(", ")
+                                            : "None"}
+                                          {rev.coi_other_details
+                                            ? `\n${rev.coi_other_details}`
+                                            : ""}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -3013,10 +3323,32 @@ export default function AdminTab() {
                     All Done!
                   </h3>
                   <p className="text-gray-500 mb-6">
-                    All abstracts have been reviewed.
+                    All{" "}
+                    {reviewPool === "invited" ? "invited speaker" : "general"}{" "}
+                    abstracts have been reviewed.
+                    {reviewPool === "general" &&
+                    pendingInvitedReviewAbstracts.length > 0
+                      ? ` ${pendingInvitedReviewAbstracts.length} invited abstract${
+                          pendingInvitedReviewAbstracts.length === 1
+                            ? ""
+                            : "s"
+                        } still pending — switch pools above to review them.`
+                      : reviewPool === "invited" &&
+                          pendingGeneralReviewAbstracts.length > 0
+                        ? ` ${pendingGeneralReviewAbstracts.length} general abstract${
+                            pendingGeneralReviewAbstracts.length === 1
+                              ? ""
+                              : "s"
+                          } still pending — switch pools above to review them.`
+                        : ""}
                   </p>
                   <button
-                    onClick={() => setAbstractViewMode("cards")}
+                    onClick={() => {
+                      setAbstractViewMode("cards");
+                      if (reviewPool === "invited") {
+                        setActiveSection("invitedSpeakerAbstracts");
+                      }
+                    }}
                     className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                   >
                     Back to All Abstracts
@@ -3562,25 +3894,49 @@ export default function AdminTab() {
                 Invited Speakers Abstracts
               </h2>
               <p className="text-gray-500 text-sm mt-1 max-w-2xl">
-                Abstracts marked as invited speaker talks. You can move an
-                abstract back to general submissions from here. Accept/reject
-                and confirmation emails stay under{" "}
-                <button
-                  type="button"
-                  onClick={() => setActiveSection("abstracts")}
-                  className="text-blue-700 font-semibold hover:underline"
-                >
-                  Abstract Submissions
-                </button>
-                .
+                Abstracts marked as invited speaker talks. Use{" "}
+                <span className="font-medium text-gray-700">
+                  Accept all invited speakers
+                </span>{" "}
+                to mark every non-accepted one as accepted (does not send
+                emails). You can also move an abstract back to general
+                submissions from here.
               </p>
             </div>
-            <div className="text-sm text-gray-500">
-              <span className="font-semibold text-gray-800">
-                {invitedSpeakerAbstracts.length}
-              </span>{" "}
-              invited abstract
-              {invitedSpeakerAbstracts.length === 1 ? "" : "s"}
+            <div className="flex flex-wrap items-center gap-3">
+              {pendingInvitedReviewAbstracts.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => startReviewMode("invited")}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  Review invited ({pendingInvitedReviewAbstracts.length})
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={acceptAllInvitedSpeakerAbstracts}
+                disabled={
+                  acceptingAllInvitedSpeakers ||
+                  abstracts.filter(
+                    (a) =>
+                      Number(a.is_invited_speaker || 0) === 1 &&
+                      String(a.status || "").toLowerCase() !== "accepted",
+                  ).length === 0
+                }
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {acceptingAllInvitedSpeakers
+                  ? "Accepting…"
+                  : "Accept all invited speakers"}
+              </button>
+              <div className="text-sm text-gray-500">
+                <span className="font-semibold text-gray-800">
+                  {invitedSpeakerAbstracts.length}
+                </span>{" "}
+                invited abstract
+                {invitedSpeakerAbstracts.length === 1 ? "" : "s"}
+              </div>
             </div>
           </div>
 
