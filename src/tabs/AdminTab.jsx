@@ -1262,7 +1262,7 @@ export default function AdminTab() {
     abstractSortBy,
   ]);
 
-  // Invited speaker abstracts (view-only tab)
+  // Invited speaker abstracts
   const invitedSpeakerAbstracts = useMemo(() => {
     let result = abstracts.filter(
       (a) => Number(a.is_invited_speaker || 0) === 1,
