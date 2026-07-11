@@ -418,7 +418,7 @@ async function handleApiRequest(request, env, url) {
     return handleSubmitReviewerReview(request, env, corsHeaders);
   }
 
-  // POST /api/admin/reviewers/create (generate password + create/update reviewer)
+  // POST /api/admin/reviewers/create (create/activate reviewer by email)
   if (
     url.pathname === "/api/admin/reviewers/create" &&
     request.method === "POST"
@@ -616,25 +616,6 @@ function getBearerToken(request) {
   const auth = request.headers.get("Authorization") || "";
   const m = auth.match(/^Bearer\s+(.+)$/i);
   return m ? m[1].trim() : null;
-}
-
-async function sha256Hex(input) {
-  const enc = new TextEncoder();
-  const digest = await crypto.subtle.digest("SHA-256", enc.encode(input));
-  const bytes = new Uint8Array(digest);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function randomPassword(length = 12) {
-  const alphabet =
-    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  let out = "";
-  for (let i = 0; i < length; i++) out += alphabet[bytes[i] % alphabet.length];
-  return out;
 }
 
 function jsonResponse(obj, status, corsHeaders) {
@@ -1066,7 +1047,7 @@ async function handleAdminCreateReviewer(request, env, corsHeaders) {
     const auth = ensureAdmin(request, env, corsHeaders);
     if (auth) return auth;
     const data = await request.json();
-    const email = (data?.email || "").trim().toLowerCase();
+    const email = normalizeEmail(data?.email || "");
     if (!email) {
       return jsonResponse(
         { success: false, error: "Email is required" },
@@ -1076,14 +1057,18 @@ async function handleAdminCreateReviewer(request, env, corsHeaders) {
     }
     const now = Date.now();
 
-    // If reviewer already has a password, do NOT overwrite it.
     const existing = await env.ISIR_DB.prepare(
-      `SELECT email, password_hash FROM reviewers WHERE email = ?`,
+      `SELECT email, active FROM reviewers WHERE email = ?`,
     )
       .bind(email)
       .first();
 
-    if (existing?.email && existing?.password_hash) {
+    if (existing?.email) {
+      await env.ISIR_DB.prepare(
+        `UPDATE reviewers SET active = 1, updated_at = ? WHERE email = ?`,
+      )
+        .bind(now, email)
+        .run();
       return jsonResponse(
         { success: true, email, existing: true },
         200,
@@ -1091,29 +1076,15 @@ async function handleAdminCreateReviewer(request, env, corsHeaders) {
       );
     }
 
-    // Create or set password (only if missing)
-    const password = randomPassword(14);
-    const password_hash = await sha256Hex(password);
-
-    if (existing?.email) {
-      await env.ISIR_DB.prepare(
-        `UPDATE reviewers
-         SET password_hash = ?, active = 1, updated_at = ?
-         WHERE email = ?`,
-      )
-        .bind(password_hash, now, email)
-        .run();
-    } else {
-      await env.ISIR_DB.prepare(
-        `INSERT INTO reviewers (email, password_hash, active, created_at, updated_at)
-         VALUES (?, ?, 1, ?, ?)`,
-      )
-        .bind(email, password_hash, now, now)
-        .run();
-    }
+    await env.ISIR_DB.prepare(
+      `INSERT INTO reviewers (email, password_hash, active, created_at, updated_at)
+       VALUES (?, '', 1, ?, ?)`,
+    )
+      .bind(email, now, now)
+      .run();
 
     return jsonResponse(
-      { success: true, email, password, existing: false },
+      { success: true, email, existing: false },
       200,
       corsHeaders,
     );
@@ -1130,34 +1101,24 @@ async function handleAdminCreateReviewer(request, env, corsHeaders) {
 async function handleReviewerLogin(request, env, corsHeaders) {
   try {
     const data = await request.json();
-    const email = (data?.email || "").trim().toLowerCase();
-    const password = String(data?.password || "");
-    if (!email || !password) {
+    const email = normalizeEmail(data?.email || "");
+    if (!email) {
       return jsonResponse(
-        { success: false, error: "Email and password are required" },
+        { success: false, error: "Email is required" },
         400,
         corsHeaders,
       );
     }
 
     const row = await env.ISIR_DB.prepare(
-      `SELECT email, password_hash, active FROM reviewers WHERE email = ?`,
+      `SELECT email, active FROM reviewers WHERE email = ?`,
     )
       .bind(email)
       .first();
 
-    if (!row || !row.password_hash || Number(row.active) !== 1) {
+    if (!row?.email || Number(row.active) !== 1) {
       return jsonResponse(
-        { success: false, error: "Invalid credentials" },
-        401,
-        corsHeaders,
-      );
-    }
-
-    const hashed = await sha256Hex(password);
-    if (hashed !== row.password_hash) {
-      return jsonResponse(
-        { success: false, error: "Invalid credentials" },
+        { success: false, error: "No active reviewer account for this email" },
         401,
         corsHeaders,
       );

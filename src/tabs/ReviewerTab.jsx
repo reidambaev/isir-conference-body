@@ -134,7 +134,6 @@ async function apiFetch(path, { token, ...options } = {}) {
 export default function ReviewerTab() {
   const [token, setToken] = useState(() => getAuthToken());
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
 
@@ -208,13 +207,12 @@ export default function ReviewerTab() {
     try {
       const data = await apiFetch("/api/reviewers/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email }),
       });
       const tkn = data?.token;
       if (!tkn) throw new Error("Login did not return a token");
       setAuthToken(tkn);
       setToken(tkn);
-      setPassword("");
     } catch (e2) {
       setAuthError(e2.message || "Login failed");
     } finally {
@@ -315,7 +313,8 @@ export default function ReviewerTab() {
                 Reviewer sign-in
               </h2>
               <p className="text-sm text-slate-600 mt-1">
-                Use the email and generated password you were provided.
+                Enter the email address that was registered for you as a
+                reviewer.
               </p>
               {authError && (
                 <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
@@ -331,18 +330,6 @@ export default function ReviewerTab() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />

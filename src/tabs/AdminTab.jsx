@@ -333,10 +333,13 @@ export default function AdminTab() {
     });
   }, [registrations, registrationSearch]);
 
-  // Reviewer password generator state
+  // Reviewer account generator state
   const [emailFileName, setEmailFileName] = useState("");
   const [emailCount, setEmailCount] = useState(0);
-  const [passwordError, setPasswordError] = useState("");
+  const [reviewerCreateError, setReviewerCreateError] = useState("");
+  const [singleReviewerEmail, setSingleReviewerEmail] = useState("");
+  const [singleReviewerMessage, setSingleReviewerMessage] = useState("");
+  const [singleReviewerLoading, setSingleReviewerLoading] = useState(false);
   const [adminToken, setAdminToken] = useState("");
 
   // Speaker invite link generator state
@@ -722,20 +725,62 @@ export default function AdminTab() {
     }
   }, [activeSection, fetchEnvVars, fetchDiscountAdmin]);
 
-  const generateRandomPassword = () => {
-    const length = 12;
-    const charset =
-      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
-    let pwd = "";
-    for (let i = 0; i < length; i += 1) {
-      const idx = Math.floor(Math.random() * charset.length);
-      pwd += charset.charAt(idx);
+  const createReviewerAccount = async (email) => {
+    const res = await fetch("/api/admin/reviewers/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Admin-Token": adminToken.trim(),
+      },
+      body: JSON.stringify({ email }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json || json.success !== true) {
+      throw new Error(
+        json?.error || `create failed (HTTP ${res.status})`,
+      );
     }
-    return pwd;
+    return json;
+  };
+
+  const handleGenerateSingleReviewer = async () => {
+    setReviewerCreateError("");
+    setSingleReviewerMessage("");
+    setEmailCount(0);
+    setEmailFileName("");
+
+    const email = normalizeEmail(singleReviewerEmail);
+    if (!email) {
+      setReviewerCreateError("Enter a valid reviewer email address.");
+      return;
+    }
+    if (!adminToken.trim()) {
+      setReviewerCreateError(
+        "Admin access token missing. Open /admin with ?admin=YOUR_TOKEN.",
+      );
+      return;
+    }
+
+    setSingleReviewerLoading(true);
+    try {
+      const json = await createReviewerAccount(email);
+      setSingleReviewerMessage(
+        json.existing
+          ? `${email} was already a reviewer (reactivated if needed). They can sign in with this email.`
+          : `${email} added as a reviewer. They can sign in with this email.`,
+      );
+      setSingleReviewerEmail("");
+    } catch (err) {
+      console.error("Failed to create reviewer:", err);
+      setReviewerCreateError(err?.message || "Failed to create reviewer.");
+    } finally {
+      setSingleReviewerLoading(false);
+    }
   };
 
   const handleEmailFileChange = async (event) => {
-    setPasswordError("");
+    setReviewerCreateError("");
+    setSingleReviewerMessage("");
     setEmailCount(0);
     const file = event.target.files?.[0];
     if (!file) return;
@@ -743,7 +788,7 @@ export default function AdminTab() {
     setEmailFileName(file.name);
 
     if (!adminToken.trim()) {
-      setPasswordError(
+      setReviewerCreateError(
         "Admin access token missing. Open /admin with ?admin=YOUR_TOKEN.",
       );
       return;
@@ -755,13 +800,13 @@ export default function AdminTab() {
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
       if (!sheet) {
-        setPasswordError("Could not read first sheet from file.");
+        setReviewerCreateError("Could not read first sheet from file.");
         return;
       }
 
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
       if (!rows || rows.length === 0) {
-        setPasswordError("Sheet is empty.");
+        setReviewerCreateError("Sheet is empty.");
         return;
       }
 
@@ -790,84 +835,43 @@ export default function AdminTab() {
       }
 
       if (emails.length === 0) {
-        setPasswordError(
+        setReviewerCreateError(
           "No emails found. Make sure there is a column with email addresses.",
         );
         return;
       }
 
       const outputRows = [];
+      let created = 0;
 
       for (const email of emails) {
         try {
-          const res = await fetch("/api/admin/reviewers/create", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Admin-Token": adminToken.trim(),
-            },
-            body: JSON.stringify({ email }),
-          });
-
-          if (!res.ok) {
-            const text = await res.text().catch(() => "");
-            outputRows.push({
-              Email: email,
-              Password: `ERROR (${res.status}): ${text || "create failed"}`,
-            });
-            continue;
-          }
-
-          const json = await res.json().catch(() => null);
-          if (!json || json.success !== true) {
-            outputRows.push({
-              Email: email,
-              Password:
-                "ERROR: unexpected response while creating reviewer account",
-            });
-            continue;
-          }
-
-          if (json.existing === true && !json.password) {
-            outputRows.push({
-              Email: email,
-              Password: "EXISTS (password unchanged)",
-            });
-            continue;
-          }
-
-          if (!json.password) {
-            outputRows.push({
-              Email: email,
-              Password: "ERROR: no password returned",
-            });
-            continue;
-          }
-
+          const json = await createReviewerAccount(email);
           outputRows.push({
             Email: email,
-            Password: json.password,
+            Status: json.existing ? "Already existed (reactivated)" : "Created",
           });
+          created += 1;
         } catch (err) {
           console.error("Error creating reviewer for email:", email, err);
           outputRows.push({
             Email: email,
-            Password: "ERROR: network or server error",
+            Status: `ERROR: ${err?.message || "network or server error"}`,
           });
         }
       }
 
-      setEmailCount(outputRows.length);
+      setEmailCount(created);
 
       const outSheet = XLSX.utils.json_to_sheet(outputRows);
       const outWb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(outWb, outSheet, "ReviewerPasswords");
+      XLSX.utils.book_append_sheet(outWb, outSheet, "Reviewers");
       const downloadName =
-        "reviewer-passwords-" + new Date().toISOString().slice(0, 10) + ".xlsx";
+        "reviewers-" + new Date().toISOString().slice(0, 10) + ".xlsx";
       XLSX.writeFile(outWb, downloadName);
     } catch (e) {
       console.error("Error processing email Excel:", e);
-      setPasswordError(
+      setReviewerCreateError(
         e?.message || "Failed to process file. Please try a different file.",
       );
     }
@@ -1935,14 +1939,14 @@ export default function AdminTab() {
           Reviewers
         </button>
         <button
-          onClick={() => setActiveSection("reviewerPasswords")}
+          onClick={() => setActiveSection("addReviewers")}
           className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "reviewerPasswords"
+            activeSection === "addReviewers"
               ? "bg-purple-600 text-white shadow-md"
               : "text-gray-600 hover:bg-gray-100"
           }`}
         >
-          Reviewer Passwords
+          Add Reviewers
         </button>
         <button
           onClick={() => setActiveSection("speakerInvites")}
@@ -5383,25 +5387,51 @@ export default function AdminTab() {
         </div>
       )}
 
-      {/* Reviewer Passwords Section */}
-      {activeSection === "reviewerPasswords" && (
+      {/* Add Reviewers Section */}
+      {activeSection === "addReviewers" && (
         <div className="space-y-6">
           <div>
             <h2 className="text-2xl font-semibold text-gray-800">
-              Reviewer Password Generator
+              Add Reviewers
             </h2>
             <p className="text-gray-600 text-sm mt-1 max-w-2xl">
-              Upload an Excel file that contains a column of email addresses.
-              The tool will create or update reviewer accounts on the server and
-              generate a new Excel file with each email and the corresponding
-              password that is stored in the database.
+              Create reviewer accounts by email. Reviewers sign in to the
+              portal with that email only—no password.
             </p>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-            <div>
+            <div className="rounded-lg border border-purple-100 bg-purple-50/40 p-4 space-y-3">
+              <p className="text-sm font-medium text-purple-900">
+                Add one reviewer from an email
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                <input
+                  type="email"
+                  value={singleReviewerEmail}
+                  onChange={(e) => setSingleReviewerEmail(e.target.value)}
+                  placeholder="reviewer@institution.edu"
+                  className="w-full sm:max-w-md border border-purple-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
+                />
+                <button
+                  type="button"
+                  onClick={handleGenerateSingleReviewer}
+                  disabled={singleReviewerLoading}
+                  className="inline-flex justify-center items-center px-4 py-2 rounded-lg bg-purple-700 text-white text-sm font-semibold hover:bg-purple-800 disabled:opacity-60"
+                >
+                  {singleReviewerLoading ? "Adding..." : "Add reviewer"}
+                </button>
+              </div>
+              {singleReviewerMessage && (
+                <div className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                  {singleReviewerMessage}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-100 pt-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Upload email list (Excel)
+                Or upload an email list (Excel)
               </label>
               <input
                 type="file"
@@ -5429,14 +5459,15 @@ export default function AdminTab() {
 
             {emailCount > 0 && (
               <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                Generated passwords for <strong>{emailCount}</strong> email
-                addresses and downloaded an Excel file with the results.
+                Processed <strong>{emailCount}</strong> reviewer account
+                {emailCount === 1 ? "" : "s"} and downloaded a status Excel
+                file.
               </div>
             )}
 
-            {passwordError && (
+            {reviewerCreateError && (
               <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                {passwordError}
+                {reviewerCreateError}
               </div>
             )}
           </div>
