@@ -91,6 +91,7 @@ export default function AdminTab() {
     [],
   );
   const [speakerProfileActionId, setSpeakerProfileActionId] = useState(null);
+  const [traineeLetterActionId, setTraineeLetterActionId] = useState(null);
   const [expandedAbstracts, setExpandedAbstracts] = useState(new Set());
 
   // Abstract filtering/sorting state
@@ -574,6 +575,44 @@ export default function AdminTab() {
       setError(e?.message || `Failed to ${action}`);
     } finally {
       setSpeakerProfileActionId(null);
+    }
+  };
+
+  const updateTraineeLetterStatus = async (registrationId, status) => {
+    if (!adminToken?.trim() || !registrationId || !status) return;
+    setTraineeLetterActionId(registrationId);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/admin/registrations/${encodeURIComponent(registrationId)}/trainee-letter-status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Token": adminToken,
+          },
+          body: JSON.stringify({ status }),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setError(
+          data.error ||
+            `Failed to update trainee letter status (HTTP ${res.status})`,
+        );
+        return;
+      }
+      setRegistrations((prev) =>
+        prev.map((reg) =>
+          reg.id === registrationId
+            ? { ...reg, trainee_letter_status: status }
+            : reg,
+        ),
+      );
+    } catch (e) {
+      setError(e?.message || "Failed to update trainee letter status");
+    } finally {
+      setTraineeLetterActionId(null);
     }
   };
 
@@ -4038,7 +4077,7 @@ export default function AdminTab() {
                       Email
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Registration proof
+                      Abstract / registration proof
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
@@ -4985,8 +5024,8 @@ export default function AdminTab() {
             Trainee Applications
           </h2>
           <p className="text-gray-600 text-sm">
-            View all trainee/student registrations and their supporting
-            documentation status.
+            Review trainee/student registrations and accept or reject their
+            verification letters.
           </p>
           {registrations.filter((r) => r.ticket_type?.includes("trainee"))
             .length === 0 ? (
@@ -5015,6 +5054,9 @@ export default function AdminTab() {
                       Letter File
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Review
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Payment Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -5025,7 +5067,10 @@ export default function AdminTab() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {registrations
                     .filter((r) => r.ticket_type?.includes("trainee"))
-                    .map((reg) => (
+                    .map((reg) => {
+                      const letterBusy = traineeLetterActionId === reg.id;
+                      const hasLetter = Boolean(reg.trainee_letter_url);
+                      return (
                       <tr key={reg.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {reg.first_name} {reg.last_name}
@@ -5065,7 +5110,7 @@ export default function AdminTab() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {reg.trainee_letter_url ? (
+                          {hasLetter ? (
                             <a
                               href={reg.trainee_letter_url}
                               target="_blank"
@@ -5091,6 +5136,50 @@ export default function AdminTab() {
                             <span className="text-gray-400">No file</span>
                           )}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {hasLetter ? (
+                            <div className="flex flex-col gap-1.5">
+                              {reg.trainee_letter_status !== "approved" ? (
+                                <button
+                                  type="button"
+                                  disabled={letterBusy}
+                                  onClick={() =>
+                                    updateTraineeLetterStatus(reg.id, "approved")
+                                  }
+                                  className="px-2.5 py-1 rounded bg-green-600 text-white text-xs font-medium hover:bg-green-700 disabled:opacity-50"
+                                >
+                                  {letterBusy ? "…" : "Accept"}
+                                </button>
+                              ) : null}
+                              {reg.trainee_letter_status !== "rejected" ? (
+                                <button
+                                  type="button"
+                                  disabled={letterBusy}
+                                  onClick={() =>
+                                    updateTraineeLetterStatus(reg.id, "rejected")
+                                  }
+                                  className="px-2.5 py-1 rounded border border-red-300 text-red-800 text-xs font-medium hover:bg-red-50 disabled:opacity-50"
+                                >
+                                  Reject
+                                </button>
+                              ) : null}
+                              {reg.trainee_letter_status !== "pending" ? (
+                                <button
+                                  type="button"
+                                  disabled={letterBusy}
+                                  onClick={() =>
+                                    updateTraineeLetterStatus(reg.id, "pending")
+                                  }
+                                  className="px-2.5 py-1 rounded border border-gray-300 text-gray-700 text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                  Reset to pending
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-xs">—</span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -5108,7 +5197,8 @@ export default function AdminTab() {
                           {formatDate(reg.registration_date)}
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                 </tbody>
               </table>
             </div>

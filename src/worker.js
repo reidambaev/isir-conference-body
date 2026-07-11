@@ -343,6 +343,19 @@ async function handleApiRequest(request, env, url) {
     );
   }
 
+  // PATCH /api/admin/registrations/:id/trainee-letter-status
+  const traineeLetterStatusMatch = url.pathname.match(
+    /^\/api\/admin\/registrations\/([^/]+)\/trainee-letter-status$/,
+  );
+  if (traineeLetterStatusMatch && request.method === "PATCH") {
+    return handleUpdateTraineeLetterStatus(
+      request,
+      env,
+      corsHeaders,
+      traineeLetterStatusMatch[1],
+    );
+  }
+
   // PATCH /api/admin/abstracts/:id/status - Update abstract status
   const abstractStatusMatch = url.pathname.match(
     /^\/api\/admin\/abstracts\/([^/]+)\/status$/,
@@ -2927,11 +2940,14 @@ function buildVisaReviewerNotificationHtml({
   nationality,
   timestamp,
   registrationProofUrl,
+  isInvited,
 }) {
   const submittedAt = formatVisaSubmittedAt(timestamp);
-  const proofRow = registrationProofUrl
-    ? `<tr><td style="padding: 4px 0;">Congress registration proof</td><td style="padding: 4px 0; text-align: right;"><a href="${escapeHtml(registrationProofUrl)}">View uploaded file</a></td></tr>`
-    : "";
+  const proofRow = isInvited
+    ? `<tr><td style="padding: 4px 0;">Eligibility</td><td style="padding: 4px 0; text-align: right;"><strong>Invited speaker/chair</strong> (no proof required)</td></tr>`
+    : registrationProofUrl
+      ? `<tr><td style="padding: 4px 0;">Abstract / registration proof</td><td style="padding: 4px 0; text-align: right;"><a href="${escapeHtml(registrationProofUrl)}">View uploaded file</a></td></tr>`
+      : "";
   return `
 <!DOCTYPE html>
 <html>
@@ -3016,7 +3032,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
         JSON.stringify({
           success: false,
           error:
-            "Please submit the form with a congress registration proof file (PDF, JPG, or PNG).",
+            "Please submit the form with an abstract acceptance or congress registration proof file (PDF, JPG, or PNG).",
         }),
         { status: 400, headers: corsHeaders },
       );
@@ -3049,7 +3065,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
         JSON.stringify({
           success: false,
           error:
-            "A photo or PDF of your congress registration confirmation is required",
+            "A photo or PDF of your abstract acceptance or congress registration confirmation is required",
         }),
         { status: 400, headers: corsHeaders },
       );
@@ -3174,7 +3190,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
     <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Visa invitation letter request received</p>
   </div>
   <p>Dear ${escapeHtml(name)},</p>
-  <p>Thank you for submitting your visa invitation letter request and congress registration proof. Our coordinator will prepare your letter using the standard template and send it to this email address.</p>
+  <p>Thank you for submitting your visa invitation letter request and abstract/registration proof. Our coordinator will prepare your letter using the standard template and send it to this email address.</p>
   <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
     <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Your submission</p>
     <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
@@ -3183,7 +3199,7 @@ async function handleVisaRequest(request, env, corsHeaders) {
       <tr><td style="padding: 4px 0;">Affiliation</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(affiliationValue)}</td></tr>
       <tr><td style="padding: 4px 0;">Nationality</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(nationalityValue)}</td></tr>
       <tr><td style="padding: 4px 0;">Email</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(email)}</td></tr>
-      <tr><td style="padding: 4px 0;">Registration proof</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(originalFilename)}</td></tr>
+      <tr><td style="padding: 4px 0;">Abstract / registration proof</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(originalFilename)}</td></tr>
       <tr><td style="padding: 4px 0;">Submitted</td><td style="padding: 4px 0; text-align: right;">${submittedAt}</td></tr>
     </table>
   </div>
@@ -5342,6 +5358,108 @@ async function handleGetAbstracts(request, env, corsHeaders) {
         status: 500,
         headers: corsHeaders,
       },
+    );
+  }
+}
+
+const TRAINEE_LETTER_STATUSES = ["pending", "approved", "rejected"];
+
+// Admin endpoint: Update trainee verification letter status
+async function handleUpdateTraineeLetterStatus(
+  request,
+  env,
+  corsHeaders,
+  registrationId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    if (!registrationId) {
+      return jsonResponse(
+        { success: false, error: "Missing registration id" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const data = await request.json();
+    const status = String(data?.status || "")
+      .trim()
+      .toLowerCase();
+
+    if (!TRAINEE_LETTER_STATUSES.includes(status)) {
+      return jsonResponse(
+        {
+          success: false,
+          error: `Invalid status. Must be: ${TRAINEE_LETTER_STATUSES.join(", ")}`,
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT id, trainee_letter_url, trainee_letter_status
+       FROM registrations WHERE id = ? LIMIT 1`,
+    )
+      .bind(registrationId)
+      .first();
+
+    if (!existing?.id) {
+      return jsonResponse(
+        { success: false, error: "Registration not found" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    if (!existing.trainee_letter_url) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "No trainee letter uploaded for this registration",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
+    await env.ISIR_DB.prepare(
+      `UPDATE registrations SET trainee_letter_status = ? WHERE id = ?`,
+    )
+      .bind(status, registrationId)
+      .run();
+
+    return jsonResponse(
+      {
+        success: true,
+        message: `Trainee letter status updated to ${status}`,
+        data: {
+          id: registrationId,
+          trainee_letter_status: status,
+        },
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Update trainee letter status error:", error);
+    return jsonResponse(
+      {
+        success: false,
+        error: error.message || "Failed to update trainee letter status",
+      },
+      500,
+      corsHeaders,
     );
   }
 }

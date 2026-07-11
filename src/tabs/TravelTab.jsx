@@ -266,12 +266,17 @@ const TravelTab = () => {
           </p>
           <div className="bg-white p-4 rounded-lg border border-yellow-300 mb-4">
             <p className="text-sm text-gray-600 mb-3">
+              You may request an invitation letter if you are an invited
+              speaker/chair, have registered for the congress, or have had an
+              abstract accepted.
+            </p>
+            <p className="text-sm text-gray-600 mb-3">
               <strong>Need an invitation letter?</strong> Submit the form below
               with your formal name, affiliation, and nationality exactly as they
-              should appear on the letter, plus a photo or PDF of your congress
-              registration confirmation. We use a standard template for all
-              attendees—no special wording is needed. Our coordinator will prepare
-              and send your letter by email.
+              should appear on the letter, plus a photo or PDF of your abstract
+              acceptance or congress registration confirmation. We use a
+              standard template for all attendees—no special wording is needed.
+              Our coordinator will prepare and send your letter by email.
             </p>
             <p className="text-sm text-gray-600">
               We do NOT contact or intervene with Embassy and/or Consulate

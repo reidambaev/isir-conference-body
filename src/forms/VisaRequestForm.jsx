@@ -12,6 +12,7 @@ const VisaRequestForm = ({ onClose }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState(null);
+  const [isInvited, setIsInvited] = useState(false);
   const [registrationProof, setRegistrationProof] = useState(null);
   const [formData, setFormData] = useState({
     email: "",
@@ -26,8 +27,22 @@ const VisaRequestForm = ({ onClose }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleInvitedToggle = () => {
+    setIsInvited((prev) => {
+      const next = !prev;
+      if (next) {
+        setRegistrationProof(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+      return next;
+    });
+    setError(null);
+  };
+
   const validateFile = (file) => {
-    if (!file) return "Please upload a photo or PDF of your congress registration.";
+    if (!file) {
+      return "Please upload a photo or PDF of your abstract acceptance or congress registration.";
+    }
     if (!ALLOWED_TYPES.includes(file.type)) {
       return "Invalid file type. Please upload a PDF, JPG, or PNG file.";
     }
@@ -77,10 +92,12 @@ const VisaRequestForm = ({ onClose }) => {
       return;
     }
 
-    const fileError = validateFile(registrationProof);
-    if (fileError) {
-      setError(fileError);
-      return;
+    if (!isInvited) {
+      const fileError = validateFile(registrationProof);
+      if (fileError) {
+        setError(fileError);
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -92,7 +109,10 @@ const VisaRequestForm = ({ onClose }) => {
       body.append("name", formData.name.trim());
       body.append("affiliation", formData.affiliation.trim());
       body.append("nationality", formData.nationality.trim());
-      body.append("registrationProof", registrationProof);
+      body.append("isInvited", isInvited ? "true" : "false");
+      if (!isInvited && registrationProof) {
+        body.append("registrationProof", registrationProof);
+      }
 
       const response = await fetch("/api/visa-request", {
         method: "POST",
@@ -214,14 +234,50 @@ const VisaRequestForm = ({ onClose }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-8">
+          <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <p className="text-sm text-blue-900 leading-relaxed">
+              You may request an invitation letter if you are an invited
+              speaker/chair, have registered for the congress, or have had an
+              abstract accepted.
+            </p>
+          </div>
+
           <p className="text-sm text-gray-600 mb-6 leading-relaxed">
             Please enter your details exactly as they should appear on your visa
-            invitation letter. You must also upload a photo or PDF of your
-            congress registration confirmation. Our coordinator will prepare
-            your letter from this information.
+            invitation letter
+            {isInvited
+              ? ". As an invited speaker/chair, no proof upload is required."
+              : ". You must also upload a photo or PDF of your abstract acceptance or congress registration confirmation."}{" "}
+            Our coordinator will prepare your letter from this information.
           </p>
 
           <div className="space-y-6">
+            <div className="flex items-center justify-between gap-4 rounded-xl border-2 border-gray-200 bg-gray-50 px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">
+                  I am an invited speaker/chair
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Turn this on to skip the abstract/registration proof upload
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isInvited}
+                onClick={handleInvitedToggle}
+                className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                  isInvited ? "bg-blue-600" : "bg-gray-300"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    isInvited ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Formal Name <span className="text-red-500">*</span>
@@ -285,71 +341,78 @@ const VisaRequestForm = ({ onClose }) => {
               </p>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Congress Registration Proof{" "}
-                <span className="text-red-500">*</span>
-              </label>
-              <p className="text-xs text-gray-500 mb-3">
-                Upload a photo or PDF of your ISIR 2026 congress registration
-                confirmation (PDF, JPG, or PNG, max 5MB).
-              </p>
+            {!isInvited ? (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Abstract / Registration Proof{" "}
+                  <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-gray-500 mb-3">
+                  Upload a photo or PDF of your abstract acceptance or congress
+                  registration confirmation (PDF, JPG, or PNG, max 5MB).
+                </p>
 
-              {!registrationProof ? (
-                <div
-                  className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 hover:bg-gray-50 cursor-pointer transition-all"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    required
-                  />
-                  <div className="w-12 h-12 mx-auto mb-3 bg-blue-100 rounded-full flex items-center justify-center">
-                    <svg
-                      className="w-6 h-6 text-blue-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                      />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium text-gray-700">
-                    Click to upload registration proof
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    PDF, JPG, or PNG · max 5MB
-                  </p>
-                </div>
-              ) : (
-                <div className="border-2 border-green-300 bg-green-50 rounded-xl p-4 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">
-                      {registrationProof.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {formatFileSize(registrationProof.size)}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleRemoveFile}
-                    className="px-3 py-1.5 text-xs font-medium text-red-700 bg-white border border-red-200 rounded-lg hover:bg-red-50"
+                {!registrationProof ? (
+                  <div
+                    className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 hover:bg-gray-50 cursor-pointer transition-all"
+                    onClick={() => fileInputRef.current?.click()}
                   >
-                    Remove
-                  </button>
-                </div>
-              )}
-            </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      required={!isInvited}
+                    />
+                    <div className="w-12 h-12 mx-auto mb-3 bg-blue-100 rounded-full flex items-center justify-center">
+                      <svg
+                        className="w-6 h-6 text-blue-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                        />
+                      </svg>
+                    </div>
+                    <p className="text-sm font-medium text-gray-700">
+                      Click to upload abstract or registration proof
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      PDF, JPG, or PNG · max 5MB
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border-2 border-green-300 bg-green-50 rounded-xl p-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">
+                        {registrationProof.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {formatFileSize(registrationProof.size)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveFile}
+                      className="px-3 py-1.5 text-xs font-medium text-red-700 bg-white border border-red-200 rounded-lg hover:bg-red-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                Proof upload skipped — you indicated you are an invited
+                speaker/chair.
+              </div>
+            )}
 
             {error && (
               <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
