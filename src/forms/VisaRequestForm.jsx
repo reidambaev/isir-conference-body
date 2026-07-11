@@ -1,19 +1,67 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
+
+const ALLOWED_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+];
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 const VisaRequestForm = ({ onClose }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState(null);
+  const [registrationProof, setRegistrationProof] = useState(null);
   const [formData, setFormData] = useState({
     email: "",
     name: "",
     affiliation: "",
     nationality: "",
   });
+  const fileInputRef = useRef(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const validateFile = (file) => {
+    if (!file) return "Please upload a photo or PDF of your congress registration.";
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return "Invalid file type. Please upload a PDF, JPG, or PNG file.";
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      return "File size exceeds 5MB limit.";
+    }
+    return null;
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validationError = validateFile(file);
+    if (validationError) {
+      setError(validationError);
+      setRegistrationProof(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    setError(null);
+    setRegistrationProof(file);
+  };
+
+  const handleRemoveFile = () => {
+    setRegistrationProof(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   };
 
   const handleSubmit = async (e) => {
@@ -29,16 +77,26 @@ const VisaRequestForm = ({ onClose }) => {
       return;
     }
 
+    const fileError = validateFile(registrationProof);
+    if (fileError) {
+      setError(fileError);
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
     try {
+      const body = new FormData();
+      body.append("email", formData.email.trim());
+      body.append("name", formData.name.trim());
+      body.append("affiliation", formData.affiliation.trim());
+      body.append("nationality", formData.nationality.trim());
+      body.append("registrationProof", registrationProof);
+
       const response = await fetch("/api/visa-request", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
+        body,
       });
 
       const result = await response.json();
@@ -48,9 +106,11 @@ const VisaRequestForm = ({ onClose }) => {
       }
 
       setIsSubmitted(true);
-    } catch (error) {
-      console.error("Visa request error:", error);
-      setError("Failed to submit visa request. Please try again.");
+    } catch (err) {
+      console.error("Visa request error:", err);
+      setError(
+        err?.message || "Failed to submit visa request. Please try again.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -130,9 +190,7 @@ const VisaRequestForm = ({ onClose }) => {
               >
                 Visa Invitation Letter Request
               </h2>
-              <p className="text-gray-600 text-sm">
-                ISIR 2026 World Congress
-              </p>
+              <p className="text-gray-600 text-sm">ISIR 2026 World Congress</p>
             </div>
           </div>
           <button
@@ -158,9 +216,9 @@ const VisaRequestForm = ({ onClose }) => {
         <form onSubmit={handleSubmit} className="p-8">
           <p className="text-sm text-gray-600 mb-6 leading-relaxed">
             Please enter your details exactly as they should appear on your visa
-            invitation letter. We use a standard template for all attendees—no
-            special wording is required. Our coordinator will prepare your letter
-            from this information.
+            invitation letter. You must also upload a photo or PDF of your
+            congress registration confirmation. Our coordinator will prepare
+            your letter from this information.
           </p>
 
           <div className="space-y-6">
@@ -225,6 +283,72 @@ const VisaRequestForm = ({ onClose }) => {
               <p className="text-xs text-gray-500 mt-1">
                 Used to send your invitation letter and any follow-up
               </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Congress Registration Proof{" "}
+                <span className="text-red-500">*</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                Upload a photo or PDF of your ISIR 2026 congress registration
+                confirmation (PDF, JPG, or PNG, max 5MB).
+              </p>
+
+              {!registrationProof ? (
+                <div
+                  className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 hover:bg-gray-50 cursor-pointer transition-all"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    required
+                  />
+                  <div className="w-12 h-12 mx-auto mb-3 bg-blue-100 rounded-full flex items-center justify-center">
+                    <svg
+                      className="w-6 h-6 text-blue-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium text-gray-700">
+                    Click to upload registration proof
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    PDF, JPG, or PNG · max 5MB
+                  </p>
+                </div>
+              ) : (
+                <div className="border-2 border-green-300 bg-green-50 rounded-xl p-4 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">
+                      {registrationProof.name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {formatFileSize(registrationProof.size)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveFile}
+                    className="px-3 py-1.5 text-xs font-medium text-red-700 bg-white border border-red-200 rounded-lg hover:bg-red-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
             </div>
 
             {error && (

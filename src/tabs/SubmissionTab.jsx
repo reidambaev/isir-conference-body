@@ -226,6 +226,7 @@ const SubmissionTab = () => {
           abstract: formData.abstract,
           presentationPreference: formData.presentationPreference,
           youngInvestigator: formData.youngInvestigator,
+          isInvitedSpeaker: formData.isInvitedSpeaker,
           presenterName: `${presenter.firstName} ${presenter.lastName}`,
           presenterEmail: presenter.email,
           correspondingName: `${corresponding.firstName} ${corresponding.lastName}`,
@@ -268,6 +269,7 @@ const SubmissionTab = () => {
           abstract: "",
           presentationPreference: "oral",
           youngInvestigator: false,
+          isInvitedSpeaker: false,
         });
       }
     } catch (error) {

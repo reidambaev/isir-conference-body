@@ -25,6 +25,7 @@ import {
   TermsOfServiceTab,
   AccessibilityTab,
   AdminTab,
+  VisaAdminTab,
   ReviewerTab,
   CheckinTab,
 } from "./tabs";
@@ -90,6 +91,14 @@ export default function App() {
       pathname.startsWith("/speaker-hotel")
     );
   });
+  const [isVisaPage, setIsVisaPage] = useState(() => {
+    const pathname = window.location.pathname || document.location.pathname;
+    return (
+      pathname === "/visa" ||
+      pathname === "/visa/" ||
+      pathname.startsWith("/visa")
+    );
+  });
 
   // Update admin page state when pathname changes
   useEffect(() => {
@@ -129,6 +138,11 @@ export default function App() {
           pathname === "/speaker-hotel/" ||
           pathname.startsWith("/speaker-hotel");
         setIsSpeakerHotelPage(isSpeakerHotel);
+        const isVisa =
+          pathname === "/visa" ||
+          pathname === "/visa/" ||
+          pathname.startsWith("/visa");
+        setIsVisaPage(isVisa);
       }, 0);
     };
 
@@ -313,6 +327,19 @@ export default function App() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
             <AdminTab />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Render visa admin page if on /visa route
+  if (isVisaPage) {
+    return (
+      <div ref={appRef} className="min-h-screen bg-gray-50">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
+            <VisaAdminTab />
           </div>
         </main>
       </div>

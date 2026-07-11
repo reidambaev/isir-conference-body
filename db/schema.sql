@@ -107,6 +107,8 @@ CREATE TABLE
         country TEXT NOT NULL,
         notes TEXT,
         status TEXT DEFAULT 'pending',
+        registration_proof_r2_key TEXT,
+        registration_proof_filename TEXT,
         created_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000),
         updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)
     );
@@ -154,6 +156,7 @@ CREATE TABLE
         is_invited_speaker INTEGER DEFAULT 0,
         young_investigator INTEGER DEFAULT 0,
         confirmation_sent_at INTEGER,
+        decision_email_sent_at INTEGER,
         created_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000),
         updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)
     );
