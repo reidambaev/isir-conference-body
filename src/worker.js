@@ -2832,15 +2832,6 @@ async function sendAbstractDecisionEmail(env, abstract) {
   const submissionId = abstract.id;
   const title = (abstract.title || "").trim();
   const category = (abstract.category || "").trim();
-  const pref = String(abstract.presentation_preference || "").toLowerCase();
-  const prefLabel =
-    pref === "oral"
-      ? "Oral"
-      : pref === "poster"
-        ? "Poster"
-        : pref === "either"
-          ? "Oral or Poster"
-          : abstract.presentation_preference || "";
   const rejectionReason = (abstract.rejection_reason || "").trim();
   const isAccepted = status === "accepted";
 
@@ -2849,16 +2840,30 @@ async function sendAbstractDecisionEmail(env, abstract) {
     ? "ISIR 2026 – Abstract accepted"
     : "ISIR 2026 – Abstract decision";
 
-  const outcomeHtml = isAccepted
+  // Acceptance letter uses the official committee wording.
+  // Rejection keeps a structured notice with optional committee reason.
+  const html = isAccepted
     ? `
-  <p>We are pleased to inform you that your abstract has been <strong style="color: #047857;">accepted</strong> for presentation at the ISIR 2026 World Congress.</p>
-  <p><strong>What happens next</strong></p>
-  <ul style="margin: 0 0 20px 0; padding-left: 1.2rem;">
-    <li>Please ensure you are registered for the congress if you have not already done so.</li>
-    <li>Presentation format and schedule details will be shared by the organizers closer to the meeting.</li>
-    <li>Keep your Submission ID (<strong>${escapeHtml(submissionId)}</strong>) for any correspondence.</li>
-  </ul>`
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Abstract Accepted – ISIR 2026</title></head>
+<body style="font-family: Georgia, 'Times New Roman', serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.6;">
+  <p>Dear ${escapeHtml(name)},</p>
+  <p>On behalf of the organizing committee, congratulations! This letter is to inform you that your abstract has been accepted for the ISIR 2026 Congress in Busan, Korea (November 5th–8th, 2026).</p>
+  <p>You will receive an additional separate notification if your submission is selected for an oral presentation.</p>
+  <p style="margin-top: 28px;">Sincerely,<br/>The ISIR 2026 Organizing Committee</p>
+</body>
+</html>`
     : `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Abstract Not Accepted – ISIR 2026</title></head>
+<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
+  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
+    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Abstract decision</p>
+  </div>
+  <p>Dear ${escapeHtml(name)},</p>
   <p>Thank you for submitting your abstract to the ISIR 2026 World Congress. After careful review by the scientific committee, we regret to inform you that your abstract was <strong style="color: #b91c1c;">not accepted</strong> for presentation this year.</p>
   ${
     rejectionReason
@@ -2868,26 +2873,13 @@ async function sendAbstractDecisionEmail(env, abstract) {
   </div>`
       : ""
   }
-  <p>We sincerely appreciate your interest in ISIR 2026 and hope you will consider participating in future meetings.</p>`;
-
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Abstract ${escapeHtml(outcomeLabel)} – ISIR 2026</title></head>
-<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
-  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
-    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
-    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Abstract decision</p>
-  </div>
-  <p>Dear ${escapeHtml(name)},</p>
-  ${outcomeHtml}
+  <p>We sincerely appreciate your interest in ISIR 2026 and hope you will consider participating in future meetings.</p>
   <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
     <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Submission details</p>
     <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
       <tr><td style="padding: 4px 0; vertical-align: top;">Submission ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(submissionId)}</strong></td></tr>
       <tr><td style="padding: 4px 0; vertical-align: top;">Title</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(title)}</td></tr>
       <tr><td style="padding: 4px 0;">Category</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(category)}</td></tr>
-      <tr><td style="padding: 4px 0;">Presentation preference</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(prefLabel)}</td></tr>
       <tr><td style="padding: 4px 0;">Decision</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(outcomeLabel)}</strong></td></tr>
     </table>
   </div>

@@ -1579,11 +1579,17 @@ export default function AdminTab() {
     }
     if (
       !window.confirm(
-        `Send ${status} decision email to ${
-          abstract?.corresponding_email ||
-          abstract?.presenter_email ||
-          "the author"
-        }?`,
+        status === "accepted"
+          ? `Send acceptance email to ${
+              abstract?.corresponding_email ||
+              abstract?.presenter_email ||
+              "the author"
+            }?`
+          : `Send rejection email to ${
+              abstract?.corresponding_email ||
+              abstract?.presenter_email ||
+              "the author"
+            }?`,
       )
     ) {
       return;
@@ -1613,9 +1619,9 @@ export default function AdminTab() {
         ),
       );
       alert(
-        `Decision email (${result.decision || status}) sent to ${
-          result.sentTo || "author"
-        }.`,
+        status === "accepted"
+          ? `Acceptance email sent to ${result.sentTo || "author"}.`
+          : `Rejection email sent to ${result.sentTo || "author"}.`,
       );
     } catch (err) {
       console.error("Error sending decision email:", err);
@@ -3748,7 +3754,11 @@ export default function AdminTab() {
                                   <div className="flex items-center justify-between flex-wrap gap-2">
                                     <div className="text-xs text-gray-600">
                                       <span className="font-semibold text-gray-700">
-                                        Decision email:
+                                        {String(
+                                          abstract.status || "",
+                                        ).toLowerCase() === "accepted"
+                                          ? "Acceptance email:"
+                                          : "Rejection email:"}
                                       </span>{" "}
                                       {abstract.decision_email_sent_at ? (
                                         <span className="text-emerald-700">
@@ -3762,10 +3772,6 @@ export default function AdminTab() {
                                           Not sent
                                         </span>
                                       )}
-                                      <span className="ml-1 text-gray-400">
-                                        (
-                                        {String(abstract.status).toLowerCase()})
-                                      </span>
                                     </div>
                                     <button
                                       type="button"
@@ -3786,9 +3792,15 @@ export default function AdminTab() {
                                     >
                                       {sendingDecisionId === abstract.id
                                         ? "Sending…"
-                                        : abstract.decision_email_sent_at
-                                          ? "Resend decision"
-                                          : "Send decision email"}
+                                        : String(
+                                              abstract.status || "",
+                                            ).toLowerCase() === "accepted"
+                                          ? abstract.decision_email_sent_at
+                                            ? "Resend acceptance email"
+                                            : "Send acceptance email"
+                                          : abstract.decision_email_sent_at
+                                            ? "Resend rejection email"
+                                            : "Send rejection email"}
                                     </button>
                                   </div>
                                 </div>
