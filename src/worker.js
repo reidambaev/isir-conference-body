@@ -791,31 +791,20 @@ async function handleAdminCreateSpeakerInvite(request, env, corsHeaders) {
     }
 
     const now = Date.now();
-    const expiresInDaysRaw = Number(data?.expires_in_days);
-    const expiresInDays =
-      Number.isFinite(expiresInDaysRaw) && expiresInDaysRaw > 0
-        ? Math.min(365, Math.floor(expiresInDaysRaw))
-        : 120;
-    const expiresAt = now + expiresInDays * 24 * 60 * 60 * 1000;
 
-    // Return existing active token if present
+    // Return existing unused token if present (invites never expire)
     const existing = await env.ISIR_DB.prepare(
-      `SELECT token, expires_at, used_at FROM speaker_invites WHERE email = ?`,
+      `SELECT token, used_at FROM speaker_invites WHERE email = ?`,
     )
       .bind(email)
       .first();
 
-    if (
-      existing?.token &&
-      Number(existing.used_at || 0) === 0 &&
-      Number(existing.expires_at || 0) > now
-    ) {
+    if (existing?.token && Number(existing.used_at || 0) === 0) {
       return jsonResponse(
         {
           success: true,
           token: existing.token,
           email,
-          expires_at: Number(existing.expires_at),
           reused: true,
         },
         200,
@@ -824,9 +813,10 @@ async function handleAdminCreateSpeakerInvite(request, env, corsHeaders) {
     }
 
     const token = crypto.randomUUID();
+    // expires_at is kept for schema compatibility but no longer enforced; 0 = never expires
     await env.ISIR_DB.prepare(
       `INSERT INTO speaker_invites (token, email, created_at, expires_at, used_at, used_registration_id)
-       VALUES (?, ?, ?, ?, NULL, NULL)
+       VALUES (?, ?, ?, 0, NULL, NULL)
        ON CONFLICT(email) DO UPDATE SET
          token = excluded.token,
          created_at = excluded.created_at,
@@ -834,11 +824,11 @@ async function handleAdminCreateSpeakerInvite(request, env, corsHeaders) {
          used_at = NULL,
          used_registration_id = NULL`,
     )
-      .bind(token, email, now, expiresAt)
+      .bind(token, email, now)
       .run();
 
     return jsonResponse(
-      { success: true, token, email, expires_at: expiresAt, reused: false },
+      { success: true, token, email, reused: false },
       200,
       corsHeaders,
     );
@@ -870,9 +860,8 @@ async function handleVerifySpeakerInvite(request, env, url, corsHeaders) {
       );
     }
 
-    const now = Date.now();
     const row = await env.ISIR_DB.prepare(
-      `SELECT token, email, expires_at, used_at FROM speaker_invites WHERE token = ?`,
+      `SELECT token, email, used_at FROM speaker_invites WHERE token = ?`,
     )
       .bind(token)
       .first();
@@ -881,13 +870,6 @@ async function handleVerifySpeakerInvite(request, env, url, corsHeaders) {
       return jsonResponse(
         { success: false, error: "Invalid invite token" },
         404,
-        corsHeaders,
-      );
-    }
-    if (Number(row.expires_at || 0) <= now) {
-      return jsonResponse(
-        { success: false, error: "Invite token expired" },
-        410,
         corsHeaders,
       );
     }
@@ -900,7 +882,7 @@ async function handleVerifySpeakerInvite(request, env, url, corsHeaders) {
     }
 
     return jsonResponse(
-      { success: true, email: row.email, expires_at: Number(row.expires_at) },
+      { success: true, email: row.email },
       200,
       corsHeaders,
     );
@@ -932,16 +914,14 @@ async function handleCheckSpeakerInviteByEmail(request, env, url, corsHeaders) {
       );
     }
 
-    const now = Date.now();
     const row = await env.ISIR_DB.prepare(
-      `SELECT token, email, expires_at, used_at FROM speaker_invites WHERE email = ?`,
+      `SELECT token, email, used_at FROM speaker_invites WHERE email = ?`,
     )
       .bind(email)
       .first();
 
     const eligible =
       Boolean(row?.token) &&
-      Number(row.expires_at || 0) > now &&
       (row.used_at == null || Number(row.used_at) === 0);
 
     return jsonResponse(
@@ -949,7 +929,6 @@ async function handleCheckSpeakerInviteByEmail(request, env, url, corsHeaders) {
         success: true,
         eligible,
         email,
-        expires_at: row?.expires_at != null ? Number(row.expires_at) : null,
       },
       200,
       corsHeaders,
@@ -969,17 +948,13 @@ async function getSpeakerProfileInviteAccess(env, email) {
   if (!env.ISIR_DB || !email) {
     return { ok: false, code: "not_in_list" };
   }
-  const now = Date.now();
   const row = await env.ISIR_DB.prepare(
-    `SELECT email, expires_at FROM speaker_invites WHERE email = ?`,
+    `SELECT email FROM speaker_invites WHERE email = ?`,
   )
     .bind(email)
     .first();
   if (!row?.email) {
     return { ok: false, code: "not_in_list" };
-  }
-  if (Number(row.expires_at || 0) <= now) {
-    return { ok: false, code: "expired" };
   }
   return { ok: true, code: "ok" };
 }
@@ -1859,20 +1834,19 @@ async function handleRegistration(request, env, corsHeaders) {
     let invitedSpeakerToken = null;
     if (data.ticketType === "invited-speaker") {
       const email = normalizedEmail;
-      const now = Date.now();
       const token = (data.inviteToken || data.invitedSpeakerToken || "").trim();
 
       let invite = null;
       if (token) {
         invite = await env.ISIR_DB.prepare(
-          `SELECT token, email, expires_at, used_at FROM speaker_invites WHERE token = ?`,
+          `SELECT token, email, used_at FROM speaker_invites WHERE token = ?`,
         )
           .bind(token)
           .first();
       } else {
         // Email-only flow (no link): look up invite by email
         invite = await env.ISIR_DB.prepare(
-          `SELECT token, email, expires_at, used_at FROM speaker_invites WHERE email = ?`,
+          `SELECT token, email, used_at FROM speaker_invites WHERE email = ?`,
         )
           .bind(email)
           .first();
@@ -1889,13 +1863,6 @@ async function handleRegistration(request, env, corsHeaders) {
         return jsonResponse(
           { success: false, error: "Invite token does not match email" },
           400,
-          corsHeaders,
-        );
-      }
-      if (Number(invite.expires_at || 0) <= now) {
-        return jsonResponse(
-          { success: false, error: "Invite token expired" },
-          410,
           corsHeaders,
         );
       }
@@ -4322,9 +4289,7 @@ async function handleSubmitSpeakerProfile(request, env, corsHeaders) {
   const inviteAccess = await getSpeakerProfileInviteAccess(env, email);
   if (!inviteAccess.ok) {
     const msg =
-      inviteAccess.code === "expired"
-        ? "The speaker invite for this email has expired. Contact the organizers."
-        : "This email is not on the invited speaker list. Use the same address the organizers added for your speaker invite (as for conference registration).";
+      "This email is not on the invited speaker list. Use the same address the organizers added for your speaker invite (as for conference registration).";
     return new Response(JSON.stringify({ success: false, error: msg }), {
       status: 403,
       headers: jsonHeaders,

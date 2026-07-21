@@ -72,6 +72,7 @@ CREATE TABLE
 CREATE UNIQUE INDEX IF NOT EXISTS uq_registrations_email ON registrations (email);
 
 -- Speaker invite tokens (free registration)
+-- expires_at is legacy: invites no longer expire; new rows are written with 0
 CREATE TABLE
     IF NOT EXISTS speaker_invites (
         token TEXT PRIMARY KEY,
