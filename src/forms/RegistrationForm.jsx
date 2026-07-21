@@ -1137,15 +1137,18 @@ const RegistrationForm = ({ onClose }) => {
       return getFinalPrice(subtotal);
     }
 
-    // Try to get price from API data first
+    // Try to get price from API data first. Pick early/standard using the local
+    // deadline (not the API's current_price, whose early-bird cutoff can be wrong).
     if (membershipData?.ticket_options?.available_tickets) {
       const ticket = membershipData.ticket_options.available_tickets.find(
         (t) => t.id === type,
       );
-      if (ticket && ticket.current_price !== undefined) {
-        const basePrice = ticket.current_price;
-        if (inBaseCurrency) return basePrice;
-        return getFinalPrice(basePrice);
+      const apiPrice = isEarlyBirdPeriod
+        ? (ticket?.early_price ?? ticket?.current_price)
+        : (ticket?.standard_price ?? ticket?.current_price);
+      if (apiPrice !== undefined) {
+        if (inBaseCurrency) return apiPrice;
+        return getFinalPrice(apiPrice);
       }
     }
 
@@ -1161,15 +1164,16 @@ const RegistrationForm = ({ onClose }) => {
 
   const getAccompanyingPrice = (inBaseCurrency = false) => {
     // Speakers can still add accompanying persons; those are paid
-    // Try to get price from API data first
+    // Try to get price from API data first; early/standard chosen by the local
+    // deadline (the API's current_price early-bird cutoff can be wrong).
     if (membershipData?.ticket_options?.accompanying) {
-      const basePrice =
-        membershipData.ticket_options.accompanying.current_price ||
-        (isEarlyBirdPeriod
-          ? membershipData.ticket_options.accompanying.early_price
-          : membershipData.ticket_options.accompanying.standard_price);
-      if (inBaseCurrency) return basePrice;
-      return getFinalPrice(basePrice);
+      const basePrice = isEarlyBirdPeriod
+        ? membershipData.ticket_options.accompanying.early_price
+        : membershipData.ticket_options.accompanying.standard_price;
+      if (basePrice != null) {
+        if (inBaseCurrency) return basePrice;
+        return getFinalPrice(basePrice);
+      }
     }
 
     // Fallback to hardcoded prices
@@ -1466,14 +1470,10 @@ const RegistrationForm = ({ onClose }) => {
               Select Your Tickets
             </FormSectionHeader>
             <div className="p-8">
-              {/* Early Bird Status */}
+              {/* Early Bird Status — local deadline only; the membership API's early-bird fields are ignored because they can disagree with what the worker actually charges */}
               {(() => {
-                const apiEarlyBird =
-                  membershipData?.ticket_options?.is_early_bird ??
-                  isEarlyBirdPeriod;
-                const earlyBirdDeadline =
-                  membershipData?.ticket_options?.early_bird_deadline ||
-                  "September 1, 2026";
+                const apiEarlyBird = isEarlyBirdPeriod;
+                const earlyBirdDeadline = "September 1, 2026";
 
                 return (
                   <div
@@ -1806,8 +1806,8 @@ const RegistrationForm = ({ onClose }) => {
                                 >
                                   {formatCurrency(
                                     getFinalPrice(
-                                      ticket.current_price ||
-                                        ticket.early_price,
+                                      ticket.early_price ??
+                                        ticket.current_price,
                                     ),
                                     getCurrency(),
                                   )}
@@ -2007,11 +2007,7 @@ const RegistrationForm = ({ onClose }) => {
                             getAccompanyingPrice(),
                             getCurrency(),
                           )}{" "}
-                          each (
-                          {(membershipData?.ticket_options?.is_early_bird ??
-                          isEarlyBirdPeriod)
-                            ? "Early Bird"
-                            : "Standard"}
+                          each ({isEarlyBirdPeriod ? "Early Bird" : "Standard"}
                           )
                         </p>
                       </div>
