@@ -138,6 +138,12 @@ export default function AdminTab() {
 
   // Reviewer overview state
   const [reviewerOverview, setReviewerOverview] = useState(null);
+  const [abstractsPerReviewerInput, setAbstractsPerReviewerInput] =
+    useState("");
+  const [savingAbstractsPerReviewer, setSavingAbstractsPerReviewer] =
+    useState(false);
+  const [abstractsPerReviewerMessage, setAbstractsPerReviewerMessage] =
+    useState(null); // { type: "success" | "error", text }
   const [reviewerOverviewLoading, setReviewerOverviewLoading] = useState(false);
   const [reviewerOverviewError, setReviewerOverviewError] = useState("");
   const [reviewerAbstractScores, setReviewerAbstractScores] = useState([]);
@@ -505,6 +511,11 @@ export default function AdminTab() {
       setSpeakerHotelRegistrations(speakerHotelData.data || []);
       setRegistrations(registrationsData.data || []);
       setReviewerOverview(reviewersData || null);
+      if (reviewersData?.abstracts_per_reviewer != null) {
+        setAbstractsPerReviewerInput(
+          String(reviewersData.abstracts_per_reviewer),
+        );
+      }
       setReviewerAbstractScores(reviewerAbstractScoresData?.data || []);
       setSpeakerProfileSubmissions(speakerProfilesData.submissions || []);
       setReviewerOverviewError("");
@@ -513,6 +524,47 @@ export default function AdminTab() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveAbstractsPerReviewer = async () => {
+    const n = Number(abstractsPerReviewerInput);
+    if (!Number.isInteger(n) || n < 1 || n > 100) {
+      setAbstractsPerReviewerMessage({
+        type: "error",
+        text: "Enter a whole number between 1 and 100.",
+      });
+      return;
+    }
+    setSavingAbstractsPerReviewer(true);
+    setAbstractsPerReviewerMessage(null);
+    try {
+      const res = await fetch("/api/admin/reviewers/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Token": adminToken,
+        },
+        body: JSON.stringify({ abstracts_per_reviewer: n }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+      setReviewerOverview((prev) =>
+        prev ? { ...prev, abstracts_per_reviewer: n } : prev,
+      );
+      setAbstractsPerReviewerMessage({
+        type: "success",
+        text: `Saved. Reviewers will now be assigned ${n} abstract${n === 1 ? "" : "s"}.`,
+      });
+    } catch (err) {
+      setAbstractsPerReviewerMessage({
+        type: "error",
+        text: err.message || "Failed to save setting.",
+      });
+    } finally {
+      setSavingAbstractsPerReviewer(false);
     }
   };
 
@@ -5753,6 +5805,54 @@ export default function AdminTab() {
                 .
               </p>
             </div>
+          </div>
+
+          {/* Assignment settings */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-gray-800">
+              Abstracts per reviewer
+            </h3>
+            <p className="text-xs text-gray-500 mt-1 max-w-2xl">
+              Each reviewer is automatically assigned this many abstracts when
+              they open their portal, preferring abstracts with the fewest
+              reviewers so far. Lowering the number does not remove existing
+              assignments beyond hiding extras; raising it tops reviewers up
+              the next time they sign in.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={abstractsPerReviewerInput}
+                onChange={(e) => setAbstractsPerReviewerInput(e.target.value)}
+                className="w-24 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              />
+              <button
+                type="button"
+                onClick={saveAbstractsPerReviewer}
+                disabled={savingAbstractsPerReviewer}
+                className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingAbstractsPerReviewer ? "Saving..." : "Save"}
+              </button>
+              {reviewerOverview?.abstracts_per_reviewer != null && (
+                <span className="text-xs text-gray-500">
+                  Current: {reviewerOverview.abstracts_per_reviewer}
+                </span>
+              )}
+            </div>
+            {abstractsPerReviewerMessage && (
+              <p
+                className={`mt-2 text-xs ${
+                  abstractsPerReviewerMessage.type === "success"
+                    ? "text-emerald-600"
+                    : "text-red-600"
+                }`}
+              >
+                {abstractsPerReviewerMessage.text}
+              </p>
+            )}
           </div>
 
           {!reviewerOverview ? (

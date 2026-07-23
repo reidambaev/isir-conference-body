@@ -489,6 +489,14 @@ async function handleApiRequest(request, env, url) {
     return handleAdminReviewerOverview(request, env, corsHeaders);
   }
 
+  // GET/POST /api/admin/reviewers/settings (abstracts per reviewer)
+  if (
+    url.pathname === "/api/admin/reviewers/settings" &&
+    (request.method === "GET" || request.method === "POST")
+  ) {
+    return handleAdminReviewerSettings(request, env, corsHeaders);
+  }
+
   // GET /api/admin/reviewers/abstract-scores
   if (
     url.pathname === "/api/admin/reviewers/abstract-scores" &&
@@ -1169,6 +1177,97 @@ function shuffleInPlace(arr) {
   return a;
 }
 
+const DEFAULT_ABSTRACTS_PER_REVIEWER = 5;
+const MAX_ABSTRACTS_PER_REVIEWER = 100;
+
+async function ensureReviewerSettingsTable(env) {
+  if (!env?.ISIR_DB) return;
+  await env.ISIR_DB.prepare(
+    `CREATE TABLE IF NOT EXISTS reviewer_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at INTEGER NOT NULL,
+      updated_by TEXT
+    )`,
+  ).run();
+}
+
+async function getAbstractsPerReviewer(env) {
+  try {
+    await ensureReviewerSettingsTable(env);
+    const row = await env.ISIR_DB.prepare(
+      `SELECT value FROM reviewer_settings WHERE key = 'abstracts_per_reviewer' LIMIT 1`,
+    ).first();
+    const n = Number(row?.value);
+    if (Number.isInteger(n) && n >= 1 && n <= MAX_ABSTRACTS_PER_REVIEWER) {
+      return n;
+    }
+  } catch (error) {
+    console.error("Failed to read abstracts_per_reviewer setting:", error);
+  }
+  return DEFAULT_ABSTRACTS_PER_REVIEWER;
+}
+
+// GET/POST /api/admin/reviewers/settings
+async function handleAdminReviewerSettings(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    if (request.method === "POST") {
+      const data = await request.json();
+      const n = Number(data?.abstracts_per_reviewer);
+      if (!Number.isInteger(n) || n < 1 || n > MAX_ABSTRACTS_PER_REVIEWER) {
+        return jsonResponse(
+          {
+            success: false,
+            error: `abstracts_per_reviewer must be an integer between 1 and ${MAX_ABSTRACTS_PER_REVIEWER}`,
+          },
+          400,
+          corsHeaders,
+        );
+      }
+      await ensureReviewerSettingsTable(env);
+      await env.ISIR_DB.prepare(
+        `INSERT INTO reviewer_settings (key, value, updated_at, updated_by)
+         VALUES ('abstracts_per_reviewer', ?, ?, 'admin')
+         ON CONFLICT(key) DO UPDATE SET
+           value = excluded.value,
+           updated_at = excluded.updated_at,
+           updated_by = excluded.updated_by`,
+      )
+        .bind(String(n), Date.now())
+        .run();
+      return jsonResponse(
+        { success: true, abstracts_per_reviewer: n },
+        200,
+        corsHeaders,
+      );
+    }
+
+    const current = await getAbstractsPerReviewer(env);
+    return jsonResponse(
+      { success: true, abstracts_per_reviewer: current },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Admin reviewer settings error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to update settings" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
 async function handleGetReviewerAbstracts(request, env, corsHeaders) {
   try {
     const reviewer = await requireReviewer(request, env);
@@ -1180,7 +1279,9 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
       );
     }
 
-    // Ensure exactly 5 assigned abstracts (persisted) — general submissions only
+    // Ensure the configured number of assigned abstracts (persisted) — general submissions only
+    const targetCount = await getAbstractsPerReviewer(env);
+
     const existing = await env.ISIR_DB.prepare(
       `SELECT ra.abstract_id
        FROM reviewer_assignments ra
@@ -1194,22 +1295,31 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
 
     let assignedIds = (existing.results || []).map((r) => r.abstract_id);
 
-    if (assignedIds.length < 5) {
-      // Only assign general (non–invited speaker) abstracts to reviewers
+    if (assignedIds.length < targetCount) {
+      // Only assign general (non–invited speaker) abstracts to reviewers,
+      // preferring the abstracts with the fewest reviewers assigned so far.
       const allAbstracts = await env.ISIR_DB.prepare(
-        `SELECT id FROM abstractions
-         WHERE status = 'submitted'
-           AND COALESCE(is_invited_speaker, 0) != 1
-         ORDER BY submission_date DESC
+        `SELECT a.id, COUNT(ra.abstract_id) AS assign_count
+         FROM abstractions a
+         LEFT JOIN reviewer_assignments ra ON ra.abstract_id = a.id
+         WHERE a.status = 'submitted'
+           AND COALESCE(a.is_invited_speaker, 0) != 1
+         GROUP BY a.id
          LIMIT 1000`,
       ).all();
 
       const pool = (allAbstracts.results || [])
-        .map((r) => r.id)
-        .filter((id) => !assignedIds.includes(id));
+        .map((r) => ({ id: r.id, count: Number(r.assign_count || 0) }))
+        .filter((r) => !assignedIds.includes(r.id));
 
+      // Shuffle first so ties in assignment count are broken randomly,
+      // then stable-sort by fewest reviewers assigned.
       shuffleInPlace(pool);
-      const toAdd = pool.slice(0, 5 - assignedIds.length);
+      pool.sort((a, b) => a.count - b.count);
+
+      const toAdd = pool
+        .slice(0, targetCount - assignedIds.length)
+        .map((r) => r.id);
 
       if (toAdd.length > 0) {
         const now = Date.now();
@@ -1223,9 +1333,9 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
       }
     }
 
-    // Cap at 5 (legacy/manual extras)
-    if (assignedIds.length > 5) {
-      assignedIds = assignedIds.slice(0, 5);
+    // Cap at the configured count (legacy/manual extras)
+    if (assignedIds.length > targetCount) {
+      assignedIds = assignedIds.slice(0, targetCount);
     }
 
     if (assignedIds.length === 0) {
@@ -1513,6 +1623,7 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
     });
 
     const reviewers = Object.values(reviewersMap);
+    const abstractsPerReviewer = await getAbstractsPerReviewer(env);
 
     return jsonResponse(
       {
@@ -1524,6 +1635,7 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
           ),
           total_assignments: Number(totalsRow?.total_assignments || 0),
         },
+        abstracts_per_reviewer: abstractsPerReviewer,
         reviewers,
       },
       200,
