@@ -382,6 +382,19 @@ async function handleApiRequest(request, env, url) {
     );
   }
 
+  // PATCH /api/admin/abstracts/:id/speakers - Change presenting/corresponding authors
+  const abstractSpeakersMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)\/speakers$/,
+  );
+  if (abstractSpeakersMatch && request.method === "PATCH") {
+    return handleUpdateAbstractSpeakers(
+      request,
+      env,
+      corsHeaders,
+      abstractSpeakersMatch[1],
+    );
+  }
+
   // POST /api/admin/abstracts/accept-invited-speakers - Accept all invited speaker abstracts
   if (
     url.pathname === "/api/admin/abstracts/accept-invited-speakers" &&
@@ -495,6 +508,22 @@ async function handleApiRequest(request, env, url) {
     (request.method === "GET" || request.method === "POST")
   ) {
     return handleAdminReviewerSettings(request, env, corsHeaders);
+  }
+
+  // GET /api/admin/reviewers/list (all reviewer accounts + individual targets)
+  if (
+    url.pathname === "/api/admin/reviewers/list" &&
+    request.method === "GET"
+  ) {
+    return handleAdminListReviewers(request, env, corsHeaders);
+  }
+
+  // POST /api/admin/reviewers/target (set one reviewer's abstract count)
+  if (
+    url.pathname === "/api/admin/reviewers/target" &&
+    request.method === "POST"
+  ) {
+    return handleAdminSetReviewerTarget(request, env, corsHeaders);
   }
 
   // GET /api/admin/reviewers/abstract-scores
@@ -1208,6 +1237,180 @@ async function getAbstractsPerReviewer(env) {
   return DEFAULT_ABSTRACTS_PER_REVIEWER;
 }
 
+function reviewerTargetSettingKey(email) {
+  return `abstracts_per_reviewer:${email}`;
+}
+
+// Per-reviewer override; falls back to the global setting when not set.
+async function getAbstractsTargetForReviewer(env, email) {
+  try {
+    await ensureReviewerSettingsTable(env);
+    const row = await env.ISIR_DB.prepare(
+      `SELECT value FROM reviewer_settings WHERE key = ? LIMIT 1`,
+    )
+      .bind(reviewerTargetSettingKey(email))
+      .first();
+    const n = Number(row?.value);
+    if (Number.isInteger(n) && n >= 1 && n <= MAX_ABSTRACTS_PER_REVIEWER) {
+      return n;
+    }
+  } catch (error) {
+    console.error("Failed to read reviewer target setting:", error);
+  }
+  return getAbstractsPerReviewer(env);
+}
+
+// GET /api/admin/reviewers/list — all reviewer accounts with individual targets
+async function handleAdminListReviewers(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+    await ensureReviewerSettingsTable(env);
+
+    const rows = await env.ISIR_DB.prepare(
+      `SELECT r.email, r.active, r.created_at,
+              (SELECT COUNT(*) FROM reviewer_assignments ra
+               WHERE ra.reviewer_email = r.email) AS assigned_count
+       FROM reviewers r
+       ORDER BY r.email ASC`,
+    ).all();
+
+    const overrides = await env.ISIR_DB.prepare(
+      `SELECT key, value FROM reviewer_settings
+       WHERE key LIKE 'abstracts_per_reviewer:%'`,
+    ).all();
+
+    const overrideByEmail = {};
+    (overrides.results || []).forEach((r) => {
+      const email = String(r.key).slice("abstracts_per_reviewer:".length);
+      const n = Number(r.value);
+      if (Number.isInteger(n) && n >= 1 && n <= MAX_ABSTRACTS_PER_REVIEWER) {
+        overrideByEmail[email] = n;
+      }
+    });
+
+    const defaultTarget = await getAbstractsPerReviewer(env);
+    const reviewers = (rows.results || []).map((r) => ({
+      email: r.email,
+      active: Number(r.active) === 1,
+      created_at: r.created_at || null,
+      assigned_count: Number(r.assigned_count || 0),
+      abstracts_target: overrideByEmail[r.email] ?? null,
+    }));
+
+    return jsonResponse(
+      { success: true, default_target: defaultTarget, reviewers },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Admin list reviewers error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to list reviewers" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+// POST /api/admin/reviewers/target — set/clear one reviewer's abstract count
+async function handleAdminSetReviewerTarget(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    const data = await request.json();
+    const email = normalizeEmail(data?.email || "");
+    if (!email) {
+      return jsonResponse(
+        { success: false, error: "Email is required" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const reviewerRow = await env.ISIR_DB.prepare(
+      `SELECT email FROM reviewers WHERE email = ?`,
+    )
+      .bind(email)
+      .first();
+    if (!reviewerRow?.email) {
+      return jsonResponse(
+        { success: false, error: "No reviewer account for this email" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    await ensureReviewerSettingsTable(env);
+    const raw = data?.abstracts_per_reviewer;
+
+    // Blank/null clears the individual number so the default applies again
+    if (raw == null || raw === "") {
+      await env.ISIR_DB.prepare(
+        `DELETE FROM reviewer_settings WHERE key = ?`,
+      )
+        .bind(reviewerTargetSettingKey(email))
+        .run();
+      return jsonResponse(
+        { success: true, email, abstracts_per_reviewer: null },
+        200,
+        corsHeaders,
+      );
+    }
+
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1 || n > MAX_ABSTRACTS_PER_REVIEWER) {
+      return jsonResponse(
+        {
+          success: false,
+          error: `abstracts_per_reviewer must be an integer between 1 and ${MAX_ABSTRACTS_PER_REVIEWER}`,
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
+    await env.ISIR_DB.prepare(
+      `INSERT INTO reviewer_settings (key, value, updated_at, updated_by)
+       VALUES (?, ?, ?, 'admin')
+       ON CONFLICT(key) DO UPDATE SET
+         value = excluded.value,
+         updated_at = excluded.updated_at,
+         updated_by = excluded.updated_by`,
+    )
+      .bind(reviewerTargetSettingKey(email), String(n), Date.now())
+      .run();
+
+    return jsonResponse(
+      { success: true, email, abstracts_per_reviewer: n },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Admin set reviewer target error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to save setting" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
 // GET/POST /api/admin/reviewers/settings
 async function handleAdminReviewerSettings(request, env, corsHeaders) {
   try {
@@ -1280,7 +1483,10 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
     }
 
     // Ensure the configured number of assigned abstracts (persisted) — general submissions only
-    const targetCount = await getAbstractsPerReviewer(env);
+    const targetCount = await getAbstractsTargetForReviewer(
+      env,
+      reviewer.email,
+    );
 
     const existing = await env.ISIR_DB.prepare(
       `SELECT ra.abstract_id
@@ -5701,6 +5907,196 @@ async function handleUpdateAbstractInvitedSpeaker(
     );
   } catch (error) {
     console.error("Update abstract invited speaker error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+function formatAuthorFullName(author) {
+  if (!author) return "";
+  return `${author.first_name || ""}${
+    author.middle_name ? ` ${author.middle_name}` : ""
+  } ${author.last_name || ""}`
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Admin endpoint: Update presenting and corresponding authors for an abstract
+async function handleUpdateAbstractSpeakers(
+  request,
+  env,
+  corsHeaders,
+  abstractId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!abstractId) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing abstract id" }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const data = await request.json();
+    const presenterAuthorId =
+      data?.presenterAuthorId || data?.presenter_author_id || null;
+    const correspondingAuthorId =
+      data?.correspondingAuthorId || data?.corresponding_author_id || null;
+
+    if (!presenterAuthorId || !correspondingAuthorId) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            "presenterAuthorId and correspondingAuthorId are required",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT id FROM abstractions WHERE id = ?`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!existing) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Abstract not found" }),
+        { status: 404, headers: corsHeaders },
+      );
+    }
+
+    const authorsResult = await env.ISIR_DB.prepare(
+      `SELECT * FROM authors WHERE abstract_id = ? ORDER BY position ASC`,
+    )
+      .bind(abstractId)
+      .all();
+    const authors = authorsResult.results || [];
+
+    const presenter = authors.find((a) => a.id === presenterAuthorId);
+    const corresponding = authors.find((a) => a.id === correspondingAuthorId);
+
+    if (!presenter) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Presenter author was not found on this abstract",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (!corresponding) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Corresponding author was not found on this abstract",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const presenterEmail = String(presenter.email || "").trim();
+    const correspondingEmail = String(corresponding.email || "").trim();
+    if (!presenterEmail) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Selected presenting author must have an email address",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (!correspondingEmail) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Selected corresponding author must have an email address",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const presenterName = formatAuthorFullName(presenter);
+    const correspondingName = formatAuthorFullName(corresponding);
+
+    const statements = [
+      env.ISIR_DB.prepare(
+        `UPDATE authors SET is_presenter = 0, is_corresponding = 0 WHERE abstract_id = ?`,
+      ).bind(abstractId),
+    ];
+
+    if (presenterAuthorId === correspondingAuthorId) {
+      statements.push(
+        env.ISIR_DB.prepare(
+          `UPDATE authors SET is_presenter = 1, is_corresponding = 1 WHERE id = ? AND abstract_id = ?`,
+        ).bind(presenterAuthorId, abstractId),
+      );
+    } else {
+      statements.push(
+        env.ISIR_DB.prepare(
+          `UPDATE authors SET is_presenter = 1 WHERE id = ? AND abstract_id = ?`,
+        ).bind(presenterAuthorId, abstractId),
+        env.ISIR_DB.prepare(
+          `UPDATE authors SET is_corresponding = 1 WHERE id = ? AND abstract_id = ?`,
+        ).bind(correspondingAuthorId, abstractId),
+      );
+    }
+
+    statements.push(
+      env.ISIR_DB.prepare(
+        `UPDATE abstractions SET
+          presenter_name = ?,
+          presenter_email = ?,
+          presenter_author_id = ?,
+          corresponding_name = ?,
+          corresponding_email = ?,
+          corresponding_author_id = ?
+        WHERE id = ?`,
+      ).bind(
+        presenterName,
+        presenterEmail,
+        presenterAuthorId,
+        correspondingName,
+        correspondingEmail,
+        correspondingAuthorId,
+        abstractId,
+      ),
+    );
+
+    await env.ISIR_DB.batch(statements);
+
+    const updatedAuthors = authors.map((author) => ({
+      ...author,
+      is_presenter: author.id === presenterAuthorId ? 1 : 0,
+      is_corresponding: author.id === correspondingAuthorId ? 1 : 0,
+    }));
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Abstract ${abstractId} speakers updated`,
+        data: {
+          presenter_name: presenterName,
+          presenter_email: presenterEmail,
+          presenter_author_id: presenterAuthorId,
+          corresponding_name: correspondingName,
+          corresponding_email: correspondingEmail,
+          corresponding_author_id: correspondingAuthorId,
+          authors: updatedAuthors,
+        },
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Update abstract speakers error:", error);
     return new Response(
       JSON.stringify({
         success: false,

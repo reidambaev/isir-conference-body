@@ -75,6 +75,117 @@ function getAbstractTypeLabel(abstract) {
   return raw;
 }
 
+function formatAuthorDisplayName(author) {
+  if (!author) return "";
+  return `${author.first_name || ""}${
+    author.middle_name ? ` ${author.middle_name}` : ""
+  } ${author.last_name || ""}`
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getAbstractAuthorId(abstract, role) {
+  const authors = abstract?.authors || [];
+  if (role === "presenter") {
+    return (
+      abstract?.presenter_author_id ||
+      authors.find((a) => Number(a.is_presenter) === 1)?.id ||
+      ""
+    );
+  }
+  return (
+    abstract?.corresponding_author_id ||
+    authors.find((a) => Number(a.is_corresponding) === 1)?.id ||
+    ""
+  );
+}
+
+function AbstractSpeakerControls({ abstract, onSave, saving }) {
+  const authors = [...(abstract?.authors || [])].sort(
+    (a, b) => (a.position ?? 0) - (b.position ?? 0),
+  );
+  const presenterId = getAbstractAuthorId(abstract, "presenter");
+  const correspondingId = getAbstractAuthorId(abstract, "corresponding");
+
+  if (authors.length === 0) {
+    return <p className="text-sm text-gray-500">No authors listed.</p>;
+  }
+
+  return (
+    <div className="space-y-3 text-sm">
+      <label className="block">
+        <span className="font-semibold text-gray-700">Presenter</span>
+        <select
+          className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 disabled:opacity-60"
+          value={presenterId}
+          disabled={saving}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (!next || next === presenterId) return;
+            onSave(abstract.id, next, correspondingId || next);
+          }}
+        >
+          {!presenterId && <option value="">Select presenter</option>}
+          {authors.map((author) => (
+            <option
+              key={author.id}
+              value={author.id}
+              disabled={!String(author.email || "").trim()}
+            >
+              {formatAuthorDisplayName(author)}
+              {author.email
+                ? ` (${author.email})`
+                : " — no email (cannot select)"}
+            </option>
+          ))}
+        </select>
+        {presenterId && (
+          <span className="mt-1 block text-xs text-gray-400">
+            {abstract.presenter_email}
+          </span>
+        )}
+      </label>
+      <label className="block">
+        <span className="font-semibold text-gray-700">Corresponding</span>
+        <select
+          className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 disabled:opacity-60"
+          value={correspondingId}
+          disabled={saving}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (!next || next === correspondingId) return;
+            onSave(abstract.id, presenterId || next, next);
+          }}
+        >
+          {!correspondingId && (
+            <option value="">Select corresponding author</option>
+          )}
+          {authors.map((author) => (
+            <option
+              key={author.id}
+              value={author.id}
+              disabled={!String(author.email || "").trim()}
+            >
+              {formatAuthorDisplayName(author)}
+              {author.email
+                ? ` (${author.email})`
+                : " — no email (cannot select)"}
+            </option>
+          ))}
+        </select>
+        {correspondingId && (
+          <span className="mt-1 block text-xs text-gray-400">
+            {abstract.corresponding_email}
+          </span>
+        )}
+      </label>
+      {saving && (
+        <p className="text-xs text-amber-700">Updating speakers…</p>
+      )}
+    </div>
+  );
+}
+
 export default function AdminTab() {
   const [abstracts, setAbstracts] = useState([]);
   const [visaRequests, setVisaRequests] = useState([]);
@@ -133,6 +244,7 @@ export default function AdminTab() {
   const [decisionSendSummary, setDecisionSendSummary] = useState(null);
   const [updatingInvitedSpeakerId, setUpdatingInvitedSpeakerId] =
     useState(null);
+  const [updatingSpeakersId, setUpdatingSpeakersId] = useState(null);
   const [acceptingAllInvitedSpeakers, setAcceptingAllInvitedSpeakers] =
     useState(false);
 
@@ -144,6 +256,14 @@ export default function AdminTab() {
     useState(false);
   const [abstractsPerReviewerMessage, setAbstractsPerReviewerMessage] =
     useState(null); // { type: "success" | "error", text }
+
+  // Per-reviewer assignment targets (Add Reviewers screen)
+  const [reviewerAccounts, setReviewerAccounts] = useState([]);
+  const [reviewerAccountsDefault, setReviewerAccountsDefault] = useState(5);
+  const [reviewerTargetInputs, setReviewerTargetInputs] = useState({});
+  const [savingReviewerTargetEmail, setSavingReviewerTargetEmail] =
+    useState(null);
+  const [reviewerTargetMessage, setReviewerTargetMessage] = useState(null); // { email, type, text }
   const [reviewerOverviewLoading, setReviewerOverviewLoading] = useState(false);
   const [reviewerOverviewError, setReviewerOverviewError] = useState("");
   const [reviewerAbstractScores, setReviewerAbstractScores] = useState([]);
@@ -516,6 +636,7 @@ export default function AdminTab() {
           String(reviewersData.abstracts_per_reviewer),
         );
       }
+      fetchReviewerAccounts(token);
       setReviewerAbstractScores(reviewerAbstractScoresData?.data || []);
       setSpeakerProfileSubmissions(speakerProfilesData.submissions || []);
       setReviewerOverviewError("");
@@ -524,6 +645,82 @@ export default function AdminTab() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReviewerAccounts = async (token) => {
+    try {
+      const res = await fetch("/api/admin/reviewers/list", {
+        headers: { "X-Admin-Token": token || adminToken },
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) return;
+      setReviewerAccounts(data.reviewers || []);
+      if (data.default_target != null) {
+        setReviewerAccountsDefault(data.default_target);
+      }
+      const inputs = {};
+      (data.reviewers || []).forEach((r) => {
+        inputs[r.email] =
+          r.abstracts_target != null ? String(r.abstracts_target) : "";
+      });
+      setReviewerTargetInputs(inputs);
+    } catch (err) {
+      console.error("Failed to load reviewer accounts:", err);
+    }
+  };
+
+  const saveReviewerTarget = async (email) => {
+    const raw = String(reviewerTargetInputs[email] ?? "").trim();
+    let target = null;
+    if (raw !== "") {
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 1 || n > 100) {
+        setReviewerTargetMessage({
+          email,
+          type: "error",
+          text: "Enter a whole number between 1 and 100, or leave blank to use the default.",
+        });
+        return;
+      }
+      target = n;
+    }
+    setSavingReviewerTargetEmail(email);
+    setReviewerTargetMessage(null);
+    try {
+      const res = await fetch("/api/admin/reviewers/target", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Token": adminToken,
+        },
+        body: JSON.stringify({ email, abstracts_per_reviewer: target }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+      setReviewerAccounts((prev) =>
+        prev.map((r) =>
+          r.email === email ? { ...r, abstracts_target: target } : r,
+        ),
+      );
+      setReviewerTargetMessage({
+        email,
+        type: "success",
+        text:
+          target == null
+            ? `Cleared — uses the default (${reviewerAccountsDefault}).`
+            : `Saved — ${target} abstract${target === 1 ? "" : "s"}.`,
+      });
+    } catch (err) {
+      setReviewerTargetMessage({
+        email,
+        type: "error",
+        text: err.message || "Failed to save.",
+      });
+    } finally {
+      setSavingReviewerTargetEmail(null);
     }
   };
 
@@ -867,6 +1064,7 @@ export default function AdminTab() {
           : `${email} added as a reviewer. They can sign in with this email.`,
       );
       setSingleReviewerEmail("");
+      fetchReviewerAccounts();
     } catch (err) {
       console.error("Failed to create reviewer:", err);
       setReviewerCreateError(err?.message || "Failed to create reviewer.");
@@ -959,6 +1157,7 @@ export default function AdminTab() {
       }
 
       setEmailCount(created);
+      fetchReviewerAccounts();
 
       const outSheet = XLSX.utils.json_to_sheet(outputRows);
       const outWb = XLSX.utils.book_new();
@@ -1498,6 +1697,70 @@ export default function AdminTab() {
       alert(err.message || "Failed to update invited speaker status");
     } finally {
       setUpdatingInvitedSpeakerId(null);
+    }
+  };
+
+  const updateAbstractSpeakers = async (
+    abstractId,
+    presenterAuthorId,
+    correspondingAuthorId,
+  ) => {
+    if (!adminToken) {
+      alert("Admin access token is missing.");
+      return;
+    }
+    if (!presenterAuthorId || !correspondingAuthorId) {
+      alert("Both presenting and corresponding authors are required.");
+      return;
+    }
+
+    setUpdatingSpeakersId(abstractId);
+    try {
+      const response = await fetch(
+        `/api/admin/abstracts/${abstractId}/speakers`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Token": adminToken,
+          },
+          body: JSON.stringify({
+            presenterAuthorId,
+            correspondingAuthorId,
+          }),
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "Failed to update abstract speakers");
+      }
+
+      const updated = result.data || {};
+      setAbstracts((prev) =>
+        prev.map((a) =>
+          a.id === abstractId
+            ? {
+                ...a,
+                presenter_name: updated.presenter_name ?? a.presenter_name,
+                presenter_email: updated.presenter_email ?? a.presenter_email,
+                presenter_author_id:
+                  updated.presenter_author_id ?? a.presenter_author_id,
+                corresponding_name:
+                  updated.corresponding_name ?? a.corresponding_name,
+                corresponding_email:
+                  updated.corresponding_email ?? a.corresponding_email,
+                corresponding_author_id:
+                  updated.corresponding_author_id ?? a.corresponding_author_id,
+                authors: updated.authors || a.authors,
+              }
+            : a,
+        ),
+      );
+    } catch (err) {
+      console.error("Error updating abstract speakers:", err);
+      alert(err.message || "Failed to update abstract speakers");
+    } finally {
+      setUpdatingSpeakersId(null);
     }
   };
 
@@ -3056,26 +3319,13 @@ export default function AdminTab() {
                         <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
                           Contact
                         </h4>
-                        <div className="space-y-2 text-sm">
-                          <p className="text-gray-600">
-                            <span className="font-semibold text-gray-700">
-                              Presenter:
-                            </span>{" "}
-                            {currentReviewAbstract.presenter_name}
-                            <span className="text-gray-400 block">
-                              {currentReviewAbstract.presenter_email}
-                            </span>
-                          </p>
-                          <p className="text-gray-600">
-                            <span className="font-semibold text-gray-700">
-                              Corresponding:
-                            </span>{" "}
-                            {currentReviewAbstract.corresponding_name}
-                            <span className="text-gray-400 block">
-                              {currentReviewAbstract.corresponding_email}
-                            </span>
-                          </p>
-                        </div>
+                        <AbstractSpeakerControls
+                          abstract={currentReviewAbstract}
+                          onSave={updateAbstractSpeakers}
+                          saving={
+                            updatingSpeakersId === currentReviewAbstract.id
+                          }
+                        />
                       </div>
                     </div>
 
@@ -3741,26 +3991,12 @@ export default function AdminTab() {
                             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
                               Contact Information
                             </h4>
-                            <div className="space-y-2 text-sm">
-                              <p className="text-gray-600">
-                                <span className="font-semibold text-gray-700">
-                                  Presenter:
-                                </span>{" "}
-                                {abstract.presenter_name}{" "}
-                                <span className="text-gray-400">
-                                  ({abstract.presenter_email})
-                                </span>
-                              </p>
-                              <p className="text-gray-600">
-                                <span className="font-semibold text-gray-700">
-                                  Corresponding:
-                                </span>{" "}
-                                {abstract.corresponding_name}{" "}
-                                <span className="text-gray-400">
-                                  ({abstract.corresponding_email})
-                                </span>
-                              </p>
-                              <div className="mt-3 p-3 bg-white rounded-lg border border-gray-100">
+                            <AbstractSpeakerControls
+                              abstract={abstract}
+                              onSave={updateAbstractSpeakers}
+                              saving={updatingSpeakersId === abstract.id}
+                            />
+                            <div className="mt-3 p-3 bg-white rounded-lg border border-gray-100">
                                 <div className="flex items-center justify-between flex-wrap gap-2">
                                   <div className="text-xs text-gray-600">
                                     <span className="font-semibold text-gray-700">
@@ -3885,7 +4121,6 @@ export default function AdminTab() {
                                   </button>
                                 </div>
                               </div>
-                            </div>
                           </div>
 
                           {/* Authors */}
@@ -4196,26 +4431,11 @@ export default function AdminTab() {
                             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
                               Contact Information
                             </h4>
-                            <div className="space-y-2 text-sm">
-                              <p className="text-gray-600">
-                                <span className="font-semibold text-gray-700">
-                                  Presenter:
-                                </span>{" "}
-                                {abstract.presenter_name}{" "}
-                                <span className="text-gray-400">
-                                  ({abstract.presenter_email})
-                                </span>
-                              </p>
-                              <p className="text-gray-600">
-                                <span className="font-semibold text-gray-700">
-                                  Corresponding:
-                                </span>{" "}
-                                {abstract.corresponding_name}{" "}
-                                <span className="text-gray-400">
-                                  ({abstract.corresponding_email})
-                                </span>
-                              </p>
-                            </div>
+                            <AbstractSpeakerControls
+                              abstract={abstract}
+                              onSave={updateAbstractSpeakers}
+                              saving={updatingSpeakersId === abstract.id}
+                            />
                           </div>
 
                           <div>
@@ -5810,14 +6030,20 @@ export default function AdminTab() {
           {/* Assignment settings */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <h3 className="text-sm font-semibold text-gray-800">
-              Abstracts per reviewer
+              Default abstracts per reviewer
             </h3>
             <p className="text-xs text-gray-500 mt-1 max-w-2xl">
-              Each reviewer is automatically assigned this many abstracts when
-              they open their portal, preferring abstracts with the fewest
-              reviewers so far. Lowering the number does not remove existing
-              assignments beyond hiding extras; raising it tops reviewers up
-              the next time they sign in.
+              Used for reviewers without an individual number. To set the
+              number for a specific reviewer, open{" "}
+              <button
+                type="button"
+                onClick={() => setActiveSection("addReviewers")}
+                className="text-teal-700 font-semibold hover:underline"
+              >
+                Add Reviewers
+              </button>
+              . Assignment prefers abstracts with the fewest reviewers so far,
+              and changes apply the next time a reviewer opens their portal.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <input
@@ -6225,6 +6451,89 @@ export default function AdminTab() {
             {reviewerCreateError && (
               <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {reviewerCreateError}
+              </div>
+            )}
+          </div>
+
+          {/* Per-reviewer abstract counts */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-800">
+                Abstracts per reviewer
+              </h3>
+              <p className="text-xs text-gray-500 mt-1 max-w-2xl">
+                Set how many abstracts each reviewer is assigned. Leave the
+                field blank to use the default ({reviewerAccountsDefault}).
+                Changes apply the next time the reviewer opens their portal;
+                extra abstracts are picked from the ones with the fewest
+                reviewers so far.
+              </p>
+            </div>
+            {reviewerAccounts.length > 0 ? (
+              <div className="divide-y divide-gray-100">
+                {reviewerAccounts.map((acct) => (
+                  <div
+                    key={acct.email}
+                    className="px-5 py-3 flex flex-wrap items-center gap-3"
+                  >
+                    <div className="flex-1 min-w-[200px]">
+                      <p className="text-sm font-medium text-gray-900 break-all">
+                        {acct.email}
+                        {!acct.active && (
+                          <span className="ml-2 inline-flex px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[11px]">
+                            inactive
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Currently assigned: {acct.assigned_count} • Target:{" "}
+                        {acct.abstracts_target != null
+                          ? acct.abstracts_target
+                          : `default (${reviewerAccountsDefault})`}
+                      </p>
+                      {reviewerTargetMessage?.email === acct.email && (
+                        <p
+                          className={`mt-1 text-xs ${
+                            reviewerTargetMessage.type === "success"
+                              ? "text-emerald-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {reviewerTargetMessage.text}
+                        </p>
+                      )}
+                    </div>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={reviewerTargetInputs[acct.email] ?? ""}
+                      placeholder={`${reviewerAccountsDefault}`}
+                      onChange={(e) =>
+                        setReviewerTargetInputs((prev) => ({
+                          ...prev,
+                          [acct.email]: e.target.value,
+                        }))
+                      }
+                      className="w-20 px-3 py-1.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-purple-400 focus:border-purple-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => saveReviewerTarget(acct.email)}
+                      disabled={savingReviewerTargetEmail === acct.email}
+                      className="px-3 py-1.5 rounded-lg bg-purple-700 text-white text-xs font-semibold hover:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {savingReviewerTargetEmail === acct.email
+                        ? "Saving..."
+                        : "Save"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="px-5 py-6 text-sm text-gray-500">
+                No reviewer accounts yet. Add reviewers above to set their
+                abstract counts.
               </div>
             )}
           </div>
