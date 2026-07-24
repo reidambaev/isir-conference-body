@@ -1101,6 +1101,27 @@ async function handleAdminCreateReviewer(request, env, corsHeaders) {
         corsHeaders,
       );
     }
+
+    // Optional per-reviewer abstract count set at creation time
+    let abstractsTarget = null;
+    if (
+      data?.abstracts_per_reviewer != null &&
+      data.abstracts_per_reviewer !== ""
+    ) {
+      const n = Number(data.abstracts_per_reviewer);
+      if (!Number.isInteger(n) || n < 1 || n > MAX_ABSTRACTS_PER_REVIEWER) {
+        return jsonResponse(
+          {
+            success: false,
+            error: `abstracts_per_reviewer must be an integer between 1 and ${MAX_ABSTRACTS_PER_REVIEWER}`,
+          },
+          400,
+          corsHeaders,
+        );
+      }
+      abstractsTarget = n;
+    }
+
     const now = Date.now();
 
     const existing = await env.ISIR_DB.prepare(
@@ -1115,22 +1136,36 @@ async function handleAdminCreateReviewer(request, env, corsHeaders) {
       )
         .bind(now, email)
         .run();
-      return jsonResponse(
-        { success: true, email, existing: true },
-        200,
-        corsHeaders,
-      );
+    } else {
+      await env.ISIR_DB.prepare(
+        `INSERT INTO reviewers (email, password_hash, active, created_at, updated_at)
+         VALUES (?, '', 1, ?, ?)`,
+      )
+        .bind(email, now, now)
+        .run();
     }
 
-    await env.ISIR_DB.prepare(
-      `INSERT INTO reviewers (email, password_hash, active, created_at, updated_at)
-       VALUES (?, '', 1, ?, ?)`,
-    )
-      .bind(email, now, now)
-      .run();
+    if (abstractsTarget != null) {
+      await ensureReviewerSettingsTable(env);
+      await env.ISIR_DB.prepare(
+        `INSERT INTO reviewer_settings (key, value, updated_at, updated_by)
+         VALUES (?, ?, ?, 'admin')
+         ON CONFLICT(key) DO UPDATE SET
+           value = excluded.value,
+           updated_at = excluded.updated_at,
+           updated_by = excluded.updated_by`,
+      )
+        .bind(reviewerTargetSettingKey(email), String(abstractsTarget), now)
+        .run();
+    }
 
     return jsonResponse(
-      { success: true, email, existing: false },
+      {
+        success: true,
+        email,
+        existing: Boolean(existing?.email),
+        abstracts_per_reviewer: abstractsTarget,
+      },
       200,
       corsHeaders,
     );

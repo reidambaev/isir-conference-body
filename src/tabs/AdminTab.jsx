@@ -471,6 +471,7 @@ export default function AdminTab() {
   const [emailCount, setEmailCount] = useState(0);
   const [reviewerCreateError, setReviewerCreateError] = useState("");
   const [singleReviewerEmail, setSingleReviewerEmail] = useState("");
+  const [singleReviewerCount, setSingleReviewerCount] = useState("");
   const [singleReviewerMessage, setSingleReviewerMessage] = useState("");
   const [singleReviewerLoading, setSingleReviewerLoading] = useState(false);
   const [adminToken, setAdminToken] = useState("");
@@ -1019,14 +1020,18 @@ export default function AdminTab() {
     }
   }, [activeSection, fetchEnvVars, fetchDiscountAdmin]);
 
-  const createReviewerAccount = async (email) => {
+  const createReviewerAccount = async (email, abstractsCount) => {
+    const body = { email };
+    if (abstractsCount != null) {
+      body.abstracts_per_reviewer = abstractsCount;
+    }
     const res = await fetch("/api/admin/reviewers/create", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Admin-Token": adminToken.trim(),
       },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify(body),
     });
     const json = await res.json().catch(() => null);
     if (!res.ok || !json || json.success !== true) {
@@ -1048,6 +1053,20 @@ export default function AdminTab() {
       setReviewerCreateError("Enter a valid reviewer email address.");
       return;
     }
+
+    let abstractsCount = null;
+    const rawCount = String(singleReviewerCount).trim();
+    if (rawCount !== "") {
+      const n = Number(rawCount);
+      if (!Number.isInteger(n) || n < 1 || n > 100) {
+        setReviewerCreateError(
+          "Number of abstracts must be a whole number between 1 and 100 (or leave it blank for the default).",
+        );
+        return;
+      }
+      abstractsCount = n;
+    }
+
     if (!adminToken.trim()) {
       setReviewerCreateError(
         "Admin access token missing. Open /admin with ?admin=YOUR_TOKEN.",
@@ -1057,13 +1076,18 @@ export default function AdminTab() {
 
     setSingleReviewerLoading(true);
     try {
-      const json = await createReviewerAccount(email);
+      const json = await createReviewerAccount(email, abstractsCount);
+      const countNote =
+        abstractsCount != null
+          ? ` They will be assigned ${abstractsCount} abstract${abstractsCount === 1 ? "" : "s"}.`
+          : "";
       setSingleReviewerMessage(
         json.existing
-          ? `${email} was already a reviewer (reactivated if needed). They can sign in with this email.`
-          : `${email} added as a reviewer. They can sign in with this email.`,
+          ? `${email} was already a reviewer (reactivated if needed). They can sign in with this email.${countNote}`
+          : `${email} added as a reviewer. They can sign in with this email.${countNote}`,
       );
       setSingleReviewerEmail("");
+      setSingleReviewerCount("");
       fetchReviewerAccounts();
     } catch (err) {
       console.error("Failed to create reviewer:", err);
@@ -6396,6 +6420,21 @@ export default function AdminTab() {
                   placeholder="reviewer@institution.edu"
                   className="w-full sm:max-w-md border border-purple-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
                 />
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-purple-900 whitespace-nowrap">
+                    Abstracts
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={singleReviewerCount}
+                    onChange={(e) => setSingleReviewerCount(e.target.value)}
+                    placeholder={`${reviewerAccountsDefault}`}
+                    title={`Number of abstracts to assign (default ${reviewerAccountsDefault})`}
+                    className="w-20 border border-purple-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={handleGenerateSingleReviewer}
