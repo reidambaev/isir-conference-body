@@ -2625,7 +2625,7 @@ async function handleGetRegistrations(request, env, corsHeaders) {
     if (auth) return auth;
 
     const result = await env.ISIR_DB.prepare(
-      "SELECT * FROM registrations ORDER BY registration_date DESC LIMIT 100",
+      "SELECT * FROM registrations ORDER BY registration_date DESC",
     ).all();
 
     return new Response(
