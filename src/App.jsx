@@ -14,6 +14,7 @@ import {
   CommitteeTab,
   SpeakersTab,
   ScheduleTab,
+  ProgramTab,
   SubmissionTab,
   RegistrationTab,
   DeadlinesTab,
@@ -185,6 +186,8 @@ export default function App() {
         url.pathname === "/accessibility" || url.pathname === "/accessibility/";
       const wantsSchedule =
         url.pathname === "/schedule" || url.pathname === "/schedule/";
+      const wantsProgram =
+        url.pathname === "/program" || url.pathname === "/program/";
       const wantsTravel =
         url.pathname === "/travel" ||
         url.pathname === "/travel/" ||
@@ -203,6 +206,8 @@ export default function App() {
         setActiveTab("accessibility");
       } else if (wantsSchedule) {
         setActiveTab("schedule");
+      } else if (wantsProgram) {
+        setActiveTab("program");
       } else if (wantsTravel) {
         setActiveTab("travel");
       } else if (wantsRegistration) {
@@ -235,6 +240,8 @@ export default function App() {
         return <SpeakersTab />;
       case "schedule":
         return <ScheduleTab />;
+      case "program":
+        return <ProgramTab />;
       case "submission":
         return <SubmissionTab />;
       case "registration":
@@ -414,7 +421,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main
-        className={`mx-auto px-4 sm:px-6 lg:px-8 py-8 ${activeTab === "schedule" ? "max-w-screen-2xl" : "max-w-6xl"}`}
+        className={`mx-auto px-4 sm:px-6 lg:px-8 py-8 ${activeTab === "schedule" || activeTab === "program" ? "max-w-screen-2xl" : "max-w-6xl"}`}
       >
         <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
           {renderTabContent()}
