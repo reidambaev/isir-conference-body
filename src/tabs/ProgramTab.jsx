@@ -100,6 +100,18 @@ function inferEventType(title) {
 }
 
 function Talk({ time, title, speaker, affiliation, compact = false }) {
+  // Placeholder slots (time + title only): keep on one line when compact
+  if (compact && time && title && !speaker) {
+    return (
+      <div className="flex gap-2 items-baseline py-1 border-t border-black/5 first:border-t-0 text-xs">
+        <span className="font-bold tabular-nums text-gray-500 shrink-0">
+          {time}
+        </span>
+        <span className="font-semibold text-gray-800">{title}</span>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`${compact ? "py-2" : "py-3"} border-t border-black/5 first:border-t-0`}
@@ -679,12 +691,12 @@ const ProgramTab = () => {
           room="Room A"
           note="Oral presentations (will be selected from abstracts)"
         >
-          <Talk time="4:00 – 4:11 PM" title="Clinical 1" />
-          <Talk time="4:11 – 4:22 PM" title="Experimental 1" />
-          <Talk time="4:22 – 4:33 PM" title="Clinical 2" />
-          <Talk time="4:33 – 4:44 PM" title="Experimental 2" />
-          <Talk time="4:44 – 4:55 PM" title="Clinical 3" />
-          <Talk time="4:55 – 5:06 PM" title="Experimental 3" />
+          <Talk compact time="4:00 – 4:11 PM" title="Clinical 1" />
+          <Talk compact time="4:11 – 4:22 PM" title="Experimental 1" />
+          <Talk compact time="4:22 – 4:33 PM" title="Clinical 2" />
+          <Talk compact time="4:33 – 4:44 PM" title="Experimental 2" />
+          <Talk compact time="4:44 – 4:55 PM" title="Clinical 3" />
+          <Talk compact time="4:55 – 5:06 PM" title="Experimental 3" />
         </Session>
 
         <Session

@@ -693,6 +693,44 @@ function jsonResponse(obj, status, corsHeaders) {
   return new Response(JSON.stringify(obj), { status, headers: corsHeaders });
 }
 
+/** D1 allows at most 100 bound parameters per query. */
+const D1_MAX_BOUND_PARAMS = 100;
+
+/**
+ * Run a query with an IN (?) list, chunking ids so we stay under D1's
+ * bound-parameter limit. `buildSql(placeholders)` returns the full SQL.
+ * `extraBinds` are prepended on every chunk (e.g. a reviewer email).
+ */
+async function d1AllWhereIn(db, buildSql, ids, extraBinds = []) {
+  if (!ids.length) return [];
+  const chunkSize = Math.max(1, D1_MAX_BOUND_PARAMS - extraBinds.length);
+  const out = [];
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    const placeholders = chunk.map(() => "?").join(",");
+    const res = await db
+      .prepare(buildSql(placeholders))
+      .bind(...extraBinds, ...chunk)
+      .all();
+    out.push(...(res.results || []));
+  }
+  return out;
+}
+
+/** Like d1AllWhereIn but for statements that use .run() (UPDATE/DELETE). */
+async function d1RunWhereIn(db, buildSql, ids, extraBinds = []) {
+  if (!ids.length) return;
+  const chunkSize = Math.max(1, D1_MAX_BOUND_PARAMS - extraBinds.length);
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    const placeholders = chunk.map(() => "?").join(",");
+    await db
+      .prepare(buildSql(placeholders))
+      .bind(...extraBinds, ...chunk)
+      .run();
+  }
+}
+
 function normalizeEmail(value) {
   if (!value) return "";
   const s = String(value).trim();
@@ -1587,35 +1625,32 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
       );
     }
 
-    const placeholders = assignedIds.map(() => "?").join(",");
-    const abstractsResult = await env.ISIR_DB.prepare(
-      `SELECT * FROM abstractions WHERE id IN (${placeholders})`,
-    )
-      .bind(...assignedIds)
-      .all();
-
-    const abstracts = abstractsResult.results || [];
+    const abstracts = await d1AllWhereIn(
+      env.ISIR_DB,
+      (ph) => `SELECT * FROM abstractions WHERE id IN (${ph})`,
+      assignedIds,
+    );
 
     // Attach authors/affiliations
-    const authorsResult = await env.ISIR_DB.prepare(
-      `SELECT * FROM authors WHERE abstract_id IN (${placeholders})`,
-    )
-      .bind(...assignedIds)
-      .all();
-    const affiliationsResult = await env.ISIR_DB.prepare(
-      `SELECT * FROM affiliations WHERE abstract_id IN (${placeholders})`,
-    )
-      .bind(...assignedIds)
-      .all();
+    const authorRows = await d1AllWhereIn(
+      env.ISIR_DB,
+      (ph) => `SELECT * FROM authors WHERE abstract_id IN (${ph})`,
+      assignedIds,
+    );
+    const affiliationRows = await d1AllWhereIn(
+      env.ISIR_DB,
+      (ph) => `SELECT * FROM affiliations WHERE abstract_id IN (${ph})`,
+      assignedIds,
+    );
 
     const authorsBy = {};
-    (authorsResult.results || []).forEach((au) => {
+    authorRows.forEach((au) => {
       if (!authorsBy[au.abstract_id]) authorsBy[au.abstract_id] = [];
       authorsBy[au.abstract_id].push(au);
     });
 
     const affBy = {};
-    (affiliationsResult.results || []).forEach((af) => {
+    affiliationRows.forEach((af) => {
       if (!affBy[af.abstract_id]) affBy[af.abstract_id] = [];
       affBy[af.abstract_id].push(af);
     });
@@ -1629,17 +1664,19 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
     const mapById = Object.fromEntries(abstracts.map((a) => [a.id, a]));
     const ordered = assignedIds.map((id) => mapById[id]).filter(Boolean);
 
-    const existingReviews = await env.ISIR_DB.prepare(
-      `SELECT * FROM reviews WHERE reviewer_email = ? AND abstract_id IN (${placeholders})`,
-    )
-      .bind(reviewer.email, ...assignedIds)
-      .all();
+    const existingReviewRows = await d1AllWhereIn(
+      env.ISIR_DB,
+      (ph) =>
+        `SELECT * FROM reviews WHERE reviewer_email = ? AND abstract_id IN (${ph})`,
+      assignedIds,
+      [reviewer.email],
+    );
 
     return jsonResponse(
       {
         success: true,
         data: ordered,
-        existingReviews: existingReviews.results || [],
+        existingReviews: existingReviewRows,
       },
       200,
       corsHeaders,
@@ -5656,36 +5693,33 @@ async function handleGetAbstracts(request, env, corsHeaders) {
     const abstracts = abstractsResult.results || [];
 
     // Get all authors and affiliations for these abstracts
+    // (chunked IN queries — D1 allows at most 100 bound params per statement)
     if (abstracts.length > 0) {
       const abstractIds = abstracts.map((a) => a.id);
-      const placeholders = abstractIds.map(() => "?").join(",");
 
-      // Get authors
-      const authorsResult = await env.ISIR_DB.prepare(
-        `SELECT * FROM authors WHERE abstract_id IN (${placeholders})`,
-      )
-        .bind(...abstractIds)
-        .all();
-
-      // Get affiliations
-      const affiliationsResult = await env.ISIR_DB.prepare(
-        `SELECT * FROM affiliations WHERE abstract_id IN (${placeholders})`,
-      )
-        .bind(...abstractIds)
-        .all();
+      const authorRows = await d1AllWhereIn(
+        env.ISIR_DB,
+        (ph) => `SELECT * FROM authors WHERE abstract_id IN (${ph})`,
+        abstractIds,
+      );
+      const affiliationRows = await d1AllWhereIn(
+        env.ISIR_DB,
+        (ph) => `SELECT * FROM affiliations WHERE abstract_id IN (${ph})`,
+        abstractIds,
+      );
 
       // Group authors and affiliations by abstract_id
       const authorsByAbstract = {};
       const affiliationsByAbstract = {};
 
-      (authorsResult.results || []).forEach((author) => {
+      authorRows.forEach((author) => {
         if (!authorsByAbstract[author.abstract_id]) {
           authorsByAbstract[author.abstract_id] = [];
         }
         authorsByAbstract[author.abstract_id].push(author);
       });
 
-      (affiliationsResult.results || []).forEach((aff) => {
+      affiliationRows.forEach((aff) => {
         if (!affiliationsByAbstract[aff.abstract_id]) {
           affiliationsByAbstract[aff.abstract_id] = [];
         }
@@ -6171,14 +6205,15 @@ async function handleAcceptAllInvitedSpeakerAbstracts(
     }
 
     const reviewedAt = Date.now();
-    const placeholders = ids.map(() => "?").join(",");
-    await env.ISIR_DB.prepare(
-      `UPDATE abstractions
+    await d1RunWhereIn(
+      env.ISIR_DB,
+      (ph) =>
+        `UPDATE abstractions
        SET status = 'accepted', rejection_reason = NULL, reviewed_at = ?
-       WHERE id IN (${placeholders})`,
-    )
-      .bind(reviewedAt, ...ids)
-      .run();
+       WHERE id IN (${ph})`,
+      ids,
+      [reviewedAt],
+    );
 
     return new Response(
       JSON.stringify({
@@ -6290,13 +6325,12 @@ async function handleBulkSendAbstractConfirmations(request, env, corsHeaders) {
 
     let rows = [];
     if (ids && ids.length > 0) {
-      const placeholders = ids.map(() => "?").join(",");
-      const res = await env.ISIR_DB.prepare(
-        `SELECT * FROM abstractions WHERE id IN (${placeholders}) ORDER BY submission_date ASC`,
-      )
-        .bind(...ids)
-        .all();
-      rows = res.results || [];
+      rows = await d1AllWhereIn(
+        env.ISIR_DB,
+        (ph) =>
+          `SELECT * FROM abstractions WHERE id IN (${ph}) ORDER BY submission_date ASC`,
+        ids,
+      );
     } else {
       const res = await env.ISIR_DB.prepare(
         `SELECT * FROM abstractions ORDER BY submission_date ASC LIMIT 1000`,
@@ -6447,13 +6481,12 @@ async function handleBulkSendAbstractDecisions(request, env, corsHeaders) {
 
     let rows = [];
     if (ids && ids.length > 0) {
-      const placeholders = ids.map(() => "?").join(",");
-      const res = await env.ISIR_DB.prepare(
-        `SELECT * FROM abstractions WHERE id IN (${placeholders}) ORDER BY submission_date ASC`,
-      )
-        .bind(...ids)
-        .all();
-      rows = res.results || [];
+      rows = await d1AllWhereIn(
+        env.ISIR_DB,
+        (ph) =>
+          `SELECT * FROM abstractions WHERE id IN (${ph}) ORDER BY submission_date ASC`,
+        ids,
+      );
     } else {
       const res = await env.ISIR_DB.prepare(
         `SELECT * FROM abstractions
