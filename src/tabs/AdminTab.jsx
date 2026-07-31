@@ -256,9 +256,6 @@ export default function AdminTab() {
   const [abstractToDelete, setAbstractToDelete] = useState(null);
   const [deleteConfirmTitle, setDeleteConfirmTitle] = useState("");
   const [deletingAbstractId, setDeletingAbstractId] = useState(null);
-  const [trashedAbstracts, setTrashedAbstracts] = useState([]);
-  const [trashLoading, setTrashLoading] = useState(false);
-  const [restoringAbstractId, setRestoringAbstractId] = useState(null);
 
   // Reviewer overview state
   const [reviewerOverview, setReviewerOverview] = useState(null);
@@ -600,7 +597,6 @@ export default function AdminTab() {
     );
     setReviewerAbstractScores(demo.reviewerAbstractScores);
     setSpeakerProfileSubmissions(demo.speakerProfileSubmissions);
-    setTrashedAbstracts(demo.trashedAbstracts);
     setReviewerOverviewError("");
     setActiveSection("registrationTotals");
   }, []);
@@ -1072,10 +1068,7 @@ export default function AdminTab() {
     if (activeSection === "discount") {
       fetchDiscountAdmin();
     }
-    if (activeSection === "abstractTrash" && adminToken && !isLocalDemo) {
-      fetchTrashedAbstracts(adminToken);
-    }
-  }, [activeSection, fetchEnvVars, fetchDiscountAdmin, adminToken, isLocalDemo]);
+  }, [activeSection, fetchEnvVars, fetchDiscountAdmin]);
 
   const createReviewerAccount = async (email, abstractsCount) => {
     const body = { email };
@@ -1792,26 +1785,6 @@ export default function AdminTab() {
     setDeleteConfirmTitle("");
   };
 
-  const fetchTrashedAbstracts = async (token = adminToken) => {
-    if (!token) return;
-    setTrashLoading(true);
-    try {
-      const response = await fetch("/api/admin/abstracts/trash", {
-        headers: { "X-Admin-Token": token },
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.error || "Failed to load trash");
-      }
-      setTrashedAbstracts(result.data || []);
-    } catch (err) {
-      console.error("Error loading trashed abstracts:", err);
-      alert(err.message || "Failed to load trash");
-    } finally {
-      setTrashLoading(false);
-    }
-  };
-
   const deleteAbstract = async () => {
     if (!adminToken) {
       alert("Admin access token is missing.");
@@ -1842,12 +1815,7 @@ export default function AdminTab() {
       }
 
       const deletedId = abstractToDelete.id;
-      const trashedRow = {
-        ...abstractToDelete,
-        deleted_at: result.deleted_at || Date.now(),
-      };
       setAbstracts((prev) => prev.filter((a) => a.id !== deletedId));
-      setTrashedAbstracts((prev) => [trashedRow, ...prev.filter((a) => a.id !== deletedId)]);
       setExpandedAbstracts((prev) => {
         const next = new Set(prev);
         next.delete(deletedId);
@@ -1865,46 +1833,6 @@ export default function AdminTab() {
       alert(err.message || "Failed to delete abstract");
     } finally {
       setDeletingAbstractId(null);
-    }
-  };
-
-  const restoreAbstract = async (abstractId) => {
-    if (!adminToken) {
-      alert("Admin access token is missing.");
-      return;
-    }
-    if (!abstractId) return;
-
-    setRestoringAbstractId(abstractId);
-    try {
-      const response = await fetch(
-        `/api/admin/abstracts/${encodeURIComponent(abstractId)}/restore`,
-        {
-          method: "POST",
-          headers: { "X-Admin-Token": adminToken },
-        },
-      );
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.error || "Failed to restore abstract");
-      }
-
-      const restored = trashedAbstracts.find((a) => a.id === abstractId);
-      setTrashedAbstracts((prev) => prev.filter((a) => a.id !== abstractId));
-      if (restored) {
-        const { deleted_at: _removed, ...activeRow } = restored;
-        setAbstracts((prev) => {
-          if (prev.some((a) => a.id === abstractId)) return prev;
-          return [{ ...activeRow, deleted_at: null }, ...prev];
-        });
-      } else {
-        await fetchAllData(adminToken);
-      }
-    } catch (err) {
-      console.error("Error restoring abstract:", err);
-      alert(err.message || "Failed to restore abstract");
-    } finally {
-      setRestoringAbstractId(null);
     }
   };
 
@@ -2610,29 +2538,12 @@ export default function AdminTab() {
             onClick={() => setActiveSection("registrationTotals")}
             className="bg-amber-500/20 backdrop-blur-sm rounded-lg px-4 py-2 border border-amber-400/40 text-left hover:bg-amber-500/30 transition-colors"
           >
-            <span className="text-amber-200 text-sm">Paid registrations</span>
+            <span className="text-amber-200 text-sm">Registrations</span>
             <span className="text-white font-bold ml-2">
               {registrationTotals.confirmedCount}
             </span>
             <span className="block text-xs text-amber-200/70 mt-0.5">
-              of {registrationTotals.total} total
-              {registrationTotals.pendingCount > 0
-                ? ` · ${registrationTotals.pendingCount} pending`
-                : ""}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSection("registrationTotals")}
-            className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 text-left hover:bg-white/15 transition-colors"
-          >
-            <span className="text-slate-300 text-sm">Confirmed revenue</span>
-            <span className="text-white font-bold ml-2">
-              $
-              {registrationTotals.revenueConfirmed.toLocaleString(undefined, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}
+              {registrationTotals.pendingCount} pending
             </span>
           </button>
           <button
@@ -2668,181 +2579,177 @@ export default function AdminTab() {
         </div>
       </div>
 
-      {/* Navigation — grouped for scanning */}
-      <nav className="space-y-3" aria-label="Admin sections">
-        {[
-          {
-            label: "Overview",
-            items: [
-              {
-                id: "registrationTotals",
-                label: "Totals",
-                activeClass: "bg-amber-600 text-white shadow-md",
-              },
-            ],
-          },
-          {
-            label: "Registrations",
-            items: [
-              {
-                id: "registrations",
-                label: "All registrations",
-                activeClass: "bg-blue-600 text-white shadow-md",
-              },
-              {
-                id: "trainees",
-                label: "Trainee applications",
-                activeClass: "bg-emerald-600 text-white shadow-md",
-              },
-            ],
-          },
-          {
-            label: "Abstracts",
-            items: [
-              {
-                id: "abstracts",
-                label: "Submissions",
-                activeClass: "bg-blue-600 text-white shadow-md",
-                onClick: () => {
-                  setActiveSection("abstracts");
-                  if (
-                    abstractViewMode === "review" &&
-                    reviewPool === "invited"
-                  ) {
-                    setAbstractViewMode("cards");
-                  }
-                },
-                isActive:
-                  activeSection === "abstracts" &&
-                  !(
-                    abstractViewMode === "review" && reviewPool === "invited"
-                  ),
-              },
-              {
-                id: "invitedSpeakerAbstracts",
-                label: "Invited speakers",
-                activeClass: "bg-orange-600 text-white shadow-md",
-                onClick: () => {
-                  setActiveSection("invitedSpeakerAbstracts");
-                  if (
-                    abstractViewMode === "review" &&
-                    reviewPool === "general"
-                  ) {
-                    setAbstractViewMode("cards");
-                  }
-                },
-                isActive:
-                  activeSection === "invitedSpeakerAbstracts" ||
-                  (abstractViewMode === "review" && reviewPool === "invited"),
-              },
-              {
-                id: "abstractReviewScores",
-                label: "Review scores",
-                activeClass: "bg-teal-600 text-white shadow-md",
-              },
-              {
-                id: "abstractTrash",
-                label: "Trash",
-                activeClass: "bg-slate-700 text-white shadow-md",
-                badge: trashedAbstracts.length || null,
-              },
-            ],
-          },
-          {
-            label: "Speakers & travel",
-            items: [
-              {
-                id: "visa",
-                label: "Visa requests",
-                activeClass: "bg-blue-600 text-white shadow-md",
-              },
-              {
-                id: "speakerHotel",
-                label: "Speaker hotel",
-                activeClass: "bg-cyan-600 text-white shadow-md",
-              },
-              {
-                id: "speakerInvites",
-                label: "Invite links",
-                activeClass: "bg-fuchsia-600 text-white shadow-md",
-              },
-              {
-                id: "speakerProfiles",
-                label: "Profile queue",
-                activeClass: "bg-rose-600 text-white shadow-md",
-                badge: pendingSpeakerProfileCount || null,
-              },
-            ],
-          },
-          {
-            label: "Reviewers",
-            items: [
-              {
-                id: "reviewers",
-                label: "Overview",
-                activeClass: "bg-indigo-600 text-white shadow-md",
-              },
-              {
-                id: "addReviewers",
-                label: "Add reviewers",
-                activeClass: "bg-purple-600 text-white shadow-md",
-              },
-            ],
-          },
-          {
-            label: "Settings",
-            items: [
-              {
-                id: "discount",
-                label: "Discount",
-                activeClass: "bg-lime-600 text-white shadow-md",
-              },
-              {
-                id: "environment",
-                label: "Environment",
-                activeClass: "bg-slate-700 text-white shadow-md",
-              },
-            ],
-          },
-        ].map((group) => (
-          <div
-            key={group.label}
-            className="flex flex-wrap items-center gap-2"
-          >
-            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400 w-full sm:w-28 sm:shrink-0">
-              {group.label}
-            </span>
-            <div className="flex flex-wrap gap-1 bg-white rounded-xl shadow-sm border border-gray-100 p-1">
-              {group.items.map((item) => {
-                const isActive =
-                  item.isActive != null
-                    ? item.isActive
-                    : activeSection === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={
-                      item.onClick || (() => setActiveSection(item.id))
+      {/* Navigation — B2 segmented categories + B4 eyebrow tray */}
+      <nav className="space-y-2" aria-label="Admin sections">
+        {(() => {
+          const navGroups = [
+            {
+              id: "overview",
+              label: "Overview",
+              short: "Overview",
+              items: [{ id: "registrationTotals", label: "Totals" }],
+            },
+            {
+              id: "registrations",
+              label: "Registrations",
+              short: "Regs",
+              items: [
+                { id: "registrations", label: "All registrations" },
+                { id: "trainees", label: "Trainee applications" },
+              ],
+            },
+            {
+              id: "abstracts",
+              label: "Abstracts",
+              short: "Abstracts",
+              items: [
+                {
+                  id: "abstracts",
+                  label: "Submissions",
+                  onClick: () => {
+                    setActiveSection("abstracts");
+                    if (
+                      abstractViewMode === "review" &&
+                      reviewPool === "invited"
+                    ) {
+                      setAbstractViewMode("cards");
                     }
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      isActive
-                        ? item.activeClass
-                        : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    {item.label}
-                    {item.badge != null && item.badge > 0 ? (
-                      <span className="ml-2 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-white/25 px-1.5 text-xs">
-                        {item.badge}
-                      </span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+                  },
+                  isActive:
+                    activeSection === "abstracts" &&
+                    !(
+                      abstractViewMode === "review" && reviewPool === "invited"
+                    ),
+                },
+                {
+                  id: "invitedSpeakerAbstracts",
+                  label: "Invited speakers",
+                  onClick: () => {
+                    setActiveSection("invitedSpeakerAbstracts");
+                    if (
+                      abstractViewMode === "review" &&
+                      reviewPool === "general"
+                    ) {
+                      setAbstractViewMode("cards");
+                    }
+                  },
+                  isActive:
+                    activeSection === "invitedSpeakerAbstracts" ||
+                    (abstractViewMode === "review" &&
+                      reviewPool === "invited"),
+                },
+                { id: "abstractReviewScores", label: "Review scores" },
+              ],
+            },
+            {
+              id: "speakers",
+              label: "Speakers & travel",
+              short: "Speakers",
+              items: [
+                { id: "visa", label: "Visa requests" },
+                { id: "speakerHotel", label: "Speaker hotel" },
+                { id: "speakerInvites", label: "Invite links" },
+                {
+                  id: "speakerProfiles",
+                  label: "Profile queue",
+                  badge: pendingSpeakerProfileCount || null,
+                },
+              ],
+            },
+            {
+              id: "reviewers",
+              label: "Reviewers",
+              short: "Reviewers",
+              items: [
+                { id: "reviewers", label: "Overview" },
+                { id: "addReviewers", label: "Add reviewers" },
+              ],
+            },
+            {
+              id: "settings",
+              label: "Settings",
+              short: "Settings",
+              items: [
+                { id: "discount", label: "Discount" },
+                { id: "environment", label: "Environment" },
+              ],
+            },
+          ];
+
+          const activeGroup =
+            navGroups.find((g) =>
+              g.items.some((item) =>
+                item.isActive != null
+                  ? item.isActive
+                  : activeSection === item.id,
+              ),
+            ) || navGroups[0];
+
+          const openGroup = (group) => {
+            const first = group.items[0];
+            if (first?.onClick) first.onClick();
+            else if (first?.id) setActiveSection(first.id);
+          };
+
+          return (
+            <>
+              <div className="inline-flex flex-wrap gap-0.5 p-1 rounded-xl bg-slate-100 border border-slate-200">
+                {navGroups.map((group) => {
+                  const isActive = group.id === activeGroup.id;
+                  return (
+                    <button
+                      key={group.id}
+                      type="button"
+                      onClick={() => openGroup(group)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                        isActive
+                          ? "bg-slate-800 text-white"
+                          : "text-slate-600 hover:bg-white hover:text-slate-900"
+                      }`}
+                    >
+                      {group.short}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">
+                  {activeGroup.label}
+                </span>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  {activeGroup.items.map((item) => {
+                    const isActive =
+                      item.isActive != null
+                        ? item.isActive
+                        : activeSection === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={
+                          item.onClick || (() => setActiveSection(item.id))
+                        }
+                        className={`text-sm font-medium transition-colors ${
+                          isActive
+                            ? "text-amber-700 underline underline-offset-4 decoration-2"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        {item.label}
+                        {item.badge != null && item.badge > 0 ? (
+                          <span className="ml-1.5 inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-rose-100 px-1 text-[10px] font-bold text-rose-700">
+                            {item.badge}
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          );
+        })()}
       </nav>
 
       {/* Abstract Submissions Section (+ invited review mode reuses review UI) */}
@@ -4427,8 +4334,7 @@ export default function AdminTab() {
                                       Danger zone:
                                     </span>{" "}
                                     Delete this abstract from admin, reviewers,
-                                    and emails. You can restore it later from
-                                    Abstract trash.
+                                    and emails. Soft-deleted in the database.
                                   </div>
                                   <button
                                     type="button"
@@ -4872,8 +4778,7 @@ export default function AdminTab() {
                                     Danger zone:
                                   </span>{" "}
                                   Delete this abstract from admin, reviewers,
-                                  and emails. You can restore it later from
-                                  Abstract trash.
+                                  and emails. Soft-deleted in the database.
                                 </div>
                                 <button
                                   type="button"
@@ -5186,95 +5091,6 @@ export default function AdminTab() {
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Abstract Trash */}
-      {activeSection === "abstractTrash" && (
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Abstract trash
-              </h2>
-              <p className="text-gray-500 text-sm mt-1 max-w-2xl">
-                Soft-deleted abstracts are hidden from submissions, reviewers,
-                and email tools, but kept in the database so you can restore
-                them.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => fetchTrashedAbstracts(adminToken)}
-              disabled={trashLoading}
-              className="px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-60"
-            >
-              {trashLoading ? "Refreshing…" : "Refresh trash"}
-            </button>
-          </div>
-
-          {trashLoading && trashedAbstracts.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center text-gray-500">
-              Loading trash…
-            </div>
-          ) : trashedAbstracts.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center">
-              <p className="text-gray-500 text-lg">Trash is empty</p>
-              <p className="text-gray-400 text-sm mt-1">
-                Moved abstracts will appear here until you restore them.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {trashedAbstracts.map((abstract) => (
-                <div
-                  key={abstract.id}
-                  className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-wrap items-start justify-between gap-4"
-                >
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-base font-bold text-gray-900 leading-snug">
-                      {abstract.title}
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {abstract.presenter_name}
-                      {abstract.presenter_email ? (
-                        <span className="text-gray-400">
-                          {" "}
-                          ({abstract.presenter_email})
-                        </span>
-                      ) : null}
-                    </p>
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
-                        {abstract.category}
-                      </span>
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                        {abstract.status}
-                      </span>
-                      {Number(abstract.is_invited_speaker || 0) === 1 ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                          Invited speaker
-                        </span>
-                      ) : null}
-                      <span className="inline-flex items-center text-xs text-gray-400">
-                        Trashed {formatDate(abstract.deleted_at)}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => restoreAbstract(abstract.id)}
-                    disabled={restoringAbstractId === abstract.id}
-                    className="px-4 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {restoringAbstractId === abstract.id
-                      ? "Restoring…"
-                      : "Restore"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
@@ -7561,8 +7377,7 @@ export default function AdminTab() {
               </h3>
               <p className="text-gray-500 mt-1 text-sm">
                 It will disappear from submissions, reviews, and email tools.
-                Authors and reviews stay attached so you can restore it later
-                from Abstract trash.
+                The row stays soft-deleted in storage for manual recovery later.
               </p>
             </div>
             <div className="p-6 space-y-4">

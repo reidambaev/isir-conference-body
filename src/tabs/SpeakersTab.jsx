@@ -179,35 +179,29 @@ function SpeakersTab() {
                   className="absolute top-0 left-0 right-0 h-1.5"
                   style={{ backgroundColor: "var(--color-secondary)" }}
                 />
-                <div
-                  className="rounded-full p-1 mb-5"
+                <SpeakerPhoto
+                  src={imgSrc}
+                  alt={speaker.name}
+                  eager
+                  className="w-36 h-36 rounded-full mb-5 border-2 flex-shrink-0"
                   style={{
-                    background:
-                      "linear-gradient(135deg, var(--color-primary), var(--color-secondary))",
+                    borderColor: "var(--color-secondary)",
+                    ...(speaker.image_position && {
+                      objectPosition: speaker.image_position,
+                    }),
                   }}
-                >
-                  <SpeakerPhoto
-                    src={imgSrc}
-                    alt={speaker.name}
-                    eager
-                    className="w-36 h-36 rounded-full border-4 border-white flex-shrink-0"
-                    style={{
-                      ...(speaker.image_position && {
-                        objectPosition: speaker.image_position,
-                      }),
-                    }}
-                    fallback={
-                      <div
-                        className="w-36 h-36 rounded-full flex items-center justify-center border-4 border-white text-3xl font-bold text-white flex-shrink-0"
-                        style={{
-                          backgroundColor: "var(--color-primary)",
-                        }}
-                      >
-                        {getInitials(speaker.name)}
-                      </div>
-                    }
-                  />
-                </div>
+                  fallback={
+                    <div
+                      className="w-36 h-36 rounded-full flex items-center justify-center mb-5 border-2 text-3xl font-bold text-white flex-shrink-0"
+                      style={{
+                        backgroundColor: "var(--color-primary)",
+                        borderColor: "var(--color-secondary)",
+                      }}
+                    >
+                      {getInitials(speaker.name)}
+                    </div>
+                  }
+                />
                 <h5
                   className="text-xl font-extrabold mb-2 leading-tight"
                   style={{ color: "var(--color-primary)" }}
@@ -254,23 +248,28 @@ function SpeakersTab() {
                 className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 flex flex-col items-center text-center relative overflow-hidden border border-sky-100"
               >
                 <div className="absolute top-0 left-0 right-0 h-1 bg-sky-400" />
-                <div className="rounded-full p-0.5 mb-4 bg-sky-200">
-                  <SpeakerPhoto
-                    src={imgSrc}
-                    alt={speaker.name}
-                    className="w-28 h-28 rounded-full border-2 border-white flex-shrink-0"
-                    style={{
-                      ...(speaker.image_position && {
-                        objectPosition: speaker.image_position,
-                      }),
-                    }}
-                    fallback={
-                      <div className="w-28 h-28 rounded-full flex items-center justify-center border-2 border-white text-2xl font-bold text-white flex-shrink-0 bg-sky-600">
-                        {getInitials(speaker.name)}
-                      </div>
-                    }
-                  />
-                </div>
+                <SpeakerPhoto
+                  src={imgSrc}
+                  alt={speaker.name}
+                  className="w-28 h-28 rounded-full mb-4 border-2 flex-shrink-0"
+                  style={{
+                    borderColor: "var(--color-secondary)",
+                    ...(speaker.image_position && {
+                      objectPosition: speaker.image_position,
+                    }),
+                  }}
+                  fallback={
+                    <div
+                      className="w-28 h-28 rounded-full flex items-center justify-center mb-4 border-2 text-2xl font-bold text-white flex-shrink-0"
+                      style={{
+                        backgroundColor: "var(--color-primary)",
+                        borderColor: "var(--color-secondary)",
+                      }}
+                    >
+                      {getInitials(speaker.name)}
+                    </div>
+                  }
+                />
                 <h5
                   className="text-lg font-bold mb-1.5 leading-tight"
                   style={{ color: "var(--color-primary)" }}

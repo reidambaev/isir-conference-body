@@ -440,17 +440,6 @@ export function buildLocalAdminDemoData() {
     },
   ];
 
-  const trashedAbstracts = [
-    {
-      id: "ABS-DEMO-TRASH-001",
-      title: "Withdrawn demo abstract (localhost)",
-      category: "Clinical Studies",
-      status: "submitted",
-      is_invited_speaker: 0,
-      deleted_at: now - day,
-    },
-  ];
-
   return {
     abstracts,
     registrations,
@@ -461,6 +450,5 @@ export function buildLocalAdminDemoData() {
     reviewerAccountsDefault: 5,
     reviewerAbstractScores,
     speakerProfileSubmissions,
-    trashedAbstracts,
   };
 }
