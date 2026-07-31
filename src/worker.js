@@ -288,6 +288,14 @@ async function handleApiRequest(request, env, url) {
     return handleGetAbstracts(request, env, corsHeaders);
   }
 
+  // GET /api/admin/abstracts/trash - Soft-deleted abstracts (restore bin)
+  if (
+    url.pathname === "/api/admin/abstracts/trash" &&
+    request.method === "GET"
+  ) {
+    return handleGetTrashedAbstracts(request, env, corsHeaders);
+  }
+
   // POST /api/admin/abstracts/send-confirmations - Bulk (re)send confirmation emails
   if (
     url.pathname === "/api/admin/abstracts/send-confirmations" &&
@@ -392,6 +400,32 @@ async function handleApiRequest(request, env, url) {
       env,
       corsHeaders,
       abstractSpeakersMatch[1],
+    );
+  }
+
+  // POST /api/admin/abstracts/:id/delete - Soft-delete (move to trash)
+  const abstractDeleteMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)\/delete$/,
+  );
+  if (abstractDeleteMatch && request.method === "POST") {
+    return handleDeleteAbstract(
+      request,
+      env,
+      corsHeaders,
+      abstractDeleteMatch[1],
+    );
+  }
+
+  // POST /api/admin/abstracts/:id/restore - Restore from trash
+  const abstractRestoreMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)\/restore$/,
+  );
+  if (abstractRestoreMatch && request.method === "POST") {
+    return handleRestoreAbstract(
+      request,
+      env,
+      corsHeaders,
+      abstractRestoreMatch[1],
     );
   }
 
@@ -1566,6 +1600,7 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
        FROM reviewer_assignments ra
        JOIN abstractions a ON a.id = ra.abstract_id
        WHERE ra.reviewer_email = ?
+         AND a.deleted_at IS NULL
          AND COALESCE(a.is_invited_speaker, 0) != 1
        ORDER BY ra.assigned_at ASC`,
     )
@@ -1582,6 +1617,7 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
          FROM abstractions a
          LEFT JOIN reviewer_assignments ra ON ra.abstract_id = a.id
          WHERE a.status = 'submitted'
+           AND a.deleted_at IS NULL
            AND COALESCE(a.is_invited_speaker, 0) != 1
          GROUP BY a.id
          LIMIT 1000`,
@@ -1627,7 +1663,8 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
 
     const abstracts = await d1AllWhereIn(
       env.ISIR_DB,
-      (ph) => `SELECT * FROM abstractions WHERE id IN (${ph})`,
+      (ph) =>
+        `SELECT * FROM abstractions WHERE id IN (${ph}) AND deleted_at IS NULL`,
       assignedIds,
     );
 
@@ -1857,6 +1894,7 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
        LEFT JOIN reviews r
          ON r.reviewer_email = ra.reviewer_email
         AND r.abstract_id = ra.abstract_id
+       WHERE a.deleted_at IS NULL
        ORDER BY ra.reviewer_email ASC, ra.assigned_at ASC`,
     ).all();
 
@@ -1946,6 +1984,7 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
          a.status,
          a.submission_date
        FROM abstractions a
+       WHERE a.deleted_at IS NULL
        ORDER BY a.submission_date DESC`,
     ).all();
 
@@ -5685,9 +5724,11 @@ async function handleGetAbstracts(request, env, corsHeaders) {
     const auth = ensureAdmin(request, env, corsHeaders);
     if (auth) return auth;
 
-    // Get all abstracts
+    // Get active (non-trashed) abstracts
     const abstractsResult = await env.ISIR_DB.prepare(
-      `SELECT * FROM abstractions ORDER BY submission_date DESC LIMIT 500`,
+      `SELECT * FROM abstractions
+       WHERE deleted_at IS NULL
+       ORDER BY submission_date DESC LIMIT 500`,
     ).all();
 
     const abstracts = abstractsResult.results || [];
@@ -5948,7 +5989,7 @@ async function handleUpdateAbstractInvitedSpeaker(
       raw === true || raw === 1 || raw === "1" || raw === "true" ? 1 : 0;
 
     const existing = await env.ISIR_DB.prepare(
-      `SELECT id FROM abstractions WHERE id = ?`,
+      `SELECT id FROM abstractions WHERE id = ? AND deleted_at IS NULL`,
     )
       .bind(abstractId)
       .first();
@@ -6031,7 +6072,7 @@ async function handleUpdateAbstractSpeakers(
     }
 
     const existing = await env.ISIR_DB.prepare(
-      `SELECT id FROM abstractions WHERE id = ?`,
+      `SELECT id FROM abstractions WHERE id = ? AND deleted_at IS NULL`,
     )
       .bind(abstractId)
       .first();
@@ -6176,7 +6217,230 @@ async function handleUpdateAbstractSpeakers(
   }
 }
 
-// Admin endpoint: Accept all invited speaker abstracts that are not already accepted
+// Admin endpoint: Soft-delete an abstract (move to trash; can be restored)
+async function handleDeleteAbstract(request, env, corsHeaders, abstractId) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    if (!abstractId) {
+      return jsonResponse(
+        { success: false, error: "Missing abstract id" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT id, title, deleted_at FROM abstractions WHERE id = ? LIMIT 1`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!existing?.id) {
+      return jsonResponse(
+        { success: false, error: "Abstract not found" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    if (existing.deleted_at) {
+      return jsonResponse(
+        { success: true, id: abstractId, title: existing.title, alreadyTrashed: true },
+        200,
+        corsHeaders,
+      );
+    }
+
+    const deletedAt = Date.now();
+    const result = await env.ISIR_DB.prepare(
+      `UPDATE abstractions SET deleted_at = ?, updated_at = ? WHERE id = ?`,
+    )
+      .bind(deletedAt, deletedAt, abstractId)
+      .run();
+
+    if (!result.success || (result.meta?.changes || 0) < 1) {
+      return jsonResponse(
+        { success: false, error: "Failed to move abstract to trash" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        id: abstractId,
+        title: existing.title,
+        deleted_at: deletedAt,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Delete abstract error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Delete failed" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+// Admin endpoint: List soft-deleted abstracts (trash)
+async function handleGetTrashedAbstracts(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    const abstractsResult = await env.ISIR_DB.prepare(
+      `SELECT * FROM abstractions
+       WHERE deleted_at IS NOT NULL
+       ORDER BY deleted_at DESC LIMIT 500`,
+    ).all();
+
+    const abstracts = abstractsResult.results || [];
+
+    if (abstracts.length > 0) {
+      const abstractIds = abstracts.map((a) => a.id);
+
+      const authorRows = await d1AllWhereIn(
+        env.ISIR_DB,
+        (ph) => `SELECT * FROM authors WHERE abstract_id IN (${ph})`,
+        abstractIds,
+      );
+      const affiliationRows = await d1AllWhereIn(
+        env.ISIR_DB,
+        (ph) => `SELECT * FROM affiliations WHERE abstract_id IN (${ph})`,
+        abstractIds,
+      );
+
+      const authorsByAbstract = {};
+      const affiliationsByAbstract = {};
+
+      authorRows.forEach((author) => {
+        if (!authorsByAbstract[author.abstract_id]) {
+          authorsByAbstract[author.abstract_id] = [];
+        }
+        authorsByAbstract[author.abstract_id].push(author);
+      });
+
+      affiliationRows.forEach((aff) => {
+        if (!affiliationsByAbstract[aff.abstract_id]) {
+          affiliationsByAbstract[aff.abstract_id] = [];
+        }
+        affiliationsByAbstract[aff.abstract_id].push(aff);
+      });
+
+      abstracts.forEach((abstract) => {
+        abstract.authors = authorsByAbstract[abstract.id] || [];
+        abstract.affiliations = affiliationsByAbstract[abstract.id] || [];
+      });
+    }
+
+    return jsonResponse(
+      { success: true, data: abstracts },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Get trashed abstracts error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to load trash" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+// Admin endpoint: Restore an abstract from trash
+async function handleRestoreAbstract(request, env, corsHeaders, abstractId) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    if (!abstractId) {
+      return jsonResponse(
+        { success: false, error: "Missing abstract id" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT id, title, deleted_at FROM abstractions WHERE id = ? LIMIT 1`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!existing?.id) {
+      return jsonResponse(
+        { success: false, error: "Abstract not found" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    if (!existing.deleted_at) {
+      return jsonResponse(
+        {
+          success: true,
+          id: abstractId,
+          title: existing.title,
+          alreadyActive: true,
+        },
+        200,
+        corsHeaders,
+      );
+    }
+
+    const now = Date.now();
+    const result = await env.ISIR_DB.prepare(
+      `UPDATE abstractions SET deleted_at = NULL, updated_at = ? WHERE id = ?`,
+    )
+      .bind(now, abstractId)
+      .run();
+
+    if (!result.success || (result.meta?.changes || 0) < 1) {
+      return jsonResponse(
+        { success: false, error: "Failed to restore abstract" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    return jsonResponse(
+      { success: true, id: abstractId, title: existing.title },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Restore abstract error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Restore failed" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
 async function handleAcceptAllInvitedSpeakerAbstracts(
   request,
   env,
@@ -6189,6 +6453,7 @@ async function handleAcceptAllInvitedSpeakerAbstracts(
     const pending = await env.ISIR_DB.prepare(
       `SELECT id FROM abstractions
        WHERE is_invited_speaker = 1
+         AND deleted_at IS NULL
          AND LOWER(COALESCE(status, '')) != 'accepted'`,
     ).all();
 
@@ -6258,7 +6523,7 @@ async function handleSendAbstractConfirmation(
     }
 
     const row = await env.ISIR_DB.prepare(
-      `SELECT * FROM abstractions WHERE id = ?`,
+      `SELECT * FROM abstractions WHERE id = ? AND deleted_at IS NULL`,
     )
       .bind(abstractId)
       .first();
@@ -6328,12 +6593,14 @@ async function handleBulkSendAbstractConfirmations(request, env, corsHeaders) {
       rows = await d1AllWhereIn(
         env.ISIR_DB,
         (ph) =>
-          `SELECT * FROM abstractions WHERE id IN (${ph}) ORDER BY submission_date ASC`,
+          `SELECT * FROM abstractions WHERE id IN (${ph}) AND deleted_at IS NULL ORDER BY submission_date ASC`,
         ids,
       );
     } else {
       const res = await env.ISIR_DB.prepare(
-        `SELECT * FROM abstractions ORDER BY submission_date ASC LIMIT 1000`,
+        `SELECT * FROM abstractions
+         WHERE deleted_at IS NULL
+         ORDER BY submission_date ASC LIMIT 1000`,
       ).all();
       rows = res.results || [];
     }
@@ -6414,7 +6681,7 @@ async function handleSendAbstractDecision(
     }
 
     const row = await env.ISIR_DB.prepare(
-      `SELECT * FROM abstractions WHERE id = ?`,
+      `SELECT * FROM abstractions WHERE id = ? AND deleted_at IS NULL`,
     )
       .bind(abstractId)
       .first();
@@ -6484,13 +6751,14 @@ async function handleBulkSendAbstractDecisions(request, env, corsHeaders) {
       rows = await d1AllWhereIn(
         env.ISIR_DB,
         (ph) =>
-          `SELECT * FROM abstractions WHERE id IN (${ph}) ORDER BY submission_date ASC`,
+          `SELECT * FROM abstractions WHERE id IN (${ph}) AND deleted_at IS NULL ORDER BY submission_date ASC`,
         ids,
       );
     } else {
       const res = await env.ISIR_DB.prepare(
         `SELECT * FROM abstractions
-         WHERE lower(status) IN ('accepted', 'rejected')
+         WHERE deleted_at IS NULL
+           AND lower(status) IN ('accepted', 'rejected')
          ORDER BY submission_date ASC
          LIMIT 1000`,
       ).all();

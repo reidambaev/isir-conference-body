@@ -158,6 +158,7 @@ CREATE TABLE
         young_investigator INTEGER DEFAULT 0,
         confirmation_sent_at INTEGER,
         decision_email_sent_at INTEGER,
+        deleted_at INTEGER,
         created_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000),
         updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)
     );
@@ -212,6 +213,8 @@ CREATE INDEX IF NOT EXISTS idx_abstractions_status ON abstractions (acceptance_s
 CREATE INDEX IF NOT EXISTS idx_abstractions_category ON abstractions (category);
 
 CREATE INDEX IF NOT EXISTS idx_abstractions_date ON abstractions (submission_date);
+
+CREATE INDEX IF NOT EXISTS idx_abstractions_deleted_at ON abstractions (deleted_at);
 
 -- Index for common queries
 CREATE INDEX IF NOT EXISTS idx_registrations_email ON registrations (email);

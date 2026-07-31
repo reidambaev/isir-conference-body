@@ -247,6 +247,12 @@ export default function AdminTab() {
   const [updatingSpeakersId, setUpdatingSpeakersId] = useState(null);
   const [acceptingAllInvitedSpeakers, setAcceptingAllInvitedSpeakers] =
     useState(false);
+  const [abstractToDelete, setAbstractToDelete] = useState(null);
+  const [deleteConfirmTitle, setDeleteConfirmTitle] = useState("");
+  const [deletingAbstractId, setDeletingAbstractId] = useState(null);
+  const [trashedAbstracts, setTrashedAbstracts] = useState([]);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [restoringAbstractId, setRestoringAbstractId] = useState(null);
 
   // Reviewer overview state
   const [reviewerOverview, setReviewerOverview] = useState(null);
@@ -1018,7 +1024,10 @@ export default function AdminTab() {
     if (activeSection === "discount") {
       fetchDiscountAdmin();
     }
-  }, [activeSection, fetchEnvVars, fetchDiscountAdmin]);
+    if (activeSection === "abstractTrash" && adminToken) {
+      fetchTrashedAbstracts(adminToken);
+    }
+  }, [activeSection, fetchEnvVars, fetchDiscountAdmin, adminToken]);
 
   const createReviewerAccount = async (email, abstractsCount) => {
     const body = { email };
@@ -1721,6 +1730,133 @@ export default function AdminTab() {
       alert(err.message || "Failed to update invited speaker status");
     } finally {
       setUpdatingInvitedSpeakerId(null);
+    }
+  };
+
+  const openDeleteAbstractModal = (abstract) => {
+    setAbstractToDelete(abstract);
+    setDeleteConfirmTitle("");
+  };
+
+  const closeDeleteAbstractModal = () => {
+    if (deletingAbstractId) return;
+    setAbstractToDelete(null);
+    setDeleteConfirmTitle("");
+  };
+
+  const fetchTrashedAbstracts = async (token = adminToken) => {
+    if (!token) return;
+    setTrashLoading(true);
+    try {
+      const response = await fetch("/api/admin/abstracts/trash", {
+        headers: { "X-Admin-Token": token },
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "Failed to load trash");
+      }
+      setTrashedAbstracts(result.data || []);
+    } catch (err) {
+      console.error("Error loading trashed abstracts:", err);
+      alert(err.message || "Failed to load trash");
+    } finally {
+      setTrashLoading(false);
+    }
+  };
+
+  const deleteAbstract = async () => {
+    if (!adminToken) {
+      alert("Admin access token is missing.");
+      return;
+    }
+    if (!abstractToDelete?.id) return;
+
+    const expected = String(abstractToDelete.title || "").trim();
+    if (deleteConfirmTitle.trim() !== expected) {
+      alert("Title does not match. Type the abstract title exactly to confirm.");
+      return;
+    }
+
+    setDeletingAbstractId(abstractToDelete.id);
+    try {
+      const response = await fetch(
+        `/api/admin/abstracts/${encodeURIComponent(abstractToDelete.id)}/delete`,
+        {
+          method: "POST",
+          headers: {
+            "X-Admin-Token": adminToken,
+          },
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "Failed to move abstract to trash");
+      }
+
+      const deletedId = abstractToDelete.id;
+      const trashedRow = {
+        ...abstractToDelete,
+        deleted_at: result.deleted_at || Date.now(),
+      };
+      setAbstracts((prev) => prev.filter((a) => a.id !== deletedId));
+      setTrashedAbstracts((prev) => [trashedRow, ...prev.filter((a) => a.id !== deletedId)]);
+      setExpandedAbstracts((prev) => {
+        const next = new Set(prev);
+        next.delete(deletedId);
+        return next;
+      });
+      setExpandedInvitedAbstracts((prev) => {
+        const next = new Set(prev);
+        next.delete(deletedId);
+        return next;
+      });
+      setAbstractToDelete(null);
+      setDeleteConfirmTitle("");
+    } catch (err) {
+      console.error("Error deleting abstract:", err);
+      alert(err.message || "Failed to move abstract to trash");
+    } finally {
+      setDeletingAbstractId(null);
+    }
+  };
+
+  const restoreAbstract = async (abstractId) => {
+    if (!adminToken) {
+      alert("Admin access token is missing.");
+      return;
+    }
+    if (!abstractId) return;
+
+    setRestoringAbstractId(abstractId);
+    try {
+      const response = await fetch(
+        `/api/admin/abstracts/${encodeURIComponent(abstractId)}/restore`,
+        {
+          method: "POST",
+          headers: { "X-Admin-Token": adminToken },
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "Failed to restore abstract");
+      }
+
+      const restored = trashedAbstracts.find((a) => a.id === abstractId);
+      setTrashedAbstracts((prev) => prev.filter((a) => a.id !== abstractId));
+      if (restored) {
+        const { deleted_at: _removed, ...activeRow } = restored;
+        setAbstracts((prev) => {
+          if (prev.some((a) => a.id === abstractId)) return prev;
+          return [{ ...activeRow, deleted_at: null }, ...prev];
+        });
+      } else {
+        await fetchAllData(adminToken);
+      }
+    } catch (err) {
+      console.error("Error restoring abstract:", err);
+      alert(err.message || "Failed to restore abstract");
+    } finally {
+      setRestoringAbstractId(null);
     }
   };
 
@@ -2452,6 +2588,21 @@ export default function AdminTab() {
           }`}
         >
           Abstract review scores
+        </button>
+        <button
+          onClick={() => setActiveSection("abstractTrash")}
+          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+            activeSection === "abstractTrash"
+              ? "bg-slate-700 text-white shadow-md"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Abstract trash
+          {trashedAbstracts.length > 0 ? (
+            <span className="ml-2 inline-flex items-center justify-center min-w-[1.25rem] px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-white/20">
+              {trashedAbstracts.length}
+            </span>
+          ) : null}
         </button>
         <button
           onClick={() => setActiveSection("visa")}
@@ -4145,6 +4296,31 @@ export default function AdminTab() {
                                   </button>
                                 </div>
                               </div>
+                              <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-100">
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                  <div className="text-xs text-red-700">
+                                    <span className="font-semibold">
+                                      Danger zone:
+                                    </span>{" "}
+                                    Permanently hide this abstract from admin,
+                                    reviewers, and emails. You can restore it
+                                    later from Abstract trash.
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openDeleteAbstractModal(abstract);
+                                    }}
+                                    disabled={
+                                      deletingAbstractId === abstract.id
+                                    }
+                                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                  >
+                                    Move to trash
+                                  </button>
+                                </div>
+                              </div>
                           </div>
 
                           {/* Authors */}
@@ -4565,6 +4741,29 @@ export default function AdminTab() {
                                 </button>
                               </div>
                             </div>
+                            <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-100">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <div className="text-xs text-red-700">
+                                  <span className="font-semibold">
+                                    Danger zone:
+                                  </span>{" "}
+                                  Permanently hide this abstract from admin,
+                                  reviewers, and emails. You can restore it
+                                  later from Abstract trash.
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openDeleteAbstractModal(abstract);
+                                  }}
+                                  disabled={deletingAbstractId === abstract.id}
+                                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                >
+                                  Move to trash
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -4863,6 +5062,95 @@ export default function AdminTab() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Abstract Trash */}
+      {activeSection === "abstractTrash" && (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Abstract trash
+              </h2>
+              <p className="text-gray-500 text-sm mt-1 max-w-2xl">
+                Soft-deleted abstracts are hidden from submissions, reviewers,
+                and email tools, but kept in the database so you can restore
+                them.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => fetchTrashedAbstracts(adminToken)}
+              disabled={trashLoading}
+              className="px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+            >
+              {trashLoading ? "Refreshing…" : "Refresh trash"}
+            </button>
+          </div>
+
+          {trashLoading && trashedAbstracts.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center text-gray-500">
+              Loading trash…
+            </div>
+          ) : trashedAbstracts.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center">
+              <p className="text-gray-500 text-lg">Trash is empty</p>
+              <p className="text-gray-400 text-sm mt-1">
+                Moved abstracts will appear here until you restore them.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {trashedAbstracts.map((abstract) => (
+                <div
+                  key={abstract.id}
+                  className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-wrap items-start justify-between gap-4"
+                >
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-base font-bold text-gray-900 leading-snug">
+                      {abstract.title}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {abstract.presenter_name}
+                      {abstract.presenter_email ? (
+                        <span className="text-gray-400">
+                          {" "}
+                          ({abstract.presenter_email})
+                        </span>
+                      ) : null}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                        {abstract.category}
+                      </span>
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                        {abstract.status}
+                      </span>
+                      {Number(abstract.is_invited_speaker || 0) === 1 ? (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                          Invited speaker
+                        </span>
+                      ) : null}
+                      <span className="inline-flex items-center text-xs text-gray-400">
+                        Trashed {formatDate(abstract.deleted_at)}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => restoreAbstract(abstract.id)}
+                    disabled={restoringAbstractId === abstract.id}
+                    className="px-4 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {restoringAbstractId === abstract.id
+                      ? "Restoring…"
+                      : "Restore"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -7117,6 +7405,68 @@ export default function AdminTab() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {abstractToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full">
+            <div className="p-6 border-b border-gray-100">
+              <h3 className="text-xl font-bold text-gray-900">
+                Move Abstract to Trash
+              </h3>
+              <p className="text-gray-500 mt-1 text-sm">
+                It will disappear from submissions, reviews, and email tools.
+                Authors and reviews stay attached so you can restore it later.
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <span className="font-semibold text-gray-800">Title:</span>{" "}
+                <span className="break-words">{abstractToDelete.title}</span>
+              </div>
+              <div>
+                <label
+                  htmlFor="delete-abstract-confirm-title"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Type the abstract title to confirm
+                </label>
+                <input
+                  id="delete-abstract-confirm-title"
+                  type="text"
+                  value={deleteConfirmTitle}
+                  onChange={(e) => setDeleteConfirmTitle(e.target.value)}
+                  placeholder="Paste or type the full title"
+                  autoComplete="off"
+                  disabled={Boolean(deletingAbstractId)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:opacity-60"
+                />
+              </div>
+            </div>
+            <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeDeleteAbstractModal}
+                disabled={Boolean(deletingAbstractId)}
+                className="px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={deleteAbstract}
+                disabled={
+                  Boolean(deletingAbstractId) ||
+                  deleteConfirmTitle.trim() !==
+                    String(abstractToDelete.title || "").trim()
+                }
+                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
+              >
+                {deletingAbstractId ? "Moving…" : "Move to trash"}
+              </button>
+            </div>
           </div>
         </div>
       )}
