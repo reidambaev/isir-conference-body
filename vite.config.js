@@ -57,7 +57,7 @@ function devSpeakerProfilesPublicBody() {
   }
   plenary.sort(sortByLastNameAsc);
   congress.sort(sortByLastNameAsc);
-  return JSON.stringify({ success: true, plenary, congress });
+  return JSON.stringify({ success: true, plenary, forum: [], congress });
 }
 
 // https://vite.dev/config/

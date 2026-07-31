@@ -568,7 +568,7 @@ async function handleApiRequest(request, env, url) {
     return handleAdminReviewerAbstractScores(request, env, corsHeaders);
   }
 
-  // GET /api/speaker-profiles/public — plenary + congress grids (D1 only)
+  // GET /api/speaker-profiles/public — plenary + forum + congress grids (D1)
   if (
     url.pathname === "/api/speaker-profiles/public" &&
     request.method === "GET"
@@ -4544,6 +4544,7 @@ async function handleGetPublicSpeakerProfiles(request, env, corsHeaders) {
        FROM speaker_profile_submissions WHERE status = 'approved'`,
     ).all();
     const plenary = [];
+    const forum = [];
     const congress = [];
     for (const r of results || []) {
       const seed = seedRowBySpeakerKey(r.speaker_key);
@@ -4552,7 +4553,9 @@ async function handleGetPublicSpeakerProfiles(request, env, corsHeaders) {
           ? String(r.tier).trim()
           : null;
       const tier =
-        tierRaw === "plenary" || tierRaw === "congress"
+        tierRaw === "plenary" ||
+        tierRaw === "forum" ||
+        tierRaw === "congress"
           ? tierRaw
           : seed?.tier === "plenary" || seed?.tier === "congress"
             ? seed.tier
@@ -4573,14 +4576,17 @@ async function handleGetPublicSpeakerProfiles(request, env, corsHeaders) {
       const merged = { ...r, tier, static_image, image_position };
       const row = mapPublicSpeakerRow(merged);
       if (merged.tier === "plenary") plenary.push(row);
+      else if (merged.tier === "forum") forum.push(row);
       else congress.push(row);
     }
     plenary.sort(sortSpeakersByLastNameAsc);
+    forum.sort(sortSpeakersByLastNameAsc);
     congress.sort(sortSpeakersByLastNameAsc);
     return new Response(
       JSON.stringify({
         success: true,
         plenary,
+        forum,
         congress,
       }),
       {

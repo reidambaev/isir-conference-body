@@ -8,6 +8,10 @@ import {
   CONGRESS_WEEKEND_MEAL_KEYS,
   formatCongressMealDayList,
 } from "../config/constants";
+import {
+  buildLocalAdminDemoData,
+  isAdminLocalhost,
+} from "./adminLocalDemoData";
 
 const REGISTRATION_TICKET_LABELS = {
   "isir-member": "ISIR Member",
@@ -196,8 +200,10 @@ export default function AdminTab() {
   const [speakerHotelNameSort, setSpeakerHotelNameSort] = useState(null);
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState("abstracts");
+  const [activeSection, setActiveSection] = useState("registrationTotals");
   const [error, setError] = useState(null);
+  /** True when browsing seeded localhost fixtures (no cloud/API). */
+  const [isLocalDemo, setIsLocalDemo] = useState(false);
   const [speakerProfileSubmissions, setSpeakerProfileSubmissions] = useState(
     [],
   );
@@ -378,27 +384,34 @@ export default function AdminTab() {
     let revenueAll = 0;
     let revenueConfirmed = 0;
     let confirmedCount = 0;
+    let pendingCount = 0;
+    let invitedSpeakers = 0;
     const lunchByDay = Object.fromEntries(weekendDays.map((d) => [d, 0]));
     const breakfastByDay = Object.fromEntries(weekendDays.map((d) => [d, 0]));
 
     for (const r of list) {
       const status = String(r.payment_status || "unknown").toLowerCase();
       byStatus[status] = (byStatus[status] || 0) + 1;
+      const tp = Number(r.total_price);
+      const amt = Number.isFinite(tp) ? tp : 0;
+      revenueAll += amt;
+
+      if (status === "pending") pendingCount += 1;
+
+      // Ticket, meal, and attendance rollups only count completed/paid registrations
+      if (!isPaymentConfirmed(r.payment_status)) continue;
+
+      confirmedCount += 1;
+      revenueConfirmed += amt;
       const tt = r.ticket_type || "unknown";
       byTicket[tt] = (byTicket[tt] || 0) + 1;
       accompanyingSum += Number(r.accompanying_count || 0);
+      if (Number(r.is_invited_speaker || 0) === 1) invitedSpeakers += 1;
       if (Number(r.opening_reception_attending || 0) === 1) {
         openingReceptionYes += 1;
       }
       if (Number(r.gala_dinner_attending || 0) === 1) {
         galaAttendingYes += 1;
-      }
-      const tp = Number(r.total_price);
-      const amt = Number.isFinite(tp) ? tp : 0;
-      revenueAll += amt;
-      if (isPaymentConfirmed(r.payment_status)) {
-        revenueConfirmed += amt;
-        confirmedCount += 1;
       }
       for (const d of normalizeWeekendMealDayList(r.lunch_days)) {
         if (d in lunchByDay) lunchByDay[d] += 1;
@@ -414,10 +427,6 @@ export default function AdminTab() {
         }
       }
     }
-
-    const invitedSpeakers = list.filter(
-      (r) => Number(r.is_invited_speaker || 0) === 1,
-    ).length;
 
     const ticketRows = Object.entries(byTicket)
       .map(([id, count]) => ({
@@ -440,6 +449,7 @@ export default function AdminTab() {
       revenueAll,
       revenueConfirmed,
       confirmedCount,
+      pendingCount,
       lunchByDay,
       breakfastByDay,
       invitedSpeakers,
@@ -525,9 +535,15 @@ export default function AdminTab() {
 
       if (!token) {
         setLoading(false);
-        setError(
-          "Admin access token is required. Open this page with ?admin=YOUR_TOKEN in the URL.",
-        );
+        if (isAdminLocalhost()) {
+          setError(
+            "No admin token. On localhost you can load sample data, or open this page with ?admin=YOUR_TOKEN.",
+          );
+        } else {
+          setError(
+            "Admin access token is required. Open this page with ?admin=YOUR_TOKEN in the URL.",
+          );
+        }
         return;
       }
 
@@ -556,6 +572,37 @@ export default function AdminTab() {
       setLoading(false);
       setError("Failed to read admin access token from URL.");
     }
+  }, []);
+
+  const loadLocalDemo = useCallback(() => {
+    if (!isAdminLocalhost()) return;
+    const demo = buildLocalAdminDemoData();
+    setIsLocalDemo(true);
+    setError(null);
+    setLoading(false);
+    setAbstracts(demo.abstracts);
+    setVisaRequests(demo.visaRequests);
+    setSpeakerHotelRegistrations(demo.speakerHotelRegistrations);
+    setRegistrations(demo.registrations);
+    setReviewerOverview(demo.reviewerOverview);
+    setAbstractsPerReviewerInput(
+      String(demo.reviewerOverview.abstracts_per_reviewer ?? 5),
+    );
+    setReviewerAccounts(demo.reviewerAccounts);
+    setReviewerAccountsDefault(demo.reviewerAccountsDefault);
+    setReviewerTargetInputs(
+      Object.fromEntries(
+        demo.reviewerAccounts.map((r) => [
+          r.email,
+          r.target_abstracts != null ? String(r.target_abstracts) : "",
+        ]),
+      ),
+    );
+    setReviewerAbstractScores(demo.reviewerAbstractScores);
+    setSpeakerProfileSubmissions(demo.speakerProfileSubmissions);
+    setTrashedAbstracts(demo.trashedAbstracts);
+    setReviewerOverviewError("");
+    setActiveSection("registrationTotals");
   }, []);
 
   const fetchAllData = async (token) => {
@@ -633,6 +680,7 @@ export default function AdminTab() {
       const reviewerAbstractScoresData = await reviewerAbstractScoresRes.json();
       const speakerProfilesData = await speakerProfilesRes.json();
 
+      setIsLocalDemo(false);
       setAbstracts(abstractsData.data || []);
       setVisaRequests(visaData.data || []);
       setSpeakerHotelRegistrations(speakerHotelData.data || []);
@@ -1024,10 +1072,10 @@ export default function AdminTab() {
     if (activeSection === "discount") {
       fetchDiscountAdmin();
     }
-    if (activeSection === "abstractTrash" && adminToken) {
+    if (activeSection === "abstractTrash" && adminToken && !isLocalDemo) {
       fetchTrashedAbstracts(adminToken);
     }
-  }, [activeSection, fetchEnvVars, fetchDiscountAdmin, adminToken]);
+  }, [activeSection, fetchEnvVars, fetchDiscountAdmin, adminToken, isLocalDemo]);
 
   const createReviewerAccount = async (email, abstractsCount) => {
     const body = { email };
@@ -1790,7 +1838,7 @@ export default function AdminTab() {
       );
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.success) {
-        throw new Error(result?.error || "Failed to move abstract to trash");
+        throw new Error(result?.error || "Failed to delete abstract");
       }
 
       const deletedId = abstractToDelete.id;
@@ -1814,7 +1862,7 @@ export default function AdminTab() {
       setDeleteConfirmTitle("");
     } catch (err) {
       console.error("Error deleting abstract:", err);
-      alert(err.message || "Failed to move abstract to trash");
+      alert(err.message || "Failed to delete abstract");
     } finally {
       setDeletingAbstractId(null);
     }
@@ -2487,239 +2535,315 @@ export default function AdminTab() {
   }
 
   if (error) {
+    const showLocalDemo = isAdminLocalhost();
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <div className="text-red-600 mb-4">Error: {error}</div>
-        <button
-          onClick={fetchAllData}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          Retry
-        </button>
+      <div className="flex flex-col items-center justify-center py-12 px-4 max-w-xl mx-auto text-center">
+        <div className="text-red-600 mb-4 whitespace-pre-wrap text-left w-full">
+          {error}
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {showLocalDemo && (
+            <button
+              type="button"
+              onClick={loadLocalDemo}
+              className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium"
+            >
+              Load localhost example
+            </button>
+          )}
+          {adminToken ? (
+            <button
+              type="button"
+              onClick={() => fetchAllData(adminToken)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Retry API
+            </button>
+          ) : null}
+        </div>
+        {showLocalDemo && (
+          <p className="mt-4 text-sm text-gray-500 max-w-md">
+            Localhost example loads sample registrations, abstracts, visa
+            requests, and reviewer data in the browser. No cloud or admin token
+            required. Actions that call the API will not persist.
+          </p>
+        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
+      {isLocalDemo && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-amber-950">
+            <span className="font-semibold">Localhost example</span> — sample
+            data only. Totals and lists work offline; API actions (emails,
+            status changes, payments) will not save.
+          </p>
+          <button
+            type="button"
+            onClick={loadLocalDemo}
+            className="px-3 py-1.5 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700"
+          >
+            Reload sample data
+          </button>
+        </div>
+      )}
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl p-8 shadow-xl">
         <h1 className="text-3xl font-bold text-white tracking-tight">
           Admin Dashboard
+          {isLocalDemo ? (
+            <span className="ml-3 align-middle text-sm font-semibold tracking-normal text-amber-300">
+              (demo)
+            </span>
+          ) : null}
         </h1>
         <p className="mt-2 text-slate-300">
-          Manage submissions, reviewer scores, visa and speaker hotel requests,
-          and registrations
+          Start with registration totals (paid only), then jump to the area you
+          need
         </p>
         <div className="flex flex-wrap gap-3 mt-6">
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
+          <button
+            type="button"
+            onClick={() => setActiveSection("registrationTotals")}
+            className="bg-amber-500/20 backdrop-blur-sm rounded-lg px-4 py-2 border border-amber-400/40 text-left hover:bg-amber-500/30 transition-colors"
+          >
+            <span className="text-amber-200 text-sm">Paid registrations</span>
+            <span className="text-white font-bold ml-2">
+              {registrationTotals.confirmedCount}
+            </span>
+            <span className="block text-xs text-amber-200/70 mt-0.5">
+              of {registrationTotals.total} total
+              {registrationTotals.pendingCount > 0
+                ? ` · ${registrationTotals.pendingCount} pending`
+                : ""}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("registrationTotals")}
+            className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 text-left hover:bg-white/15 transition-colors"
+          >
+            <span className="text-slate-300 text-sm">Confirmed revenue</span>
+            <span className="text-white font-bold ml-2">
+              $
+              {registrationTotals.revenueConfirmed.toLocaleString(undefined, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+              })}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("abstracts")}
+            className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 text-left hover:bg-white/15 transition-colors"
+          >
             <span className="text-slate-300 text-sm">Abstracts</span>
             <span className="text-white font-bold ml-2">
               {generalAbstracts.length}
             </span>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
-            <span className="text-slate-300 text-sm">Invited abstracts</span>
-            <span className="text-white font-bold ml-2">
-              {abstracts.length - generalAbstracts.length}
-            </span>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
-            <span className="text-slate-300 text-sm">Visa Requests</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("visa")}
+            className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 text-left hover:bg-white/15 transition-colors"
+          >
+            <span className="text-slate-300 text-sm">Visa</span>
             <span className="text-white font-bold ml-2">
               {visaRequests.length}
             </span>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("speakerHotel")}
+            className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 text-left hover:bg-white/15 transition-colors"
+          >
             <span className="text-slate-300 text-sm">Speaker hotel</span>
             <span className="text-white font-bold ml-2">
               {speakerHotelRegistrations.length}
             </span>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
-            <span className="text-slate-300 text-sm">Registrations</span>
-            <span className="text-white font-bold ml-2">
-              {registrations.length}
-            </span>
-          </div>
+          </button>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="bg-white rounded-xl shadow-md border border-gray-100 p-1 inline-flex flex-wrap gap-1">
-        <button
-          onClick={() => {
-            setActiveSection("abstracts");
-            if (abstractViewMode === "review" && reviewPool === "invited") {
-              setAbstractViewMode("cards");
-            }
-          }}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "abstracts" &&
-            !(abstractViewMode === "review" && reviewPool === "invited")
-              ? "bg-blue-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Abstract Submissions
-        </button>
-        <button
-          onClick={() => {
-            setActiveSection("invitedSpeakerAbstracts");
-            if (abstractViewMode === "review" && reviewPool === "general") {
-              setAbstractViewMode("cards");
-            }
-          }}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "invitedSpeakerAbstracts" ||
-            (abstractViewMode === "review" && reviewPool === "invited")
-              ? "bg-orange-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Invited Speakers Abstracts
-        </button>
-        <button
-          onClick={() => setActiveSection("abstractReviewScores")}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "abstractReviewScores"
-              ? "bg-teal-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Abstract review scores
-        </button>
-        <button
-          onClick={() => setActiveSection("abstractTrash")}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "abstractTrash"
-              ? "bg-slate-700 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Abstract trash
-          {trashedAbstracts.length > 0 ? (
-            <span className="ml-2 inline-flex items-center justify-center min-w-[1.25rem] px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-white/20">
-              {trashedAbstracts.length}
+      {/* Navigation — grouped for scanning */}
+      <nav className="space-y-3" aria-label="Admin sections">
+        {[
+          {
+            label: "Overview",
+            items: [
+              {
+                id: "registrationTotals",
+                label: "Totals",
+                activeClass: "bg-amber-600 text-white shadow-md",
+              },
+            ],
+          },
+          {
+            label: "Registrations",
+            items: [
+              {
+                id: "registrations",
+                label: "All registrations",
+                activeClass: "bg-blue-600 text-white shadow-md",
+              },
+              {
+                id: "trainees",
+                label: "Trainee applications",
+                activeClass: "bg-emerald-600 text-white shadow-md",
+              },
+            ],
+          },
+          {
+            label: "Abstracts",
+            items: [
+              {
+                id: "abstracts",
+                label: "Submissions",
+                activeClass: "bg-blue-600 text-white shadow-md",
+                onClick: () => {
+                  setActiveSection("abstracts");
+                  if (
+                    abstractViewMode === "review" &&
+                    reviewPool === "invited"
+                  ) {
+                    setAbstractViewMode("cards");
+                  }
+                },
+                isActive:
+                  activeSection === "abstracts" &&
+                  !(
+                    abstractViewMode === "review" && reviewPool === "invited"
+                  ),
+              },
+              {
+                id: "invitedSpeakerAbstracts",
+                label: "Invited speakers",
+                activeClass: "bg-orange-600 text-white shadow-md",
+                onClick: () => {
+                  setActiveSection("invitedSpeakerAbstracts");
+                  if (
+                    abstractViewMode === "review" &&
+                    reviewPool === "general"
+                  ) {
+                    setAbstractViewMode("cards");
+                  }
+                },
+                isActive:
+                  activeSection === "invitedSpeakerAbstracts" ||
+                  (abstractViewMode === "review" && reviewPool === "invited"),
+              },
+              {
+                id: "abstractReviewScores",
+                label: "Review scores",
+                activeClass: "bg-teal-600 text-white shadow-md",
+              },
+              {
+                id: "abstractTrash",
+                label: "Trash",
+                activeClass: "bg-slate-700 text-white shadow-md",
+                badge: trashedAbstracts.length || null,
+              },
+            ],
+          },
+          {
+            label: "Speakers & travel",
+            items: [
+              {
+                id: "visa",
+                label: "Visa requests",
+                activeClass: "bg-blue-600 text-white shadow-md",
+              },
+              {
+                id: "speakerHotel",
+                label: "Speaker hotel",
+                activeClass: "bg-cyan-600 text-white shadow-md",
+              },
+              {
+                id: "speakerInvites",
+                label: "Invite links",
+                activeClass: "bg-fuchsia-600 text-white shadow-md",
+              },
+              {
+                id: "speakerProfiles",
+                label: "Profile queue",
+                activeClass: "bg-rose-600 text-white shadow-md",
+                badge: pendingSpeakerProfileCount || null,
+              },
+            ],
+          },
+          {
+            label: "Reviewers",
+            items: [
+              {
+                id: "reviewers",
+                label: "Overview",
+                activeClass: "bg-indigo-600 text-white shadow-md",
+              },
+              {
+                id: "addReviewers",
+                label: "Add reviewers",
+                activeClass: "bg-purple-600 text-white shadow-md",
+              },
+            ],
+          },
+          {
+            label: "Settings",
+            items: [
+              {
+                id: "discount",
+                label: "Discount",
+                activeClass: "bg-lime-600 text-white shadow-md",
+              },
+              {
+                id: "environment",
+                label: "Environment",
+                activeClass: "bg-slate-700 text-white shadow-md",
+              },
+            ],
+          },
+        ].map((group) => (
+          <div
+            key={group.label}
+            className="flex flex-wrap items-center gap-2"
+          >
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400 w-full sm:w-28 sm:shrink-0">
+              {group.label}
             </span>
-          ) : null}
-        </button>
-        <button
-          onClick={() => setActiveSection("visa")}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "visa"
-              ? "bg-blue-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Visa Requests
-        </button>
-        <button
-          onClick={() => setActiveSection("speakerHotel")}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "speakerHotel"
-              ? "bg-cyan-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Speaker hotel
-        </button>
-        <button
-          onClick={() => setActiveSection("registrations")}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "registrations"
-              ? "bg-blue-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Registrations
-        </button>
-        <button
-          onClick={() => setActiveSection("registrationTotals")}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "registrationTotals"
-              ? "bg-amber-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Totals
-        </button>
-        <button
-          onClick={() => setActiveSection("trainees")}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "trainees"
-              ? "bg-emerald-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Trainee Applications
-        </button>
-        <button
-          onClick={() => setActiveSection("reviewers")}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "reviewers"
-              ? "bg-indigo-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Reviewers
-        </button>
-        <button
-          onClick={() => setActiveSection("addReviewers")}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "addReviewers"
-              ? "bg-purple-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Add Reviewers
-        </button>
-        <button
-          onClick={() => setActiveSection("speakerInvites")}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "speakerInvites"
-              ? "bg-fuchsia-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Speaker Invite Links
-        </button>
-        <button
-          onClick={() => setActiveSection("speakerProfiles")}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "speakerProfiles"
-              ? "bg-rose-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Speaker profile queue
-          {pendingSpeakerProfileCount > 0 ? (
-            <span className="ml-2 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-white/25 px-1.5 text-xs">
-              {pendingSpeakerProfileCount}
-            </span>
-          ) : null}
-        </button>
-        <button
-          onClick={() => setActiveSection("discount")}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "discount"
-              ? "bg-lime-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Discount
-        </button>
-        <button
-          onClick={() => setActiveSection("environment")}
-          className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-            activeSection === "environment"
-              ? "bg-slate-700 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Environment
-        </button>
-      </div>
+            <div className="flex flex-wrap gap-1 bg-white rounded-xl shadow-sm border border-gray-100 p-1">
+              {group.items.map((item) => {
+                const isActive =
+                  item.isActive != null
+                    ? item.isActive
+                    : activeSection === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={
+                      item.onClick || (() => setActiveSection(item.id))
+                    }
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      isActive
+                        ? item.activeClass
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    {item.label}
+                    {item.badge != null && item.badge > 0 ? (
+                      <span className="ml-2 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-white/25 px-1.5 text-xs">
+                        {item.badge}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
 
       {/* Abstract Submissions Section (+ invited review mode reuses review UI) */}
       {(activeSection === "abstracts" ||
@@ -4302,9 +4426,9 @@ export default function AdminTab() {
                                     <span className="font-semibold">
                                       Danger zone:
                                     </span>{" "}
-                                    Permanently hide this abstract from admin,
-                                    reviewers, and emails. You can restore it
-                                    later from Abstract trash.
+                                    Delete this abstract from admin, reviewers,
+                                    and emails. You can restore it later from
+                                    Abstract trash.
                                   </div>
                                   <button
                                     type="button"
@@ -4317,7 +4441,7 @@ export default function AdminTab() {
                                     }
                                     className="px-3 py-1.5 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
                                   >
-                                    Move to trash
+                                    Delete abstract
                                   </button>
                                 </div>
                               </div>
@@ -4747,9 +4871,9 @@ export default function AdminTab() {
                                   <span className="font-semibold">
                                     Danger zone:
                                   </span>{" "}
-                                  Permanently hide this abstract from admin,
-                                  reviewers, and emails. You can restore it
-                                  later from Abstract trash.
+                                  Delete this abstract from admin, reviewers,
+                                  and emails. You can restore it later from
+                                  Abstract trash.
                                 </div>
                                 <button
                                   type="button"
@@ -4760,7 +4884,7 @@ export default function AdminTab() {
                                   disabled={deletingAbstractId === abstract.id}
                                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
-                                  Move to trash
+                                  Delete abstract
                                 </button>
                               </div>
                             </div>
@@ -5910,38 +6034,52 @@ export default function AdminTab() {
                 Registration totals
               </h2>
               <p className="text-gray-500 text-sm mt-1 max-w-3xl">
-                Rollups from the registration list loaded in this session (API
-                returns up to the 100 most recent). Revenue uses{" "}
-                <code className="text-xs bg-gray-100 px-1 rounded">
-                  total_price
-                </code>{" "}
-                and counts payments with status{" "}
-                <span className="font-medium">completed</span> or{" "}
-                <span className="font-medium">paid</span>.
+                Figures below count only registrations with payment status{" "}
+                <span className="font-medium text-gray-700">completed</span> or{" "}
+                <span className="font-medium text-gray-700">paid</span> (including
+                free invited-speaker registrations). Pending and failed rows are
+                excluded from tickets, meals, and attendance. This session loads
+                up to the 100 most recent registrations from the API.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => fetchAllData(adminToken)}
-              className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium"
-            >
-              Refresh data
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveSection("registrations")}
+                className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              >
+                View all registrations
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  isLocalDemo ? loadLocalDemo() : fetchAllData(adminToken)
+                }
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium"
+              >
+                Refresh data
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-              <p className="text-sm font-medium text-gray-500">Registrations</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">
-                {registrationTotals.total}
+            <div className="bg-amber-50 rounded-xl border border-amber-200 p-5 shadow-sm">
+              <p className="text-sm font-medium text-amber-800">
+                Paid registrations
               </p>
-              <p className="text-xs text-gray-400 mt-2">
-                Confirmed payment: {registrationTotals.confirmedCount}
+              <p className="text-3xl font-bold text-amber-950 mt-1">
+                {registrationTotals.confirmedCount}
+              </p>
+              <p className="text-xs text-amber-700/80 mt-2">
+                {registrationTotals.total} total rows
+                {registrationTotals.pendingCount > 0
+                  ? ` · ${registrationTotals.pendingCount} pending payment`
+                  : ""}
               </p>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
               <p className="text-sm font-medium text-gray-500">
-                Revenue (confirmed)
+                Revenue (paid)
               </p>
               <p className="text-3xl font-bold text-amber-700 mt-1">
                 $
@@ -5966,7 +6104,7 @@ export default function AdminTab() {
                 {registrationTotals.accompanyingSum}
               </p>
               <p className="text-xs text-gray-400 mt-2">
-                Sum of accompanying_count
+                From paid registrations only
               </p>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
@@ -5985,7 +6123,7 @@ export default function AdminTab() {
                   <strong>{speakerHotelRegistrations.length}</strong>
                 </span>
                 <span className="block">
-                  Invited speaker registrations:{" "}
+                  Invited speaker registrations (paid):{" "}
                   <strong>{registrationTotals.invitedSpeakers}</strong>
                 </span>
               </p>
@@ -6004,6 +6142,7 @@ export default function AdminTab() {
                   attending
                 </span>
               </p>
+              <p className="text-xs text-emerald-700/70 mt-1">Paid only</p>
             </div>
             <div className="bg-purple-50 rounded-xl border border-purple-200 p-5">
               <p className="text-sm font-medium text-purple-800">Gala dinner</p>
@@ -6014,10 +6153,11 @@ export default function AdminTab() {
                   attending
                 </span>
               </p>
+              <p className="text-xs text-purple-700/70 mt-1">Paid only</p>
             </div>
             <div className="bg-slate-50 rounded-xl border border-slate-200 p-5">
               <p className="text-sm font-medium text-slate-700">
-                Payment status (this batch)
+                Payment status (all rows)
               </p>
               <ul className="mt-2 text-sm text-slate-800 space-y-1">
                 {registrationTotals.statusRows.length === 0 ? (
@@ -6040,6 +6180,9 @@ export default function AdminTab() {
                 <h3 className="font-semibold text-gray-800">
                   Ticket type breakdown
                 </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Paid registrations only
+                </p>
               </div>
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -6059,7 +6202,7 @@ export default function AdminTab() {
                         colSpan={2}
                         className="px-5 py-4 text-sm text-gray-500"
                       >
-                        No registrations in this batch.
+                        No paid registrations in this batch.
                       </td>
                     </tr>
                   ) : (
@@ -6084,7 +6227,7 @@ export default function AdminTab() {
                   Meal attendance by day
                 </h3>
                 <p className="text-xs text-gray-500 mt-1">
-                  Count of registrants who selected each day (Friday–Sunday, Nov
+                  Paid registrants who selected each day (Friday–Sunday, Nov
                   6–8, 2026) for lunch or breakfast.
                 </p>
               </div>
@@ -7414,11 +7557,12 @@ export default function AdminTab() {
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full">
             <div className="p-6 border-b border-gray-100">
               <h3 className="text-xl font-bold text-gray-900">
-                Move Abstract to Trash
+                Delete Abstract
               </h3>
               <p className="text-gray-500 mt-1 text-sm">
                 It will disappear from submissions, reviews, and email tools.
-                Authors and reviews stay attached so you can restore it later.
+                Authors and reviews stay attached so you can restore it later
+                from Abstract trash.
               </p>
             </div>
             <div className="p-6 space-y-4">
@@ -7464,7 +7608,7 @@ export default function AdminTab() {
                 }
                 className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
               >
-                {deletingAbstractId ? "Moving…" : "Move to trash"}
+                {deletingAbstractId ? "Deleting…" : "Delete"}
               </button>
             </div>
           </div>

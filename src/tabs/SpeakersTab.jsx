@@ -9,8 +9,15 @@ function getInitials(name) {
     .toUpperCase();
 }
 
+function speakerImgSrc(speaker) {
+  if (speaker.r2_key) return `/${speaker.r2_key}`;
+  if (speaker.image) return `/speakers/${speaker.image}`;
+  return null;
+}
+
 function SpeakersTab() {
   const [plenarySpeakers, setPlenarySpeakers] = useState([]);
+  const [forumSpeakers, setForumSpeakers] = useState([]);
   const [congressSpeakers, setCongressSpeakers] = useState([]);
 
   useEffect(() => {
@@ -25,10 +32,12 @@ function SpeakersTab() {
         if (!res.ok || !data.success) return;
         if (cancelled) return;
         setPlenarySpeakers(Array.isArray(data.plenary) ? data.plenary : []);
+        setForumSpeakers(Array.isArray(data.forum) ? data.forum : []);
         setCongressSpeakers(Array.isArray(data.congress) ? data.congress : []);
       } catch {
         if (!cancelled) {
           setPlenarySpeakers([]);
+          setForumSpeakers([]);
           setCongressSpeakers([]);
         }
       }
@@ -111,11 +120,7 @@ function SpeakersTab() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {plenarySpeakers.map((speaker) => {
-            const imgSrc = speaker.r2_key
-              ? `/${speaker.r2_key}`
-              : speaker.image
-                ? `/speakers/${speaker.image}`
-                : null;
+            const imgSrc = speakerImgSrc(speaker);
             return (
               <div
                 key={speaker.key}
@@ -169,6 +174,72 @@ function SpeakersTab() {
         </div>
       </div>
 
+      <div
+        className="mb-14 -mx-6 sm:-mx-8 px-6 sm:px-8 py-9 rounded-2xl border border-sky-200"
+        style={{
+          background:
+            "linear-gradient(160deg, #f0f9ff 0%, #e0f2fe 55%, #f8fafc 100%)",
+        }}
+      >
+        <div className="text-center mb-8">
+          <span className="inline-block px-3.5 py-1 rounded-full text-xs font-semibold tracking-widest uppercase mb-3 bg-sky-200/80 text-sky-900">
+            Ask the Expert
+          </span>
+          <h4
+            className="text-2xl sm:text-3xl font-bold mb-2 tracking-tight"
+            style={{ color: "var(--color-primary)" }}
+          >
+            Public Forum Speakers
+          </h4>
+          <p className="text-sky-900/70 text-sm max-w-xl mx-auto">
+            Featured clinicians joining the Public Forum sessions throughout the
+            congress.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          {forumSpeakers.map((speaker) => {
+            const imgSrc = speakerImgSrc(speaker);
+            return (
+              <div
+                key={speaker.key}
+                className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 flex flex-col items-center text-center relative overflow-hidden border border-sky-100"
+              >
+                <div className="absolute top-0 left-0 right-0 h-1 bg-sky-400" />
+                <div className="rounded-full p-0.5 mb-4 bg-sky-200">
+                  {imgSrc ? (
+                    <img
+                      src={imgSrc}
+                      alt={speaker.name}
+                      className="w-28 h-28 rounded-full object-cover border-2 border-white flex-shrink-0"
+                      style={{
+                        ...(speaker.image_position && {
+                          objectPosition: speaker.image_position,
+                        }),
+                      }}
+                    />
+                  ) : (
+                    <div
+                      className="w-28 h-28 rounded-full flex items-center justify-center border-2 border-white text-2xl font-bold text-white flex-shrink-0 bg-sky-600"
+                    >
+                      {getInitials(speaker.name)}
+                    </div>
+                  )}
+                </div>
+                <h5
+                  className="text-lg font-bold mb-1.5 leading-tight"
+                  style={{ color: "var(--color-primary)" }}
+                >
+                  {speaker.name}
+                </h5>
+                <p className="text-gray-500 text-sm leading-relaxed">
+                  {speaker.affiliation}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="mb-10">
         <h4
           className="text-xl font-semibold mb-6 flex items-center"
@@ -191,11 +262,7 @@ function SpeakersTab() {
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {congressSpeakers.map((speaker) => {
-            const imgSrc = speaker.r2_key
-              ? `/${speaker.r2_key}`
-              : speaker.image
-                ? `/speakers/${speaker.image}`
-                : null;
+            const imgSrc = speakerImgSrc(speaker);
             return (
               <div
                 key={speaker.key}
