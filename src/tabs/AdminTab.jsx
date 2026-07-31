@@ -2542,9 +2542,6 @@ export default function AdminTab() {
             <span className="text-white font-bold ml-2">
               {registrationTotals.confirmedCount}
             </span>
-            <span className="block text-xs text-amber-200/70 mt-0.5">
-              {registrationTotals.pendingCount} pending
-            </span>
           </button>
           <button
             type="button"
@@ -2579,20 +2576,18 @@ export default function AdminTab() {
         </div>
       </div>
 
-      {/* Navigation — B2 segmented categories + B4 eyebrow tray */}
+      {/* Navigation — segmented categories + sub-links */}
       <nav className="space-y-2" aria-label="Admin sections">
         {(() => {
           const navGroups = [
             {
               id: "overview",
               label: "Overview",
-              short: "Overview",
               items: [{ id: "registrationTotals", label: "Totals" }],
             },
             {
               id: "registrations",
               label: "Registrations",
-              short: "Regs",
               items: [
                 { id: "registrations", label: "All registrations" },
                 { id: "trainees", label: "Trainee applications" },
@@ -2601,7 +2596,6 @@ export default function AdminTab() {
             {
               id: "abstracts",
               label: "Abstracts",
-              short: "Abstracts",
               items: [
                 {
                   id: "abstracts",
@@ -2644,7 +2638,6 @@ export default function AdminTab() {
             {
               id: "speakers",
               label: "Speakers & travel",
-              short: "Speakers",
               items: [
                 { id: "visa", label: "Visa requests" },
                 { id: "speakerHotel", label: "Speaker hotel" },
@@ -2659,7 +2652,6 @@ export default function AdminTab() {
             {
               id: "reviewers",
               label: "Reviewers",
-              short: "Reviewers",
               items: [
                 { id: "reviewers", label: "Overview" },
                 { id: "addReviewers", label: "Add reviewers" },
@@ -2668,7 +2660,6 @@ export default function AdminTab() {
             {
               id: "settings",
               label: "Settings",
-              short: "Settings",
               items: [
                 { id: "discount", label: "Discount" },
                 { id: "environment", label: "Environment" },
@@ -2707,45 +2698,40 @@ export default function AdminTab() {
                           : "text-slate-600 hover:bg-white hover:text-slate-900"
                       }`}
                     >
-                      {group.short}
+                      {group.label}
                     </button>
                   );
                 })}
               </div>
 
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 shrink-0">
-                  {activeGroup.label}
-                </span>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  {activeGroup.items.map((item) => {
-                    const isActive =
-                      item.isActive != null
-                        ? item.isActive
-                        : activeSection === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={
-                          item.onClick || (() => setActiveSection(item.id))
-                        }
-                        className={`text-sm font-medium transition-colors ${
-                          isActive
-                            ? "text-amber-700 underline underline-offset-4 decoration-2"
-                            : "text-slate-600 hover:text-slate-900"
-                        }`}
-                      >
-                        {item.label}
-                        {item.badge != null && item.badge > 0 ? (
-                          <span className="ml-1.5 inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-rose-100 px-1 text-[10px] font-bold text-rose-700">
-                            {item.badge}
-                          </span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                {activeGroup.items.map((item) => {
+                  const isActive =
+                    item.isActive != null
+                      ? item.isActive
+                      : activeSection === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={
+                        item.onClick || (() => setActiveSection(item.id))
+                      }
+                      className={`text-sm font-medium transition-colors ${
+                        isActive
+                          ? "text-amber-700 underline underline-offset-4 decoration-2"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      {item.label}
+                      {item.badge != null && item.badge > 0 ? (
+                        <span className="ml-1.5 inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-rose-100 px-1 text-[10px] font-bold text-rose-700">
+                          {item.badge}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
               </div>
             </>
           );
