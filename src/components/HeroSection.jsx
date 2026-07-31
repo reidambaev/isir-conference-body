@@ -1,5 +1,4 @@
 import React from "react";
-import { BEXCO_VENUE } from "../config/constants";
 import heroSkyline from "../assets/hero_skyline.jpg";
 
 const HeroSection = () => {
@@ -40,7 +39,7 @@ const HeroSection = () => {
           Join leading researchers and clinicians from around the world
         </p>
 
-        {/* Venue Update Notice */}
+        {/* Abstract Deadline Extension Notice */}
         <div
           role="status"
           className="max-w-2xl mx-auto mb-8 flex items-start gap-3 rounded-xl border backdrop-blur-sm px-5 py-4 text-left shadow-lg"
@@ -73,19 +72,11 @@ const HeroSection = () => {
               className="font-bold text-base uppercase tracking-wide"
               style={{ color: "var(--color-secondary)" }}
             >
-              Venue Announced
+              Deadline Extended
             </p>
             <p className="text-sm md:text-base text-blue-50">
-              The congress will be held at{" "}
-              <a
-                href={BEXCO_VENUE.website}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                BEXCO
-              </a>{" "}
-              (Busan Exhibition and Convention Center),{" "}
-              <strong>Exhibition Center II</strong>.
+              The abstract submission deadline has been extended to{" "}
+              <strong>August 7, 2026</strong>.
             </p>
           </div>
         </div>

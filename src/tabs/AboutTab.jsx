@@ -156,7 +156,7 @@ const AboutTab = () => (
               <div>
                 <strong>Abstract Deadline:</strong>
                 <br />
-                July 31, 2026
+                August 7, 2026
               </div>
             </li>
             <li className="flex items-start">

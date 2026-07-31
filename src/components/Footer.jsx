@@ -210,7 +210,7 @@ const Footer = ({ onNavigateTab }) => (
               </svg>
               <div>
                 <p className="font-medium text-white">Abstract Deadline</p>
-                <p>July 31, 2026</p>
+                <p>August 7, 2026</p>
               </div>
             </li>
             <li className="flex items-start">

@@ -362,7 +362,7 @@ const SubmissionTab = () => {
           </div>
           <div className="bg-white/10 rounded-lg p-3">
             <div className="text-sm opacity-80">Submission Deadline</div>
-            <div className="font-bold">July 31, 2026</div>
+            <div className="font-bold">August 7, 2026</div>
           </div>
           <div className="bg-white/10 rounded-lg p-3">
             <div className="text-sm opacity-80">Notification of Acceptance</div>
@@ -1404,7 +1404,7 @@ const SubmissionTab = () => {
               )}
             </button>
             <p className="text-center text-sm text-gray-500 mt-3">
-              Submission deadline: July 31, 2026
+              Submission deadline: August 7, 2026
             </p>
           </div>
         </form>
