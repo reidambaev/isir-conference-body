@@ -518,7 +518,7 @@ export default function ReviewerTab() {
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <h3 className="text-lg font-semibold text-slate-900">
-                          Gusdon Award evaluation
+                          New Investigator Award evaluation
                         </h3>
                         <p className="text-sm text-slate-600">
                           Score each category (1–5). Total updates
