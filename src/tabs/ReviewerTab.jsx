@@ -393,6 +393,17 @@ export default function ReviewerTab() {
                               <div className="text-xs text-slate-500 mt-1">
                                 {a.category} • {a.word_count} words
                               </div>
+                              <div
+                                className={`text-xs font-semibold mt-1 ${
+                                  Number(a.young_investigator) === 1
+                                    ? "text-amber-700"
+                                    : "text-slate-400"
+                                }`}
+                              >
+                                {Number(a.young_investigator) === 1
+                                  ? "Young Investigator"
+                                  : "Not Young Investigator"}
+                              </div>
                             </div>
                             <div
                               className={`text-xs font-semibold px-2 py-1 rounded-full ${hasReview ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}
@@ -419,6 +430,17 @@ export default function ReviewerTab() {
                     <div className="flex flex-wrap gap-2 mb-3">
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
                         {selectedAbstract.category}
+                      </span>
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                          Number(selectedAbstract.young_investigator) === 1
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {Number(selectedAbstract.young_investigator) === 1
+                          ? "Young Investigator Competition"
+                          : "Not in Young Investigator Competition"}
                       </span>
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
                         {selectedAbstract.word_count} words
@@ -515,24 +537,13 @@ export default function ReviewerTab() {
                   </div>
 
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-slate-900">
-                          New Investigator Award evaluation
-                        </h3>
-                        <p className="text-sm text-slate-600">
-                          Score each category (1–5). Total updates
-                          automatically.
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Total
-                        </div>
-                        <div className="text-3xl font-bold text-slate-900">
-                          {totalScore}
-                        </div>
-                      </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        Abstract evaluation
+                      </h3>
+                      <p className="text-sm text-slate-600">
+                        Score each category (1–5). Total updates automatically.
+                      </p>
                     </div>
 
                     <div className="mt-6 space-y-5">
@@ -682,6 +693,20 @@ export default function ReviewerTab() {
                           className="w-full mt-3 px-3 py-2 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           placeholder="Additional notes (optional)"
                         />
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex items-center justify-between gap-4">
+                        <div>
+                          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            Final score
+                          </div>
+                          <div className="text-sm text-slate-600 mt-1">
+                            Sum of all category scores (updates automatically).
+                          </div>
+                        </div>
+                        <div className="text-3xl font-bold text-slate-900">
+                          {totalScore}
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-between gap-4 pt-2">

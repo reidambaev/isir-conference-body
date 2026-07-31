@@ -32,7 +32,19 @@ import {
 } from "./tabs";
 import SpeakerProfileTab from "./tabs/SpeakerProfileTab";
 import SpeakerHotelTab from "./tabs/SpeakerHotelTab";
+import { isAdminLocalhost } from "./tabs/adminLocalDemoData";
 
+function hasAdminAccessToken() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (String(params.get("admin") || "").trim()) return true;
+    return Boolean(
+      String(localStorage.getItem("isir_admin_token") || "").trim(),
+    );
+  } catch {
+    return false;
+  }
+}
 export default function App() {
   const [activeTab, setActiveTab] = useState("about");
   // 1. Create a ref to attach to the main container
@@ -326,8 +338,30 @@ export default function App() {
     }
   }, [isAdminPage]);
 
-  // Render admin page if on /admin route
+  // Render admin page if on /admin route.
+  // Localhost: always allowed (sample mode or ?admin=TOKEN).
+  // Online: only with an admin token — otherwise show a token-required error.
   if (isAdminPage) {
+    if (!isAdminLocalhost() && !hasAdminAccessToken()) {
+      return (
+        <div ref={appRef} className="min-h-screen bg-gray-50">
+          <main className="max-w-xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <div className="bg-white rounded-xl shadow-lg p-6 md:p-10 text-center">
+              <h1 className="text-2xl font-bold text-gray-900">
+                Admin access required
+              </h1>
+              <p className="mt-3 text-gray-600">
+                An admin token is needed to view this page. Open it with{" "}
+                <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm text-gray-800">
+                  ?admin=YOUR_TOKEN
+                </code>{" "}
+                in the URL.
+              </p>
+            </div>
+          </main>
+        </div>
+      );
+    }
     console.log("Rendering admin page");
     return (
       <div ref={appRef} className="min-h-screen bg-gray-50">

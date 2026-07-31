@@ -364,6 +364,19 @@ async function handleApiRequest(request, env, url) {
     );
   }
 
+  // PATCH /api/admin/abstracts/:id - Update abstract content
+  const abstractUpdateMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)$/,
+  );
+  if (abstractUpdateMatch && request.method === "PATCH") {
+    return handleUpdateAbstract(
+      request,
+      env,
+      corsHeaders,
+      abstractUpdateMatch[1],
+    );
+  }
+
   // PATCH /api/admin/abstracts/:id/status - Update abstract status
   const abstractStatusMatch = url.pathname.match(
     /^\/api\/admin\/abstracts\/([^/]+)\/status$/,
@@ -558,6 +571,22 @@ async function handleApiRequest(request, env, url) {
     request.method === "POST"
   ) {
     return handleAdminSetReviewerTarget(request, env, corsHeaders);
+  }
+
+  // POST /api/admin/reviewers/unassign (remove one assignment)
+  if (
+    url.pathname === "/api/admin/reviewers/unassign" &&
+    request.method === "POST"
+  ) {
+    return handleAdminUnassignReviewerAbstract(request, env, corsHeaders);
+  }
+
+  // POST /api/admin/reviewers/delete (remove reviewer account)
+  if (
+    url.pathname === "/api/admin/reviewers/delete" &&
+    request.method === "POST"
+  ) {
+    return handleAdminDeleteReviewer(request, env, corsHeaders);
   }
 
   // GET /api/admin/reviewers/abstract-scores
@@ -1231,12 +1260,23 @@ async function handleAdminCreateReviewer(request, env, corsHeaders) {
         .run();
     }
 
+    const targetForAssign =
+      abstractsTarget != null
+        ? abstractsTarget
+        : await getAbstractsPerReviewer(env);
+    const assignedIds = await ensureReviewerAssignments(
+      env,
+      email,
+      targetForAssign,
+    );
+
     return jsonResponse(
       {
         success: true,
         email,
         existing: Boolean(existing?.email),
         abstracts_per_reviewer: abstractsTarget,
+        assigned_count: assignedIds.length,
       },
       200,
       corsHeaders,
@@ -1313,6 +1353,74 @@ function shuffleInPlace(arr) {
   return a;
 }
 
+/** Peer-review eligibility: not invited speaker, not poster-only. */
+const PEER_REVIEW_ELIGIBLE_SQL = `COALESCE(a.is_invited_speaker, 0) != 1
+         AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster'`;
+
+/**
+ * Ensure a reviewer has up to `targetCount` peer-reviewable assignments.
+ * Only adds abstracts; never removes. Returns the full list of eligible assigned IDs.
+ */
+async function ensureReviewerAssignments(env, reviewerEmail, targetCount) {
+  const existing = await env.ISIR_DB.prepare(
+    `SELECT ra.abstract_id
+     FROM reviewer_assignments ra
+     JOIN abstractions a ON a.id = ra.abstract_id
+     WHERE ra.reviewer_email = ?
+       AND a.deleted_at IS NULL
+       AND ${PEER_REVIEW_ELIGIBLE_SQL}
+     ORDER BY ra.assigned_at ASC`,
+  )
+    .bind(reviewerEmail)
+    .all();
+
+  let assignedIds = (existing.results || []).map((r) => r.abstract_id);
+  const target = Math.max(0, Number(targetCount) || 0);
+
+  if (assignedIds.length < target) {
+    const allAbstracts = await env.ISIR_DB.prepare(
+      `SELECT a.id, COUNT(ra.abstract_id) AS assign_count
+       FROM abstractions a
+       LEFT JOIN reviewer_assignments ra ON ra.abstract_id = a.id
+       WHERE a.status = 'submitted'
+         AND a.deleted_at IS NULL
+         AND ${PEER_REVIEW_ELIGIBLE_SQL}
+       GROUP BY a.id
+       LIMIT 1000`,
+    ).all();
+
+    const pool = (allAbstracts.results || [])
+      .map((r) => ({ id: r.id, count: Number(r.assign_count || 0) }))
+      .filter((r) => !assignedIds.includes(r.id));
+
+    shuffleInPlace(pool);
+    pool.sort((a, b) => a.count - b.count);
+
+    const toAdd = pool.slice(0, target - assignedIds.length).map((r) => r.id);
+    if (toAdd.length > 0) {
+      const now = Date.now();
+      const stmt = env.ISIR_DB.prepare(
+        `INSERT OR IGNORE INTO reviewer_assignments (reviewer_email, abstract_id, assigned_at) VALUES (?, ?, ?)`,
+      );
+      for (const absId of toAdd) {
+        await stmt.bind(reviewerEmail, absId, now).run();
+      }
+      assignedIds = [...assignedIds, ...toAdd];
+    }
+  }
+
+  return assignedIds;
+}
+
+async function countReviewerAssignments(env, reviewerEmail) {
+  const row = await env.ISIR_DB.prepare(
+    `SELECT COUNT(*) AS n FROM reviewer_assignments WHERE reviewer_email = ?`,
+  )
+    .bind(reviewerEmail)
+    .first();
+  return Number(row?.n || 0);
+}
+
 const DEFAULT_ABSTRACTS_PER_REVIEWER = 5;
 const MAX_ABSTRACTS_PER_REVIEWER = 100;
 
@@ -1358,7 +1466,8 @@ async function getAbstractsTargetForReviewer(env, email) {
       .bind(reviewerTargetSettingKey(email))
       .first();
     const n = Number(row?.value);
-    if (Number.isInteger(n) && n >= 1 && n <= MAX_ABSTRACTS_PER_REVIEWER) {
+    // 0 is allowed as an explicit "assign nothing more" override
+    if (Number.isInteger(n) && n >= 0 && n <= MAX_ABSTRACTS_PER_REVIEWER) {
       return n;
     }
   } catch (error) {
@@ -1398,7 +1507,7 @@ async function handleAdminListReviewers(request, env, corsHeaders) {
     (overrides.results || []).forEach((r) => {
       const email = String(r.key).slice("abstracts_per_reviewer:".length);
       const n = Number(r.value);
-      if (Number.isInteger(n) && n >= 1 && n <= MAX_ABSTRACTS_PER_REVIEWER) {
+      if (Number.isInteger(n) && n >= 0 && n <= MAX_ABSTRACTS_PER_REVIEWER) {
         overrideByEmail[email] = n;
       }
     });
@@ -1464,28 +1573,65 @@ async function handleAdminSetReviewerTarget(request, env, corsHeaders) {
     }
 
     await ensureReviewerSettingsTable(env);
+    const assignedCount = await countReviewerAssignments(env, email);
     const raw = data?.abstracts_per_reviewer;
 
     // Blank/null clears the individual number so the default applies again
     if (raw == null || raw === "") {
+      const defaultTarget = await getAbstractsPerReviewer(env);
+      if (defaultTarget < assignedCount) {
+        return jsonResponse(
+          {
+            success: false,
+            error: `Cannot use the default (${defaultTarget}) — this reviewer already has ${assignedCount} assignment${assignedCount === 1 ? "" : "s"}. Remove assignments first, or set a number of at least ${assignedCount}.`,
+            assigned_count: assignedCount,
+            default_target: defaultTarget,
+          },
+          400,
+          corsHeaders,
+        );
+      }
       await env.ISIR_DB.prepare(
         `DELETE FROM reviewer_settings WHERE key = ?`,
       )
         .bind(reviewerTargetSettingKey(email))
         .run();
+      const assignedIds = await ensureReviewerAssignments(
+        env,
+        email,
+        defaultTarget,
+      );
       return jsonResponse(
-        { success: true, email, abstracts_per_reviewer: null },
+        {
+          success: true,
+          email,
+          abstracts_per_reviewer: null,
+          assigned_count: assignedIds.length,
+          newly_assigned: Math.max(0, assignedIds.length - assignedCount),
+        },
         200,
         corsHeaders,
       );
     }
 
     const n = Number(raw);
-    if (!Number.isInteger(n) || n < 1 || n > MAX_ABSTRACTS_PER_REVIEWER) {
+    if (!Number.isInteger(n) || n < 0 || n > MAX_ABSTRACTS_PER_REVIEWER) {
       return jsonResponse(
         {
           success: false,
-          error: `abstracts_per_reviewer must be an integer between 1 and ${MAX_ABSTRACTS_PER_REVIEWER}`,
+          error: `abstracts_per_reviewer must be an integer between 0 and ${MAX_ABSTRACTS_PER_REVIEWER}`,
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
+    if (n < assignedCount) {
+      return jsonResponse(
+        {
+          success: false,
+          error: `Cannot set target to ${n} — this reviewer already has ${assignedCount} assignment${assignedCount === 1 ? "" : "s"}. Remove specific assignments first if you need a lower number.`,
+          assigned_count: assignedCount,
         },
         400,
         corsHeaders,
@@ -1503,8 +1649,17 @@ async function handleAdminSetReviewerTarget(request, env, corsHeaders) {
       .bind(reviewerTargetSettingKey(email), String(n), Date.now())
       .run();
 
+    // Immediately fill up to the new target (adds only; never removes)
+    const assignedIds = await ensureReviewerAssignments(env, email, n);
+
     return jsonResponse(
-      { success: true, email, abstracts_per_reviewer: n },
+      {
+        success: true,
+        email,
+        abstracts_per_reviewer: n,
+        assigned_count: assignedIds.length,
+        newly_assigned: Math.max(0, assignedIds.length - assignedCount),
+      },
       200,
       corsHeaders,
     );
@@ -1512,6 +1667,169 @@ async function handleAdminSetReviewerTarget(request, env, corsHeaders) {
     console.error("Admin set reviewer target error:", error);
     return jsonResponse(
       { success: false, error: error.message || "Failed to save setting" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+// POST /api/admin/reviewers/unassign — remove one abstract assignment
+async function handleAdminUnassignReviewerAbstract(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    const data = await request.json();
+    const email = normalizeEmail(data?.email || data?.reviewer_email || "");
+    const abstractId = String(data?.abstract_id || data?.abstractId || "").trim();
+    if (!email || !abstractId) {
+      return jsonResponse(
+        { success: false, error: "email and abstract_id are required" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT 1 FROM reviewer_assignments
+       WHERE reviewer_email = ? AND abstract_id = ?`,
+    )
+      .bind(email, abstractId)
+      .first();
+    if (!existing) {
+      return jsonResponse(
+        { success: false, error: "Assignment not found" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    await env.ISIR_DB.prepare(
+      `DELETE FROM reviewer_assignments
+       WHERE reviewer_email = ? AND abstract_id = ?`,
+    )
+      .bind(email, abstractId)
+      .run();
+
+    // Drop that reviewer's score for this abstract so it leaves the review pool cleanly
+    await env.ISIR_DB.prepare(
+      `DELETE FROM reviews WHERE reviewer_email = ? AND abstract_id = ?`,
+    )
+      .bind(email, abstractId)
+      .run();
+
+    const assignedCount = await countReviewerAssignments(env, email);
+
+    // Pin target to the new assigned count so the portal won't auto-refill
+    await ensureReviewerSettingsTable(env);
+    await env.ISIR_DB.prepare(
+      `INSERT INTO reviewer_settings (key, value, updated_at, updated_by)
+       VALUES (?, ?, ?, 'admin')
+       ON CONFLICT(key) DO UPDATE SET
+         value = excluded.value,
+         updated_at = excluded.updated_at,
+         updated_by = excluded.updated_by`,
+    )
+      .bind(
+        reviewerTargetSettingKey(email),
+        String(assignedCount),
+        Date.now(),
+      )
+      .run();
+
+    return jsonResponse(
+      {
+        success: true,
+        email,
+        abstract_id: abstractId,
+        assigned_count: assignedCount,
+        abstracts_per_reviewer: assignedCount,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Admin unassign reviewer abstract error:", error);
+    return jsonResponse(
+      {
+        success: false,
+        error: error.message || "Failed to remove assignment",
+      },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+// POST /api/admin/reviewers/delete — remove a reviewer account and their assignments
+async function handleAdminDeleteReviewer(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    const data = await request.json();
+    const email = normalizeEmail(data?.email || "");
+    if (!email) {
+      return jsonResponse(
+        { success: false, error: "Email is required" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const reviewerRow = await env.ISIR_DB.prepare(
+      `SELECT email FROM reviewers WHERE email = ?`,
+    )
+      .bind(email)
+      .first();
+    if (!reviewerRow?.email) {
+      return jsonResponse(
+        { success: false, error: "No reviewer account for this email" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    await env.ISIR_DB.prepare(
+      `DELETE FROM reviewer_sessions WHERE reviewer_email = ?`,
+    )
+      .bind(email)
+      .run();
+    await env.ISIR_DB.prepare(
+      `DELETE FROM reviewer_assignments WHERE reviewer_email = ?`,
+    )
+      .bind(email)
+      .run();
+    // Keep submitted reviews for historical abstract scores
+    await ensureReviewerSettingsTable(env);
+    await env.ISIR_DB.prepare(
+      `DELETE FROM reviewer_settings WHERE key = ?`,
+    )
+      .bind(reviewerTargetSettingKey(email))
+      .run();
+    await env.ISIR_DB.prepare(`DELETE FROM reviewers WHERE email = ?`)
+      .bind(email)
+      .run();
+
+    return jsonResponse({ success: true, email }, 200, corsHeaders);
+  } catch (error) {
+    console.error("Admin delete reviewer error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to delete reviewer" },
       500,
       corsHeaders,
     );
@@ -1589,64 +1907,18 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
       );
     }
 
-    // Ensure the configured number of assigned abstracts (persisted) — general submissions only
+    // Peer-review pool: general oral/either submissions only
+    // (exclude invited speakers and poster-only)
     const targetCount = await getAbstractsTargetForReviewer(
       env,
       reviewer.email,
     );
 
-    const existing = await env.ISIR_DB.prepare(
-      `SELECT ra.abstract_id
-       FROM reviewer_assignments ra
-       JOIN abstractions a ON a.id = ra.abstract_id
-       WHERE ra.reviewer_email = ?
-         AND a.deleted_at IS NULL
-         AND COALESCE(a.is_invited_speaker, 0) != 1
-       ORDER BY ra.assigned_at ASC`,
-    )
-      .bind(reviewer.email)
-      .all();
-
-    let assignedIds = (existing.results || []).map((r) => r.abstract_id);
-
-    if (assignedIds.length < targetCount) {
-      // Only assign general (non–invited speaker) abstracts to reviewers,
-      // preferring the abstracts with the fewest reviewers assigned so far.
-      const allAbstracts = await env.ISIR_DB.prepare(
-        `SELECT a.id, COUNT(ra.abstract_id) AS assign_count
-         FROM abstractions a
-         LEFT JOIN reviewer_assignments ra ON ra.abstract_id = a.id
-         WHERE a.status = 'submitted'
-           AND a.deleted_at IS NULL
-           AND COALESCE(a.is_invited_speaker, 0) != 1
-         GROUP BY a.id
-         LIMIT 1000`,
-      ).all();
-
-      const pool = (allAbstracts.results || [])
-        .map((r) => ({ id: r.id, count: Number(r.assign_count || 0) }))
-        .filter((r) => !assignedIds.includes(r.id));
-
-      // Shuffle first so ties in assignment count are broken randomly,
-      // then stable-sort by fewest reviewers assigned.
-      shuffleInPlace(pool);
-      pool.sort((a, b) => a.count - b.count);
-
-      const toAdd = pool
-        .slice(0, targetCount - assignedIds.length)
-        .map((r) => r.id);
-
-      if (toAdd.length > 0) {
-        const now = Date.now();
-        const stmt = env.ISIR_DB.prepare(
-          `INSERT OR IGNORE INTO reviewer_assignments (reviewer_email, abstract_id, assigned_at) VALUES (?, ?, ?)`,
-        );
-        for (const absId of toAdd) {
-          await stmt.bind(reviewer.email, absId, now).run();
-        }
-        assignedIds = [...assignedIds, ...toAdd];
-      }
-    }
+    let assignedIds = await ensureReviewerAssignments(
+      env,
+      reviewer.email,
+      targetCount,
+    );
 
     // Cap at the configured count (legacy/manual extras)
     if (assignedIds.length > targetCount) {
@@ -1664,7 +1936,11 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
     const abstracts = await d1AllWhereIn(
       env.ISIR_DB,
       (ph) =>
-        `SELECT * FROM abstractions WHERE id IN (${ph}) AND deleted_at IS NULL`,
+        `SELECT * FROM abstractions
+         WHERE id IN (${ph})
+           AND deleted_at IS NULL
+           AND COALESCE(is_invited_speaker, 0) != 1
+           AND LOWER(COALESCE(presentation_preference, '')) != 'poster'`,
       assignedIds,
     );
 
@@ -1755,9 +2031,16 @@ async function handleSubmitReviewerReview(request, env, corsHeaders) {
       );
     }
 
-    // Ensure this abstract is assigned to reviewer
+    // Ensure this abstract is assigned and eligible for peer review
     const assignment = await env.ISIR_DB.prepare(
-      `SELECT 1 FROM reviewer_assignments WHERE reviewer_email = ? AND abstract_id = ?`,
+      `SELECT 1
+       FROM reviewer_assignments ra
+       JOIN abstractions a ON a.id = ra.abstract_id
+       WHERE ra.reviewer_email = ?
+         AND ra.abstract_id = ?
+         AND a.deleted_at IS NULL
+         AND COALESCE(a.is_invited_speaker, 0) != 1
+         AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster'`,
     )
       .bind(reviewer.email, abstractId)
       .first();
@@ -1854,12 +2137,24 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
     const auth = ensureAdmin(request, env, corsHeaders);
     if (auth) return auth;
 
-    // Overall totals
+    // Overall totals (peer-review pool only: not invited, not poster-only)
     const totalsRow = await env.ISIR_DB.prepare(
       `SELECT
-         (SELECT COUNT(*) FROM reviews) AS total_reviews,
-         (SELECT COUNT(DISTINCT reviewer_email) FROM reviewer_assignments) AS total_reviewers_with_assignments,
-         (SELECT COUNT(*) FROM reviewer_assignments) AS total_assignments`,
+         (SELECT COUNT(*) FROM reviews r
+            JOIN abstractions a ON a.id = r.abstract_id
+           WHERE a.deleted_at IS NULL
+             AND COALESCE(a.is_invited_speaker, 0) != 1
+             AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster') AS total_reviews,
+         (SELECT COUNT(DISTINCT ra.reviewer_email) FROM reviewer_assignments ra
+            JOIN abstractions a ON a.id = ra.abstract_id
+           WHERE a.deleted_at IS NULL
+             AND COALESCE(a.is_invited_speaker, 0) != 1
+             AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster') AS total_reviewers_with_assignments,
+         (SELECT COUNT(*) FROM reviewer_assignments ra
+            JOIN abstractions a ON a.id = ra.abstract_id
+           WHERE a.deleted_at IS NULL
+             AND COALESCE(a.is_invited_speaker, 0) != 1
+             AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster') AS total_assignments`,
     ).first();
 
     // Per-reviewer aggregate stats
@@ -1871,9 +2166,14 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
          AVG(r.total) AS avg_score,
          MAX(r.updated_at) AS last_review_at
        FROM reviewer_assignments ra
+       JOIN abstractions a
+         ON a.id = ra.abstract_id
        LEFT JOIN reviews r
          ON r.reviewer_email = ra.reviewer_email
         AND r.abstract_id = ra.abstract_id
+       WHERE a.deleted_at IS NULL
+         AND COALESCE(a.is_invited_speaker, 0) != 1
+         AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster'
        GROUP BY ra.reviewer_email
        ORDER BY ra.reviewer_email ASC`,
     ).all();
@@ -1895,6 +2195,8 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
          ON r.reviewer_email = ra.reviewer_email
         AND r.abstract_id = ra.abstract_id
        WHERE a.deleted_at IS NULL
+         AND COALESCE(a.is_invited_speaker, 0) != 1
+         AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster'
        ORDER BY ra.reviewer_email ASC, ra.assigned_at ASC`,
     ).all();
 
@@ -1976,6 +2278,7 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
     const auth = ensureAdmin(request, env, corsHeaders);
     if (auth) return auth;
 
+    // Peer-review pool only — exclude invited speakers and poster-only submissions
     const abstractsResult = await env.ISIR_DB.prepare(
       `SELECT
          a.id,
@@ -1985,6 +2288,8 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
          a.submission_date
        FROM abstractions a
        WHERE a.deleted_at IS NULL
+         AND COALESCE(a.is_invited_speaker, 0) != 1
+         AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster'
        ORDER BY a.submission_date DESC`,
     ).all();
 
@@ -1999,6 +2304,10 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
          AVG(r.significance) AS avg_significance,
          AVG(r.total) AS avg_total
        FROM reviews r
+       JOIN abstractions a ON a.id = r.abstract_id
+       WHERE a.deleted_at IS NULL
+         AND COALESCE(a.is_invited_speaker, 0) != 1
+         AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster'
        GROUP BY r.abstract_id`,
     ).all();
 
@@ -2019,6 +2328,10 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
          r.coi_other_details,
          r.updated_at
        FROM reviews r
+       JOIN abstractions a ON a.id = r.abstract_id
+       WHERE a.deleted_at IS NULL
+         AND COALESCE(a.is_invited_speaker, 0) != 1
+         AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster'
        ORDER BY r.updated_at DESC`,
     ).all();
 
@@ -2894,6 +3207,16 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
     const correspondingAuthorId = `AUTH-${submissionId}-${correspondingIdx}`;
     const presenterAuthorId = `AUTH-${submissionId}-${presenterIdx}`;
 
+    const youngInvestigator =
+      data.youngInvestigator === true ||
+      data.youngInvestigator === 1 ||
+      data.youngInvestigator === "1" ||
+      data.young_investigator === true ||
+      data.young_investigator === 1 ||
+      data.young_investigator === "1"
+        ? 1
+        : 0;
+
     // Insert abstract. Store abstract_submission_type when available, and
     // gracefully fall back for older DBs that haven't run the migration yet.
     try {
@@ -2905,8 +3228,8 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
           presenter_author_id,
           corresponding_name, corresponding_email, corresponding_author_id,
           affiliations, status, created_at,
-          is_invited_speaker
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          is_invited_speaker, young_investigator
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
         .bind(
           submissionId,
@@ -2928,45 +3251,126 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
           "submitted",
           submissionDate,
           data.isInvitedSpeaker ? 1 : 0,
+          youngInvestigator,
         )
         .run();
     } catch (insertError) {
       const message = String(insertError?.message || "");
-      if (!message.includes("abstract_submission_type")) {
+      if (
+        !message.includes("abstract_submission_type") &&
+        !message.includes("young_investigator")
+      ) {
         throw insertError;
       }
-      await env.ISIR_DB.prepare(
-        `INSERT INTO abstractions (
-          id, submission_date, title, category, keywords, abstract,
-          word_count, presentation_preference,
-          presenter_name, presenter_email,
-          presenter_author_id,
-          corresponding_name, corresponding_email, corresponding_author_id,
-          affiliations, status, created_at,
-          is_invited_speaker
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-        .bind(
-          submissionId,
-          submissionDate,
-          data.title.trim(),
-          data.category,
-          data.keywords.trim(),
-          data.abstract.trim(),
-          wordCount,
-          data.presentationPreference,
-          data.presenterName.trim(),
-          data.presenterEmail.trim(),
-          presenterAuthorId,
-          data.correspondingName.trim(),
-          data.correspondingEmail.trim(),
-          correspondingAuthorId,
-          data.affiliations || null,
-          "submitted",
-          submissionDate,
-          data.isInvitedSpeaker ? 1 : 0,
+      // Fallback without optional columns that may be missing on older DBs
+      if (message.includes("young_investigator")) {
+        try {
+          await env.ISIR_DB.prepare(
+            `INSERT INTO abstractions (
+              id, submission_date, title, category, abstract_submission_type, keywords, abstract,
+              word_count, presentation_preference,
+              presenter_name, presenter_email,
+              presenter_author_id,
+              corresponding_name, corresponding_email, corresponding_author_id,
+              affiliations, status, created_at,
+              is_invited_speaker
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+            .bind(
+              submissionId,
+              submissionDate,
+              data.title.trim(),
+              data.category,
+              normalizedSubmissionType,
+              data.keywords.trim(),
+              data.abstract.trim(),
+              wordCount,
+              data.presentationPreference,
+              data.presenterName.trim(),
+              data.presenterEmail.trim(),
+              presenterAuthorId,
+              data.correspondingName.trim(),
+              data.correspondingEmail.trim(),
+              correspondingAuthorId,
+              data.affiliations || null,
+              "submitted",
+              submissionDate,
+              data.isInvitedSpeaker ? 1 : 0,
+            )
+            .run();
+        } catch (fallbackError) {
+          const fallbackMessage = String(fallbackError?.message || "");
+          if (!fallbackMessage.includes("abstract_submission_type")) {
+            throw fallbackError;
+          }
+          await env.ISIR_DB.prepare(
+            `INSERT INTO abstractions (
+              id, submission_date, title, category, keywords, abstract,
+              word_count, presentation_preference,
+              presenter_name, presenter_email,
+              presenter_author_id,
+              corresponding_name, corresponding_email, corresponding_author_id,
+              affiliations, status, created_at,
+              is_invited_speaker
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+            .bind(
+              submissionId,
+              submissionDate,
+              data.title.trim(),
+              data.category,
+              data.keywords.trim(),
+              data.abstract.trim(),
+              wordCount,
+              data.presentationPreference,
+              data.presenterName.trim(),
+              data.presenterEmail.trim(),
+              presenterAuthorId,
+              data.correspondingName.trim(),
+              data.correspondingEmail.trim(),
+              correspondingAuthorId,
+              data.affiliations || null,
+              "submitted",
+              submissionDate,
+              data.isInvitedSpeaker ? 1 : 0,
+            )
+            .run();
+        }
+      } else {
+        await env.ISIR_DB.prepare(
+          `INSERT INTO abstractions (
+            id, submission_date, title, category, keywords, abstract,
+            word_count, presentation_preference,
+            presenter_name, presenter_email,
+            presenter_author_id,
+            corresponding_name, corresponding_email, corresponding_author_id,
+            affiliations, status, created_at,
+            is_invited_speaker, young_investigator
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run();
+          .bind(
+            submissionId,
+            submissionDate,
+            data.title.trim(),
+            data.category,
+            data.keywords.trim(),
+            data.abstract.trim(),
+            wordCount,
+            data.presentationPreference,
+            data.presenterName.trim(),
+            data.presenterEmail.trim(),
+            presenterAuthorId,
+            data.correspondingName.trim(),
+            data.correspondingEmail.trim(),
+            correspondingAuthorId,
+            data.affiliations || null,
+            "submitted",
+            submissionDate,
+            data.isInvitedSpeaker ? 1 : 0,
+            youngInvestigator,
+          )
+          .run();
+      }
     }
 
     // Insert authors
@@ -5907,6 +6311,545 @@ async function handleUpdateTraineeLetterStatus(
   }
 }
 
+// Admin endpoint: Update abstract content (title, body, metadata, authors)
+async function handleUpdateAbstract(request, env, corsHeaders, abstractId) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!abstractId) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing abstract id" }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT id FROM abstractions WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!existing) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Abstract not found" }),
+        { status: 404, headers: corsHeaders },
+      );
+    }
+
+    const data = await request.json();
+    const title = String(data?.title || "").trim();
+    const category = String(data?.category || "").trim();
+    const keywords = String(data?.keywords || "").trim();
+    const abstractText = String(data?.abstract || "").trim();
+    const presentationPreference = String(
+      data?.presentationPreference || data?.presentation_preference || "",
+    ).trim();
+    const rawSubmissionType = String(
+      data?.abstractSubmissionType || data?.abstract_submission_type || "",
+    ).trim();
+
+    let authorsData = data?.authors;
+    if (typeof authorsData === "string") {
+      try {
+        authorsData = JSON.parse(authorsData);
+      } catch {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Invalid authors format. Must be a JSON array.",
+          }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+    }
+
+    let affiliationsData = data?.affiliations;
+    if (typeof affiliationsData === "string") {
+      try {
+        affiliationsData = JSON.parse(affiliationsData);
+      } catch {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Invalid affiliations format. Must be a JSON array.",
+          }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+    }
+
+    if (!title) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Title is required" }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (title.length > 150) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Title exceeds 150 character limit (current: ${title.length} characters)`,
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (!category) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Category is required" }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (!keywords) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Keywords are required" }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (!abstractText) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Abstract text is required" }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const validPreferences = ["oral", "poster", "either"];
+    if (!validPreferences.includes(presentationPreference)) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid presentation preference",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const submissionTypeMap = {
+      "Clinical Studies": "Clinical Studies",
+      "Basic Studies": "Basic Studies",
+      "Clinical Research": "Clinical Studies",
+      "Basic Research": "Basic Studies",
+    };
+    const normalizedSubmissionType = submissionTypeMap[rawSubmissionType];
+    if (!normalizedSubmissionType) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid abstract submission type",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const wordCount = abstractText.split(/\s+/).filter((w) => w).length;
+    if (wordCount > 300) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Abstract exceeds 300 word limit (current: ${wordCount} words)`,
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (wordCount < 50) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Abstract must be at least 50 words",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    if (!Array.isArray(authorsData) || authorsData.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "authors must be a non-empty array",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const normalizedAuthors = [];
+    for (let i = 0; i < authorsData.length; i++) {
+      const author = authorsData[i] || {};
+      const firstName = String(
+        author.firstName || author.first_name || "",
+      ).trim();
+      const middleName =
+        String(author.middleName || author.middle_name || "").trim() || null;
+      const lastName = String(author.lastName || author.last_name || "").trim();
+      const email =
+        String(author.email || "").trim() || null;
+      const isPresenter = Boolean(
+        author.isPresenter ?? author.is_presenter ?? false,
+      );
+      const isCorresponding = Boolean(
+        author.isCorresponding ?? author.is_corresponding ?? false,
+      );
+
+      if (!firstName || !lastName) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Author ${i + 1} must have first and last name`,
+          }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+      if ((isPresenter || isCorresponding) && !email) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Author ${i + 1} email is required for presenter/corresponding`,
+          }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+      if (email && !emailRegex.test(email)) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Author ${i + 1} has an invalid email format`,
+          }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+
+      normalizedAuthors.push({
+        id: String(author.id || "").trim() || `AUTH-${abstractId}-${i}`,
+        firstName,
+        middleName,
+        lastName,
+        email,
+        isPresenter,
+        isCorresponding,
+        position: i,
+      });
+    }
+
+    const presenterIdx = normalizedAuthors.findIndex((a) => a.isPresenter);
+    const correspondingIdx = normalizedAuthors.findIndex(
+      (a) => a.isCorresponding,
+    );
+    if (presenterIdx === -1) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "A presenting author must be designated",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (correspondingIdx === -1) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "A corresponding author must be designated",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    // Prefer nested author.affiliations; fall back to flat affiliations array.
+    let normalizedAffiliations = [];
+    const hasNestedAffiliations = authorsData.some((a) =>
+      Array.isArray(a?.affiliations),
+    );
+    if (hasNestedAffiliations) {
+      for (let i = 0; i < authorsData.length; i++) {
+        const author = authorsData[i] || {};
+        const authorName = `${normalizedAuthors[i].firstName} ${normalizedAuthors[i].lastName}`.trim();
+        const affs = Array.isArray(author.affiliations)
+          ? author.affiliations
+          : [];
+        if (affs.length === 0) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: `Author ${i + 1} must have at least one affiliation`,
+            }),
+            { status: 400, headers: corsHeaders },
+          );
+        }
+        for (const aff of affs) {
+          const institution = String(
+            aff.institution || "",
+          ).trim();
+          const city = String(aff.city || "").trim();
+          const country = String(aff.country || "").trim();
+          if (!institution || !city || !country) {
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: `Author ${i + 1} affiliations need institution, city, and country`,
+              }),
+              { status: 400, headers: corsHeaders },
+            );
+          }
+          normalizedAffiliations.push({
+            authorName,
+            department:
+              String(aff.department || "").trim() || null,
+            institution,
+            city,
+            country,
+          });
+        }
+      }
+    } else if (Array.isArray(affiliationsData) && affiliationsData.length > 0) {
+      for (const aff of affiliationsData) {
+        const institution = String(aff.institution || "").trim();
+        const city = String(aff.city || "").trim();
+        const country = String(aff.country || "").trim();
+        if (!institution || !city || !country) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error:
+                "Each affiliation needs institution, city, and country",
+            }),
+            { status: 400, headers: corsHeaders },
+          );
+        }
+        normalizedAffiliations.push({
+          authorName:
+            String(aff.authorName || aff.author_name || "").trim() || null,
+          department:
+            String(aff.department || "").trim() || null,
+          institution,
+          city,
+          country,
+        });
+      }
+    } else {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "At least one affiliation is required",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const presenter = normalizedAuthors[presenterIdx];
+    const corresponding = normalizedAuthors[correspondingIdx];
+    const presenterName = formatAuthorFullName({
+      first_name: presenter.firstName,
+      middle_name: presenter.middleName,
+      last_name: presenter.lastName,
+    });
+    const correspondingName = formatAuthorFullName({
+      first_name: corresponding.firstName,
+      middle_name: corresponding.middleName,
+      last_name: corresponding.lastName,
+    });
+    const updatedAt = Date.now();
+
+    const statements = [
+      env.ISIR_DB.prepare(`DELETE FROM authors WHERE abstract_id = ?`).bind(
+        abstractId,
+      ),
+      env.ISIR_DB.prepare(
+        `DELETE FROM affiliations WHERE abstract_id = ?`,
+      ).bind(abstractId),
+    ];
+
+    for (const author of normalizedAuthors) {
+      statements.push(
+        env.ISIR_DB.prepare(
+          `INSERT INTO authors (
+            id, abstract_id, first_name, middle_name, last_name,
+            email, is_presenter, is_corresponding, position
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          author.id,
+          abstractId,
+          author.firstName,
+          author.middleName,
+          author.lastName,
+          author.email,
+          author.isPresenter ? 1 : 0,
+          author.isCorresponding ? 1 : 0,
+          author.position,
+        ),
+      );
+    }
+
+    for (let i = 0; i < normalizedAffiliations.length; i++) {
+      const aff = normalizedAffiliations[i];
+      statements.push(
+        env.ISIR_DB.prepare(
+          `INSERT INTO affiliations (
+            id, abstract_id, author_name, department, institution,
+            city, country, position
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          `AFF-${abstractId}-${i}`,
+          abstractId,
+          aff.authorName,
+          aff.department,
+          aff.institution,
+          aff.city,
+          aff.country,
+          i,
+        ),
+      );
+    }
+
+    try {
+      statements.push(
+        env.ISIR_DB.prepare(
+          `UPDATE abstractions SET
+            title = ?,
+            category = ?,
+            abstract_submission_type = ?,
+            keywords = ?,
+            abstract = ?,
+            word_count = ?,
+            presentation_preference = ?,
+            presenter_name = ?,
+            presenter_email = ?,
+            presenter_author_id = ?,
+            corresponding_name = ?,
+            corresponding_email = ?,
+            corresponding_author_id = ?,
+            updated_at = ?
+          WHERE id = ? AND deleted_at IS NULL`,
+        ).bind(
+          title,
+          category,
+          normalizedSubmissionType,
+          keywords,
+          abstractText,
+          wordCount,
+          presentationPreference,
+          presenterName,
+          presenter.email,
+          presenter.id,
+          correspondingName,
+          corresponding.email,
+          corresponding.id,
+          updatedAt,
+          abstractId,
+        ),
+      );
+      await env.ISIR_DB.batch(statements);
+    } catch (updateError) {
+      const message = String(updateError?.message || "");
+      if (!message.includes("abstract_submission_type")) {
+        throw updateError;
+      }
+      // Rebuild without abstract_submission_type for older DBs.
+      const fallbackStatements = statements.slice(0, -1);
+      fallbackStatements.push(
+        env.ISIR_DB.prepare(
+          `UPDATE abstractions SET
+            title = ?,
+            category = ?,
+            keywords = ?,
+            abstract = ?,
+            word_count = ?,
+            presentation_preference = ?,
+            presenter_name = ?,
+            presenter_email = ?,
+            presenter_author_id = ?,
+            corresponding_name = ?,
+            corresponding_email = ?,
+            corresponding_author_id = ?,
+            updated_at = ?
+          WHERE id = ? AND deleted_at IS NULL`,
+        ).bind(
+          title,
+          category,
+          keywords,
+          abstractText,
+          wordCount,
+          presentationPreference,
+          presenterName,
+          presenter.email,
+          presenter.id,
+          correspondingName,
+          corresponding.email,
+          corresponding.id,
+          updatedAt,
+          abstractId,
+        ),
+      );
+      await env.ISIR_DB.batch(fallbackStatements);
+    }
+
+    // Poster-only submissions are not peer-reviewed — drop any assignments
+    if (presentationPreference === "poster") {
+      await env.ISIR_DB.prepare(
+        `DELETE FROM reviewer_assignments WHERE abstract_id = ?`,
+      )
+        .bind(abstractId)
+        .run();
+    }
+
+    const authors = normalizedAuthors.map((author) => ({
+      id: author.id,
+      abstract_id: abstractId,
+      first_name: author.firstName,
+      middle_name: author.middleName,
+      last_name: author.lastName,
+      email: author.email,
+      is_presenter: author.isPresenter ? 1 : 0,
+      is_corresponding: author.isCorresponding ? 1 : 0,
+      position: author.position,
+    }));
+    const affiliations = normalizedAffiliations.map((aff, i) => ({
+      id: `AFF-${abstractId}-${i}`,
+      abstract_id: abstractId,
+      author_name: aff.authorName,
+      department: aff.department,
+      institution: aff.institution,
+      city: aff.city,
+      country: aff.country,
+      position: i,
+    }));
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Abstract ${abstractId} updated`,
+        data: {
+          id: abstractId,
+          title,
+          category,
+          abstract_submission_type: normalizedSubmissionType,
+          keywords,
+          abstract: abstractText,
+          word_count: wordCount,
+          presentation_preference: presentationPreference,
+          presenter_name: presenterName,
+          presenter_email: presenter.email,
+          presenter_author_id: presenter.id,
+          corresponding_name: correspondingName,
+          corresponding_email: corresponding.email,
+          corresponding_author_id: corresponding.id,
+          updated_at: updatedAt,
+          authors,
+          affiliations,
+        },
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Update abstract error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || "Failed to update abstract",
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
 // Admin endpoint: Update abstract status
 async function handleUpdateAbstractStatus(
   request,
@@ -6012,6 +6955,15 @@ async function handleUpdateAbstractInvitedSpeaker(
     )
       .bind(isInvitedSpeaker, abstractId)
       .run();
+
+    // Invited speaker abstracts are not peer-reviewed — drop any reviewer assignments
+    if (isInvitedSpeaker === 1) {
+      await env.ISIR_DB.prepare(
+        `DELETE FROM reviewer_assignments WHERE abstract_id = ?`,
+      )
+        .bind(abstractId)
+        .run();
+    }
 
     return new Response(
       JSON.stringify({

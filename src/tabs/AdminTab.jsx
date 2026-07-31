@@ -67,6 +67,34 @@ function registrationPaymentBadgeClass(status) {
   return "bg-red-100 text-red-800";
 }
 
+const ABSTRACT_EDIT_CATEGORIES = [
+  "Immune Regulation in Reproduction",
+  "Early Pregnancy and Implantation",
+  "Placental Development and Function",
+  "Preeclampsia and Pregnancy Complications",
+  "Recurrent Pregnancy Loss",
+  "Male Reproductive Immunology",
+  "Endometriosis and Reproductive Disorders",
+  "ART and Fertility Treatment",
+  "Infection and Vaccination in Pregnancy",
+  "Autoimmune Conditions and Pregnancy",
+  "Microbiome and Reproduction",
+  "Novel Technologies and Methods",
+  "Other",
+];
+
+const ABSTRACT_EDIT_SUBMISSION_TYPES = [
+  "Clinical Studies",
+  "Basic Studies",
+];
+
+function normalizeAbstractSubmissionType(raw) {
+  const value = String(raw || "").trim();
+  if (value === "Clinical Research") return "Clinical Studies";
+  if (value === "Basic Research") return "Basic Studies";
+  return value;
+}
+
 function getAbstractTypeLabel(abstract) {
   const raw = String(
     abstract?.abstract_submission_type ||
@@ -74,16 +102,135 @@ function getAbstractTypeLabel(abstract) {
       "",
   ).trim();
   if (!raw) return "Not specified";
-  if (raw === "Clinical Research") return "Clinical Studies";
-  if (raw === "Basic Research") return "Basic Studies";
-  return raw;
+  return normalizeAbstractSubmissionType(raw) || raw;
+}
+
+function emptyEditAffiliation() {
+  return {
+    institution: "",
+    department: "",
+    city: "",
+    country: "",
+  };
+}
+
+function emptyEditAuthor({ isPresenter = false, isCorresponding = false } = {}) {
+  return {
+    id: "",
+    firstName: "",
+    middleName: "",
+    lastName: "",
+    email: "",
+    isPresenter,
+    isCorresponding,
+    affiliations: [emptyEditAffiliation()],
+  };
+}
+
+function authorNamesMatch(affName, author) {
+  const left = String(affName || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  if (!left) return false;
+  const full = formatAuthorDisplayName({
+    first_name: author.firstName || author.first_name,
+    middle_name: author.middleName || author.middle_name,
+    last_name: author.lastName || author.last_name,
+  }).toLowerCase();
+  const noMiddle = `${author.firstName || author.first_name || ""} ${
+    author.lastName || author.last_name || ""
+  }`
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  return left === full || left === noMiddle;
+}
+
+function buildAbstractEditForm(abstract) {
+  const rawAuthors = [...(abstract?.authors || [])].sort(
+    (a, b) => (a.position ?? 0) - (b.position ?? 0),
+  );
+  const rawAffiliations = [...(abstract?.affiliations || [])].sort(
+    (a, b) => (a.position ?? 0) - (b.position ?? 0),
+  );
+  const usedAffIds = new Set();
+
+  const authors =
+    rawAuthors.length > 0
+      ? rawAuthors.map((author) => {
+          const matched = rawAffiliations.filter((aff) => {
+            if (usedAffIds.has(aff.id)) return false;
+            if (!authorNamesMatch(aff.author_name, author)) return false;
+            usedAffIds.add(aff.id);
+            return true;
+          });
+          return {
+            id: author.id || "",
+            firstName: String(author.first_name || ""),
+            middleName: String(author.middle_name || ""),
+            lastName: String(author.last_name || ""),
+            email: String(author.email || ""),
+            isPresenter: Number(author.is_presenter) === 1,
+            isCorresponding: Number(author.is_corresponding) === 1,
+            affiliations:
+              matched.length > 0
+                ? matched.map((aff) => ({
+                    institution: String(aff.institution || ""),
+                    department: String(aff.department || ""),
+                    city: String(aff.city || ""),
+                    country: String(aff.country || ""),
+                  }))
+                : [emptyEditAffiliation()],
+          };
+        })
+      : [emptyEditAuthor({ isPresenter: true, isCorresponding: true })];
+
+  // Keep any unmatched affiliations on the first author so nothing is dropped.
+  const leftovers = rawAffiliations.filter((aff) => !usedAffIds.has(aff.id));
+  if (leftovers.length > 0 && authors[0]) {
+    const existing = authors[0].affiliations || [];
+    const isBlankOnly =
+      existing.length === 1 &&
+      !existing[0].institution &&
+      !existing[0].department &&
+      !existing[0].city &&
+      !existing[0].country;
+    authors[0].affiliations = [
+      ...(isBlankOnly ? [] : existing),
+      ...leftovers.map((aff) => ({
+        institution: String(aff.institution || ""),
+        department: String(aff.department || ""),
+        city: String(aff.city || ""),
+        country: String(aff.country || ""),
+      })),
+    ];
+  }
+
+  return {
+    title: String(abstract?.title || ""),
+    category: String(abstract?.category || ""),
+    abstractSubmissionType: normalizeAbstractSubmissionType(
+      abstract?.abstract_submission_type || abstract?.abstractSubmissionType,
+    ),
+    keywords: String(abstract?.keywords || ""),
+    abstract: String(abstract?.abstract || abstract?.abstract_text || ""),
+    presentationPreference: String(
+      abstract?.presentation_preference ||
+        abstract?.presentationPreference ||
+        "oral",
+    ),
+    authors,
+  };
 }
 
 function formatAuthorDisplayName(author) {
   if (!author) return "";
-  return `${author.first_name || ""}${
-    author.middle_name ? ` ${author.middle_name}` : ""
-  } ${author.last_name || ""}`
+  return `${author.first_name || author.firstName || ""}${
+    author.middle_name || author.middleName
+      ? ` ${author.middle_name || author.middleName}`
+      : ""
+  } ${author.last_name || author.lastName || ""}`
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -190,6 +337,157 @@ function AbstractSpeakerControls({ abstract, onSave, saving }) {
   );
 }
 
+function AbstractCardActions({
+  abstract,
+  isInvited,
+  formatDate,
+  sendingConfirmationId,
+  sendingDecisionId,
+  updatingInvitedSpeakerId,
+  savingAbstractId,
+  deletingAbstractId,
+  onSendConfirmation,
+  onSendDecision,
+  onToggleInvited,
+  onEdit,
+  onDelete,
+}) {
+  const status = String(abstract.status || "").toLowerCase();
+  const showDecision = status === "accepted" || status === "rejected";
+
+  return (
+    <div className="md:col-span-2 pt-4 mt-1 border-t border-gray-200">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-xs text-gray-600">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span>
+            <span className="font-semibold text-gray-700">Confirmation:</span>{" "}
+            {abstract.confirmation_sent_at ? (
+              <span className="text-emerald-700">
+                Sent {formatDate(abstract.confirmation_sent_at)}
+              </span>
+            ) : (
+              <span className="text-amber-700">Not sent</span>
+            )}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSendConfirmation(abstract.id);
+            }}
+            disabled={sendingConfirmationId === abstract.id}
+            className="px-2.5 py-1 text-xs font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {sendingConfirmationId === abstract.id
+              ? "Sending…"
+              : abstract.confirmation_sent_at
+                ? "Resend confirmation"
+                : "Send confirmation"}
+          </button>
+
+          {showDecision && (
+            <>
+              <span className="hidden sm:inline text-gray-300">|</span>
+              <span>
+                <span className="font-semibold text-gray-700">
+                  {status === "accepted" ? "Acceptance:" : "Rejection:"}
+                </span>{" "}
+                {abstract.decision_email_sent_at ? (
+                  <span className="text-emerald-700">
+                    Sent {formatDate(abstract.decision_email_sent_at)}
+                  </span>
+                ) : (
+                  <span className="text-amber-700">Not sent</span>
+                )}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSendDecision(abstract.id);
+                }}
+                disabled={sendingDecisionId === abstract.id}
+                className={`px-2.5 py-1 text-xs font-medium rounded-md text-white disabled:opacity-60 disabled:cursor-not-allowed ${
+                  status === "accepted"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : "bg-red-600 hover:bg-red-700"
+                }`}
+              >
+                {sendingDecisionId === abstract.id
+                  ? "Sending…"
+                  : status === "accepted"
+                    ? abstract.decision_email_sent_at
+                      ? "Resend acceptance"
+                      : "Send acceptance"
+                    : abstract.decision_email_sent_at
+                      ? "Resend rejection"
+                      : "Send rejection"}
+              </button>
+            </>
+          )}
+
+          <span className="hidden sm:inline text-gray-300">|</span>
+          <span>
+            <span className="font-semibold text-gray-700">Invited:</span>{" "}
+            {isInvited ? (
+              <span className="text-orange-700">Yes</span>
+            ) : (
+              <span className="text-gray-500">No</span>
+            )}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleInvited(abstract.id, !isInvited);
+            }}
+            disabled={updatingInvitedSpeakerId === abstract.id}
+            className={`px-2.5 py-1 text-xs font-medium rounded-md text-white disabled:opacity-60 disabled:cursor-not-allowed ${
+              isInvited
+                ? "bg-slate-700 hover:bg-slate-800"
+                : "bg-orange-600 hover:bg-orange-700"
+            }`}
+          >
+            {updatingInvitedSpeakerId === abstract.id
+              ? "Updating…"
+              : isInvited
+                ? "Move to general"
+                : "Mark invited"}
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(abstract);
+            }}
+            disabled={savingAbstractId === abstract.id}
+            className="px-2.5 py-1 text-xs font-medium rounded-md bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            Edit abstract
+          </button>
+          <div className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-1">
+            <span className="font-semibold text-red-700">Danger:</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(abstract);
+              }}
+              disabled={deletingAbstractId === abstract.id}
+              className="px-2.5 py-1 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminTab() {
   const [abstracts, setAbstracts] = useState([]);
   const [visaRequests, setVisaRequests] = useState([]);
@@ -256,6 +554,12 @@ export default function AdminTab() {
   const [abstractToDelete, setAbstractToDelete] = useState(null);
   const [deleteConfirmTitle, setDeleteConfirmTitle] = useState("");
   const [deletingAbstractId, setDeletingAbstractId] = useState(null);
+  const [abstractToEdit, setAbstractToEdit] = useState(null);
+  const [editAbstractForm, setEditAbstractForm] = useState(null);
+  const [editAbstractError, setEditAbstractError] = useState("");
+  const [editAbstractAcknowledged, setEditAbstractAcknowledged] =
+    useState(false);
+  const [savingAbstractId, setSavingAbstractId] = useState(null);
 
   // Reviewer overview state
   const [reviewerOverview, setReviewerOverview] = useState(null);
@@ -269,10 +573,18 @@ export default function AdminTab() {
   // Per-reviewer assignment targets (Add Reviewers screen)
   const [reviewerAccounts, setReviewerAccounts] = useState([]);
   const [reviewerAccountsDefault, setReviewerAccountsDefault] = useState(5);
-  const [reviewerTargetInputs, setReviewerTargetInputs] = useState({});
+  const [reviewerAddMoreInputs, setReviewerAddMoreInputs] = useState({}); // email -> "how many more"
+  const [selectedReviewerEmails, setSelectedReviewerEmails] = useState(
+    () => new Set(),
+  );
+  const [bulkAddMoreCount, setBulkAddMoreCount] = useState("1");
+  const [bulkAssigning, setBulkAssigning] = useState(false);
+  const [bulkAssignMessage, setBulkAssignMessage] = useState(null); // { type, text }
   const [savingReviewerTargetEmail, setSavingReviewerTargetEmail] =
     useState(null);
   const [reviewerTargetMessage, setReviewerTargetMessage] = useState(null); // { email, type, text }
+  const [deletingReviewerEmail, setDeletingReviewerEmail] = useState(null);
+  const [unassigningKey, setUnassigningKey] = useState(null); // `${email}::${abstractId}`
   const [reviewerOverviewLoading, setReviewerOverviewLoading] = useState(false);
   const [reviewerOverviewError, setReviewerOverviewError] = useState("");
   const [reviewerAbstractScores, setReviewerAbstractScores] = useState([]);
@@ -314,15 +626,29 @@ export default function AdminTab() {
     return { completedReviewers, reviewersWithPending, completedAssignments };
   }, [reviewerOverview]);
 
+  // Review scores UI: peer-review pool only (not invited, not poster-only)
+  const generalReviewerAbstractScores = useMemo(() => {
+    const excludedIds = new Set(
+      (abstracts || [])
+        .filter(
+          (a) =>
+            Number(a.is_invited_speaker || 0) === 1 ||
+            String(a.presentation_preference || "").toLowerCase() === "poster",
+        )
+        .map((a) => a.id),
+    );
+    return (reviewerAbstractScores || []).filter((a) => !excludedIds.has(a.id));
+  }, [reviewerAbstractScores, abstracts]);
+
   const reviewerAbstractCategories = useMemo(() => {
     const categories = new Set(
-      (reviewerAbstractScores || []).map((a) => a.category).filter(Boolean),
+      generalReviewerAbstractScores.map((a) => a.category).filter(Boolean),
     );
     return Array.from(categories).sort();
-  }, [reviewerAbstractScores]);
+  }, [generalReviewerAbstractScores]);
 
   const filteredReviewerAbstractScores = useMemo(() => {
-    let result = [...(reviewerAbstractScores || [])];
+    let result = [...generalReviewerAbstractScores];
     const query = reviewerAbstractSearch.trim().toLowerCase();
     if (query) {
       result = result.filter((a) => {
@@ -343,18 +669,18 @@ export default function AdminTab() {
     }
     return result;
   }, [
-    reviewerAbstractScores,
+    generalReviewerAbstractScores,
     reviewerAbstractSearch,
     reviewerAbstractCategoryFilter,
   ]);
 
   const abstractReviewRollupStats = useMemo(() => {
-    const list = reviewerAbstractScores || [];
+    const list = generalReviewerAbstractScores;
     const withReviews = list.filter(
       (a) => Number(a.review_summary?.review_count || 0) > 0,
     ).length;
     return { total: list.length, withReviews };
-  }, [reviewerAbstractScores]);
+  }, [generalReviewerAbstractScores]);
 
   const registrationTotals = useMemo(() => {
     const list = Array.isArray(registrations) ? registrations : [];
@@ -520,10 +846,46 @@ export default function AdminTab() {
     return loadStripe(testPublishableKey);
   }, [testPublishableKey]);
 
+  const loadLocalDemo = useCallback(() => {
+    if (!isAdminLocalhost()) return;
+    const demo = buildLocalAdminDemoData();
+    setIsLocalDemo(true);
+    setAdminToken("");
+    setError(null);
+    setLoading(false);
+    setAbstracts(demo.abstracts);
+    setVisaRequests(demo.visaRequests);
+    setSpeakerHotelRegistrations(demo.speakerHotelRegistrations);
+    setRegistrations(demo.registrations);
+    setReviewerOverview(demo.reviewerOverview);
+    setAbstractsPerReviewerInput(
+      String(demo.reviewerOverview.abstracts_per_reviewer ?? 5),
+    );
+    setReviewerAccounts(demo.reviewerAccounts);
+    setReviewerAccountsDefault(demo.reviewerAccountsDefault);
+    setReviewerAddMoreInputs(
+      Object.fromEntries(demo.reviewerAccounts.map((r) => [r.email, "1"])),
+    );
+    setReviewerAbstractScores(demo.reviewerAbstractScores);
+    setSpeakerProfileSubmissions(demo.speakerProfileSubmissions);
+    setReviewerOverviewError("");
+    setActiveSection("registrationTotals");
+  }, []);
+
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const urlAdminToken = params.get("admin");
+      const forceDemo =
+        params.get("demo") === "1" || params.get("demo") === "true";
+
+      // Localhost defaults to in-browser sample data (no cloud).
+      // Pass ?admin=TOKEN to hit the real API, or ?demo=1 to force samples.
+      if (isAdminLocalhost() && (forceDemo || !urlAdminToken)) {
+        loadLocalDemo();
+        return;
+      }
+
       let token =
         (urlAdminToken && String(urlAdminToken).trim()) ||
         (typeof window !== "undefined"
@@ -569,37 +931,7 @@ export default function AdminTab() {
       setLoading(false);
       setError("Failed to read admin access token from URL.");
     }
-  }, []);
-
-  const loadLocalDemo = useCallback(() => {
-    if (!isAdminLocalhost()) return;
-    const demo = buildLocalAdminDemoData();
-    setIsLocalDemo(true);
-    setError(null);
-    setLoading(false);
-    setAbstracts(demo.abstracts);
-    setVisaRequests(demo.visaRequests);
-    setSpeakerHotelRegistrations(demo.speakerHotelRegistrations);
-    setRegistrations(demo.registrations);
-    setReviewerOverview(demo.reviewerOverview);
-    setAbstractsPerReviewerInput(
-      String(demo.reviewerOverview.abstracts_per_reviewer ?? 5),
-    );
-    setReviewerAccounts(demo.reviewerAccounts);
-    setReviewerAccountsDefault(demo.reviewerAccountsDefault);
-    setReviewerTargetInputs(
-      Object.fromEntries(
-        demo.reviewerAccounts.map((r) => [
-          r.email,
-          r.target_abstracts != null ? String(r.target_abstracts) : "",
-        ]),
-      ),
-    );
-    setReviewerAbstractScores(demo.reviewerAbstractScores);
-    setSpeakerProfileSubmissions(demo.speakerProfileSubmissions);
-    setReviewerOverviewError("");
-    setActiveSection("registrationTotals");
-  }, []);
+  }, [loadLocalDemo]);
 
   const fetchAllData = async (token) => {
     setLoading(true);
@@ -710,34 +1042,173 @@ export default function AdminTab() {
       if (data.default_target != null) {
         setReviewerAccountsDefault(data.default_target);
       }
-      const inputs = {};
-      (data.reviewers || []).forEach((r) => {
-        inputs[r.email] =
-          r.abstracts_target != null ? String(r.abstracts_target) : "";
+      setReviewerAddMoreInputs((prev) => {
+        const next = { ...prev };
+        (data.reviewers || []).forEach((r) => {
+          if (next[r.email] == null || next[r.email] === "") {
+            next[r.email] = "1";
+          }
+        });
+        return next;
       });
-      setReviewerTargetInputs(inputs);
     } catch (err) {
       console.error("Failed to load reviewer accounts:", err);
     }
   };
 
-  const saveReviewerTarget = async (email) => {
-    const raw = String(reviewerTargetInputs[email] ?? "").trim();
-    let target = null;
-    if (raw !== "") {
-      const n = Number(raw);
-      if (!Number.isInteger(n) || n < 1 || n > 100) {
+  const refreshReviewerAdminData = async (token) => {
+    const authToken = token || adminToken;
+    if (!authToken || isLocalDemo) return;
+    try {
+      const [overviewRes, listRes] = await Promise.all([
+        fetch("/api/admin/reviewers/overview", {
+          headers: { "X-Admin-Token": authToken },
+        }),
+        fetch("/api/admin/reviewers/list", {
+          headers: { "X-Admin-Token": authToken },
+        }),
+      ]);
+      const overviewData = await overviewRes.json().catch(() => null);
+      const listData = await listRes.json().catch(() => null);
+      if (overviewRes.ok && overviewData) {
+        setReviewerOverview(overviewData);
+        if (overviewData.abstracts_per_reviewer != null) {
+          setAbstractsPerReviewerInput(
+            String(overviewData.abstracts_per_reviewer),
+          );
+        }
+      }
+      if (listRes.ok && listData?.success) {
+        setReviewerAccounts(listData.reviewers || []);
+        if (listData.default_target != null) {
+          setReviewerAccountsDefault(listData.default_target);
+        }
+        setReviewerAddMoreInputs((prev) => {
+          const next = { ...prev };
+          (listData.reviewers || []).forEach((r) => {
+            if (next[r.email] == null || next[r.email] === "") {
+              next[r.email] = "1";
+            }
+          });
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error("Failed to refresh reviewer admin data:", err);
+    }
+  };
+
+  const setReviewerAddMoreCount = (email, value) => {
+    setReviewerAddMoreInputs((prev) => ({ ...prev, [email]: value }));
+  };
+
+  const bumpReviewerAddMore = (email, delta) => {
+    const current = Number(reviewerAddMoreInputs[email] ?? 1);
+    const base = Number.isInteger(current) && current > 0 ? current : 1;
+    const next = Math.max(1, Math.min(100, base + delta));
+    setReviewerAddMoreCount(email, String(next));
+  };
+
+  const bumpBulkAddMore = (delta) => {
+    const current = Number(bulkAddMoreCount);
+    const base = Number.isInteger(current) && current > 0 ? current : 1;
+    setBulkAddMoreCount(String(Math.max(1, Math.min(100, base + delta))));
+  };
+
+  const toggleReviewerSelected = (email) => {
+    setSelectedReviewerEmails((prev) => {
+      const next = new Set(prev);
+      if (next.has(email)) next.delete(email);
+      else next.add(email);
+      return next;
+    });
+  };
+
+  const selectAllReviewers = () => {
+    setSelectedReviewerEmails(
+      new Set((reviewerAccounts || []).map((r) => r.email)),
+    );
+  };
+
+  const clearSelectedReviewers = () => {
+    setSelectedReviewerEmails(new Set());
+  };
+
+  const addMoreAbstractsToReviewer = async (
+    email,
+    amountOverride,
+    { quiet = false } = {},
+  ) => {
+    const acct = (reviewerAccounts || []).find((r) => r.email === email);
+    const assignedCount = Number(acct?.assigned_count || 0);
+    const raw =
+      amountOverride != null
+        ? String(amountOverride)
+        : String(reviewerAddMoreInputs[email] ?? "1").trim();
+    const addCount = Number(raw);
+    if (!Number.isInteger(addCount) || addCount < 1 || addCount > 100) {
+      const err = "Choose how many more abstracts to assign (1–100).";
+      if (!quiet) {
+        setReviewerTargetMessage({ email, type: "error", text: err });
+      }
+      return { success: false, error: err };
+    }
+    const target = assignedCount + addCount;
+    if (target > 100) {
+      const err = `That would exceed the max of 100 (currently ${assignedCount}).`;
+      if (!quiet) {
+        setReviewerTargetMessage({ email, type: "error", text: err });
+      }
+      return { success: false, error: err };
+    }
+
+    if (!quiet) {
+      setSavingReviewerTargetEmail(email);
+      setReviewerTargetMessage(null);
+    }
+
+    if (isLocalDemo) {
+      setReviewerAccounts((prev) =>
+        prev.map((r) =>
+          r.email === email
+            ? {
+                ...r,
+                abstracts_target: target,
+                assigned_count: target,
+              }
+            : r,
+        ),
+      );
+      setReviewerOverview((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          reviewers: (prev.reviewers || []).map((rev) => {
+            const revEmail = rev.reviewer_email || rev.email;
+            if (revEmail !== email) return rev;
+            return {
+              ...rev,
+              assigned_count: target,
+            };
+          }),
+        };
+      });
+      if (!quiet) {
+        setReviewerAddMoreCount(email, "1");
         setReviewerTargetMessage({
           email,
-          type: "error",
-          text: "Enter a whole number between 1 and 100, or leave blank to use the default.",
+          type: "success",
+          text: `Assigned ${addCount} more abstract${addCount === 1 ? "" : "s"} (now ${target}, demo).`,
         });
-        return;
+        setSavingReviewerTargetEmail(null);
       }
-      target = n;
+      return {
+        success: true,
+        newly_assigned: addCount,
+        assigned_count: target,
+      };
     }
-    setSavingReviewerTargetEmail(email);
-    setReviewerTargetMessage(null);
+
     try {
       const res = await fetch("/api/admin/reviewers/target", {
         method: "POST",
@@ -751,27 +1222,266 @@ export default function AdminTab() {
       if (!res.ok || !data?.success) {
         throw new Error(data?.error || `HTTP ${res.status}`);
       }
+      const newAssigned =
+        data.assigned_count != null
+          ? Number(data.assigned_count)
+          : target;
+      const newlyAssigned = Number(data.newly_assigned || addCount);
       setReviewerAccounts((prev) =>
         prev.map((r) =>
-          r.email === email ? { ...r, abstracts_target: target } : r,
+          r.email === email
+            ? {
+                ...r,
+                abstracts_target: target,
+                assigned_count: newAssigned,
+              }
+            : r,
         ),
       );
+      if (!quiet) {
+        setReviewerAddMoreCount(email, "1");
+        setReviewerTargetMessage({
+          email,
+          type: "success",
+          text:
+            newlyAssigned > 0
+              ? `Assigned ${newlyAssigned} more abstract${newlyAssigned === 1 ? "" : "s"} (now ${newAssigned}).`
+              : `No new abstracts available to assign (still at ${newAssigned}).`,
+        });
+        await refreshReviewerAdminData(adminToken);
+      }
+      return {
+        success: true,
+        newly_assigned: newlyAssigned,
+        assigned_count: newAssigned,
+      };
+    } catch (err) {
+      const message = err.message || "Failed to assign more abstracts.";
+      if (!quiet) {
+        setReviewerTargetMessage({
+          email,
+          type: "error",
+          text: message,
+        });
+      }
+      return { success: false, error: message };
+    } finally {
+      if (!quiet) setSavingReviewerTargetEmail(null);
+    }
+  };
+
+  const addMoreAbstractsBulk = async () => {
+    const addCount = Number(String(bulkAddMoreCount).trim());
+    if (!Number.isInteger(addCount) || addCount < 1 || addCount > 100) {
+      setBulkAssignMessage({
+        type: "error",
+        text: "Choose how many more abstracts to assign to each reviewer (1–100).",
+      });
+      return;
+    }
+
+    const emails = [...selectedReviewerEmails];
+
+    if (emails.length === 0) {
+      setBulkAssignMessage({
+        type: "error",
+        text: "Select at least one reviewer first.",
+      });
+      return;
+    }
+
+    const ok = window.confirm(
+      `Assign ${addCount} more abstract${addCount === 1 ? "" : "s"} to each of the selected ${emails.length} reviewer${emails.length === 1 ? "" : "s"}?`,
+    );
+    if (!ok) return;
+
+    setBulkAssigning(true);
+    setBulkAssignMessage(null);
+    setReviewerTargetMessage(null);
+
+    let succeeded = 0;
+    let failed = 0;
+    let totalNewlyAssigned = 0;
+    const failures = [];
+
+    for (const email of emails) {
+      const result = await addMoreAbstractsToReviewer(email, addCount, {
+        quiet: true,
+      });
+      if (result?.success) {
+        succeeded += 1;
+        totalNewlyAssigned += Number(result.newly_assigned || 0);
+      } else {
+        failed += 1;
+        failures.push(`${email}: ${result?.error || "failed"}`);
+      }
+    }
+
+    if (!isLocalDemo) {
+      await refreshReviewerAdminData(adminToken);
+    }
+
+    setBulkAssignMessage({
+      type: failed > 0 && succeeded === 0 ? "error" : "success",
+      text:
+        failed === 0
+          ? `Assigned ${totalNewlyAssigned} abstract${totalNewlyAssigned === 1 ? "" : "s"} across ${succeeded} reviewer${succeeded === 1 ? "" : "s"}.`
+          : `Updated ${succeeded} reviewer${succeeded === 1 ? "" : "s"} (${totalNewlyAssigned} new assignments). ${failed} failed${
+              failures[0] ? `: ${failures[0]}` : "."
+            }`,
+    });
+    setBulkAssigning(false);
+  };
+
+  const deleteReviewer = async (email) => {
+    if (!email) return;
+    const ok = window.confirm(
+      `Delete reviewer ${email}? This removes their account and assignments. Past review scores on abstracts are kept.`,
+    );
+    if (!ok) return;
+    setDeletingReviewerEmail(email);
+    setReviewerTargetMessage(null);
+
+    if (isLocalDemo) {
+      setReviewerAccounts((prev) => prev.filter((r) => r.email !== email));
+      setSelectedReviewerEmails((prev) => {
+        const next = new Set(prev);
+        next.delete(email);
+        return next;
+      });
+      setReviewerOverview((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          reviewers: (prev.reviewers || []).filter(
+            (r) => r.reviewer_email !== email && r.email !== email,
+          ),
+        };
+      });
+      setReviewerAddMoreInputs((prev) => {
+        const next = { ...prev };
+        delete next[email];
+        return next;
+      });
       setReviewerTargetMessage({
         email,
         type: "success",
-        text:
-          target == null
-            ? `Cleared — uses the default (${reviewerAccountsDefault}).`
-            : `Saved — ${target} abstract${target === 1 ? "" : "s"}.`,
+        text: "Reviewer deleted (demo).",
+      });
+      setDeletingReviewerEmail(null);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/reviewers/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Token": adminToken,
+        },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+      setReviewerAccounts((prev) => prev.filter((r) => r.email !== email));
+      setSelectedReviewerEmails((prev) => {
+        const next = new Set(prev);
+        next.delete(email);
+        return next;
+      });
+      setReviewerAddMoreInputs((prev) => {
+        const next = { ...prev };
+        delete next[email];
+        return next;
+      });
+      await refreshReviewerAdminData(adminToken);
+      setReviewerTargetMessage({
+        email,
+        type: "success",
+        text: "Reviewer deleted.",
       });
     } catch (err) {
       setReviewerTargetMessage({
         email,
         type: "error",
-        text: err.message || "Failed to save.",
+        text: err.message || "Failed to delete reviewer.",
       });
     } finally {
-      setSavingReviewerTargetEmail(null);
+      setDeletingReviewerEmail(null);
+    }
+  };
+
+  const unassignReviewerAbstract = async (email, abstractId, title) => {
+    if (!email || !abstractId) return;
+    const label = title ? `"${title}"` : abstractId;
+    const ok = window.confirm(
+      `Remove assignment of ${label} from ${email}? Their review for this abstract (if any) will also be removed, and their target will be set to the remaining assignment count so it is not auto-refilled.`,
+    );
+    if (!ok) return;
+    const key = `${email}::${abstractId}`;
+    setUnassigningKey(key);
+
+    if (isLocalDemo) {
+      setReviewerOverview((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          reviewers: (prev.reviewers || []).map((rev) => {
+            const revEmail = rev.reviewer_email || rev.email;
+            if (revEmail !== email) return rev;
+            const nextAssignments = (rev.assignments || []).filter(
+              (a) => a.abstract_id !== abstractId,
+            );
+            return {
+              ...rev,
+              assignments: nextAssignments,
+              assigned_count: nextAssignments.length,
+              reviewed_count: nextAssignments.filter(
+                (a) => a.review_total != null,
+              ).length,
+            };
+          }),
+        };
+      });
+      setReviewerAccounts((prev) =>
+        prev.map((r) =>
+          r.email === email
+            ? {
+                ...r,
+                assigned_count: Math.max(0, Number(r.assigned_count || 0) - 1),
+                abstracts_target: Math.max(
+                  0,
+                  Number(r.assigned_count || 0) - 1,
+                ),
+              }
+            : r,
+        ),
+      );
+      setReviewerAddMoreCount(email, "1");
+      setUnassigningKey(null);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/reviewers/unassign", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Token": adminToken,
+        },
+        body: JSON.stringify({ email, abstract_id: abstractId }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+      await refreshReviewerAdminData(adminToken);
+    } catch (err) {
+      alert(err.message || "Failed to remove assignment.");
+    } finally {
+      setUnassigningKey(null);
     }
   };
 
@@ -1127,10 +1837,13 @@ export default function AdminTab() {
     setSingleReviewerLoading(true);
     try {
       const json = await createReviewerAccount(email, abstractsCount);
+      const assigned = Number(json.assigned_count || 0);
       const countNote =
         abstractsCount != null
-          ? ` They will be assigned ${abstractsCount} abstract${abstractsCount === 1 ? "" : "s"}.`
-          : "";
+          ? ` Assigned ${assigned} of ${abstractsCount} abstract${abstractsCount === 1 ? "" : "s"} now.`
+          : assigned > 0
+            ? ` Assigned ${assigned} abstract${assigned === 1 ? "" : "s"} now (default).`
+            : "";
       setSingleReviewerMessage(
         json.existing
           ? `${email} was already a reviewer (reactivated if needed). They can sign in with this email.${countNote}`
@@ -1680,26 +2393,28 @@ export default function AdminTab() {
 
   // Update abstract status
   const updateAbstractStatus = async (abstractId, status, reason = null) => {
-    if (!adminToken) {
+    if (!isLocalDemo && !adminToken) {
       alert("Admin access token is missing.");
       return;
     }
     setReviewUpdating(true);
     try {
-      const response = await fetch(
-        `/api/admin/abstracts/${abstractId}/status`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Admin-Token": adminToken,
+      if (!isLocalDemo) {
+        const response = await fetch(
+          `/api/admin/abstracts/${abstractId}/status`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Admin-Token": adminToken,
+            },
+            body: JSON.stringify({ status, rejection_reason: reason }),
           },
-          body: JSON.stringify({ status, rejection_reason: reason }),
-        },
-      );
+        );
 
-      if (!response.ok) {
-        throw new Error("Failed to update status");
+        if (!response.ok) {
+          throw new Error("Failed to update status");
+        }
       }
 
       // Update local state
@@ -1729,7 +2444,7 @@ export default function AdminTab() {
   };
 
   const updateAbstractInvitedSpeaker = async (abstractId, isInvitedSpeaker) => {
-    if (!adminToken) {
+    if (!isLocalDemo && !adminToken) {
       alert("Admin access token is missing.");
       return;
     }
@@ -1741,22 +2456,24 @@ export default function AdminTab() {
 
     setUpdatingInvitedSpeakerId(abstractId);
     try {
-      const response = await fetch(
-        `/api/admin/abstracts/${abstractId}/invited-speaker`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Admin-Token": adminToken,
+      if (!isLocalDemo) {
+        const response = await fetch(
+          `/api/admin/abstracts/${abstractId}/invited-speaker`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Admin-Token": adminToken,
+            },
+            body: JSON.stringify({ isInvitedSpeaker: nextValue }),
           },
-          body: JSON.stringify({ isInvitedSpeaker: nextValue }),
-        },
-      );
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result?.success) {
-        throw new Error(
-          result?.error || "Failed to update invited speaker status",
         );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result?.success) {
+          throw new Error(
+            result?.error || "Failed to update invited speaker status",
+          );
+        }
       }
 
       setAbstracts((prev) =>
@@ -1785,8 +2502,428 @@ export default function AdminTab() {
     setDeleteConfirmTitle("");
   };
 
+  const openEditAbstractModal = (abstract) => {
+    setAbstractToEdit(abstract);
+    setEditAbstractForm(buildAbstractEditForm(abstract));
+    setEditAbstractError("");
+    setEditAbstractAcknowledged(false);
+  };
+
+  const closeEditAbstractModal = () => {
+    if (savingAbstractId) return;
+    setAbstractToEdit(null);
+    setEditAbstractForm(null);
+    setEditAbstractError("");
+    setEditAbstractAcknowledged(false);
+  };
+
+  const updateEditAbstractField = (field, value) => {
+    setEditAbstractForm((prev) =>
+      prev ? { ...prev, [field]: value } : prev,
+    );
+    setEditAbstractError("");
+  };
+
+  const updateEditAuthorField = (authorIndex, field, value) => {
+    setEditAbstractForm((prev) => {
+      if (!prev) return prev;
+      const authors = (prev.authors || []).map((author, i) => {
+        if (i !== authorIndex) {
+          if (field === "isPresenter" && value) {
+            return { ...author, isPresenter: false };
+          }
+          if (field === "isCorresponding" && value) {
+            return { ...author, isCorresponding: false };
+          }
+          return author;
+        }
+        return { ...author, [field]: value };
+      });
+      return { ...prev, authors };
+    });
+    setEditAbstractError("");
+  };
+
+  const updateEditAffiliationField = (
+    authorIndex,
+    affIndex,
+    field,
+    value,
+  ) => {
+    setEditAbstractForm((prev) => {
+      if (!prev) return prev;
+      const authors = (prev.authors || []).map((author, i) => {
+        if (i !== authorIndex) return author;
+        const affiliations = (author.affiliations || []).map((aff, j) =>
+          j === affIndex ? { ...aff, [field]: value } : aff,
+        );
+        return { ...author, affiliations };
+      });
+      return { ...prev, authors };
+    });
+    setEditAbstractError("");
+  };
+
+  const addEditAuthor = () => {
+    setEditAbstractForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            authors: [...(prev.authors || []), emptyEditAuthor()],
+          }
+        : prev,
+    );
+    setEditAbstractError("");
+  };
+
+  const removeEditAuthor = (authorIndex) => {
+    setEditAbstractForm((prev) => {
+      if (!prev) return prev;
+      const authors = (prev.authors || []).filter((_, i) => i !== authorIndex);
+      if (authors.length === 0) {
+        return {
+          ...prev,
+          authors: [
+            emptyEditAuthor({ isPresenter: true, isCorresponding: true }),
+          ],
+        };
+      }
+      if (!authors.some((a) => a.isPresenter)) authors[0].isPresenter = true;
+      if (!authors.some((a) => a.isCorresponding)) {
+        authors[0].isCorresponding = true;
+      }
+      return { ...prev, authors };
+    });
+    setEditAbstractError("");
+  };
+
+  const addEditAffiliation = (authorIndex) => {
+    setEditAbstractForm((prev) => {
+      if (!prev) return prev;
+      const authors = (prev.authors || []).map((author, i) =>
+        i === authorIndex
+          ? {
+              ...author,
+              affiliations: [
+                ...(author.affiliations || []),
+                emptyEditAffiliation(),
+              ],
+            }
+          : author,
+      );
+      return { ...prev, authors };
+    });
+  };
+
+  const removeEditAffiliation = (authorIndex, affIndex) => {
+    setEditAbstractForm((prev) => {
+      if (!prev) return prev;
+      const authors = (prev.authors || []).map((author, i) => {
+        if (i !== authorIndex) return author;
+        const affiliations = (author.affiliations || []).filter(
+          (_, j) => j !== affIndex,
+        );
+        return {
+          ...author,
+          affiliations:
+            affiliations.length > 0 ? affiliations : [emptyEditAffiliation()],
+        };
+      });
+      return { ...prev, authors };
+    });
+  };
+
+  const saveEditedAbstract = async () => {
+    if (!isLocalDemo && !adminToken) {
+      alert("Admin access token is missing.");
+      return;
+    }
+    if (!abstractToEdit?.id || !editAbstractForm) return;
+    if (!editAbstractAcknowledged) {
+      setEditAbstractError(
+        "Please acknowledge that these changes cannot be reverted.",
+      );
+      return;
+    }
+
+    const title = String(editAbstractForm.title || "").trim();
+    const category = String(editAbstractForm.category || "").trim();
+    const abstractSubmissionType = String(
+      editAbstractForm.abstractSubmissionType || "",
+    ).trim();
+    const keywords = String(editAbstractForm.keywords || "").trim();
+    const abstractText = String(editAbstractForm.abstract || "").trim();
+    const presentationPreference = String(
+      editAbstractForm.presentationPreference || "",
+    ).trim();
+    const formAuthors = Array.isArray(editAbstractForm.authors)
+      ? editAbstractForm.authors
+      : [];
+
+    if (!title) {
+      setEditAbstractError("Title is required");
+      return;
+    }
+    if (title.length > 150) {
+      setEditAbstractError(
+        `Title exceeds 150 character limit (current: ${title.length} characters)`,
+      );
+      return;
+    }
+    if (!category) {
+      setEditAbstractError("Category is required");
+      return;
+    }
+    if (!abstractSubmissionType) {
+      setEditAbstractError("Abstract type is required");
+      return;
+    }
+    if (!keywords) {
+      setEditAbstractError("Keywords are required");
+      return;
+    }
+    if (!abstractText) {
+      setEditAbstractError("Abstract text is required");
+      return;
+    }
+    if (!["oral", "poster", "either"].includes(presentationPreference)) {
+      setEditAbstractError("Invalid presentation preference");
+      return;
+    }
+
+    const wordCount = abstractText.split(/\s+/).filter((w) => w).length;
+    if (wordCount > 300) {
+      setEditAbstractError(
+        `Abstract exceeds 300 word limit (current: ${wordCount} words)`,
+      );
+      return;
+    }
+    if (wordCount < 50) {
+      setEditAbstractError("Abstract must be at least 50 words");
+      return;
+    }
+
+    if (formAuthors.length === 0) {
+      setEditAbstractError("At least one author is required");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const presenter = formAuthors.find((a) => a.isPresenter);
+    const corresponding = formAuthors.find((a) => a.isCorresponding);
+    if (!presenter) {
+      setEditAbstractError("A presenting author must be designated");
+      return;
+    }
+    if (!corresponding) {
+      setEditAbstractError("A corresponding author must be designated");
+      return;
+    }
+
+    for (let i = 0; i < formAuthors.length; i++) {
+      const author = formAuthors[i];
+      if (!String(author.firstName || "").trim()) {
+        setEditAbstractError(`Author ${i + 1}: first name is required`);
+        return;
+      }
+      if (!String(author.lastName || "").trim()) {
+        setEditAbstractError(`Author ${i + 1}: last name is required`);
+        return;
+      }
+      const email = String(author.email || "").trim();
+      if ((author.isPresenter || author.isCorresponding) && !email) {
+        setEditAbstractError(
+          `Author ${i + 1}: email is required for presenter/corresponding`,
+        );
+        return;
+      }
+      if (email && !emailRegex.test(email)) {
+        setEditAbstractError(`Author ${i + 1}: invalid email format`);
+        return;
+      }
+      const affiliations = author.affiliations || [];
+      if (affiliations.length === 0) {
+        setEditAbstractError(
+          `Author ${i + 1}: at least one affiliation is required`,
+        );
+        return;
+      }
+      for (let j = 0; j < affiliations.length; j++) {
+        const aff = affiliations[j];
+        if (!String(aff.institution || "").trim()) {
+          setEditAbstractError(
+            `Author ${i + 1}, affiliation ${j + 1}: institution is required`,
+          );
+          return;
+        }
+        if (!String(aff.city || "").trim()) {
+          setEditAbstractError(
+            `Author ${i + 1}, affiliation ${j + 1}: city is required`,
+          );
+          return;
+        }
+        if (!String(aff.country || "").trim()) {
+          setEditAbstractError(
+            `Author ${i + 1}, affiliation ${j + 1}: country is required`,
+          );
+          return;
+        }
+      }
+    }
+
+    const authorsPayload = formAuthors.map((author, index) => ({
+      id: author.id || undefined,
+      firstName: String(author.firstName || "").trim(),
+      middleName: String(author.middleName || "").trim() || null,
+      lastName: String(author.lastName || "").trim(),
+      email: String(author.email || "").trim() || null,
+      isPresenter: Boolean(author.isPresenter),
+      isCorresponding: Boolean(author.isCorresponding),
+      position: index,
+      affiliations: (author.affiliations || []).map((aff) => ({
+        institution: String(aff.institution || "").trim(),
+        department: String(aff.department || "").trim() || null,
+        city: String(aff.city || "").trim(),
+        country: String(aff.country || "").trim(),
+      })),
+    }));
+
+    const affiliationsPayload = authorsPayload.flatMap((author) =>
+      (author.affiliations || []).map((aff) => ({
+        authorName: `${author.firstName} ${author.lastName}`.trim(),
+        department: aff.department || "",
+        institution: aff.institution,
+        city: aff.city,
+        country: aff.country,
+      })),
+    );
+
+    setSavingAbstractId(abstractToEdit.id);
+    setEditAbstractError("");
+    try {
+      let updated = {
+        title,
+        category,
+        abstract_submission_type: abstractSubmissionType,
+        keywords,
+        abstract: abstractText,
+        word_count: wordCount,
+        presentation_preference: presentationPreference,
+        updated_at: Date.now(),
+      };
+
+      if (isLocalDemo) {
+        const localAuthors = authorsPayload.map((author, index) => {
+          const id = author.id || `AUTH-LOCAL-${abstractToEdit.id}-${index}`;
+          return {
+            id,
+            abstract_id: abstractToEdit.id,
+            first_name: author.firstName,
+            middle_name: author.middleName,
+            last_name: author.lastName,
+            email: author.email,
+            is_presenter: author.isPresenter ? 1 : 0,
+            is_corresponding: author.isCorresponding ? 1 : 0,
+            position: index,
+          };
+        });
+        const presenterRow = localAuthors.find((a) => a.is_presenter === 1);
+        const correspondingRow = localAuthors.find(
+          (a) => a.is_corresponding === 1,
+        );
+        const localAffiliations = affiliationsPayload.map((aff, index) => ({
+          id: `AFF-LOCAL-${abstractToEdit.id}-${index}`,
+          abstract_id: abstractToEdit.id,
+          author_name: aff.authorName,
+          department: aff.department || null,
+          institution: aff.institution,
+          city: aff.city,
+          country: aff.country,
+          position: index,
+        }));
+        updated = {
+          ...updated,
+          authors: localAuthors,
+          affiliations: localAffiliations,
+          presenter_name: formatAuthorDisplayName(presenterRow),
+          presenter_email: presenterRow?.email || "",
+          presenter_author_id: presenterRow?.id || "",
+          corresponding_name: formatAuthorDisplayName(correspondingRow),
+          corresponding_email: correspondingRow?.email || "",
+          corresponding_author_id: correspondingRow?.id || "",
+        };
+      } else {
+        const response = await fetch(
+          `/api/admin/abstracts/${encodeURIComponent(abstractToEdit.id)}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Admin-Token": adminToken,
+            },
+            body: JSON.stringify({
+              title,
+              category,
+              abstractSubmissionType,
+              keywords,
+              abstract: abstractText,
+              presentationPreference,
+              authors: authorsPayload,
+              affiliations: affiliationsPayload,
+            }),
+          },
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error || "Failed to update abstract");
+        }
+        updated = { ...updated, ...(result.data || {}) };
+      }
+
+      setAbstracts((prev) =>
+        prev.map((a) =>
+          a.id === abstractToEdit.id
+            ? {
+                ...a,
+                title: updated.title ?? title,
+                category: updated.category ?? category,
+                abstract_submission_type:
+                  updated.abstract_submission_type ?? abstractSubmissionType,
+                keywords: updated.keywords ?? keywords,
+                abstract: updated.abstract ?? abstractText,
+                word_count: updated.word_count ?? wordCount,
+                presentation_preference:
+                  updated.presentation_preference ?? presentationPreference,
+                updated_at: updated.updated_at ?? a.updated_at,
+                authors: updated.authors || a.authors,
+                affiliations: updated.affiliations || a.affiliations,
+                presenter_name: updated.presenter_name ?? a.presenter_name,
+                presenter_email: updated.presenter_email ?? a.presenter_email,
+                presenter_author_id:
+                  updated.presenter_author_id ?? a.presenter_author_id,
+                corresponding_name:
+                  updated.corresponding_name ?? a.corresponding_name,
+                corresponding_email:
+                  updated.corresponding_email ?? a.corresponding_email,
+                corresponding_author_id:
+                  updated.corresponding_author_id ?? a.corresponding_author_id,
+              }
+            : a,
+        ),
+      );
+      setAbstractToEdit(null);
+      setEditAbstractForm(null);
+      setEditAbstractAcknowledged(false);
+    } catch (err) {
+      console.error("Error updating abstract:", err);
+      setEditAbstractError(err.message || "Failed to update abstract");
+    } finally {
+      setSavingAbstractId(null);
+    }
+  };
+
   const deleteAbstract = async () => {
-    if (!adminToken) {
+    if (!isLocalDemo && !adminToken) {
       alert("Admin access token is missing.");
       return;
     }
@@ -1800,18 +2937,20 @@ export default function AdminTab() {
 
     setDeletingAbstractId(abstractToDelete.id);
     try {
-      const response = await fetch(
-        `/api/admin/abstracts/${encodeURIComponent(abstractToDelete.id)}/delete`,
-        {
-          method: "POST",
-          headers: {
-            "X-Admin-Token": adminToken,
+      if (!isLocalDemo) {
+        const response = await fetch(
+          `/api/admin/abstracts/${encodeURIComponent(abstractToDelete.id)}/delete`,
+          {
+            method: "POST",
+            headers: {
+              "X-Admin-Token": adminToken,
+            },
           },
-        },
-      );
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.error || "Failed to delete abstract");
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error || "Failed to delete abstract");
+        }
       }
 
       const deletedId = abstractToDelete.id;
@@ -1841,7 +2980,7 @@ export default function AdminTab() {
     presenterAuthorId,
     correspondingAuthorId,
   ) => {
-    if (!adminToken) {
+    if (!isLocalDemo && !adminToken) {
       alert("Admin access token is missing.");
       return;
     }
@@ -1852,6 +2991,34 @@ export default function AdminTab() {
 
     setUpdatingSpeakersId(abstractId);
     try {
+      if (isLocalDemo) {
+        setAbstracts((prev) =>
+          prev.map((a) => {
+            if (a.id !== abstractId) return a;
+            const authors = (a.authors || []).map((author) => ({
+              ...author,
+              is_presenter: author.id === presenterAuthorId ? 1 : 0,
+              is_corresponding: author.id === correspondingAuthorId ? 1 : 0,
+            }));
+            const presenter = authors.find((x) => x.id === presenterAuthorId);
+            const corresponding = authors.find(
+              (x) => x.id === correspondingAuthorId,
+            );
+            return {
+              ...a,
+              authors,
+              presenter_author_id: presenterAuthorId,
+              corresponding_author_id: correspondingAuthorId,
+              presenter_name: formatAuthorDisplayName(presenter),
+              presenter_email: presenter?.email || "",
+              corresponding_name: formatAuthorDisplayName(corresponding),
+              corresponding_email: corresponding?.email || "",
+            };
+          }),
+        );
+        return;
+      }
+
       const response = await fetch(
         `/api/admin/abstracts/${abstractId}/speakers`,
         {
@@ -1901,7 +3068,7 @@ export default function AdminTab() {
   };
 
   const acceptAllInvitedSpeakerAbstracts = async () => {
-    if (!adminToken) {
+    if (!isLocalDemo && !adminToken) {
       alert("Admin access token is missing.");
       return;
     }
@@ -1929,6 +3096,16 @@ export default function AdminTab() {
 
     setAcceptingAllInvitedSpeakers(true);
     try {
+      if (isLocalDemo) {
+        const pendingIds = new Set(pending.map((a) => a.id));
+        setAbstracts((prev) =>
+          prev.map((a) =>
+            pendingIds.has(a.id) ? { ...a, status: "accepted" } : a,
+          ),
+        );
+        return;
+      }
+
       const response = await fetch(
         "/api/admin/abstracts/accept-invited-speakers",
         {
@@ -1946,18 +3123,11 @@ export default function AdminTab() {
         );
       }
 
-      const updatedIds = new Set(result.ids || pending.map((a) => a.id));
+      const acceptedIds = new Set(result.acceptedIds || pending.map((a) => a.id));
       setAbstracts((prev) =>
         prev.map((a) =>
-          updatedIds.has(a.id)
-            ? { ...a, status: "accepted", rejection_reason: null }
-            : a,
+          acceptedIds.has(a.id) ? { ...a, status: "accepted" } : a,
         ),
-      );
-
-      alert(
-        result.message ||
-          `Accepted ${result.updated ?? pending.length} invited speaker abstract(s).`,
       );
     } catch (err) {
       console.error("Error accepting invited speaker abstracts:", err);
@@ -2505,17 +3675,20 @@ export default function AdminTab() {
       {isLocalDemo && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-amber-950">
-            <span className="font-semibold">Localhost example</span> — sample
-            data only. Totals and lists work offline; API actions (emails,
-            status changes, payments) will not save.
+            <span className="font-semibold">Localhost sample mode</span> —
+            browsing in-browser fixtures (registrations, abstracts, visas,
+            reviewers, hotels). No cloud or admin token needed. Abstract edits
+            stay in this session only; email/payment actions are disabled.
           </p>
-          <button
-            type="button"
-            onClick={loadLocalDemo}
-            className="px-3 py-1.5 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700"
-          >
-            Reload sample data
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={loadLocalDemo}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700"
+            >
+              Reload sample data
+            </button>
+          </div>
         </div>
       )}
       {/* Header */}
@@ -4188,155 +5361,6 @@ export default function AdminTab() {
                               onSave={updateAbstractSpeakers}
                               saving={updatingSpeakersId === abstract.id}
                             />
-                            <div className="mt-3 p-3 bg-white rounded-lg border border-gray-100">
-                                <div className="flex items-center justify-between flex-wrap gap-2">
-                                  <div className="text-xs text-gray-600">
-                                    <span className="font-semibold text-gray-700">
-                                      Confirmation email:
-                                    </span>{" "}
-                                    {abstract.confirmation_sent_at ? (
-                                      <span className="text-emerald-700">
-                                        Sent{" "}
-                                        {formatDate(
-                                          abstract.confirmation_sent_at,
-                                        )}
-                                      </span>
-                                    ) : (
-                                      <span className="text-amber-700">
-                                        Not sent
-                                      </span>
-                                    )}
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      sendAbstractConfirmation(abstract.id);
-                                    }}
-                                    disabled={
-                                      sendingConfirmationId === abstract.id
-                                    }
-                                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                                  >
-                                    {sendingConfirmationId === abstract.id
-                                      ? "Sending…"
-                                      : abstract.confirmation_sent_at
-                                        ? "Resend confirmation"
-                                        : "Send confirmation"}
-                                  </button>
-                                </div>
-                              </div>
-                              {(String(abstract.status || "").toLowerCase() ===
-                                "accepted" ||
-                                String(abstract.status || "").toLowerCase() ===
-                                  "rejected") && (
-                                <div className="mt-3 p-3 bg-white rounded-lg border border-gray-100">
-                                  <div className="flex items-center justify-between flex-wrap gap-2">
-                                    <div className="text-xs text-gray-600">
-                                      <span className="font-semibold text-gray-700">
-                                        {String(
-                                          abstract.status || "",
-                                        ).toLowerCase() === "accepted"
-                                          ? "Acceptance email:"
-                                          : "Rejection email:"}
-                                      </span>{" "}
-                                      {abstract.decision_email_sent_at ? (
-                                        <span className="text-emerald-700">
-                                          Sent{" "}
-                                          {formatDate(
-                                            abstract.decision_email_sent_at,
-                                          )}
-                                        </span>
-                                      ) : (
-                                        <span className="text-amber-700">
-                                          Not sent
-                                        </span>
-                                      )}
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        sendAbstractDecision(abstract.id);
-                                      }}
-                                      disabled={
-                                        sendingDecisionId === abstract.id
-                                      }
-                                      className={`px-3 py-1.5 text-xs font-medium rounded-md text-white disabled:opacity-60 disabled:cursor-not-allowed ${
-                                        String(
-                                          abstract.status || "",
-                                        ).toLowerCase() === "accepted"
-                                          ? "bg-emerald-600 hover:bg-emerald-700"
-                                          : "bg-red-600 hover:bg-red-700"
-                                      }`}
-                                    >
-                                      {sendingDecisionId === abstract.id
-                                        ? "Sending…"
-                                        : String(
-                                              abstract.status || "",
-                                            ).toLowerCase() === "accepted"
-                                          ? abstract.decision_email_sent_at
-                                            ? "Resend acceptance email"
-                                            : "Send acceptance email"
-                                          : abstract.decision_email_sent_at
-                                            ? "Resend rejection email"
-                                            : "Send rejection email"}
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                              <div className="mt-3 p-3 bg-white rounded-lg border border-gray-100">
-                                <div className="flex items-center justify-between flex-wrap gap-2">
-                                  <div className="text-xs text-gray-600">
-                                    <span className="font-semibold text-gray-700">
-                                      Invited speaker:
-                                    </span>{" "}
-                                    <span className="text-gray-500">No</span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      updateAbstractInvitedSpeaker(
-                                        abstract.id,
-                                        true,
-                                      );
-                                    }}
-                                    disabled={
-                                      updatingInvitedSpeakerId === abstract.id
-                                    }
-                                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                                  >
-                                    {updatingInvitedSpeakerId === abstract.id
-                                      ? "Updating…"
-                                      : "Mark as invited speaker"}
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-100">
-                                <div className="flex items-center justify-between flex-wrap gap-2">
-                                  <div className="text-xs text-red-700">
-                                    <span className="font-semibold">
-                                      Danger zone:
-                                    </span>{" "}
-                                    Delete this abstract from admin, reviewers,
-                                    and emails. Soft-deleted in the database.
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openDeleteAbstractModal(abstract);
-                                    }}
-                                    disabled={
-                                      deletingAbstractId === abstract.id
-                                    }
-                                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                                  >
-                                    Delete abstract
-                                  </button>
-                                </div>
-                              </div>
                           </div>
 
                           {/* Authors */}
@@ -4414,6 +5438,22 @@ export default function AdminTab() {
                               )}
                             </div>
                           </div>
+
+                          <AbstractCardActions
+                            abstract={abstract}
+                            isInvited={false}
+                            formatDate={formatDate}
+                            sendingConfirmationId={sendingConfirmationId}
+                            sendingDecisionId={sendingDecisionId}
+                            updatingInvitedSpeakerId={updatingInvitedSpeakerId}
+                            savingAbstractId={savingAbstractId}
+                            deletingAbstractId={deletingAbstractId}
+                            onSendConfirmation={sendAbstractConfirmation}
+                            onSendDecision={sendAbstractDecision}
+                            onToggleInvited={updateAbstractInvitedSpeaker}
+                            onEdit={openEditAbstractModal}
+                            onDelete={openDeleteAbstractModal}
+                          />
                         </div>
                       </div>
                     )}
@@ -4728,58 +5768,21 @@ export default function AdminTab() {
                             </div>
                           </div>
 
-                          <div className="md:col-span-2">
-                            <div className="p-3 bg-white rounded-lg border border-gray-100">
-                              <div className="flex items-center justify-between flex-wrap gap-2">
-                                <div className="text-xs text-gray-600">
-                                  <span className="font-semibold text-gray-700">
-                                    Invited speaker:
-                                  </span>{" "}
-                                  <span className="text-orange-700">Yes</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    updateAbstractInvitedSpeaker(
-                                      abstract.id,
-                                      false,
-                                    );
-                                  }}
-                                  disabled={
-                                    updatingInvitedSpeakerId === abstract.id
-                                  }
-                                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
-                                >
-                                  {updatingInvitedSpeakerId === abstract.id
-                                    ? "Updating…"
-                                    : "Move to general submissions"}
-                                </button>
-                              </div>
-                            </div>
-                            <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-100">
-                              <div className="flex items-center justify-between flex-wrap gap-2">
-                                <div className="text-xs text-red-700">
-                                  <span className="font-semibold">
-                                    Danger zone:
-                                  </span>{" "}
-                                  Delete this abstract from admin, reviewers,
-                                  and emails. Soft-deleted in the database.
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openDeleteAbstractModal(abstract);
-                                  }}
-                                  disabled={deletingAbstractId === abstract.id}
-                                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                                >
-                                  Delete abstract
-                                </button>
-                              </div>
-                            </div>
-                          </div>
+                          <AbstractCardActions
+                            abstract={abstract}
+                            isInvited={true}
+                            formatDate={formatDate}
+                            sendingConfirmationId={sendingConfirmationId}
+                            sendingDecisionId={sendingDecisionId}
+                            updatingInvitedSpeakerId={updatingInvitedSpeakerId}
+                            savingAbstractId={savingAbstractId}
+                            deletingAbstractId={deletingAbstractId}
+                            onSendConfirmation={sendAbstractConfirmation}
+                            onSendDecision={sendAbstractDecision}
+                            onToggleInvited={updateAbstractInvitedSpeaker}
+                            onEdit={openEditAbstractModal}
+                            onDelete={openDeleteAbstractModal}
+                          />
                         </div>
                       </div>
                     )}
@@ -4800,9 +5803,11 @@ export default function AdminTab() {
                 Abstract review scores
               </h2>
               <p className="text-gray-500 text-sm mt-1 max-w-2xl">
-                Average scores by category across reviewers, per-abstract
-                totals, reviewer notes, and conflict-of-interest flags.
-                Submissions (accept/reject, full text) stay under{" "}
+                Peer-review pool only (invited speakers and poster-only
+                submissions are excluded). Average scores by category across
+                reviewers, per-abstract totals, reviewer notes, and
+                conflict-of-interest flags. Submissions (accept/reject, full
+                text) stay under{" "}
                 <button
                   type="button"
                   onClick={() => setActiveSection("abstracts")}
@@ -6290,17 +7295,18 @@ export default function AdminTab() {
               Default abstracts per reviewer
             </h3>
             <p className="text-xs text-gray-500 mt-1 max-w-2xl">
-              Used for reviewers without an individual number. To set the
-              number for a specific reviewer, open{" "}
+              Used for new reviewers without a custom starting count. To give
+              reviewers more work, open{" "}
               <button
                 type="button"
                 onClick={() => setActiveSection("addReviewers")}
                 className="text-teal-700 font-semibold hover:underline"
               >
                 Add Reviewers
-              </button>
-              . Assignment prefers abstracts with the fewest reviewers so far,
-              and changes apply the next time a reviewer opens their portal.
+              </button>{" "}
+              and assign more to one person or selected reviewers.
+              Assignment prefers oral/either abstracts (not invited speakers or
+              poster-only) with the fewest reviewers so far.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <input
@@ -6570,39 +7576,67 @@ export default function AdminTab() {
                                       <th className="py-2 pr-2">
                                         Last updated
                                       </th>
+                                      <th className="py-2 pl-2 text-right">
+                                        Actions
+                                      </th>
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {rev.assignments.map((a) => (
-                                      <tr key={a.abstract_id}>
-                                        <td className="py-1.5 pr-4 font-mono text-[11px] text-gray-700">
-                                          {a.abstract_id}
-                                        </td>
-                                        <td className="py-1.5 pr-4 text-gray-800 max-w-xs truncate">
-                                          {a.title}
-                                        </td>
-                                        <td className="py-1.5 pr-4">
-                                          <span className="inline-flex px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
-                                            {a.status || "submitted"}
-                                          </span>
-                                        </td>
-                                        <td className="py-1.5 pr-4">
-                                          {a.review_total != null
-                                            ? a.review_total
-                                            : "—"}
-                                        </td>
-                                        <td className="py-1.5 pr-4 text-gray-600">
-                                          {a.assigned_at
-                                            ? formatDate(a.assigned_at)
-                                            : "–"}
-                                        </td>
-                                        <td className="py-1.5 pr-2 text-gray-600">
-                                          {a.review_updated_at
-                                            ? formatDate(a.review_updated_at)
-                                            : "–"}
-                                        </td>
-                                      </tr>
-                                    ))}
+                                    {rev.assignments.map((a) => {
+                                      const unassignKey = `${rev.reviewer_email}::${a.abstract_id}`;
+                                      return (
+                                        <tr key={a.abstract_id}>
+                                          <td className="py-1.5 pr-4 font-mono text-[11px] text-gray-700">
+                                            {a.abstract_id}
+                                          </td>
+                                          <td className="py-1.5 pr-4 text-gray-800 max-w-xs truncate">
+                                            {a.title}
+                                          </td>
+                                          <td className="py-1.5 pr-4">
+                                            <span className="inline-flex px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                                              {a.status || "submitted"}
+                                            </span>
+                                          </td>
+                                          <td className="py-1.5 pr-4">
+                                            {a.review_total != null
+                                              ? a.review_total
+                                              : "—"}
+                                          </td>
+                                          <td className="py-1.5 pr-4 text-gray-600">
+                                            {a.assigned_at
+                                              ? formatDate(a.assigned_at)
+                                              : "–"}
+                                          </td>
+                                          <td className="py-1.5 pr-2 text-gray-600">
+                                            {a.review_updated_at
+                                              ? formatDate(a.review_updated_at)
+                                              : "–"}
+                                          </td>
+                                          <td className="py-1.5 pl-2 text-right">
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                unassignReviewerAbstract(
+                                                  rev.reviewer_email,
+                                                  a.abstract_id,
+                                                  a.title,
+                                                );
+                                              }}
+                                              disabled={
+                                                unassigningKey === unassignKey
+                                              }
+                                              className="px-2 py-1 rounded-md border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                            >
+                                              {unassigningKey === unassignKey
+                                                ? "Removing…"
+                                                : "Remove"}
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
                                   </tbody>
                                 </table>
                               </div>
@@ -6727,85 +7761,237 @@ export default function AdminTab() {
             )}
           </div>
 
-          {/* Per-reviewer abstract counts */}
+          {/* Per-reviewer abstract assignment */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-800">
-                Abstracts per reviewer
-              </h3>
-              <p className="text-xs text-gray-500 mt-1 max-w-2xl">
-                Set how many abstracts each reviewer is assigned. Leave the
-                field blank to use the default ({reviewerAccountsDefault}).
-                Changes apply the next time the reviewer opens their portal;
-                extra abstracts are picked from the ones with the fewest
-                reviewers so far.
-              </p>
+            <div className="px-5 py-3 border-b border-gray-100 space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800">
+                  Assign more abstracts
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 max-w-2xl">
+                  Give one reviewer more work with the stepper on their row, or
+                  select reviewers and use mass assign. To take work away,
+                  remove specific assignments under{" "}
+                  <button
+                    type="button"
+                    onClick={() => setActiveSection("reviewers")}
+                    className="text-teal-700 font-semibold hover:underline"
+                  >
+                    Reviewer Overview
+                  </button>
+                  .
+                </p>
+              </div>
+
+              {reviewerAccounts.length > 0 && (
+                <div className="rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-3 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold text-teal-900">
+                      Mass assign
+                    </span>
+                    <div className="inline-flex items-center rounded-lg border border-teal-200 bg-white overflow-hidden">
+                      <button
+                        type="button"
+                        aria-label="Fewer abstracts for mass assign"
+                        onClick={() => bumpBulkAddMore(-1)}
+                        disabled={
+                          bulkAssigning || Number(bulkAddMoreCount) <= 1
+                        }
+                        className="px-2.5 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={bulkAddMoreCount}
+                        onChange={(e) => setBulkAddMoreCount(e.target.value)}
+                        className="w-14 border-x border-teal-200 px-1 py-1.5 text-center text-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-500"
+                        title="How many more to assign to each reviewer"
+                      />
+                      <button
+                        type="button"
+                        aria-label="More abstracts for mass assign"
+                        onClick={() => bumpBulkAddMore(1)}
+                        disabled={
+                          bulkAssigning || Number(bulkAddMoreCount) >= 100
+                        }
+                        className="px-2.5 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => addMoreAbstractsBulk()}
+                      disabled={
+                        bulkAssigning || selectedReviewerEmails.size === 0
+                      }
+                      className="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-xs font-semibold hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {bulkAssigning
+                        ? "Assigning…"
+                        : `Assign to selected (${selectedReviewerEmails.size})`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={selectAllReviewers}
+                      disabled={bulkAssigning}
+                      className="px-2.5 py-1.5 text-xs font-medium text-teal-800 hover:underline disabled:opacity-50"
+                    >
+                      Select all
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearSelectedReviewers}
+                      disabled={
+                        bulkAssigning || selectedReviewerEmails.size === 0
+                      }
+                      className="px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:underline disabled:opacity-50"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  {bulkAssignMessage && (
+                    <p
+                      className={`text-xs ${
+                        bulkAssignMessage.type === "success"
+                          ? "text-emerald-700"
+                          : "text-red-700"
+                      }`}
+                    >
+                      {bulkAssignMessage.text}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             {reviewerAccounts.length > 0 ? (
               <div className="divide-y divide-gray-100">
-                {reviewerAccounts.map((acct) => (
-                  <div
-                    key={acct.email}
-                    className="px-5 py-3 flex flex-wrap items-center gap-3"
-                  >
-                    <div className="flex-1 min-w-[200px]">
-                      <p className="text-sm font-medium text-gray-900 break-all">
-                        {acct.email}
-                        {!acct.active && (
-                          <span className="ml-2 inline-flex px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[11px]">
-                            inactive
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Currently assigned: {acct.assigned_count} • Target:{" "}
-                        {acct.abstracts_target != null
-                          ? acct.abstracts_target
-                          : `default (${reviewerAccountsDefault})`}
-                      </p>
-                      {reviewerTargetMessage?.email === acct.email && (
-                        <p
-                          className={`mt-1 text-xs ${
-                            reviewerTargetMessage.type === "success"
-                              ? "text-emerald-600"
-                              : "text-red-600"
-                          }`}
-                        >
-                          {reviewerTargetMessage.text}
-                        </p>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={reviewerTargetInputs[acct.email] ?? ""}
-                      placeholder={`${reviewerAccountsDefault}`}
-                      onChange={(e) =>
-                        setReviewerTargetInputs((prev) => ({
-                          ...prev,
-                          [acct.email]: e.target.value,
-                        }))
-                      }
-                      className="w-20 px-3 py-1.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-purple-400 focus:border-purple-400"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => saveReviewerTarget(acct.email)}
-                      disabled={savingReviewerTargetEmail === acct.email}
-                      className="px-3 py-1.5 rounded-lg bg-purple-700 text-white text-xs font-semibold hover:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                {reviewerAccounts.map((acct) => {
+                  const assignedCount = Number(acct.assigned_count || 0);
+                  const addRaw = reviewerAddMoreInputs[acct.email] ?? "1";
+                  const addCount = Number(addRaw);
+                  const addValid =
+                    Number.isInteger(addCount) &&
+                    addCount >= 1 &&
+                    addCount <= 100;
+                  const saving = savingReviewerTargetEmail === acct.email;
+                  const selected = selectedReviewerEmails.has(acct.email);
+                  return (
+                    <div
+                      key={acct.email}
+                      className={`px-5 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${
+                        selected ? "bg-teal-50/40" : ""
+                      }`}
                     >
-                      {savingReviewerTargetEmail === acct.email
-                        ? "Saving..."
-                        : "Save"}
-                    </button>
-                  </div>
-                ))}
+                      <div className="min-w-0 flex-1 flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleReviewerSelected(acct.email)}
+                          className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+                          aria-label={`Select ${acct.email}`}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 break-all">
+                            {acct.email}
+                            {!acct.active && (
+                              <span className="ml-2 inline-flex px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[11px]">
+                                inactive
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Currently reviewing{" "}
+                            <span className="font-semibold text-gray-700">
+                              {assignedCount}
+                            </span>{" "}
+                            abstract{assignedCount === 1 ? "" : "s"}
+                          </p>
+                          {reviewerTargetMessage?.email === acct.email && (
+                            <p
+                              className={`mt-1.5 text-xs ${
+                                reviewerTargetMessage.type === "success"
+                                  ? "text-emerald-600"
+                                  : "text-red-600"
+                              }`}
+                            >
+                              {reviewerTargetMessage.text}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 sm:pl-7">
+                        <div className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
+                          <button
+                            type="button"
+                            aria-label="Fewer abstracts to add"
+                            onClick={() => bumpReviewerAddMore(acct.email, -1)}
+                            disabled={saving || (addValid && addCount <= 1)}
+                            className="px-2.5 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-40"
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={addRaw}
+                            onChange={(e) =>
+                              setReviewerAddMoreCount(
+                                acct.email,
+                                e.target.value,
+                              )
+                            }
+                            className="w-14 border-x border-gray-200 px-1 py-1.5 text-center text-sm bg-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-500"
+                            title="How many more to assign"
+                          />
+                          <button
+                            type="button"
+                            aria-label="More abstracts to add"
+                            onClick={() => bumpReviewerAddMore(acct.email, 1)}
+                            disabled={saving || (addValid && addCount >= 100)}
+                            className="px-2.5 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-40"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            addMoreAbstractsToReviewer(acct.email)
+                          }
+                          disabled={saving || !addValid || bulkAssigning}
+                          className="px-3 py-1.5 rounded-lg bg-teal-700 text-white text-xs font-semibold hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {saving
+                            ? "Assigning…"
+                            : addValid
+                              ? `Assign ${addCount} more`
+                              : "Assign more"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteReviewer(acct.email)}
+                          disabled={deletingReviewerEmail === acct.email}
+                          className="px-3 py-1.5 rounded-lg border border-red-200 text-red-700 text-xs font-semibold hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {deletingReviewerEmail === acct.email
+                            ? "Deleting..."
+                            : "Delete"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="px-5 py-6 text-sm text-gray-500">
-                No reviewer accounts yet. Add reviewers above to set their
-                abstract counts.
+                No reviewer accounts yet. Add reviewers above to assign
+                abstracts.
               </div>
             )}
           </div>
@@ -7350,6 +8536,490 @@ export default function AdminTab() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {abstractToEdit && editAbstractForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-gray-100">
+              <h3 className="text-xl font-bold text-gray-900">
+                Edit Abstract
+              </h3>
+              <p className="text-gray-500 mt-1 text-sm">
+                Update abstract content, authors, emails, and affiliations.
+              </p>
+            </div>
+            <div className="p-6 space-y-4 overflow-y-auto">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <p className="font-semibold">Warning: changes cannot be reverted</p>
+                <p className="mt-1">
+                  Saving overwrites the current title, category, type, keywords,
+                  abstract text, presentation preference, authors, and
+                  affiliations permanently. There is no undo.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-abstract-title"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Title
+                </label>
+                <input
+                  id="edit-abstract-title"
+                  type="text"
+                  value={editAbstractForm.title}
+                  onChange={(e) =>
+                    updateEditAbstractField("title", e.target.value)
+                  }
+                  disabled={Boolean(savingAbstractId)}
+                  maxLength={150}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:opacity-60"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  {editAbstractForm.title.length}/150 characters
+                </p>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label
+                    htmlFor="edit-abstract-category"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Category
+                  </label>
+                  <select
+                    id="edit-abstract-category"
+                    value={editAbstractForm.category}
+                    onChange={(e) =>
+                      updateEditAbstractField("category", e.target.value)
+                    }
+                    disabled={Boolean(savingAbstractId)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:opacity-60 bg-white"
+                  >
+                    <option value="">Select category</option>
+                    {!ABSTRACT_EDIT_CATEGORIES.includes(
+                      editAbstractForm.category,
+                    ) &&
+                      editAbstractForm.category && (
+                        <option value={editAbstractForm.category}>
+                          {editAbstractForm.category}
+                        </option>
+                      )}
+                    {ABSTRACT_EDIT_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    htmlFor="edit-abstract-type"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Abstract type
+                  </label>
+                  <select
+                    id="edit-abstract-type"
+                    value={editAbstractForm.abstractSubmissionType}
+                    onChange={(e) =>
+                      updateEditAbstractField(
+                        "abstractSubmissionType",
+                        e.target.value,
+                      )
+                    }
+                    disabled={Boolean(savingAbstractId)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:opacity-60 bg-white"
+                  >
+                    <option value="">Select type</option>
+                    {!ABSTRACT_EDIT_SUBMISSION_TYPES.includes(
+                      editAbstractForm.abstractSubmissionType,
+                    ) &&
+                      editAbstractForm.abstractSubmissionType && (
+                        <option value={editAbstractForm.abstractSubmissionType}>
+                          {editAbstractForm.abstractSubmissionType}
+                        </option>
+                      )}
+                    {ABSTRACT_EDIT_SUBMISSION_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-abstract-preference"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Presentation preference
+                </label>
+                <select
+                  id="edit-abstract-preference"
+                  value={editAbstractForm.presentationPreference}
+                  onChange={(e) =>
+                    updateEditAbstractField(
+                      "presentationPreference",
+                      e.target.value,
+                    )
+                  }
+                  disabled={Boolean(savingAbstractId)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:opacity-60 bg-white"
+                >
+                  <option value="oral">Oral</option>
+                  <option value="poster">Poster</option>
+                  <option value="either">Either</option>
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-abstract-keywords"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Keywords
+                </label>
+                <input
+                  id="edit-abstract-keywords"
+                  type="text"
+                  value={editAbstractForm.keywords}
+                  onChange={(e) =>
+                    updateEditAbstractField("keywords", e.target.value)
+                  }
+                  disabled={Boolean(savingAbstractId)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:opacity-60"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-abstract-text"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Abstract text
+                </label>
+                <textarea
+                  id="edit-abstract-text"
+                  value={editAbstractForm.abstract}
+                  onChange={(e) =>
+                    updateEditAbstractField("abstract", e.target.value)
+                  }
+                  disabled={Boolean(savingAbstractId)}
+                  rows={8}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:opacity-60 resize-y"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  {
+                    editAbstractForm.abstract
+                      .split(/\s+/)
+                      .filter((w) => w).length
+                  }
+                  /300 words
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h4 className="text-sm font-semibold text-gray-900">
+                    Authors & affiliations
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={addEditAuthor}
+                    disabled={Boolean(savingAbstractId)}
+                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-slate-100 text-slate-800 hover:bg-slate-200 disabled:opacity-50"
+                  >
+                    Add author
+                  </button>
+                </div>
+
+                {(editAbstractForm.authors || []).map((author, authorIndex) => (
+                  <div
+                    key={author.id || `author-${authorIndex}`}
+                    className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-gray-800">
+                        Author {authorIndex + 1}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => removeEditAuthor(authorIndex)}
+                        disabled={
+                          Boolean(savingAbstractId) ||
+                          (editAbstractForm.authors || []).length <= 1
+                        }
+                        className="text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-40"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          First name
+                        </label>
+                        <input
+                          type="text"
+                          value={author.firstName}
+                          onChange={(e) =>
+                            updateEditAuthorField(
+                              authorIndex,
+                              "firstName",
+                              e.target.value,
+                            )
+                          }
+                          disabled={Boolean(savingAbstractId)}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:opacity-60"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Middle name
+                        </label>
+                        <input
+                          type="text"
+                          value={author.middleName}
+                          onChange={(e) =>
+                            updateEditAuthorField(
+                              authorIndex,
+                              "middleName",
+                              e.target.value,
+                            )
+                          }
+                          disabled={Boolean(savingAbstractId)}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:opacity-60"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Last name
+                        </label>
+                        <input
+                          type="text"
+                          value={author.lastName}
+                          onChange={(e) =>
+                            updateEditAuthorField(
+                              authorIndex,
+                              "lastName",
+                              e.target.value,
+                            )
+                          }
+                          disabled={Boolean(savingAbstractId)}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:opacity-60"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        value={author.email}
+                        onChange={(e) =>
+                          updateEditAuthorField(
+                            authorIndex,
+                            "email",
+                            e.target.value,
+                          )
+                        }
+                        disabled={Boolean(savingAbstractId)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:opacity-60"
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-700">
+                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`edit-presenter-${abstractToEdit.id}`}
+                          checked={Boolean(author.isPresenter)}
+                          onChange={() =>
+                            updateEditAuthorField(
+                              authorIndex,
+                              "isPresenter",
+                              true,
+                            )
+                          }
+                          disabled={Boolean(savingAbstractId)}
+                        />
+                        Presenter
+                      </label>
+                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`edit-corresponding-${abstractToEdit.id}`}
+                          checked={Boolean(author.isCorresponding)}
+                          onChange={() =>
+                            updateEditAuthorField(
+                              authorIndex,
+                              "isCorresponding",
+                              true,
+                            )
+                          }
+                          disabled={Boolean(savingAbstractId)}
+                        />
+                        Corresponding
+                      </label>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                          Affiliations
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => addEditAffiliation(authorIndex)}
+                          disabled={Boolean(savingAbstractId)}
+                          className="text-xs font-medium text-slate-700 hover:text-slate-900 disabled:opacity-50"
+                        >
+                          Add affiliation
+                        </button>
+                      </div>
+                      {(author.affiliations || []).map((aff, affIndex) => (
+                        <div
+                          key={`${authorIndex}-aff-${affIndex}`}
+                          className="rounded-md border border-gray-200 bg-white p-3 space-y-2"
+                        >
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removeEditAffiliation(authorIndex, affIndex)
+                              }
+                              disabled={
+                                Boolean(savingAbstractId) ||
+                                (author.affiliations || []).length <= 1
+                              }
+                              className="text-xs text-red-600 hover:text-red-700 disabled:opacity-40"
+                            >
+                              Remove affiliation
+                            </button>
+                          </div>
+                          <div className="grid sm:grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              placeholder="Institution"
+                              value={aff.institution}
+                              onChange={(e) =>
+                                updateEditAffiliationField(
+                                  authorIndex,
+                                  affIndex,
+                                  "institution",
+                                  e.target.value,
+                                )
+                              }
+                              disabled={Boolean(savingAbstractId)}
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:opacity-60"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Department"
+                              value={aff.department}
+                              onChange={(e) =>
+                                updateEditAffiliationField(
+                                  authorIndex,
+                                  affIndex,
+                                  "department",
+                                  e.target.value,
+                                )
+                              }
+                              disabled={Boolean(savingAbstractId)}
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:opacity-60"
+                            />
+                            <input
+                              type="text"
+                              placeholder="City"
+                              value={aff.city}
+                              onChange={(e) =>
+                                updateEditAffiliationField(
+                                  authorIndex,
+                                  affIndex,
+                                  "city",
+                                  e.target.value,
+                                )
+                              }
+                              disabled={Boolean(savingAbstractId)}
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:opacity-60"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Country"
+                              value={aff.country}
+                              onChange={(e) =>
+                                updateEditAffiliationField(
+                                  authorIndex,
+                                  affIndex,
+                                  "country",
+                                  e.target.value,
+                                )
+                              }
+                              disabled={Boolean(savingAbstractId)}
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:opacity-60"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editAbstractAcknowledged}
+                  onChange={(e) => {
+                    setEditAbstractAcknowledged(e.target.checked);
+                    setEditAbstractError("");
+                  }}
+                  disabled={Boolean(savingAbstractId)}
+                  className="mt-0.5"
+                />
+                <span>
+                  I understand these edits cannot be reverted and will
+                  permanently replace the saved abstract content, authors, and
+                  affiliations.
+                </span>
+              </label>
+
+              {editAbstractError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {editAbstractError}
+                </div>
+              )}
+            </div>
+            <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeEditAbstractModal}
+                disabled={Boolean(savingAbstractId)}
+                className="px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveEditedAbstract}
+                disabled={
+                  Boolean(savingAbstractId) || !editAbstractAcknowledged
+                }
+                className="px-6 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 disabled:opacity-50 font-medium"
+              >
+                {savingAbstractId ? "Saving…" : "Save changes"}
+              </button>
+            </div>
           </div>
         </div>
       )}
