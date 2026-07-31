@@ -15,6 +15,55 @@ function speakerImgSrc(speaker) {
   return null;
 }
 
+/** Lazy-loads speaker photos; soft placeholder until the image arrives. */
+function SpeakerPhoto({
+  src,
+  alt,
+  className,
+  style,
+  eager = false,
+  fallback,
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setLoaded(false);
+    setFailed(false);
+  }, [src]);
+
+  if (!src || failed) return fallback;
+
+  const { objectPosition, ...wrapperStyle } = style || {};
+
+  return (
+    <span
+      className={`relative inline-block overflow-hidden ${className}`}
+      style={wrapperStyle}
+    >
+      {!loaded && (
+        <span
+          aria-hidden
+          className="absolute inset-0 animate-pulse bg-gray-200"
+        />
+      )}
+      <img
+        src={src}
+        alt={alt}
+        className={`h-full w-full object-cover transition-opacity duration-300 ${
+          loaded ? "opacity-100" : "opacity-0"
+        }`}
+        style={objectPosition ? { objectPosition } : undefined}
+        loading={eager ? "eager" : "lazy"}
+        decoding="async"
+        fetchPriority={eager ? "high" : "low"}
+        onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
+      />
+    </span>
+  );
+}
+
 function SpeakersTab() {
   const [plenarySpeakers, setPlenarySpeakers] = useState([]);
   const [forumSpeakers, setForumSpeakers] = useState([]);
@@ -137,27 +186,27 @@ function SpeakersTab() {
                       "linear-gradient(135deg, var(--color-primary), var(--color-secondary))",
                   }}
                 >
-                  {imgSrc ? (
-                    <img
-                      src={imgSrc}
-                      alt={speaker.name}
-                      className="w-36 h-36 rounded-full object-cover border-4 border-white flex-shrink-0"
-                      style={{
-                        ...(speaker.image_position && {
-                          objectPosition: speaker.image_position,
-                        }),
-                      }}
-                    />
-                  ) : (
-                    <div
-                      className="w-36 h-36 rounded-full flex items-center justify-center border-4 border-white text-3xl font-bold text-white flex-shrink-0"
-                      style={{
-                        backgroundColor: "var(--color-primary)",
-                      }}
-                    >
-                      {getInitials(speaker.name)}
-                    </div>
-                  )}
+                  <SpeakerPhoto
+                    src={imgSrc}
+                    alt={speaker.name}
+                    eager
+                    className="w-36 h-36 rounded-full border-4 border-white flex-shrink-0"
+                    style={{
+                      ...(speaker.image_position && {
+                        objectPosition: speaker.image_position,
+                      }),
+                    }}
+                    fallback={
+                      <div
+                        className="w-36 h-36 rounded-full flex items-center justify-center border-4 border-white text-3xl font-bold text-white flex-shrink-0"
+                        style={{
+                          backgroundColor: "var(--color-primary)",
+                        }}
+                      >
+                        {getInitials(speaker.name)}
+                      </div>
+                    }
+                  />
                 </div>
                 <h5
                   className="text-xl font-extrabold mb-2 leading-tight"
@@ -206,24 +255,21 @@ function SpeakersTab() {
               >
                 <div className="absolute top-0 left-0 right-0 h-1 bg-sky-400" />
                 <div className="rounded-full p-0.5 mb-4 bg-sky-200">
-                  {imgSrc ? (
-                    <img
-                      src={imgSrc}
-                      alt={speaker.name}
-                      className="w-28 h-28 rounded-full object-cover border-2 border-white flex-shrink-0"
-                      style={{
-                        ...(speaker.image_position && {
-                          objectPosition: speaker.image_position,
-                        }),
-                      }}
-                    />
-                  ) : (
-                    <div
-                      className="w-28 h-28 rounded-full flex items-center justify-center border-2 border-white text-2xl font-bold text-white flex-shrink-0 bg-sky-600"
-                    >
-                      {getInitials(speaker.name)}
-                    </div>
-                  )}
+                  <SpeakerPhoto
+                    src={imgSrc}
+                    alt={speaker.name}
+                    className="w-28 h-28 rounded-full border-2 border-white flex-shrink-0"
+                    style={{
+                      ...(speaker.image_position && {
+                        objectPosition: speaker.image_position,
+                      }),
+                    }}
+                    fallback={
+                      <div className="w-28 h-28 rounded-full flex items-center justify-center border-2 border-white text-2xl font-bold text-white flex-shrink-0 bg-sky-600">
+                        {getInitials(speaker.name)}
+                      </div>
+                    }
+                  />
                 </div>
                 <h5
                   className="text-lg font-bold mb-1.5 leading-tight"
@@ -268,29 +314,28 @@ function SpeakersTab() {
                 key={speaker.key}
                 className="bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition-shadow flex flex-col items-center text-center"
               >
-                {imgSrc ? (
-                  <img
-                    src={imgSrc}
-                    alt={speaker.name}
-                    className="w-28 h-28 rounded-full object-cover mb-3 border-2 flex-shrink-0"
-                    style={{
-                      borderColor: "var(--color-secondary)",
-                      ...(speaker.image_position && {
-                        objectPosition: speaker.image_position,
-                      }),
-                    }}
-                  />
-                ) : (
-                  <div
-                    className="w-28 h-28 rounded-full flex items-center justify-center mb-3 border-2 text-2xl font-bold text-white flex-shrink-0"
-                    style={{
-                      backgroundColor: "var(--color-primary)",
-                      borderColor: "var(--color-secondary)",
-                    }}
-                  >
-                    {getInitials(speaker.name)}
-                  </div>
-                )}
+                <SpeakerPhoto
+                  src={imgSrc}
+                  alt={speaker.name}
+                  className="w-28 h-28 rounded-full mb-3 border-2 flex-shrink-0"
+                  style={{
+                    borderColor: "var(--color-secondary)",
+                    ...(speaker.image_position && {
+                      objectPosition: speaker.image_position,
+                    }),
+                  }}
+                  fallback={
+                    <div
+                      className="w-28 h-28 rounded-full flex items-center justify-center mb-3 border-2 text-2xl font-bold text-white flex-shrink-0"
+                      style={{
+                        backgroundColor: "var(--color-primary)",
+                        borderColor: "var(--color-secondary)",
+                      }}
+                    >
+                      {getInitials(speaker.name)}
+                    </div>
+                  }
+                />
                 <h5
                   className="text-base font-bold mb-1.5 leading-tight"
                   style={{ color: "var(--color-primary)" }}
