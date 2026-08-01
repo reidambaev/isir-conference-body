@@ -665,6 +665,18 @@ async function handleApiRequest(request, env, url) {
     );
   }
 
+  const spPhotoMatch = url.pathname.match(
+    /^\/api\/admin\/speaker-profiles\/([^/]+)\/photo$/,
+  );
+  if (spPhotoMatch && request.method === "POST") {
+    return handleAdminSpeakerProfilePhoto(
+      request,
+      env,
+      corsHeaders,
+      spPhotoMatch[1],
+    );
+  }
+
   return new Response(JSON.stringify({ error: "Not Found" }), {
     status: 404,
     headers: corsHeaders,
@@ -5691,6 +5703,147 @@ async function handleAdminSpeakerProfileDelete(request, env, corsHeaders, id) {
     console.error("handleAdminSpeakerProfileDelete:", e);
     return jsonResponse(
       { success: false, error: "Delete failed" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleAdminSpeakerProfilePhoto(request, env, corsHeaders, id) {
+  const auth = ensureAdmin(request, env, corsHeaders);
+  if (auth) return auth;
+  if (!env.ISIR_DB) {
+    return jsonResponse(
+      { success: false, error: "Database not configured" },
+      500,
+      corsHeaders,
+    );
+  }
+  if (!getSpeakerPhotosBucketForWrite(env)) {
+    return jsonResponse(
+      {
+        success: false,
+        error:
+          "Speaker photo storage is misconfigured. Bind SPEAKER_PHOTOS_BUCKET as an R2 bucket (not a plain env var).",
+      },
+      500,
+      corsHeaders,
+    );
+  }
+
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return jsonResponse(
+      { success: false, error: "Invalid form data" },
+      400,
+      corsHeaders,
+    );
+  }
+
+  const file = formData.get("file");
+  const wantsUpload = Boolean(
+    file && typeof file.size === "number" && file.size > 0,
+  );
+  if (!wantsUpload) {
+    return jsonResponse(
+      { success: false, error: "Photo file is required (JPEG or PNG)." },
+      400,
+      corsHeaders,
+    );
+  }
+
+  const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
+  const fileType = file.type;
+  if (!allowedTypes.includes(fileType)) {
+    return jsonResponse(
+      { success: false, error: "Photo must be JPEG or PNG." },
+      400,
+      corsHeaders,
+    );
+  }
+  if (file.size > SPEAKER_PHOTO_MAX_BYTES) {
+    return jsonResponse(
+      {
+        success: false,
+        error: "Photo is too large. Maximum size is 5 MB (JPEG or PNG).",
+      },
+      400,
+      corsHeaders,
+    );
+  }
+
+  try {
+    const row = await env.ISIR_DB.prepare(
+      `SELECT id, email, r2_key FROM speaker_profile_submissions WHERE id = ?`,
+    )
+      .bind(id)
+      .first();
+    if (!row?.id) {
+      return jsonResponse(
+        { success: false, error: "No submission with that id" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    const timestamp = Date.now();
+    const randomId = Math.random().toString(36).slice(2, 11).toUpperCase();
+    const ext = fileType === "image/png" ? "png" : "jpg";
+    const r2Key = `speaker-photos/nsp-${id.slice(0, 8)}_${timestamp}_${randomId}.${ext}`;
+    const fileBuffer = await file.arrayBuffer();
+    const speakerBucket = getSpeakerPhotosBucketForWrite(env);
+    if (!speakerBucket) {
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "Speaker photo storage is misconfigured. Bind SPEAKER_PHOTOS_BUCKET as an R2 bucket.",
+        },
+        500,
+        corsHeaders,
+      );
+    }
+
+    await speakerBucket.put(r2Key, fileBuffer, {
+      httpMetadata: { contentType: fileType },
+      customMetadata: {
+        email: row.email || "",
+        submissionId: id,
+        uploadedBy: "admin",
+        uploadedAt: new Date().toISOString(),
+      },
+    });
+
+    const now = Date.now();
+    const prevKey = row.r2_key || null;
+    try {
+      await env.ISIR_DB.prepare(
+        `UPDATE speaker_profile_submissions
+         SET r2_key = ?, static_image = NULL, updated_at = ?
+         WHERE id = ?`,
+      )
+        .bind(r2Key, now, id)
+        .run();
+    } catch (dbErr) {
+      await safeDeleteR2Object(env, r2Key);
+      throw dbErr;
+    }
+
+    if (prevKey && prevKey !== r2Key) {
+      await safeDeleteR2Object(env, prevKey);
+    }
+
+    return jsonResponse(
+      { success: true, r2_key: r2Key },
+      200,
+      corsHeaders,
+    );
+  } catch (e) {
+    console.error("handleAdminSpeakerProfilePhoto:", e);
+    return jsonResponse(
+      { success: false, error: "Failed to upload speaker photo" },
       500,
       corsHeaders,
     );

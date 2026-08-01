@@ -1610,6 +1610,46 @@ export default function AdminTab() {
     }
   };
 
+  const uploadSpeakerProfilePhoto = async (id, file) => {
+    if (!adminToken?.trim() || !id || !file) return;
+    setSpeakerProfileActionId(id);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(
+        `/api/admin/speaker-profiles/${encodeURIComponent(id)}/photo`,
+        {
+          method: "POST",
+          headers: { "X-Admin-Token": adminToken },
+          body: formData,
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setError(
+          data.error ||
+            `Failed to upload speaker photo (HTTP ${res.status})`,
+        );
+        return;
+      }
+      if (data.r2_key) {
+        setSpeakerProfileSubmissions((prev) =>
+          prev.map((row) =>
+            row.id === id
+              ? { ...row, r2_key: data.r2_key, static_image: null }
+              : row,
+          ),
+        );
+      }
+      await fetchAllData(adminToken);
+    } catch (e) {
+      setError(e?.message || "Failed to upload speaker photo");
+    } finally {
+      setSpeakerProfileActionId(null);
+    }
+  };
+
   const updateTraineeLetterStatus = async (registrationId, status) => {
     if (!adminToken?.trim() || !registrationId || !status) return;
     setTraineeLetterActionId(registrationId);
@@ -8247,7 +8287,8 @@ export default function AdminTab() {
               page. The Speaker key column is for legacy rows only; new rows
               show (new). Presentation title and brief CV are for organizer
               reference only and are not shown on the public site. Rejecting
-              removes a pending headshot and CV from storage.
+              removes a pending headshot and CV from storage. You can upload or
+              replace a headshot (JPEG/PNG, max 5 MB) from the Photo column.
             </p>
             <p className="text-sm mt-2 font-medium text-gray-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 max-w-2xl">
               For <strong>approved</strong> or <strong>rejected</strong> rows, use
@@ -8346,22 +8387,54 @@ export default function AdminTab() {
                         {row.email}
                       </td>
                       <td className="px-3 py-2">
-                        {row.r2_key ? (
-                          <a
-                            href={`/${row.r2_key}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="block"
-                          >
-                            <img
-                              src={`/${row.r2_key}`}
-                              alt=""
-                              className="h-16 w-16 rounded-lg object-cover border border-gray-200"
+                        <div className="flex flex-col gap-1.5 min-w-[7.5rem]">
+                          {row.r2_key ? (
+                            <a
+                              href={`/${row.r2_key}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block"
+                            >
+                              <img
+                                src={`/${row.r2_key}`}
+                                alt=""
+                                className="h-16 w-16 rounded-lg object-cover border border-gray-200"
+                              />
+                            </a>
+                          ) : (
+                            <span className="text-gray-400 text-xs">
+                              No photo
+                            </span>
+                          )}
+                          <label className="block">
+                            <span className="sr-only">
+                              {row.r2_key
+                                ? "Replace photo"
+                                : "Upload photo"}
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/jpg,image/png,.jpg,.jpeg,.png"
+                              disabled={
+                                !adminToken?.trim() ||
+                                speakerProfileActionId === row.id
+                              }
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                e.target.value = "";
+                                if (file) {
+                                  void uploadSpeakerProfilePhoto(row.id, file);
+                                }
+                              }}
+                              className="block w-full max-w-[9rem] text-[11px] text-gray-700 file:mr-1.5 file:py-1 file:px-2 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-amber-50 file:text-amber-900 hover:file:bg-amber-100 disabled:opacity-50 cursor-pointer"
                             />
-                          </a>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
+                          </label>
+                          {speakerProfileActionId === row.id ? (
+                            <span className="text-[11px] text-gray-500">
+                              Uploading…
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-3 py-2">
                         {row.cv_r2_key ? (
