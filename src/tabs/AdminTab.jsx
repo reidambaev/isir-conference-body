@@ -8287,8 +8287,7 @@ export default function AdminTab() {
               page. The Speaker key column is for legacy rows only; new rows
               show (new). Presentation title and brief CV are for organizer
               reference only and are not shown on the public site. Rejecting
-              removes a pending headshot and CV from storage. You can upload or
-              replace a headshot (JPEG/PNG, max 5 MB) from the Photo column.
+              removes a pending headshot and CV from storage.
             </p>
             <p className="text-sm mt-2 font-medium text-gray-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 max-w-2xl">
               For <strong>approved</strong> or <strong>rejected</strong> rows, use
@@ -8387,7 +8386,7 @@ export default function AdminTab() {
                         {row.email}
                       </td>
                       <td className="px-3 py-2">
-                        <div className="flex flex-col gap-1.5 min-w-[7.5rem]">
+                        <div className="flex flex-col items-start gap-1">
                           {row.r2_key ? (
                             <a
                               href={`/${row.r2_key}`}
@@ -8398,41 +8397,33 @@ export default function AdminTab() {
                               <img
                                 src={`/${row.r2_key}`}
                                 alt=""
-                                className="h-16 w-16 rounded-lg object-cover border border-gray-200"
+                                className="h-14 w-14 rounded object-cover border border-gray-200"
                               />
                             </a>
                           ) : (
-                            <span className="text-gray-400 text-xs">
-                              No photo
-                            </span>
+                            <span className="text-gray-400 text-xs">—</span>
                           )}
-                          <label className="block">
-                            <span className="sr-only">
-                              {row.r2_key
-                                ? "Replace photo"
-                                : "Upload photo"}
-                            </span>
-                            <input
-                              type="file"
-                              accept="image/jpeg,image/jpg,image/png,.jpg,.jpeg,.png"
-                              disabled={
-                                !adminToken?.trim() ||
-                                speakerProfileActionId === row.id
-                              }
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                e.target.value = "";
-                                if (file) {
-                                  void uploadSpeakerProfilePhoto(row.id, file);
-                                }
-                              }}
-                              className="block w-full max-w-[9rem] text-[11px] text-gray-700 file:mr-1.5 file:py-1 file:px-2 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-amber-50 file:text-amber-900 hover:file:bg-amber-100 disabled:opacity-50 cursor-pointer"
-                            />
-                          </label>
-                          {speakerProfileActionId === row.id ? (
-                            <span className="text-[11px] text-gray-500">
-                              Uploading…
-                            </span>
+                          {adminToken?.trim() ? (
+                            <label className="inline-flex items-center text-[11px] text-gray-500 hover:text-amber-800 cursor-pointer">
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/jpg,image/png,.jpg,.jpeg,.png"
+                                disabled={speakerProfileActionId === row.id}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  e.target.value = "";
+                                  if (file) {
+                                    void uploadSpeakerProfilePhoto(row.id, file);
+                                  }
+                                }}
+                                className="sr-only"
+                              />
+                              {speakerProfileActionId === row.id
+                                ? "…"
+                                : row.r2_key
+                                  ? "Replace"
+                                  : "Upload"}
+                            </label>
                           ) : null}
                         </div>
                       </td>

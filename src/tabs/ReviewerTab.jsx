@@ -1,7 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const RATING_SCALE_HELP =
   "1 Poor • 2 Fair • 3 Good • 4 Very good • 5 Excellent";
+
+const AUTO_SAVE_MS = 650;
+const DRAFT_STORAGE_PREFIX = "isir_review_draft:";
 
 const SCORE_FIELDS = [
   {
@@ -51,6 +54,72 @@ function getDefaultReview() {
     data_analysis: 3,
     significance: 3,
   };
+}
+
+function draftStorageKey(abstractId) {
+  return `${DRAFT_STORAGE_PREFIX}${abstractId}`;
+}
+
+function readLocalDraft(abstractId) {
+  try {
+    const raw = localStorage.getItem(draftStorageKey(abstractId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalDraft(abstractId, review) {
+  try {
+    localStorage.setItem(
+      draftStorageKey(abstractId),
+      JSON.stringify({
+        ...review,
+        abstract_id: abstractId,
+        updated_at: Date.now(),
+      }),
+    );
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function normalizeReview(raw) {
+  const base = getDefaultReview();
+  if (!raw || typeof raw !== "object") return base;
+  const scoreOrDefault = (value, fallback) => {
+    if (value == null || value === "") return fallback;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  return {
+    ...base,
+    coi_mentor_pi: Boolean(Number(raw.coi_mentor_pi)),
+    coi_same_lab: Boolean(Number(raw.coi_same_lab)),
+    coi_other: Boolean(Number(raw.coi_other)),
+    coi_other_details: raw.coi_other_details || "",
+    previous_study_notes: raw.previous_study_notes || "",
+    originality: scoreOrDefault(raw.originality, base.originality),
+    clarity: scoreOrDefault(raw.clarity, base.clarity),
+    study_design: scoreOrDefault(raw.study_design, base.study_design),
+    data_analysis: scoreOrDefault(raw.data_analysis, base.data_analysis),
+    significance: scoreOrDefault(raw.significance, base.significance),
+    total: raw.total != null ? Number(raw.total) : undefined,
+    updated_at: raw.updated_at != null ? Number(raw.updated_at) : undefined,
+  };
+}
+
+function computeTotalScore(review) {
+  if (!review) return 0;
+  return SCORE_FIELDS.reduce((sum, f) => sum + (Number(review[f.key]) || 0), 0);
+}
+
+function reviewHasCoi(review) {
+  return Boolean(
+    review?.coi_mentor_pi || review?.coi_same_lab || review?.coi_other,
+  );
 }
 
 function parseAbstractSections(text) {
@@ -144,6 +213,20 @@ export default function ReviewerTab() {
   const [reviewsByAbstract, setReviewsByAbstract] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const autoSaveTimerRef = useRef(null);
+  const saveMessageTimerRef = useRef(null);
+  const latestReviewsRef = useRef({});
+  const tokenRef = useRef(token);
+  const saveInFlightRef = useRef(new Set());
+  const pendingSaveIdsRef = useRef(new Set());
+
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+
+  useEffect(() => {
+    latestReviewsRef.current = reviewsByAbstract;
+  }, [reviewsByAbstract]);
 
   const selectedAbstract = useMemo(() => {
     return abstracts.find((a) => a.id === selectedAbstractId) || null;
@@ -161,22 +244,119 @@ export default function ReviewerTab() {
     return parseAbstractSections(selectedAbstract.abstract);
   }, [selectedAbstract?.abstract]);
 
-  const totalScore = useMemo(() => {
-    if (!currentReview) return 0;
-    return SCORE_FIELDS.reduce(
-      (sum, f) => sum + (Number(currentReview[f.key]) || 0),
-      0,
-    );
-  }, [currentReview]);
+  const totalScore = useMemo(
+    () => computeTotalScore(currentReview),
+    [currentReview],
+  );
 
-  const hasConflictOfInterest = useMemo(() => {
-    if (!currentReview) return false;
-    return Boolean(
-      currentReview.coi_mentor_pi ||
-        currentReview.coi_same_lab ||
-        currentReview.coi_other,
-    );
-  }, [currentReview]);
+  const hasConflictOfInterest = useMemo(
+    () => reviewHasCoi(currentReview),
+    [currentReview],
+  );
+
+  const showSaveStatus = (message, clearMs = 2500) => {
+    if (saveMessageTimerRef.current) {
+      clearTimeout(saveMessageTimerRef.current);
+      saveMessageTimerRef.current = null;
+    }
+    setSaveMessage(message);
+    if (clearMs != null) {
+      saveMessageTimerRef.current = setTimeout(() => {
+        setSaveMessage("");
+        saveMessageTimerRef.current = null;
+      }, clearMs);
+    }
+  };
+
+  const persistReview = async (
+    abstractId,
+    review,
+    { showStatus = true } = {},
+  ) => {
+    const tkn = tokenRef.current;
+    if (!tkn || !abstractId || !review) return null;
+
+    if (saveInFlightRef.current.has(abstractId)) {
+      pendingSaveIdsRef.current.add(abstractId);
+      return null;
+    }
+
+    saveInFlightRef.current.add(abstractId);
+    setSaving(true);
+    if (showStatus) showSaveStatus("Saving…", null);
+    setError("");
+    try {
+      const declaredCoi = reviewHasCoi(review);
+      const payload = {
+        abstract_id: abstractId,
+        ...review,
+        total: declaredCoi ? null : computeTotalScore(review),
+      };
+      const data = await apiFetch("/api/reviewers/reviews", {
+        method: "POST",
+        token: tkn,
+        body: JSON.stringify(payload),
+      });
+      const now = Date.now();
+      const latestLocal = latestReviewsRef.current[abstractId] || review;
+      const serverTotal =
+        typeof data?.total === "number"
+          ? data.total
+          : reviewHasCoi(latestLocal)
+            ? null
+            : computeTotalScore(latestLocal);
+      const savedReview = {
+        ...normalizeReview(latestLocal),
+        total: serverTotal,
+        updated_at: now,
+      };
+      latestReviewsRef.current = {
+        ...latestReviewsRef.current,
+        [abstractId]: savedReview,
+      };
+      setReviewsByAbstract((prev) => ({
+        ...prev,
+        [abstractId]: savedReview,
+      }));
+      writeLocalDraft(abstractId, savedReview);
+      if (showStatus) {
+        showSaveStatus(
+          data?.message ||
+            (declaredCoi
+              ? "Conflict of interest saved — scores not counted"
+              : "Progress saved"),
+        );
+      }
+      return data;
+    } catch (e) {
+      setError(e.message || "Failed to save review");
+      if (showStatus) showSaveStatus("Save failed — draft kept locally", 4000);
+      throw e;
+    } finally {
+      saveInFlightRef.current.delete(abstractId);
+      setSaving(false);
+      if (pendingSaveIdsRef.current.has(abstractId)) {
+        pendingSaveIdsRef.current.delete(abstractId);
+        const latest = latestReviewsRef.current[abstractId];
+        if (latest) {
+          void persistReview(abstractId, latest, { showStatus });
+        }
+      }
+    }
+  };
+
+  const scheduleAutoSave = (abstractId) => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveTimerRef.current = null;
+      const review = latestReviewsRef.current[abstractId];
+      if (!review) return;
+      void persistReview(abstractId, review, { showStatus: true });
+    }, AUTO_SAVE_MS);
+  };
 
   const loadAssignments = async (tkn) => {
     setLoading(true);
@@ -186,16 +366,35 @@ export default function ReviewerTab() {
         method: "GET",
         token: tkn,
       });
-      setAbstracts(data?.data || []);
-      const firstId = data?.data?.[0]?.id || null;
+      const list = data?.data || [];
+      setAbstracts(list);
+      const firstId = list[0]?.id || null;
       setSelectedAbstractId((prev) => prev || firstId);
-      setReviewsByAbstract((prev) => {
-        const next = { ...prev };
-        (data?.existingReviews || []).forEach((r) => {
-          if (r?.abstract_id) next[r.abstract_id] = r;
-        });
-        return next;
+
+      const next = {};
+      const draftsToSync = [];
+      (data?.existingReviews || []).forEach((r) => {
+        if (!r?.abstract_id) return;
+        next[r.abstract_id] = normalizeReview(r);
       });
+
+      // Prefer a newer local draft (e.g. reload before server round-trip finished)
+      list.forEach((abstract) => {
+        const id = abstract?.id;
+        if (!id) return;
+        const draft = readLocalDraft(id);
+        if (!draft) return;
+        const serverUpdated = Number(next[id]?.updated_at || 0);
+        const draftUpdated = Number(draft.updated_at || 0);
+        if (!next[id] || draftUpdated > serverUpdated) {
+          next[id] = normalizeReview(draft);
+          draftsToSync.push(id);
+        }
+      });
+
+      latestReviewsRef.current = next;
+      setReviewsByAbstract(next);
+      draftsToSync.forEach((id) => scheduleAutoSave(id));
     } catch (e) {
       setError(e.message || "Failed to load assignments");
     } finally {
@@ -208,6 +407,26 @@ export default function ReviewerTab() {
     loadAssignments(token);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // Flush pending autosave when leaving the page
+  useEffect(() => {
+    const flush = () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+      const id = selectedAbstractId;
+      const review = id ? latestReviewsRef.current[id] : null;
+      if (id && review) writeLocalDraft(id, review);
+    };
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("beforeunload", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("beforeunload", flush);
+      flush();
+    };
+  }, [selectedAbstractId]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -230,11 +449,16 @@ export default function ReviewerTab() {
   };
 
   const handleLogout = () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
     setAuthToken(null);
     setToken(null);
     setAbstracts([]);
     setSelectedAbstractId(null);
     setReviewsByAbstract({});
+    latestReviewsRef.current = {};
     setSaveMessage("");
     setError("");
   };
@@ -244,57 +468,34 @@ export default function ReviewerTab() {
     setReviewsByAbstract((prev) => {
       const existing = prev[selectedAbstractId];
       const base = existing || getDefaultReview();
-      return {
-        ...prev,
-        [selectedAbstractId]: {
-          ...base,
-          [field]: value,
-        },
+      const nextReview = {
+        ...base,
+        [field]: value,
+        updated_at: Date.now(),
       };
+      const next = {
+        ...prev,
+        [selectedAbstractId]: nextReview,
+      };
+      latestReviewsRef.current = next;
+      writeLocalDraft(selectedAbstractId, nextReview);
+      scheduleAutoSave(selectedAbstractId);
+      return next;
     });
   };
 
   const submitReview = async () => {
-    if (!token || !selectedAbstractId) return;
-    setSaving(true);
-    setSaveMessage("");
-    setError("");
+    if (!token || !selectedAbstractId || !currentReview) return;
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
     try {
-      const payload = {
-        abstract_id: selectedAbstractId,
-        ...currentReview,
-        total: totalScore,
-      };
-      const data = await apiFetch("/api/reviewers/reviews", {
-        method: "POST",
-        token,
-        body: JSON.stringify(payload),
+      await persistReview(selectedAbstractId, currentReview, {
+        showStatus: true,
       });
-      setReviewsByAbstract((prev) => {
-        const existing = prev[selectedAbstractId] || getDefaultReview();
-        const declaredCoi = Boolean(data?.has_coi);
-        const serverTotal =
-          typeof data?.total === "number"
-            ? data.total
-            : declaredCoi
-              ? null
-              : totalScore;
-        return {
-          ...prev,
-          [selectedAbstractId]: {
-            ...existing,
-            ...currentReview,
-            total: serverTotal,
-            updated_at: Date.now(),
-          },
-        };
-      });
-      setSaveMessage(data?.message || "Saved");
-    } catch (e) {
-      setError(e.message || "Failed to save review");
-    } finally {
-      setSaving(false);
-      setTimeout(() => setSaveMessage(""), 2500);
+    } catch {
+      // error already surfaced
     }
   };
 
@@ -554,7 +755,7 @@ export default function ReviewerTab() {
                       <p className="text-sm text-slate-600">
                         {hasConflictOfInterest
                           ? "Conflict of interest declared — your response will be saved, but scores will not be counted."
-                          : "Score each category (1–5). Total updates automatically."}
+                          : "Score each category (1–5). Changes save automatically as you go."}
                       </p>
                     </div>
 
@@ -755,7 +956,7 @@ export default function ReviewerTab() {
                             ? "Saving..."
                             : hasConflictOfInterest
                               ? "Save conflict of interest"
-                              : "Save review"}
+                              : "Save now"}
                         </button>
                       </div>
                       {error && (
