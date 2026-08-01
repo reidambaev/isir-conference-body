@@ -393,17 +393,15 @@ export default function ReviewerTab() {
                               <div className="text-xs text-slate-500 mt-1">
                                 {a.category} • {a.word_count} words
                               </div>
-                              <div
-                                className={`text-xs font-semibold mt-1 ${
-                                  Number(a.young_investigator) === 1
-                                    ? "text-amber-700"
-                                    : "text-slate-400"
-                                }`}
-                              >
-                                {Number(a.young_investigator) === 1
-                                  ? "Young Investigator"
-                                  : "Not Young Investigator"}
-                              </div>
+                              {Number(a.young_investigator) === 1 && (
+                                <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-white shadow-sm">
+                                  <span
+                                    className="h-1.5 w-1.5 rounded-full bg-white"
+                                    aria-hidden
+                                  />
+                                  Young Investigator
+                                </div>
+                              )}
                             </div>
                             <div
                               className={`text-xs font-semibold px-2 py-1 rounded-full ${hasReview ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}
@@ -428,19 +426,17 @@ export default function ReviewerTab() {
                 <div className="space-y-6">
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
                     <div className="flex flex-wrap gap-2 mb-3">
+                      {Number(selectedAbstract.young_investigator) === 1 && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide bg-amber-500 text-white shadow-sm">
+                          <span
+                            className="h-1.5 w-1.5 rounded-full bg-white"
+                            aria-hidden
+                          />
+                          Young Investigator Competition
+                        </span>
+                      )}
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
                         {selectedAbstract.category}
-                      </span>
-                      <span
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                          Number(selectedAbstract.young_investigator) === 1
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {Number(selectedAbstract.young_investigator) === 1
-                          ? "Young Investigator Competition"
-                          : "Not in Young Investigator Competition"}
                       </span>
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
                         {selectedAbstract.word_count} words

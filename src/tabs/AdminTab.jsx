@@ -1507,6 +1507,9 @@ export default function AdminTab() {
       });
       return;
     }
+    if (Number(reviewerOverview?.abstracts_per_reviewer) === n) {
+      return;
+    }
     setSavingAbstractsPerReviewer(true);
     setAbstractsPerReviewerMessage(null);
     try {
@@ -4605,6 +4608,16 @@ export default function AdminTab() {
                   {/* Abstract Header */}
                   <div className="p-6 border-b border-gray-100">
                     <div className="flex flex-wrap gap-2 mb-4">
+                      {Number(currentReviewAbstract.young_investigator) ===
+                        1 && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide bg-amber-500 text-white shadow-sm">
+                          <span
+                            className="h-1.5 w-1.5 rounded-full bg-white"
+                            aria-hidden
+                          />
+                          Young Investigator
+                        </span>
+                      )}
                       {reviewPool === "invited" && (
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 ring-1 ring-orange-200">
                           Invited speaker
@@ -5276,6 +5289,15 @@ export default function AdminTab() {
                             {abstract.title}
                           </h3>
                           <div className="flex flex-wrap gap-2">
+                            {Number(abstract.young_investigator) === 1 && (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide bg-amber-500 text-white shadow-sm">
+                                <span
+                                  className="h-1.5 w-1.5 rounded-full bg-white"
+                                  aria-hidden
+                                />
+                                Young Investigator
+                              </span>
+                            )}
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 ring-1 ring-slate-200">
                               {abstract.category}
                             </span>
@@ -7330,7 +7352,17 @@ export default function AdminTab() {
                 max={100}
                 value={abstractsPerReviewerInput}
                 onChange={(e) => setAbstractsPerReviewerInput(e.target.value)}
+                onBlur={() => {
+                  if (!savingAbstractsPerReviewer) saveAbstractsPerReviewer();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  }
+                }}
                 className="w-24 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                title="Saves when you finish typing (Enter or click away)"
               />
               <button
                 type="button"
@@ -7823,8 +7855,19 @@ export default function AdminTab() {
                         max={100}
                         value={bulkAddMoreCount}
                         onChange={(e) => setBulkAddMoreCount(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            if (
+                              !bulkAssigning &&
+                              selectedReviewerEmails.size > 0
+                            ) {
+                              addMoreAbstractsBulk();
+                            }
+                          }
+                        }}
                         className="w-14 border-x border-teal-200 px-1 py-1.5 text-center text-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-500"
-                        title="How many more to assign to each reviewer"
+                        title="How many more to assign to each selected reviewer (Enter to assign)"
                       />
                       <button
                         type="button"
@@ -7962,8 +8005,16 @@ export default function AdminTab() {
                                 e.target.value,
                               )
                             }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                if (!saving && addValid && !bulkAssigning) {
+                                  addMoreAbstractsToReviewer(acct.email);
+                                }
+                              }
+                            }}
                             className="w-14 border-x border-gray-200 px-1 py-1.5 text-center text-sm bg-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-500"
-                            title="How many more to assign"
+                            title="Press Enter to assign this many more"
                           />
                           <button
                             type="button"
