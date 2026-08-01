@@ -1353,24 +1353,29 @@ function shuffleInPlace(arr) {
   return a;
 }
 
-/** Peer-review eligibility: not invited speaker, not poster-only. */
+/** Peer-review eligibility: admin-accepted, not invited, not poster-only. */
 const PEER_REVIEW_ELIGIBLE_SQL = `COALESCE(a.is_invited_speaker, 0) != 1
-         AND LOWER(TRIM(COALESCE(a.presentation_preference, ''))) != 'poster'`;
+         AND LOWER(TRIM(COALESCE(a.presentation_preference, ''))) != 'poster'
+         AND LOWER(COALESCE(a.status, '')) = 'accepted'`;
 
 /**
  * Ensure a reviewer has up to `targetCount` peer-reviewable assignments.
+ * Pipeline: submitted → admin accept → assign to /review scorers.
  * Only adds abstracts; never removes eligible ones. Returns
  * { assignedIds, added, eligibleBefore }.
  */
 async function ensureReviewerAssignments(env, reviewerEmail, targetCount) {
-  // Drop leftover assignments to invited / poster-only abstracts so counts stay honest
+  // Drop assignments that are no longer in the scoring pool
+  // (not accepted, invited, poster-only, or deleted)
   await env.ISIR_DB.prepare(
     `DELETE FROM reviewer_assignments
      WHERE reviewer_email = ?
        AND abstract_id IN (
          SELECT a.id FROM abstractions a
-         WHERE COALESCE(a.is_invited_speaker, 0) = 1
+         WHERE a.deleted_at IS NOT NULL
+            OR COALESCE(a.is_invited_speaker, 0) = 1
             OR LOWER(TRIM(COALESCE(a.presentation_preference, ''))) = 'poster'
+            OR LOWER(COALESCE(a.status, '')) != 'accepted'
        )`,
   )
     .bind(reviewerEmail)
@@ -1396,14 +1401,12 @@ async function ensureReviewerAssignments(env, reviewerEmail, targetCount) {
   if (assignedIds.length < target) {
     const needed = target - assignedIds.length;
 
-    // Peer-review pool: submitted (or revision) oral/either general abstracts
-    // not already assigned to this reviewer
+    // Scoring pool: admin-accepted oral/either general abstracts
     const allAbstracts = await env.ISIR_DB.prepare(
       `SELECT a.id, COUNT(ra.abstract_id) AS assign_count
        FROM abstractions a
        LEFT JOIN reviewer_assignments ra ON ra.abstract_id = a.id
        WHERE a.deleted_at IS NULL
-         AND LOWER(COALESCE(a.status, '')) IN ('submitted', 'revision')
          AND ${PEER_REVIEW_ELIGIBLE_SQL}
          AND NOT EXISTS (
            SELECT 1 FROM reviewer_assignments mine
@@ -1542,6 +1545,7 @@ async function handleAdminListReviewers(request, env, corsHeaders) {
                  AND a.deleted_at IS NULL
                  AND COALESCE(a.is_invited_speaker, 0) != 1
                  AND LOWER(TRIM(COALESCE(a.presentation_preference, ''))) != 'poster'
+                 AND LOWER(COALESCE(a.status, '')) = 'accepted'
               ) AS assigned_count
        FROM reviewers r
        ORDER BY r.email ASC`,
@@ -1678,7 +1682,7 @@ async function handleAdminSetReviewerTarget(request, env, corsHeaders) {
           {
             success: false,
             error:
-              "No eligible abstracts left to assign. The peer-review pool only includes submitted (or revision) oral/either abstracts — not invited speakers or poster-only.",
+              "No eligible abstracts left to assign. Reviewers only get admin-accepted oral/either abstracts (not invited speakers, poster-only, or rejected).",
             email,
             abstracts_per_reviewer: target,
             assigned_count: assignedIds.length,
@@ -2076,7 +2080,8 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
          WHERE id IN (${ph})
            AND deleted_at IS NULL
            AND COALESCE(is_invited_speaker, 0) != 1
-           AND LOWER(COALESCE(presentation_preference, '')) != 'poster'`,
+           AND LOWER(TRIM(COALESCE(presentation_preference, ''))) != 'poster'
+           AND LOWER(COALESCE(status, '')) = 'accepted'`,
       assignedIds,
     );
 
@@ -2167,7 +2172,7 @@ async function handleSubmitReviewerReview(request, env, corsHeaders) {
       );
     }
 
-    // Ensure this abstract is assigned and eligible for peer review
+    // Ensure this abstract is assigned and eligible for scoring (admin-accepted)
     const assignment = await env.ISIR_DB.prepare(
       `SELECT 1
        FROM reviewer_assignments ra
@@ -2175,8 +2180,7 @@ async function handleSubmitReviewerReview(request, env, corsHeaders) {
        WHERE ra.reviewer_email = ?
          AND ra.abstract_id = ?
          AND a.deleted_at IS NULL
-         AND COALESCE(a.is_invited_speaker, 0) != 1
-         AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster'`,
+         AND ${PEER_REVIEW_ELIGIBLE_SQL}`,
     )
       .bind(reviewer.email, abstractId)
       .first();
@@ -2273,24 +2277,21 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
     const auth = ensureAdmin(request, env, corsHeaders);
     if (auth) return auth;
 
-    // Overall totals (peer-review pool only: not invited, not poster-only)
+    // Overall totals (scoring pool: accepted, not invited, not poster-only)
     const totalsRow = await env.ISIR_DB.prepare(
       `SELECT
          (SELECT COUNT(*) FROM reviews r
             JOIN abstractions a ON a.id = r.abstract_id
            WHERE a.deleted_at IS NULL
-             AND COALESCE(a.is_invited_speaker, 0) != 1
-             AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster') AS total_reviews,
+             AND ${PEER_REVIEW_ELIGIBLE_SQL}) AS total_reviews,
          (SELECT COUNT(DISTINCT ra.reviewer_email) FROM reviewer_assignments ra
             JOIN abstractions a ON a.id = ra.abstract_id
            WHERE a.deleted_at IS NULL
-             AND COALESCE(a.is_invited_speaker, 0) != 1
-             AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster') AS total_reviewers_with_assignments,
+             AND ${PEER_REVIEW_ELIGIBLE_SQL}) AS total_reviewers_with_assignments,
          (SELECT COUNT(*) FROM reviewer_assignments ra
             JOIN abstractions a ON a.id = ra.abstract_id
            WHERE a.deleted_at IS NULL
-             AND COALESCE(a.is_invited_speaker, 0) != 1
-             AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster') AS total_assignments`,
+             AND ${PEER_REVIEW_ELIGIBLE_SQL}) AS total_assignments`,
     ).first();
 
     // Per-reviewer aggregate stats
@@ -2308,8 +2309,7 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
          ON r.reviewer_email = ra.reviewer_email
         AND r.abstract_id = ra.abstract_id
        WHERE a.deleted_at IS NULL
-         AND COALESCE(a.is_invited_speaker, 0) != 1
-         AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster'
+         AND ${PEER_REVIEW_ELIGIBLE_SQL}
        GROUP BY ra.reviewer_email
        ORDER BY ra.reviewer_email ASC`,
     ).all();
@@ -2331,8 +2331,7 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
          ON r.reviewer_email = ra.reviewer_email
         AND r.abstract_id = ra.abstract_id
        WHERE a.deleted_at IS NULL
-         AND COALESCE(a.is_invited_speaker, 0) != 1
-         AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster'
+         AND ${PEER_REVIEW_ELIGIBLE_SQL}
        ORDER BY ra.reviewer_email ASC, ra.assigned_at ASC`,
     ).all();
 
@@ -2414,7 +2413,7 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
     const auth = ensureAdmin(request, env, corsHeaders);
     if (auth) return auth;
 
-    // Peer-review pool only — exclude invited speakers and poster-only submissions
+    // Scoring pool: admin-accepted general oral/either abstracts only
     const abstractsResult = await env.ISIR_DB.prepare(
       `SELECT
          a.id,
@@ -2424,8 +2423,7 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
          a.submission_date
        FROM abstractions a
        WHERE a.deleted_at IS NULL
-         AND COALESCE(a.is_invited_speaker, 0) != 1
-         AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster'
+         AND ${PEER_REVIEW_ELIGIBLE_SQL}
        ORDER BY a.submission_date DESC`,
     ).all();
 
@@ -2442,8 +2440,7 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
        FROM reviews r
        JOIN abstractions a ON a.id = r.abstract_id
        WHERE a.deleted_at IS NULL
-         AND COALESCE(a.is_invited_speaker, 0) != 1
-         AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster'
+         AND ${PEER_REVIEW_ELIGIBLE_SQL}
        GROUP BY r.abstract_id`,
     ).all();
 
@@ -2466,8 +2463,7 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
        FROM reviews r
        JOIN abstractions a ON a.id = r.abstract_id
        WHERE a.deleted_at IS NULL
-         AND COALESCE(a.is_invited_speaker, 0) != 1
-         AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster'
+         AND ${PEER_REVIEW_ELIGIBLE_SQL}
        ORDER BY r.updated_at DESC`,
     ).all();
 
@@ -7020,6 +7016,15 @@ async function handleUpdateAbstractStatus(
     )
       .bind(status, rejection_reason || null, Date.now(), abstractId)
       .run();
+
+    // Scorers only see accepted abstracts — drop assignments if no longer accepted
+    if (status !== "accepted") {
+      await env.ISIR_DB.prepare(
+        `DELETE FROM reviewer_assignments WHERE abstract_id = ?`,
+      )
+        .bind(abstractId)
+        .run();
+    }
 
     return new Response(
       JSON.stringify({

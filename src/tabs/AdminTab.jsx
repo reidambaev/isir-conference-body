@@ -626,14 +626,16 @@ export default function AdminTab() {
     return { completedReviewers, reviewersWithPending, completedAssignments };
   }, [reviewerOverview]);
 
-  // Review scores UI: peer-review pool only (not invited, not poster-only)
+  // Review scores UI: accepted general abstracts only (after admin review mode)
   const generalReviewerAbstractScores = useMemo(() => {
     const excludedIds = new Set(
       (abstracts || [])
         .filter(
           (a) =>
             Number(a.is_invited_speaker || 0) === 1 ||
-            String(a.presentation_preference || "").toLowerCase() === "poster",
+            String(a.presentation_preference || "").toLowerCase() ===
+              "poster" ||
+            String(a.status || "").toLowerCase() !== "accepted",
         )
         .map((a) => a.id),
     );
@@ -1253,7 +1255,7 @@ export default function AdminTab() {
               ? data.partial
                 ? `Only ${newlyAssigned} of ${addCount} could be assigned (pool ran low). Now at ${newAssigned}.`
                 : `Assigned ${newlyAssigned} more abstract${newlyAssigned === 1 ? "" : "s"} (now ${newAssigned}).`
-              : "No eligible abstracts left in the peer-review pool.",
+              : "No eligible abstracts left. Accept oral/either abstracts in review mode first (rejected, invited, and poster-only are excluded).",
         });
         await refreshReviewerAdminData(adminToken);
       }
@@ -1264,7 +1266,7 @@ export default function AdminTab() {
         error:
           newlyAssigned > 0
             ? undefined
-            : "No eligible abstracts left in the peer-review pool.",
+            : "No eligible abstracts left. Accept oral/either abstracts in review mode first (rejected, invited, and poster-only are excluded).",
       };
     } catch (err) {
       const message = err.message || "Failed to assign more abstracts.";
@@ -5814,9 +5816,9 @@ export default function AdminTab() {
                 Abstract review scores
               </h2>
               <p className="text-gray-500 text-sm mt-1 max-w-2xl">
-                Peer-review pool only (invited speakers and poster-only
-                submissions are excluded). Average scores by category across
-                reviewers, per-abstract totals, reviewer notes, and
+                Peer-review scores for admin-accepted abstracts only (invited
+                speakers, poster-only, and not-yet-accepted submissions are
+                excluded). Average scores by category across reviewers, per-abstract totals, reviewer notes, and
                 conflict-of-interest flags. Submissions (accept/reject, full
                 text) stay under{" "}
                 <button
@@ -7316,8 +7318,10 @@ export default function AdminTab() {
                 Add Reviewers
               </button>{" "}
               and assign more to one person or selected reviewers.
-              Assignment prefers oral/either abstracts (not invited speakers or
-              poster-only) with the fewest reviewers so far.
+              Assignment prefers admin-accepted oral/either abstracts (not
+              invited speakers or poster-only) with the fewest reviewers so far.
+              Accept abstracts in review mode first — only then can they be
+              assigned to /review scorers.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <input
@@ -7781,7 +7785,8 @@ export default function AdminTab() {
                 </h3>
                 <p className="text-xs text-gray-500 mt-1 max-w-2xl">
                   Give one reviewer more work with the stepper on their row, or
-                  select reviewers and use mass assign. To take work away,
+                  select reviewers and use mass assign. Only admin-accepted
+                  oral/either abstracts enter this pool. To take work away,
                   remove specific assignments under{" "}
                   <button
                     type="button"
