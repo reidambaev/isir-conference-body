@@ -1264,7 +1264,7 @@ async function handleAdminCreateReviewer(request, env, corsHeaders) {
       abstractsTarget != null
         ? abstractsTarget
         : await getAbstractsPerReviewer(env);
-    const assignedIds = await ensureReviewerAssignments(
+    const { assignedIds } = await ensureReviewerAssignments(
       env,
       email,
       targetForAssign,
@@ -1355,13 +1355,27 @@ function shuffleInPlace(arr) {
 
 /** Peer-review eligibility: not invited speaker, not poster-only. */
 const PEER_REVIEW_ELIGIBLE_SQL = `COALESCE(a.is_invited_speaker, 0) != 1
-         AND LOWER(COALESCE(a.presentation_preference, '')) != 'poster'`;
+         AND LOWER(TRIM(COALESCE(a.presentation_preference, ''))) != 'poster'`;
 
 /**
  * Ensure a reviewer has up to `targetCount` peer-reviewable assignments.
- * Only adds abstracts; never removes. Returns the full list of eligible assigned IDs.
+ * Only adds abstracts; never removes eligible ones. Returns
+ * { assignedIds, added, eligibleBefore }.
  */
 async function ensureReviewerAssignments(env, reviewerEmail, targetCount) {
+  // Drop leftover assignments to invited / poster-only abstracts so counts stay honest
+  await env.ISIR_DB.prepare(
+    `DELETE FROM reviewer_assignments
+     WHERE reviewer_email = ?
+       AND abstract_id IN (
+         SELECT a.id FROM abstractions a
+         WHERE COALESCE(a.is_invited_speaker, 0) = 1
+            OR LOWER(TRIM(COALESCE(a.presentation_preference, ''))) = 'poster'
+       )`,
+  )
+    .bind(reviewerEmail)
+    .run();
+
   const existing = await env.ISIR_DB.prepare(
     `SELECT ra.abstract_id
      FROM reviewer_assignments ra
@@ -1375,46 +1389,76 @@ async function ensureReviewerAssignments(env, reviewerEmail, targetCount) {
     .all();
 
   let assignedIds = (existing.results || []).map((r) => r.abstract_id);
+  const eligibleBefore = assignedIds.length;
   const target = Math.max(0, Number(targetCount) || 0);
+  let added = 0;
 
   if (assignedIds.length < target) {
+    const needed = target - assignedIds.length;
+
+    // Peer-review pool: submitted (or revision) oral/either general abstracts
+    // not already assigned to this reviewer
     const allAbstracts = await env.ISIR_DB.prepare(
       `SELECT a.id, COUNT(ra.abstract_id) AS assign_count
        FROM abstractions a
        LEFT JOIN reviewer_assignments ra ON ra.abstract_id = a.id
-       WHERE a.status = 'submitted'
-         AND a.deleted_at IS NULL
+       WHERE a.deleted_at IS NULL
+         AND LOWER(COALESCE(a.status, '')) IN ('submitted', 'revision')
          AND ${PEER_REVIEW_ELIGIBLE_SQL}
+         AND NOT EXISTS (
+           SELECT 1 FROM reviewer_assignments mine
+           WHERE mine.abstract_id = a.id
+             AND mine.reviewer_email = ?
+         )
        GROUP BY a.id
-       LIMIT 1000`,
-    ).all();
+       ORDER BY assign_count ASC
+       LIMIT ?`,
+    )
+      .bind(reviewerEmail, Math.max(needed * 5, needed + 50))
+      .all();
 
-    const pool = (allAbstracts.results || [])
-      .map((r) => ({ id: r.id, count: Number(r.assign_count || 0) }))
-      .filter((r) => !assignedIds.includes(r.id));
+    const pool = (allAbstracts.results || []).map((r) => ({
+      id: r.id,
+      count: Number(r.assign_count || 0),
+    }));
 
     shuffleInPlace(pool);
     pool.sort((a, b) => a.count - b.count);
 
-    const toAdd = pool.slice(0, target - assignedIds.length).map((r) => r.id);
+    const toAdd = pool.slice(0, needed).map((r) => r.id);
     if (toAdd.length > 0) {
       const now = Date.now();
-      const stmt = env.ISIR_DB.prepare(
-        `INSERT OR IGNORE INTO reviewer_assignments (reviewer_email, abstract_id, assigned_at) VALUES (?, ?, ?)`,
+      const inserts = toAdd.map((absId) =>
+        env.ISIR_DB.prepare(
+          `INSERT OR IGNORE INTO reviewer_assignments (reviewer_email, abstract_id, assigned_at) VALUES (?, ?, ?)`,
+        ).bind(reviewerEmail, absId, now),
       );
-      for (const absId of toAdd) {
-        await stmt.bind(reviewerEmail, absId, now).run();
-      }
+      await env.ISIR_DB.batch(inserts);
       assignedIds = [...assignedIds, ...toAdd];
+      added = toAdd.length;
     }
   }
 
-  return assignedIds;
+  return { assignedIds, added, eligibleBefore };
 }
 
 async function countReviewerAssignments(env, reviewerEmail) {
   const row = await env.ISIR_DB.prepare(
     `SELECT COUNT(*) AS n FROM reviewer_assignments WHERE reviewer_email = ?`,
+  )
+    .bind(reviewerEmail)
+    .first();
+  return Number(row?.n || 0);
+}
+
+async function countPeerEligibleAssignments(env, reviewerEmail) {
+  const row = await env.ISIR_DB.prepare(
+    `SELECT COUNT(*) AS n
+     FROM reviewer_assignments ra
+     JOIN abstractions a ON a.id = ra.abstract_id
+     WHERE ra.reviewer_email = ?
+       AND a.deleted_at IS NULL
+       AND ${PEER_REVIEW_ELIGIBLE_SQL}`,
   )
     .bind(reviewerEmail)
     .first();
@@ -1493,7 +1537,12 @@ async function handleAdminListReviewers(request, env, corsHeaders) {
     const rows = await env.ISIR_DB.prepare(
       `SELECT r.email, r.active, r.created_at,
               (SELECT COUNT(*) FROM reviewer_assignments ra
-               WHERE ra.reviewer_email = r.email) AS assigned_count
+               JOIN abstractions a ON a.id = ra.abstract_id
+               WHERE ra.reviewer_email = r.email
+                 AND a.deleted_at IS NULL
+                 AND COALESCE(a.is_invited_speaker, 0) != 1
+                 AND LOWER(TRIM(COALESCE(a.presentation_preference, ''))) != 'poster'
+              ) AS assigned_count
        FROM reviewers r
        ORDER BY r.email ASC`,
     ).all();
@@ -1573,7 +1622,90 @@ async function handleAdminSetReviewerTarget(request, env, corsHeaders) {
     }
 
     await ensureReviewerSettingsTable(env);
-    const assignedCount = await countReviewerAssignments(env, email);
+
+    // Preferred path from admin UI: add N more peer-review abstracts
+    const addRaw = data?.add_count ?? data?.addCount;
+    if (addRaw != null && addRaw !== "") {
+      const addCount = Number(addRaw);
+      if (
+        !Number.isInteger(addCount) ||
+        addCount < 1 ||
+        addCount > MAX_ABSTRACTS_PER_REVIEWER
+      ) {
+        return jsonResponse(
+          {
+            success: false,
+            error: `add_count must be an integer between 1 and ${MAX_ABSTRACTS_PER_REVIEWER}`,
+          },
+          400,
+          corsHeaders,
+        );
+      }
+
+      const eligibleBefore = await countPeerEligibleAssignments(env, email);
+      const target = eligibleBefore + addCount;
+      if (target > MAX_ABSTRACTS_PER_REVIEWER) {
+        return jsonResponse(
+          {
+            success: false,
+            error: `That would exceed the max of ${MAX_ABSTRACTS_PER_REVIEWER} (currently ${eligibleBefore}).`,
+            assigned_count: eligibleBefore,
+          },
+          400,
+          corsHeaders,
+        );
+      }
+
+      await env.ISIR_DB.prepare(
+        `INSERT INTO reviewer_settings (key, value, updated_at, updated_by)
+         VALUES (?, ?, ?, 'admin')
+         ON CONFLICT(key) DO UPDATE SET
+           value = excluded.value,
+           updated_at = excluded.updated_at,
+           updated_by = excluded.updated_by`,
+      )
+        .bind(reviewerTargetSettingKey(email), String(target), Date.now())
+        .run();
+
+      const { assignedIds, added } = await ensureReviewerAssignments(
+        env,
+        email,
+        target,
+      );
+
+      if (added === 0) {
+        return jsonResponse(
+          {
+            success: false,
+            error:
+              "No eligible abstracts left to assign. The peer-review pool only includes submitted (or revision) oral/either abstracts — not invited speakers or poster-only.",
+            email,
+            abstracts_per_reviewer: target,
+            assigned_count: assignedIds.length,
+            newly_assigned: 0,
+            requested: addCount,
+          },
+          409,
+          corsHeaders,
+        );
+      }
+
+      return jsonResponse(
+        {
+          success: true,
+          email,
+          abstracts_per_reviewer: target,
+          assigned_count: assignedIds.length,
+          newly_assigned: added,
+          requested: addCount,
+          partial: added < addCount,
+        },
+        200,
+        corsHeaders,
+      );
+    }
+
+    const assignedCount = await countPeerEligibleAssignments(env, email);
     const raw = data?.abstracts_per_reviewer;
 
     // Blank/null clears the individual number so the default applies again
@@ -1596,7 +1728,7 @@ async function handleAdminSetReviewerTarget(request, env, corsHeaders) {
       )
         .bind(reviewerTargetSettingKey(email))
         .run();
-      const assignedIds = await ensureReviewerAssignments(
+      const { assignedIds, added } = await ensureReviewerAssignments(
         env,
         email,
         defaultTarget,
@@ -1607,7 +1739,7 @@ async function handleAdminSetReviewerTarget(request, env, corsHeaders) {
           email,
           abstracts_per_reviewer: null,
           assigned_count: assignedIds.length,
-          newly_assigned: Math.max(0, assignedIds.length - assignedCount),
+          newly_assigned: added,
         },
         200,
         corsHeaders,
@@ -1650,7 +1782,11 @@ async function handleAdminSetReviewerTarget(request, env, corsHeaders) {
       .run();
 
     // Immediately fill up to the new target (adds only; never removes)
-    const assignedIds = await ensureReviewerAssignments(env, email, n);
+    const { assignedIds, added } = await ensureReviewerAssignments(
+      env,
+      email,
+      n,
+    );
 
     return jsonResponse(
       {
@@ -1658,7 +1794,7 @@ async function handleAdminSetReviewerTarget(request, env, corsHeaders) {
         email,
         abstracts_per_reviewer: n,
         assigned_count: assignedIds.length,
-        newly_assigned: Math.max(0, assignedIds.length - assignedCount),
+        newly_assigned: added,
       },
       200,
       corsHeaders,
@@ -1914,7 +2050,7 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
       reviewer.email,
     );
 
-    let assignedIds = await ensureReviewerAssignments(
+    let { assignedIds } = await ensureReviewerAssignments(
       env,
       reviewer.email,
       targetCount,

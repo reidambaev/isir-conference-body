@@ -1153,8 +1153,7 @@ export default function AdminTab() {
       }
       return { success: false, error: err };
     }
-    const target = assignedCount + addCount;
-    if (target > 100) {
+    if (assignedCount + addCount > 100) {
       const err = `That would exceed the max of 100 (currently ${assignedCount}).`;
       if (!quiet) {
         setReviewerTargetMessage({ email, type: "error", text: err });
@@ -1168,6 +1167,7 @@ export default function AdminTab() {
     }
 
     if (isLocalDemo) {
+      const target = assignedCount + addCount;
       setReviewerAccounts((prev) =>
         prev.map((r) =>
           r.email === email
@@ -1216,7 +1216,7 @@ export default function AdminTab() {
           "Content-Type": "application/json",
           "X-Admin-Token": adminToken,
         },
-        body: JSON.stringify({ email, abstracts_per_reviewer: target }),
+        body: JSON.stringify({ email, add_count: addCount }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
@@ -1225,14 +1225,19 @@ export default function AdminTab() {
       const newAssigned =
         data.assigned_count != null
           ? Number(data.assigned_count)
-          : target;
-      const newlyAssigned = Number(data.newly_assigned || addCount);
+          : assignedCount + addCount;
+      const newlyAssigned = Number(
+        data.newly_assigned != null ? data.newly_assigned : addCount,
+      );
       setReviewerAccounts((prev) =>
         prev.map((r) =>
           r.email === email
             ? {
                 ...r,
-                abstracts_target: target,
+                abstracts_target:
+                  data.abstracts_per_reviewer != null
+                    ? Number(data.abstracts_per_reviewer)
+                    : newAssigned,
                 assigned_count: newAssigned,
               }
             : r,
@@ -1242,18 +1247,24 @@ export default function AdminTab() {
         setReviewerAddMoreCount(email, "1");
         setReviewerTargetMessage({
           email,
-          type: "success",
+          type: newlyAssigned > 0 ? "success" : "error",
           text:
             newlyAssigned > 0
-              ? `Assigned ${newlyAssigned} more abstract${newlyAssigned === 1 ? "" : "s"} (now ${newAssigned}).`
-              : `No new abstracts available to assign (still at ${newAssigned}).`,
+              ? data.partial
+                ? `Only ${newlyAssigned} of ${addCount} could be assigned (pool ran low). Now at ${newAssigned}.`
+                : `Assigned ${newlyAssigned} more abstract${newlyAssigned === 1 ? "" : "s"} (now ${newAssigned}).`
+              : "No eligible abstracts left in the peer-review pool.",
         });
         await refreshReviewerAdminData(adminToken);
       }
       return {
-        success: true,
+        success: newlyAssigned > 0,
         newly_assigned: newlyAssigned,
         assigned_count: newAssigned,
+        error:
+          newlyAssigned > 0
+            ? undefined
+            : "No eligible abstracts left in the peer-review pool.",
       };
     } catch (err) {
       const message = err.message || "Failed to assign more abstracts.";
