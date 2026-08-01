@@ -2198,13 +2198,6 @@ async function handleSubmitReviewerReview(request, env, corsHeaders) {
     const study_design = clampInt(data?.study_design, 0, 10);
     const data_analysis = clampInt(data?.data_analysis, 0, 10);
     const significance = clampInt(data?.significance, 0, 10);
-    const total =
-      originality +
-      clarity +
-      powerpoint +
-      study_design +
-      data_analysis +
-      significance;
 
     const coi_mentor_pi = data?.coi_mentor_pi ? 1 : 0;
     const coi_same_lab = data?.coi_same_lab ? 1 : 0;
@@ -2213,6 +2206,24 @@ async function handleSubmitReviewerReview(request, env, corsHeaders) {
     const previous_study_notes =
       (data?.previous_study_notes || "").trim() || null;
     const now = Date.now();
+
+    // COI declarations are saved, but scores are not counted toward averages
+    const hasCoi =
+      coi_mentor_pi === 1 || coi_same_lab === 1 || coi_other === 1;
+    const scoredOriginality = hasCoi ? null : originality;
+    const scoredClarity = hasCoi ? null : clarity;
+    const scoredPowerpoint = hasCoi ? null : powerpoint;
+    const scoredStudyDesign = hasCoi ? null : study_design;
+    const scoredDataAnalysis = hasCoi ? null : data_analysis;
+    const scoredSignificance = hasCoi ? null : significance;
+    const total = hasCoi
+      ? null
+      : originality +
+        clarity +
+        powerpoint +
+        study_design +
+        data_analysis +
+        significance;
 
     await env.ISIR_DB.prepare(
       `INSERT INTO reviews (
@@ -2243,12 +2254,12 @@ async function handleSubmitReviewerReview(request, env, corsHeaders) {
         coi_same_lab,
         coi_other,
         coi_other_details,
-        originality,
-        clarity,
-        powerpoint,
-        study_design,
-        data_analysis,
-        significance,
+        scoredOriginality,
+        scoredClarity,
+        scoredPowerpoint,
+        scoredStudyDesign,
+        scoredDataAnalysis,
+        scoredSignificance,
         total,
         previous_study_notes,
         now,
@@ -2257,7 +2268,14 @@ async function handleSubmitReviewerReview(request, env, corsHeaders) {
       .run();
 
     return jsonResponse(
-      { success: true, message: "Review saved", total },
+      {
+        success: true,
+        message: hasCoi
+          ? "Conflict of interest saved — scores not counted"
+          : "Review saved",
+        total,
+        has_coi: hasCoi,
+      },
       200,
       corsHeaders,
     );
@@ -2283,7 +2301,10 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
          (SELECT COUNT(*) FROM reviews r
             JOIN abstractions a ON a.id = r.abstract_id
            WHERE a.deleted_at IS NULL
-             AND ${PEER_REVIEW_ELIGIBLE_SQL}) AS total_reviews,
+             AND ${PEER_REVIEW_ELIGIBLE_SQL}
+             AND COALESCE(r.coi_mentor_pi, 0) = 0
+             AND COALESCE(r.coi_same_lab, 0) = 0
+             AND COALESCE(r.coi_other, 0) = 0) AS total_reviews,
          (SELECT COUNT(DISTINCT ra.reviewer_email) FROM reviewer_assignments ra
             JOIN abstractions a ON a.id = ra.abstract_id
            WHERE a.deleted_at IS NULL
@@ -2299,8 +2320,16 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
       `SELECT
          ra.reviewer_email,
          COUNT(*) AS assigned_count,
-         SUM(CASE WHEN r.total IS NOT NULL THEN 1 ELSE 0 END) AS reviewed_count,
-         AVG(r.total) AS avg_score,
+         SUM(CASE WHEN r.reviewer_email IS NOT NULL THEN 1 ELSE 0 END) AS reviewed_count,
+         AVG(
+           CASE
+             WHEN COALESCE(r.coi_mentor_pi, 0) = 0
+              AND COALESCE(r.coi_same_lab, 0) = 0
+              AND COALESCE(r.coi_other, 0) = 0
+             THEN r.total
+             ELSE NULL
+           END
+         ) AS avg_score,
          MAX(r.updated_at) AS last_review_at
        FROM reviewer_assignments ra
        JOIN abstractions a
@@ -2323,7 +2352,10 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
          a.title,
          a.status,
          r.total AS review_total,
-         r.updated_at AS review_updated_at
+         r.updated_at AS review_updated_at,
+         r.coi_mentor_pi,
+         r.coi_same_lab,
+         r.coi_other
        FROM reviewer_assignments ra
        JOIN abstractions a
          ON a.id = ra.abstract_id
@@ -2362,13 +2394,20 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
           assignments: [],
         };
       }
+      const hasCoi =
+        Number(row.coi_mentor_pi || 0) === 1 ||
+        Number(row.coi_same_lab || 0) === 1 ||
+        Number(row.coi_other || 0) === 1;
       reviewersMap[row.reviewer_email].assignments.push({
         abstract_id: row.abstract_id,
         assigned_at: row.assigned_at || null,
         title: row.title || "",
         status: row.status || "",
+        has_coi: hasCoi,
         review_total:
-          row.review_total != null && !Number.isNaN(Number(row.review_total))
+          !hasCoi &&
+          row.review_total != null &&
+          !Number.isNaN(Number(row.review_total))
             ? Number(row.review_total)
             : null,
         review_updated_at: row.review_updated_at || null,
@@ -2430,13 +2469,66 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
     const reviewAveragesResult = await env.ISIR_DB.prepare(
       `SELECT
          r.abstract_id,
-         COUNT(*) AS review_count,
-         AVG(r.originality) AS avg_originality,
-         AVG(r.clarity) AS avg_clarity,
-         AVG(r.study_design) AS avg_study_design,
-         AVG(r.data_analysis) AS avg_data_analysis,
-         AVG(r.significance) AS avg_significance,
-         AVG(r.total) AS avg_total
+         COUNT(*) AS response_count,
+         SUM(
+           CASE
+             WHEN COALESCE(r.coi_mentor_pi, 0) = 1
+               OR COALESCE(r.coi_same_lab, 0) = 1
+               OR COALESCE(r.coi_other, 0) = 1
+             THEN 1 ELSE 0
+           END
+         ) AS coi_count,
+         SUM(
+           CASE
+             WHEN COALESCE(r.coi_mentor_pi, 0) = 0
+              AND COALESCE(r.coi_same_lab, 0) = 0
+              AND COALESCE(r.coi_other, 0) = 0
+              AND r.total IS NOT NULL
+             THEN 1 ELSE 0
+           END
+         ) AS review_count,
+         AVG(
+           CASE
+             WHEN COALESCE(r.coi_mentor_pi, 0) = 0
+              AND COALESCE(r.coi_same_lab, 0) = 0
+              AND COALESCE(r.coi_other, 0) = 0
+             THEN r.originality END
+         ) AS avg_originality,
+         AVG(
+           CASE
+             WHEN COALESCE(r.coi_mentor_pi, 0) = 0
+              AND COALESCE(r.coi_same_lab, 0) = 0
+              AND COALESCE(r.coi_other, 0) = 0
+             THEN r.clarity END
+         ) AS avg_clarity,
+         AVG(
+           CASE
+             WHEN COALESCE(r.coi_mentor_pi, 0) = 0
+              AND COALESCE(r.coi_same_lab, 0) = 0
+              AND COALESCE(r.coi_other, 0) = 0
+             THEN r.study_design END
+         ) AS avg_study_design,
+         AVG(
+           CASE
+             WHEN COALESCE(r.coi_mentor_pi, 0) = 0
+              AND COALESCE(r.coi_same_lab, 0) = 0
+              AND COALESCE(r.coi_other, 0) = 0
+             THEN r.data_analysis END
+         ) AS avg_data_analysis,
+         AVG(
+           CASE
+             WHEN COALESCE(r.coi_mentor_pi, 0) = 0
+              AND COALESCE(r.coi_same_lab, 0) = 0
+              AND COALESCE(r.coi_other, 0) = 0
+             THEN r.significance END
+         ) AS avg_significance,
+         AVG(
+           CASE
+             WHEN COALESCE(r.coi_mentor_pi, 0) = 0
+              AND COALESCE(r.coi_same_lab, 0) = 0
+              AND COALESCE(r.coi_other, 0) = 0
+             THEN r.total END
+         ) AS avg_total
        FROM reviews r
        JOIN abstractions a ON a.id = r.abstract_id
        WHERE a.deleted_at IS NULL
@@ -2471,6 +2563,8 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
     (reviewAveragesResult.results || []).forEach((row) => {
       avgByAbstract[row.abstract_id] = {
         review_count: Number(row.review_count || 0),
+        coi_count: Number(row.coi_count || 0),
+        response_count: Number(row.response_count || 0),
         avg_originality:
           row.avg_originality != null ? Number(row.avg_originality) : null,
         avg_clarity: row.avg_clarity != null ? Number(row.avg_clarity) : null,
@@ -2488,30 +2582,44 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
     (reviewDetailsResult.results || []).forEach((row) => {
       if (!detailsByAbstract[row.abstract_id])
         detailsByAbstract[row.abstract_id] = [];
+      const hasCoi =
+        Number(row.coi_mentor_pi || 0) === 1 ||
+        Number(row.coi_same_lab || 0) === 1 ||
+        Number(row.coi_other || 0) === 1;
       detailsByAbstract[row.abstract_id].push({
         reviewer_email: row.reviewer_email,
         originality:
-          row.originality != null && !Number.isNaN(Number(row.originality))
+          !hasCoi &&
+          row.originality != null &&
+          !Number.isNaN(Number(row.originality))
             ? Number(row.originality)
             : null,
         clarity:
-          row.clarity != null && !Number.isNaN(Number(row.clarity))
+          !hasCoi &&
+          row.clarity != null &&
+          !Number.isNaN(Number(row.clarity))
             ? Number(row.clarity)
             : null,
         study_design:
-          row.study_design != null && !Number.isNaN(Number(row.study_design))
+          !hasCoi &&
+          row.study_design != null &&
+          !Number.isNaN(Number(row.study_design))
             ? Number(row.study_design)
             : null,
         data_analysis:
-          row.data_analysis != null && !Number.isNaN(Number(row.data_analysis))
+          !hasCoi &&
+          row.data_analysis != null &&
+          !Number.isNaN(Number(row.data_analysis))
             ? Number(row.data_analysis)
             : null,
         significance:
-          row.significance != null && !Number.isNaN(Number(row.significance))
+          !hasCoi &&
+          row.significance != null &&
+          !Number.isNaN(Number(row.significance))
             ? Number(row.significance)
             : null,
         total:
-          row.total != null && !Number.isNaN(Number(row.total))
+          !hasCoi && row.total != null && !Number.isNaN(Number(row.total))
             ? Number(row.total)
             : null,
         previous_study_notes: row.previous_study_notes || "",
@@ -2519,6 +2627,7 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
         coi_same_lab: Number(row.coi_same_lab || 0) === 1,
         coi_other: Number(row.coi_other || 0) === 1,
         coi_other_details: row.coi_other_details || "",
+        has_coi: hasCoi,
         updated_at: row.updated_at || null,
       });
     });
@@ -2531,6 +2640,8 @@ async function handleAdminReviewerAbstractScores(request, env, corsHeaders) {
       submission_date: a.submission_date || null,
       review_summary: avgByAbstract[a.id] || {
         review_count: 0,
+        coi_count: 0,
+        response_count: 0,
         avg_originality: null,
         avg_clarity: null,
         avg_study_design: null,

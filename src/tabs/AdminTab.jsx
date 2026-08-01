@@ -4767,11 +4767,18 @@ export default function AdminTab() {
                         const summary =
                           currentReviewScoreData?.review_summary || {};
                         const reviewCount = Number(summary.review_count || 0);
+                        const coiCount = Number(summary.coi_count || 0);
+                        const responseCount = Number(
+                          summary.response_count ||
+                            (currentReviewScoreData?.reviewer_reviews || [])
+                              .length ||
+                            0,
+                        );
                         const avgValue = (v) =>
                           v != null && !Number.isNaN(Number(v))
                             ? Number(v).toFixed(2)
                             : "—";
-                        if (reviewCount === 0) {
+                        if (responseCount === 0) {
                           return (
                             <p className="text-sm text-gray-500 bg-gray-50 rounded-lg px-4 py-3">
                               No reviewer scores submitted for this abstract
@@ -4784,10 +4791,15 @@ export default function AdminTab() {
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
                               <div className="bg-indigo-50 rounded-lg border border-indigo-100 p-3">
                                 <p className="text-indigo-600 font-medium">
-                                  Reviews
+                                  Scored reviews
                                 </p>
                                 <p className="text-lg font-bold text-indigo-900 mt-1">
                                   {reviewCount}
+                                  {coiCount > 0 ? (
+                                    <span className="ml-1 text-xs font-medium text-amber-700">
+                                      (+{coiCount} COI)
+                                    </span>
+                                  ) : null}
                                 </p>
                               </div>
                               <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
@@ -4853,6 +4865,8 @@ export default function AdminTab() {
                                       coiFlags.push("Same lab");
                                     if (rev.coi_other)
                                       coiFlags.push("Other COI");
+                                    const isCoi =
+                                      rev.has_coi || coiFlags.length > 0;
                                     return (
                                       <tr
                                         key={`${currentReviewAbstract.id}-${rev.reviewer_email}-${idx}`}
@@ -4862,14 +4876,22 @@ export default function AdminTab() {
                                           {rev.reviewer_email}
                                         </td>
                                         <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
-                                          O:{rev.originality ?? "—"} C:
-                                          {rev.clarity ?? "—"} SD:
-                                          {rev.study_design ?? "—"} DA:
-                                          {rev.data_analysis ?? "—"} S:
-                                          {rev.significance ?? "—"}{" "}
-                                          <span className="font-semibold">
-                                            T:{rev.total ?? "—"}
-                                          </span>
+                                          {isCoi ? (
+                                            <span className="text-amber-700 font-medium">
+                                              Not scored (COI)
+                                            </span>
+                                          ) : (
+                                            <>
+                                              O:{rev.originality ?? "—"} C:
+                                              {rev.clarity ?? "—"} SD:
+                                              {rev.study_design ?? "—"} DA:
+                                              {rev.data_analysis ?? "—"} S:
+                                              {rev.significance ?? "—"}{" "}
+                                              <span className="font-semibold">
+                                                T:{rev.total ?? "—"}
+                                              </span>
+                                            </>
+                                          )}
                                         </td>
                                         <td className="px-3 py-2 text-gray-700 max-w-sm whitespace-pre-wrap">
                                           {rev.previous_study_notes || "—"}
@@ -5943,7 +5965,11 @@ export default function AdminTab() {
                 {filteredReviewerAbstractScores.map((item) => {
                   const summary = item.review_summary || {};
                   const reviewCount = Number(summary.review_count || 0);
-                  const hasReviews = reviewCount > 0;
+                  const coiCount = Number(summary.coi_count || 0);
+                  const hasResponses =
+                    reviewCount > 0 ||
+                    coiCount > 0 ||
+                    (item.reviewer_reviews || []).length > 0;
                   const avgValue = (v) =>
                     v != null && !Number.isNaN(Number(v))
                       ? Number(v).toFixed(2)
@@ -5963,9 +5989,16 @@ export default function AdminTab() {
                         </div>
                         <div className="text-right flex items-center gap-3">
                           <div>
-                            <p className="text-xs text-gray-500">Reviews</p>
+                            <p className="text-xs text-gray-500">
+                              Scored reviews
+                            </p>
                             <p className="text-sm font-semibold text-gray-900">
                               {reviewCount}
+                              {coiCount > 0 ? (
+                                <span className="ml-1 text-xs font-medium text-amber-700">
+                                  (+{coiCount} COI)
+                                </span>
+                              ) : null}
                             </p>
                           </div>
                           <div>
@@ -6030,7 +6063,7 @@ export default function AdminTab() {
                           </div>
                         </div>
 
-                        {!hasReviews ? (
+                        {!hasResponses ? (
                           <p className="text-sm text-gray-500">
                             No reviews submitted for this abstract yet.
                           </p>
@@ -6066,6 +6099,8 @@ export default function AdminTab() {
                                       coiFlags.push("Same lab");
                                     if (rev.coi_other)
                                       coiFlags.push("Other COI");
+                                    const isCoi =
+                                      rev.has_coi || coiFlags.length > 0;
                                     return (
                                       <tr
                                         key={`${item.id}-${rev.reviewer_email}-${idx}`}
@@ -6075,12 +6110,20 @@ export default function AdminTab() {
                                           {rev.reviewer_email}
                                         </td>
                                         <td className="px-3 py-2 text-gray-700">
-                                          O:{rev.originality ?? "—"} C:
-                                          {rev.clarity ?? "—"} SD:
-                                          {rev.study_design ?? "—"} DA:
-                                          {rev.data_analysis ?? "—"} S:
-                                          {rev.significance ?? "—"} T:
-                                          {rev.total ?? "—"}
+                                          {isCoi ? (
+                                            <span className="text-amber-700 font-medium">
+                                              Not scored (COI)
+                                            </span>
+                                          ) : (
+                                            <>
+                                              O:{rev.originality ?? "—"} C:
+                                              {rev.clarity ?? "—"} SD:
+                                              {rev.study_design ?? "—"} DA:
+                                              {rev.data_analysis ?? "—"} S:
+                                              {rev.significance ?? "—"} T:
+                                              {rev.total ?? "—"}
+                                            </>
+                                          )}
                                         </td>
                                         <td className="px-3 py-2 text-gray-700 max-w-md whitespace-pre-wrap">
                                           {rev.previous_study_notes || "—"}
@@ -7645,9 +7688,11 @@ export default function AdminTab() {
                                             </span>
                                           </td>
                                           <td className="py-1.5 pr-4">
-                                            {a.review_total != null
-                                              ? a.review_total
-                                              : "—"}
+                                            {a.has_coi
+                                              ? "COI"
+                                              : a.review_total != null
+                                                ? a.review_total
+                                                : "—"}
                                           </td>
                                           <td className="py-1.5 pr-4 text-gray-600">
                                             {a.assigned_at

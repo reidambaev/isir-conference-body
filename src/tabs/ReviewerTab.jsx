@@ -169,6 +169,15 @@ export default function ReviewerTab() {
     );
   }, [currentReview]);
 
+  const hasConflictOfInterest = useMemo(() => {
+    if (!currentReview) return false;
+    return Boolean(
+      currentReview.coi_mentor_pi ||
+        currentReview.coi_same_lab ||
+        currentReview.coi_other,
+    );
+  }, [currentReview]);
+
   const loadAssignments = async (tkn) => {
     setLoading(true);
     setError("");
@@ -263,8 +272,13 @@ export default function ReviewerTab() {
       });
       setReviewsByAbstract((prev) => {
         const existing = prev[selectedAbstractId] || getDefaultReview();
+        const declaredCoi = Boolean(data?.has_coi);
         const serverTotal =
-          typeof data?.total === "number" ? data.total : totalScore;
+          typeof data?.total === "number"
+            ? data.total
+            : declaredCoi
+              ? null
+              : totalScore;
         return {
           ...prev,
           [selectedAbstractId]: {
@@ -538,7 +552,9 @@ export default function ReviewerTab() {
                         Abstract evaluation
                       </h3>
                       <p className="text-sm text-slate-600">
-                        Score each category (1–5). Total updates automatically.
+                        {hasConflictOfInterest
+                          ? "Conflict of interest declared — your response will be saved, but scores will not be counted."
+                          : "Score each category (1–5). Total updates automatically."}
                       </p>
                     </div>
 
@@ -547,6 +563,12 @@ export default function ReviewerTab() {
                         <div className="font-semibold text-slate-900 mb-3">
                           Conflict of interest
                         </div>
+                        {hasConflictOfInterest ? (
+                          <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                            Declaring a conflict saves your response without
+                            counting scores toward averages.
+                          </p>
+                        ) : null}
                         <div className="space-y-3 text-sm text-slate-700">
                           <label className="flex items-start gap-3">
                             <input
@@ -614,68 +636,76 @@ export default function ReviewerTab() {
                         </div>
                       </div>
 
-                      {SCORE_FIELDS.map((f) => {
-                        const hasNotes =
-                          f.help &&
-                          f.help !== RATING_SCALE_HELP &&
-                          f.help.includes(RATING_SCALE_HELP);
-                        const helpNoteText = hasNotes
-                          ? f.help.replace(` • ${RATING_SCALE_HELP}`, "")
-                          : null;
-                        const helpRatingText = hasNotes
-                          ? RATING_SCALE_HELP
-                          : f.help;
+                      {!hasConflictOfInterest ? (
+                        <>
+                          {SCORE_FIELDS.map((f) => {
+                            const hasNotes =
+                              f.help &&
+                              f.help !== RATING_SCALE_HELP &&
+                              f.help.includes(RATING_SCALE_HELP);
+                            const helpNoteText = hasNotes
+                              ? f.help.replace(` • ${RATING_SCALE_HELP}`, "")
+                              : null;
+                            const helpRatingText = hasNotes
+                              ? RATING_SCALE_HELP
+                              : f.help;
 
-                        return (
-                          <div
-                            key={f.key}
-                            className="rounded-xl border border-slate-200 p-4"
-                          >
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div>
-                                <div className="font-semibold text-slate-900">
-                                  {f.label}
+                            return (
+                              <div
+                                key={f.key}
+                                className="rounded-xl border border-slate-200 p-4"
+                              >
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div>
+                                    <div className="font-semibold text-slate-900">
+                                      {f.label}
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-1">
+                                      {helpNoteText && <div>{helpNoteText}</div>}
+                                      <div>{helpRatingText}</div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                      Score
+                                    </div>
+                                    <div className="text-2xl font-bold text-slate-900">
+                                      {Number(currentReview[f.key]) || 3}
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="text-xs text-slate-500 mt-1">
-                                  {helpNoteText && <div>{helpNoteText}</div>}
-                                  <div>{helpRatingText}</div>
+                                <input
+                                  type="range"
+                                  min={1}
+                                  max={5}
+                                  step={1}
+                                  value={Number(currentReview[f.key]) || 3}
+                                  onChange={(e) =>
+                                    updateReviewField(
+                                      f.key,
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  className="w-full mt-4"
+                                />
+                                <div className="flex justify-between text-xs text-slate-500 mt-1">
+                                  <span>1</span>
+                                  <span>5</span>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                  Score
-                                </div>
-                                <div className="text-2xl font-bold text-slate-900">
-                                  {Number(currentReview[f.key]) || 3}
-                                </div>
-                              </div>
-                            </div>
-                            <input
-                              type="range"
-                              min={1}
-                              max={5}
-                              step={1}
-                              value={Number(currentReview[f.key]) || 3}
-                              onChange={(e) =>
-                                updateReviewField(f.key, Number(e.target.value))
-                              }
-                              className="w-full mt-4"
-                            />
-                            <div className="flex justify-between text-xs text-slate-500 mt-1">
-                              <span>1</span>
-                              <span>5</span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                            );
+                          })}
+                        </>
+                      ) : null}
 
                       <div className="rounded-xl border border-slate-200 p-4">
                         <div className="font-semibold text-slate-900">
                           Additional notes
                         </div>
                         <div className="text-xs text-slate-500 mt-1">
-                          Any additional comments to help the selection committee
-                          interpret your scores (optional).
+                          {hasConflictOfInterest
+                            ? "Optional notes for the selection committee (scores are not counted)."
+                            : "Any additional comments to help the selection committee interpret your scores (optional)."}
                         </div>
                         <textarea
                           value={currentReview.previous_study_notes || ""}
@@ -691,19 +721,22 @@ export default function ReviewerTab() {
                         />
                       </div>
 
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex items-center justify-between gap-4">
-                        <div>
-                          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            Final score
+                      {!hasConflictOfInterest ? (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex items-center justify-between gap-4">
+                          <div>
+                            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                              Final score
+                            </div>
+                            <div className="text-sm text-slate-600 mt-1">
+                              Sum of all category scores (updates
+                              automatically).
+                            </div>
                           </div>
-                          <div className="text-sm text-slate-600 mt-1">
-                            Sum of all category scores (updates automatically).
+                          <div className="text-3xl font-bold text-slate-900">
+                            {totalScore}
                           </div>
                         </div>
-                        <div className="text-3xl font-bold text-slate-900">
-                          {totalScore}
-                        </div>
-                      </div>
+                      ) : null}
 
                       <div className="flex items-center justify-between gap-4 pt-2">
                         <div className="text-sm text-slate-600">
@@ -718,7 +751,11 @@ export default function ReviewerTab() {
                           disabled={saving || loading}
                           className="px-6 py-3 rounded-xl font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
                         >
-                          {saving ? "Saving..." : "Save review"}
+                          {saving
+                            ? "Saving..."
+                            : hasConflictOfInterest
+                              ? "Save conflict of interest"
+                              : "Save review"}
                         </button>
                       </div>
                       {error && (
