@@ -105,6 +105,45 @@ function getAbstractTypeLabel(abstract) {
   return normalizeAbstractSubmissionType(raw) || raw;
 }
 
+const ADMIN_SECTION_COOKIE = "isir_admin_section";
+const ADMIN_SECTION_COOKIE_MAX_AGE_SEC = 5 * 60;
+const ADMIN_SECTION_IDS = new Set([
+  "registrationTotals",
+  "registrations",
+  "trainees",
+  "abstracts",
+  "invitedSpeakerAbstracts",
+  "abstractReviewScores",
+  "visa",
+  "speakerHotel",
+  "speakerInvites",
+  "speakerProfiles",
+  "reviewers",
+  "addReviewers",
+  "discount",
+  "environment",
+]);
+
+function readAdminSectionCookie() {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(
+    /(?:^|;\s*)isir_admin_section=([^;]*)/,
+  );
+  if (!match) return null;
+  try {
+    const value = decodeURIComponent(match[1]);
+    return ADMIN_SECTION_IDS.has(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeAdminSectionCookie(section) {
+  if (typeof document === "undefined") return;
+  if (!ADMIN_SECTION_IDS.has(section)) return;
+  document.cookie = `${ADMIN_SECTION_COOKIE}=${encodeURIComponent(section)}; Max-Age=${ADMIN_SECTION_COOKIE_MAX_AGE_SEC}; Path=/; SameSite=Lax`;
+}
+
 function emptyEditAffiliation() {
   return {
     institution: "",
@@ -498,7 +537,9 @@ export default function AdminTab() {
   const [speakerHotelNameSort, setSpeakerHotelNameSort] = useState(null);
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState("registrationTotals");
+  const [activeSection, setActiveSection] = useState(
+    () => readAdminSectionCookie() || "registrationTotals",
+  );
   const [error, setError] = useState(null);
   /** True when browsing seeded localhost fixtures (no cloud/API). */
   const [isLocalDemo, setIsLocalDemo] = useState(false);
@@ -591,6 +632,7 @@ export default function AdminTab() {
   const [reviewerAbstractSearch, setReviewerAbstractSearch] = useState("");
   const [reviewerAbstractCategoryFilter, setReviewerAbstractCategoryFilter] =
     useState("all");
+  const [reviewerAbstractSort, setReviewerAbstractSort] = useState("avg_desc");
 
   const reviewerStats = useMemo(() => {
     const base = {
@@ -714,19 +756,91 @@ export default function AdminTab() {
         (a) => a.category === reviewerAbstractCategoryFilter,
       );
     }
+
+    const avgTotal = (a) => {
+      const v = a.review_summary?.avg_total;
+      return v != null && !Number.isNaN(Number(v)) ? Number(v) : null;
+    };
+    const reviewCount = (a) => Number(a.review_summary?.review_count || 0);
+
+    result.sort((a, b) => {
+      if (reviewerAbstractSort === "avg_asc" || reviewerAbstractSort === "avg_desc") {
+        const aAvg = avgTotal(a);
+        const bAvg = avgTotal(b);
+        if (aAvg == null && bAvg == null) {
+          return String(a.title || "").localeCompare(String(b.title || ""));
+        }
+        if (aAvg == null) return 1;
+        if (bAvg == null) return -1;
+        const diff =
+          reviewerAbstractSort === "avg_desc" ? bAvg - aAvg : aAvg - bAvg;
+        if (diff !== 0) return diff;
+        return reviewCount(b) - reviewCount(a);
+      }
+      if (reviewerAbstractSort === "reviews_desc") {
+        const diff = reviewCount(b) - reviewCount(a);
+        if (diff !== 0) return diff;
+        const aAvg = avgTotal(a) ?? -1;
+        const bAvg = avgTotal(b) ?? -1;
+        return bAvg - aAvg;
+      }
+      if (reviewerAbstractSort === "title_asc") {
+        return String(a.title || "").localeCompare(String(b.title || ""));
+      }
+      return 0;
+    });
+
     return result;
   }, [
     generalReviewerAbstractScores,
     reviewerAbstractSearch,
     reviewerAbstractCategoryFilter,
+    reviewerAbstractSort,
   ]);
 
   const abstractReviewRollupStats = useMemo(() => {
     const list = generalReviewerAbstractScores;
-    const withReviews = list.filter(
+    const scored = list.filter(
       (a) => Number(a.review_summary?.review_count || 0) > 0,
+    );
+    const avgs = scored
+      .map((a) => Number(a.review_summary?.avg_total))
+      .filter((n) => Number.isFinite(n));
+    const overallAvg =
+      avgs.length > 0
+        ? avgs.reduce((sum, n) => sum + n, 0) / avgs.length
+        : null;
+    const highestAvg = avgs.length > 0 ? Math.max(...avgs) : null;
+    const lowestAvg = avgs.length > 0 ? Math.min(...avgs) : null;
+    const totalCoi = list.reduce(
+      (sum, a) => sum + Number(a.review_summary?.coi_count || 0),
+      0,
+    );
+    const singleReview = scored.filter(
+      (a) => Number(a.review_summary?.review_count || 0) === 1,
     ).length;
-    return { total: list.length, withReviews };
+    const byAvgDesc = [...scored].sort((a, b) => {
+      const diff =
+        Number(b.review_summary?.avg_total || 0) -
+        Number(a.review_summary?.avg_total || 0);
+      if (diff !== 0) return diff;
+      return (
+        Number(b.review_summary?.review_count || 0) -
+        Number(a.review_summary?.review_count || 0)
+      );
+    });
+
+    return {
+      total: list.length,
+      withReviews: scored.length,
+      overallAvg,
+      highestAvg,
+      lowestAvg,
+      totalCoi,
+      singleReview,
+      bestRated: byAvgDesc.slice(0, 5),
+      worstRated: [...byAvgDesc].reverse().slice(0, 5),
+    };
   }, [generalReviewerAbstractScores]);
 
   const registrationTotals = useMemo(() => {
@@ -916,8 +1030,11 @@ export default function AdminTab() {
     setReviewerAbstractScores(demo.reviewerAbstractScores);
     setSpeakerProfileSubmissions(demo.speakerProfileSubmissions);
     setReviewerOverviewError("");
-    setActiveSection("registrationTotals");
   }, []);
+
+  useEffect(() => {
+    writeAdminSectionCookie(activeSection);
+  }, [activeSection]);
 
   useEffect(() => {
     try {
@@ -5977,7 +6094,7 @@ export default function AdminTab() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                 Abstracts listed
@@ -5988,25 +6105,159 @@ export default function AdminTab() {
             </div>
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                With at least one review
+                With scored reviews
               </p>
               <p className="text-2xl font-bold text-teal-700 mt-1">
                 {abstractReviewRollupStats.withReviews}
               </p>
-            </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Pending reviewer data
-              </p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
+              <p className="text-[11px] text-gray-500 mt-1">
                 {Math.max(
                   0,
                   abstractReviewRollupStats.total -
                     abstractReviewRollupStats.withReviews,
-                )}
+                )}{" "}
+                still pending
+              </p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Overall avg total
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {abstractReviewRollupStats.overallAvg != null
+                  ? abstractReviewRollupStats.overallAvg.toFixed(2)
+                  : "—"}
+              </p>
+              <p className="text-[11px] text-gray-500 mt-1">
+                Max possible 25
+              </p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Score range
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {abstractReviewRollupStats.lowestAvg != null &&
+                abstractReviewRollupStats.highestAvg != null
+                  ? `${abstractReviewRollupStats.lowestAvg.toFixed(1)}–${abstractReviewRollupStats.highestAvg.toFixed(1)}`
+                  : "—"}
+              </p>
+              <p className="text-[11px] text-gray-500 mt-1">
+                Lowest to highest avg
+              </p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Single-review only
+              </p>
+              <p className="text-2xl font-bold text-amber-700 mt-1">
+                {abstractReviewRollupStats.singleReview}
+              </p>
+              <p className="text-[11px] text-gray-500 mt-1">
+                Thin coverage
+              </p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                COI responses
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {abstractReviewRollupStats.totalCoi}
+              </p>
+              <p className="text-[11px] text-gray-500 mt-1">
+                Not counted in averages
               </p>
             </div>
           </div>
+
+          {abstractReviewRollupStats.withReviews > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-5 py-3 border-b border-gray-100 bg-emerald-50/60">
+                  <h3 className="text-sm font-semibold text-emerald-900">
+                    Best rated
+                  </h3>
+                  <p className="text-xs text-emerald-800/80 mt-0.5">
+                    Highest average total among abstracts with scored reviews
+                  </p>
+                </div>
+                <ul className="divide-y divide-gray-100">
+                  {abstractReviewRollupStats.bestRated.map((item, index) => {
+                    const summary = item.review_summary || {};
+                    return (
+                      <li
+                        key={`best-${item.id}`}
+                        className="px-5 py-3 flex items-start justify-between gap-3"
+                      >
+                        <div className="min-w-0 flex gap-3">
+                          <span className="text-xs font-semibold text-emerald-700 tabular-nums mt-0.5">
+                            #{index + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                              {item.title || item.id}
+                            </p>
+                            <p className="text-[11px] text-gray-500 mt-0.5">
+                              {item.category || "Uncategorized"} •{" "}
+                              {Number(summary.review_count || 0)} review
+                              {Number(summary.review_count || 0) === 1
+                                ? ""
+                                : "s"}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="shrink-0 inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-sm font-semibold text-emerald-800 tabular-nums">
+                          {Number(summary.avg_total).toFixed(2)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-5 py-3 border-b border-gray-100 bg-amber-50/60">
+                  <h3 className="text-sm font-semibold text-amber-900">
+                    Lowest rated
+                  </h3>
+                  <p className="text-xs text-amber-800/80 mt-0.5">
+                    Lowest average total among abstracts with scored reviews
+                  </p>
+                </div>
+                <ul className="divide-y divide-gray-100">
+                  {abstractReviewRollupStats.worstRated.map((item, index) => {
+                    const summary = item.review_summary || {};
+                    return (
+                      <li
+                        key={`worst-${item.id}`}
+                        className="px-5 py-3 flex items-start justify-between gap-3"
+                      >
+                        <div className="min-w-0 flex gap-3">
+                          <span className="text-xs font-semibold text-amber-700 tabular-nums mt-0.5">
+                            #{index + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                              {item.title || item.id}
+                            </p>
+                            <p className="text-[11px] text-gray-500 mt-0.5">
+                              {item.category || "Uncategorized"} •{" "}
+                              {Number(summary.review_count || 0)} review
+                              {Number(summary.review_count || 0) === 1
+                                ? ""
+                                : "s"}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="shrink-0 inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-sm font-semibold text-amber-800 tabular-nums">
+                          {Number(summary.avg_total).toFixed(2)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+          )}
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100">
@@ -6042,6 +6293,16 @@ export default function AdminTab() {
                     </option>
                   ))}
                 </select>
+                <select
+                  value={reviewerAbstractSort}
+                  onChange={(e) => setReviewerAbstractSort(e.target.value)}
+                  className="min-w-[180px] px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="avg_desc">Highest avg total</option>
+                  <option value="avg_asc">Lowest avg total</option>
+                  <option value="reviews_desc">Most scored reviews</option>
+                  <option value="title_asc">Title A–Z</option>
+                </select>
               </div>
             </div>
 
@@ -6059,6 +6320,19 @@ export default function AdminTab() {
                     v != null && !Number.isNaN(Number(v))
                       ? Number(v).toFixed(2)
                       : "—";
+                  const avgTotalNum =
+                    summary.avg_total != null &&
+                    !Number.isNaN(Number(summary.avg_total))
+                      ? Number(summary.avg_total)
+                      : null;
+                  const avgTotalClass =
+                    avgTotalNum == null
+                      ? "text-gray-900"
+                      : avgTotalNum >= 20
+                        ? "text-emerald-700"
+                        : avgTotalNum <= 12
+                          ? "text-amber-700"
+                          : "text-gray-900";
                   return (
                     <details key={item.id} className="group">
                       <summary className="px-5 py-4 cursor-pointer hover:bg-gray-50 flex items-start justify-between gap-3">
@@ -6088,7 +6362,9 @@ export default function AdminTab() {
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">Avg total</p>
-                            <p className="text-sm font-semibold text-gray-900">
+                            <p
+                              className={`text-sm font-semibold ${avgTotalClass}`}
+                            >
                               {avgValue(summary.avg_total)}
                             </p>
                           </div>
