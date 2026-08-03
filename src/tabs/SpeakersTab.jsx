@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { getSpeakerBio } from "../speakerBios";
 
 function getInitials(name) {
   return name
@@ -64,10 +65,153 @@ function SpeakerPhoto({
   );
 }
 
+function ViewBioHint({ tone = "gold" }) {
+  const tones = {
+    gold: {
+      className: "border-[var(--color-secondary)]/40 text-[var(--color-primary)] bg-[var(--color-secondary)]/15",
+    },
+    sky: {
+      className: "border-sky-300 text-sky-900 bg-sky-50",
+    },
+    muted: {
+      className: "border-gray-300 text-gray-700 bg-gray-50",
+    },
+  };
+  const { className } = tones[tone] || tones.gold;
+
+  return (
+    <span
+      className={`mt-4 inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold ${className}`}
+    >
+      <svg
+        className="w-3.5 h-3.5 opacity-80"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+      Read bio
+    </span>
+  );
+}
+
+function SpeakerBioModal({ speaker, bio, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  const imgSrc = speakerImgSrc(speaker);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="speaker-bio-title"
+        className="relative w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors"
+          aria-label="Close biography"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+
+        <div className="px-6 pt-8 pb-6 sm:px-8 sm:pt-9 sm:pb-8">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-5 mb-6">
+            <SpeakerPhoto
+              src={imgSrc}
+              alt={speaker.name}
+              eager
+              className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-2 flex-shrink-0 mx-auto sm:mx-0"
+              style={{
+                borderColor: "var(--color-secondary)",
+                ...(speaker.image_position && {
+                  objectPosition: speaker.image_position,
+                }),
+              }}
+              fallback={
+                <div
+                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-full flex items-center justify-center border-2 text-2xl font-bold text-white flex-shrink-0 mx-auto sm:mx-0"
+                  style={{
+                    backgroundColor: "var(--color-primary)",
+                    borderColor: "var(--color-secondary)",
+                  }}
+                >
+                  {getInitials(speaker.name)}
+                </div>
+              }
+            />
+            <div className="text-center sm:text-left min-w-0 pt-1">
+              <h3
+                id="speaker-bio-title"
+                className="text-xl sm:text-2xl font-extrabold leading-tight mb-2"
+                style={{ color: "var(--color-primary)" }}
+              >
+                {speaker.name}
+              </h3>
+              <p className="text-gray-500 text-sm leading-relaxed">
+                {speaker.affiliation}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4 border-t border-gray-100 pt-5">
+            {bio.map((paragraph, i) => (
+              <p
+                key={i}
+                className="text-gray-700 text-sm sm:text-[15px] leading-relaxed"
+              >
+                {paragraph}
+              </p>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SpeakersTab() {
   const [plenarySpeakers, setPlenarySpeakers] = useState([]);
   const [forumSpeakers, setForumSpeakers] = useState([]);
   const [congressSpeakers, setCongressSpeakers] = useState([]);
+  const [selectedSpeaker, setSelectedSpeaker] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +257,10 @@ function SpeakersTab() {
       window.removeEventListener("pageshow", onPageShow);
     };
   }, []);
+
+  const selectedBio = selectedSpeaker
+    ? getSpeakerBio(selectedSpeaker)
+    : null;
 
   return (
     <div role="tabpanel">
@@ -170,10 +318,30 @@ function SpeakersTab() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {plenarySpeakers.map((speaker) => {
             const imgSrc = speakerImgSrc(speaker);
+            const bio = getSpeakerBio(speaker);
+            const interactive = Boolean(bio);
             return (
               <div
                 key={speaker.key}
-                className="bg-white rounded-2xl p-8 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center text-center relative overflow-hidden"
+                className={`bg-white rounded-2xl p-8 shadow-xl flex flex-col items-center text-center relative overflow-hidden ${
+                  interactive
+                    ? "cursor-pointer hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-secondary)]"
+                    : ""
+                }`}
+                {...(interactive
+                  ? {
+                      role: "button",
+                      tabIndex: 0,
+                      onClick: () => setSelectedSpeaker(speaker),
+                      onKeyDown: (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedSpeaker(speaker);
+                        }
+                      },
+                      "aria-label": `View biography for ${speaker.name}`,
+                    }
+                  : {})}
               >
                 <div
                   className="absolute top-0 left-0 right-0 h-1.5"
@@ -211,6 +379,7 @@ function SpeakersTab() {
                 <p className="text-gray-500 text-sm leading-relaxed">
                   {speaker.affiliation}
                 </p>
+                {interactive && <ViewBioHint tone="gold" />}
               </div>
             );
           })}
@@ -242,10 +411,30 @@ function SpeakersTab() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {forumSpeakers.map((speaker) => {
             const imgSrc = speakerImgSrc(speaker);
+            const bio = getSpeakerBio(speaker);
+            const interactive = Boolean(bio);
             return (
               <div
                 key={speaker.key}
-                className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 flex flex-col items-center text-center relative overflow-hidden border border-sky-100"
+                className={`bg-white rounded-xl p-6 shadow-md flex flex-col items-center text-center relative overflow-hidden border border-sky-100 ${
+                  interactive
+                    ? "cursor-pointer hover:bg-sky-50/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-400"
+                    : ""
+                }`}
+                {...(interactive
+                  ? {
+                      role: "button",
+                      tabIndex: 0,
+                      onClick: () => setSelectedSpeaker(speaker),
+                      onKeyDown: (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedSpeaker(speaker);
+                        }
+                      },
+                      "aria-label": `View biography for ${speaker.name}`,
+                    }
+                  : {})}
               >
                 <div className="absolute top-0 left-0 right-0 h-1 bg-sky-400" />
                 <SpeakerPhoto
@@ -279,6 +468,7 @@ function SpeakersTab() {
                 <p className="text-gray-500 text-sm leading-relaxed">
                   {speaker.affiliation}
                 </p>
+                {interactive && <ViewBioHint tone="sky" />}
               </div>
             );
           })}
@@ -308,10 +498,30 @@ function SpeakersTab() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {congressSpeakers.map((speaker) => {
             const imgSrc = speakerImgSrc(speaker);
+            const bio = getSpeakerBio(speaker);
+            const interactive = Boolean(bio);
             return (
               <div
                 key={speaker.key}
-                className="bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition-shadow flex flex-col items-center text-center"
+                className={`bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200 p-5 flex flex-col items-center text-center ${
+                  interactive
+                    ? "cursor-pointer hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-secondary)]"
+                    : ""
+                }`}
+                {...(interactive
+                  ? {
+                      role: "button",
+                      tabIndex: 0,
+                      onClick: () => setSelectedSpeaker(speaker),
+                      onKeyDown: (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedSpeaker(speaker);
+                        }
+                      },
+                      "aria-label": `View biography for ${speaker.name}`,
+                    }
+                  : {})}
               >
                 <SpeakerPhoto
                   src={imgSrc}
@@ -344,6 +554,7 @@ function SpeakersTab() {
                 <p className="text-gray-600 text-xs leading-snug line-clamp-3">
                   {speaker.affiliation}
                 </p>
+                {interactive && <ViewBioHint tone="muted" />}
               </div>
             );
           })}
@@ -399,6 +610,14 @@ function SpeakersTab() {
           </button>
         </div>
       </div>
+
+      {selectedSpeaker && selectedBio && (
+        <SpeakerBioModal
+          speaker={selectedSpeaker}
+          bio={selectedBio}
+          onClose={() => setSelectedSpeaker(null)}
+        />
+      )}
     </div>
   );
 }
