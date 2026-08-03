@@ -626,6 +626,63 @@ export default function AdminTab() {
     return { completedReviewers, reviewersWithPending, completedAssignments };
   }, [reviewerOverview]);
 
+  const abstractAssignmentBalance = useMemo(() => {
+    const rows = Array.isArray(reviewerOverview?.abstract_assignments)
+      ? reviewerOverview.abstract_assignments
+      : [];
+    if (rows.length === 0) {
+      return {
+        rows: [],
+        totalAbstracts: 0,
+        min: 0,
+        max: 0,
+        avg: 0,
+        histogram: [],
+        mostAssigned: [],
+        leastAssigned: [],
+      };
+    }
+
+    const counts = rows.map((r) => Number(r.assigned_reviewers || 0));
+    const min = Math.min(...counts);
+    const max = Math.max(...counts);
+    const avg =
+      counts.reduce((sum, n) => sum + n, 0) / Math.max(counts.length, 1);
+
+    const bucketMap = new Map();
+    counts.forEach((n) => {
+      bucketMap.set(n, (bucketMap.get(n) || 0) + 1);
+    });
+    const histogram = [];
+    for (let n = min; n <= max; n += 1) {
+      histogram.push({
+        reviewers: n,
+        abstracts: bucketMap.get(n) || 0,
+      });
+    }
+    const maxBucket = Math.max(...histogram.map((h) => h.abstracts), 1);
+
+    const sortedAsc = [...rows].sort((a, b) => {
+      const diff =
+        Number(a.assigned_reviewers || 0) - Number(b.assigned_reviewers || 0);
+      if (diff !== 0) return diff;
+      return String(a.title || "").localeCompare(String(b.title || ""));
+    });
+    const sortedDesc = [...sortedAsc].reverse();
+
+    return {
+      rows,
+      totalAbstracts: rows.length,
+      min,
+      max,
+      avg,
+      histogram,
+      maxBucket,
+      mostAssigned: sortedDesc.slice(0, 8),
+      leastAssigned: sortedAsc.slice(0, 8),
+    };
+  }, [reviewerOverview]);
+
   // Review scores UI: accepted general abstracts only (after admin review mode)
   const generalReviewerAbstractScores = useMemo(() => {
     const excludedIds = new Set(
@@ -7597,6 +7654,171 @@ export default function AdminTab() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Abstract assignment balance */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-5 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-800">
+                      Reviewers per abstract
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      How evenly peer-review assignments are spread across
+                      eligible abstracts.
+                    </p>
+                  </div>
+                  {abstractAssignmentBalance.totalAbstracts > 0 && (
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
+                      <span>
+                        <span className="font-semibold text-gray-800">
+                          {abstractAssignmentBalance.totalAbstracts}
+                        </span>{" "}
+                        abstracts
+                      </span>
+                      <span>
+                        min{" "}
+                        <span className="font-semibold text-gray-800">
+                          {abstractAssignmentBalance.min}
+                        </span>
+                      </span>
+                      <span>
+                        avg{" "}
+                        <span className="font-semibold text-gray-800">
+                          {abstractAssignmentBalance.avg.toFixed(1)}
+                        </span>
+                      </span>
+                      <span>
+                        max{" "}
+                        <span className="font-semibold text-gray-800">
+                          {abstractAssignmentBalance.max}
+                        </span>
+                      </span>
+                      {abstractAssignmentBalance.max -
+                        abstractAssignmentBalance.min <=
+                      1 ? (
+                        <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
+                          Evenly balanced
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">
+                          Spread:{" "}
+                          {abstractAssignmentBalance.max -
+                            abstractAssignmentBalance.min}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {abstractAssignmentBalance.totalAbstracts === 0 ? (
+                  <div className="px-5 py-6 text-sm text-gray-500">
+                    No eligible abstracts in the scoring pool yet.
+                  </div>
+                ) : (
+                  <div className="p-5 space-y-6">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+                        Distribution
+                      </p>
+                      <div className="space-y-2">
+                        {abstractAssignmentBalance.histogram.map((bucket) => (
+                          <div
+                            key={bucket.reviewers}
+                            className="flex items-center gap-3"
+                          >
+                            <div className="w-24 shrink-0 text-xs text-gray-600 tabular-nums">
+                              {bucket.reviewers} reviewer
+                              {bucket.reviewers === 1 ? "" : "s"}
+                            </div>
+                            <div className="flex-1 h-2.5 rounded-full bg-gray-100 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-teal-500 transition-all"
+                                style={{
+                                  width: `${
+                                    (bucket.abstracts /
+                                      abstractAssignmentBalance.maxBucket) *
+                                    100
+                                  }%`,
+                                  minWidth:
+                                    bucket.abstracts > 0 ? "0.35rem" : 0,
+                                }}
+                              />
+                            </div>
+                            <div className="w-20 shrink-0 text-right text-xs font-semibold text-gray-800 tabular-nums">
+                              {bucket.abstracts} abs.
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+                        <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Most assigned
+                        </h4>
+                        <ul className="mt-3 space-y-2">
+                          {abstractAssignmentBalance.mostAssigned.map((row) => (
+                            <li
+                              key={`most-${row.abstract_id}`}
+                              className="flex items-start justify-between gap-3"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                                  {row.title || row.abstract_id}
+                                </p>
+                                {row.category ? (
+                                  <p className="text-[11px] text-gray-500 mt-0.5">
+                                    {row.category}
+                                  </p>
+                                ) : null}
+                              </div>
+                              <span className="shrink-0 inline-flex items-center rounded-full bg-white border border-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-800 tabular-nums">
+                                {row.assigned_reviewers}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+                        <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Least assigned
+                        </h4>
+                        <ul className="mt-3 space-y-2">
+                          {abstractAssignmentBalance.leastAssigned.map(
+                            (row) => (
+                              <li
+                                key={`least-${row.abstract_id}`}
+                                className="flex items-start justify-between gap-3"
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                                    {row.title || row.abstract_id}
+                                  </p>
+                                  {row.category ? (
+                                    <p className="text-[11px] text-gray-500 mt-0.5">
+                                      {row.category}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <span
+                                  className={`shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold tabular-nums ${
+                                    Number(row.assigned_reviewers || 0) === 0
+                                      ? "bg-amber-50 border-amber-200 text-amber-800"
+                                      : "bg-white border-gray-200 text-gray-800"
+                                  }`}
+                                >
+                                  {row.assigned_reviewers}
+                                </span>
+                              </li>
+                            ),
+                          )}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Per-reviewer table */}

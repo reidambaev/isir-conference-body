@@ -116,6 +116,10 @@ function computeTotalScore(review) {
   return SCORE_FIELDS.reduce((sum, f) => sum + (Number(review[f.key]) || 0), 0);
 }
 
+function hasSavedReview(review) {
+  return Boolean(review?.updated_at || review?.created_at);
+}
+
 function reviewHasCoi(review) {
   return Boolean(
     review?.coi_mentor_pi || review?.coi_same_lab || review?.coi_other,
@@ -253,6 +257,20 @@ export default function ReviewerTab() {
     () => reviewHasCoi(currentReview),
     [currentReview],
   );
+
+  const reviewProgress = useMemo(() => {
+    const total = abstracts.length;
+    const saved = abstracts.reduce(
+      (count, a) =>
+        count + (hasSavedReview(reviewsByAbstract[a.id]) ? 1 : 0),
+      0,
+    );
+    return {
+      total,
+      saved,
+      complete: total > 0 && saved >= total,
+    };
+  }, [abstracts, reviewsByAbstract]);
 
   const showSaveStatus = (message, clearMs = 2500) => {
     if (saveMessageTimerRef.current) {
@@ -572,6 +590,57 @@ export default function ReviewerTab() {
                   You can only review these abstracts.
                 </p>
 
+                {!loading && !error && abstracts.length > 0 && (
+                  <div
+                    className={`mt-4 rounded-xl border px-3 py-3 ${
+                      reviewProgress.complete
+                        ? "border-emerald-200 bg-emerald-50"
+                        : "border-slate-200 bg-slate-50"
+                    }`}
+                  >
+                    {reviewProgress.complete ? (
+                      <>
+                        <div className="text-sm font-semibold text-emerald-800">
+                          All reviews complete — thank you
+                        </div>
+                        <p className="text-xs text-emerald-700 mt-1 leading-relaxed">
+                          You can still change any review until the deadline.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-sm font-semibold text-slate-800">
+                            {reviewProgress.saved} of {reviewProgress.total}{" "}
+                            reviews saved
+                          </div>
+                          <div className="text-xs font-medium text-slate-500 tabular-nums">
+                            {reviewProgress.total - reviewProgress.saved}{" "}
+                            remaining
+                          </div>
+                        </div>
+                        <div className="mt-2 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-blue-500 transition-all"
+                            style={{
+                              width: `${
+                                reviewProgress.total > 0
+                                  ? (reviewProgress.saved /
+                                      reviewProgress.total) *
+                                    100
+                                  : 0
+                              }%`,
+                            }}
+                          />
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                          Saved reviews can be changed until the deadline.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {loading ? (
                   <div className="py-6 text-slate-600">Loading…</div>
                 ) : error ? (
@@ -586,9 +655,8 @@ export default function ReviewerTab() {
                   <div className="mt-4 space-y-2">
                     {abstracts.map((a) => {
                       const selected = a.id === selectedAbstractId;
-                      const hasReview = Boolean(
-                        reviewsByAbstract[a.id]?.updated_at ||
-                        reviewsByAbstract[a.id]?.created_at,
+                      const hasReview = hasSavedReview(
+                        reviewsByAbstract[a.id],
                       );
                       return (
                         <button

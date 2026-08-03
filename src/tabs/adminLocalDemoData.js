@@ -539,6 +539,20 @@ export function buildLocalAdminDemoData() {
         assignments: [],
       },
     ],
+    abstract_assignments: [
+      {
+        abstract_id: "ABS-DEMO-003",
+        title: abstracts[2].title,
+        category: abstracts[2].category,
+        assigned_reviewers: 1,
+      },
+      {
+        abstract_id: "ABS-DEMO-001",
+        title: abstracts[0].title,
+        category: abstracts[0].category,
+        assigned_reviewers: 2,
+      },
+    ],
   };
 
   const reviewerAccounts = [

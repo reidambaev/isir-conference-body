@@ -2429,6 +2429,31 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
     const reviewers = Object.values(reviewersMap);
     const abstractsPerReviewer = await getAbstractsPerReviewer(env);
 
+    // Per-abstract reviewer load (eligible scoring pool, including 0 assignments)
+    const abstractAssignmentsResult = await env.ISIR_DB.prepare(
+      `SELECT
+         a.id AS abstract_id,
+         a.title,
+         a.category,
+         COUNT(ra.reviewer_email) AS assigned_reviewers
+       FROM abstractions a
+       LEFT JOIN reviewer_assignments ra
+         ON ra.abstract_id = a.id
+       WHERE a.deleted_at IS NULL
+         AND ${PEER_REVIEW_ELIGIBLE_SQL}
+       GROUP BY a.id
+       ORDER BY assigned_reviewers ASC, a.title ASC`,
+    ).all();
+
+    const abstract_assignments = (abstractAssignmentsResult.results || []).map(
+      (row) => ({
+        abstract_id: row.abstract_id,
+        title: row.title || "",
+        category: row.category || "",
+        assigned_reviewers: Number(row.assigned_reviewers || 0),
+      }),
+    );
+
     return jsonResponse(
       {
         success: true,
@@ -2441,6 +2466,7 @@ async function handleAdminReviewerOverview(request, env, corsHeaders) {
         },
         abstracts_per_reviewer: abstractsPerReviewer,
         reviewers,
+        abstract_assignments,
       },
       200,
       corsHeaders,
