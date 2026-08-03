@@ -638,8 +638,6 @@ export default function AdminTab() {
         max: 0,
         avg: 0,
         histogram: [],
-        mostAssigned: [],
-        leastAssigned: [],
       };
     }
 
@@ -662,14 +660,6 @@ export default function AdminTab() {
     }
     const maxBucket = Math.max(...histogram.map((h) => h.abstracts), 1);
 
-    const sortedAsc = [...rows].sort((a, b) => {
-      const diff =
-        Number(a.assigned_reviewers || 0) - Number(b.assigned_reviewers || 0);
-      if (diff !== 0) return diff;
-      return String(a.title || "").localeCompare(String(b.title || ""));
-    });
-    const sortedDesc = [...sortedAsc].reverse();
-
     return {
       rows,
       totalAbstracts: rows.length,
@@ -678,8 +668,6 @@ export default function AdminTab() {
       avg,
       histogram,
       maxBucket,
-      mostAssigned: sortedDesc.slice(0, 8),
-      leastAssigned: sortedAsc.slice(0, 8),
     };
   }, [reviewerOverview]);
 
@@ -7750,71 +7738,6 @@ export default function AdminTab() {
                             </div>
                           </div>
                         ))}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                          Most assigned
-                        </h4>
-                        <ul className="mt-3 space-y-2">
-                          {abstractAssignmentBalance.mostAssigned.map((row) => (
-                            <li
-                              key={`most-${row.abstract_id}`}
-                              className="flex items-start justify-between gap-3"
-                            >
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-gray-900 line-clamp-2">
-                                  {row.title || row.abstract_id}
-                                </p>
-                                {row.category ? (
-                                  <p className="text-[11px] text-gray-500 mt-0.5">
-                                    {row.category}
-                                  </p>
-                                ) : null}
-                              </div>
-                              <span className="shrink-0 inline-flex items-center rounded-full bg-white border border-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-800 tabular-nums">
-                                {row.assigned_reviewers}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                          Least assigned
-                        </h4>
-                        <ul className="mt-3 space-y-2">
-                          {abstractAssignmentBalance.leastAssigned.map(
-                            (row) => (
-                              <li
-                                key={`least-${row.abstract_id}`}
-                                className="flex items-start justify-between gap-3"
-                              >
-                                <div className="min-w-0">
-                                  <p className="text-sm font-medium text-gray-900 line-clamp-2">
-                                    {row.title || row.abstract_id}
-                                  </p>
-                                  {row.category ? (
-                                    <p className="text-[11px] text-gray-500 mt-0.5">
-                                      {row.category}
-                                    </p>
-                                  ) : null}
-                                </div>
-                                <span
-                                  className={`shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold tabular-nums ${
-                                    Number(row.assigned_reviewers || 0) === 0
-                                      ? "bg-amber-50 border-amber-200 text-amber-800"
-                                      : "bg-white border-gray-200 text-gray-800"
-                                  }`}
-                                >
-                                  {row.assigned_reviewers}
-                                </span>
-                              </li>
-                            ),
-                          )}
-                        </ul>
                       </div>
                     </div>
                   </div>
