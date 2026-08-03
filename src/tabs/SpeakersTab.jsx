@@ -73,13 +73,9 @@ function SpeakerPhoto({
 
 function BioSection({ label, children, tone = "default" }) {
   const labelClass =
-    tone === "forum"
-      ? "text-sky-800/70"
-      : tone === "onDark"
-        ? "text-gray-500"
-        : "text-gray-500";
+    tone === "forum" ? "text-sky-800/70" : "text-gray-500";
   return (
-    <div className="text-left">
+    <div className="speaker-bio-section text-left">
       <p
         className={`text-[11px] font-semibold tracking-wider uppercase mb-1.5 ${labelClass}`}
       >
@@ -90,8 +86,8 @@ function BioSection({ label, children, tone = "default" }) {
   );
 }
 
-/** Layout C: Who / Focus / Why / At ISIR — shown inside an expanded card. */
-function SpeakerBioExpand({ bio, tone = "plenary" }) {
+/** Layout C: Who / Focus / Why / At ISIR — fold-open inside an expanded card. */
+function SpeakerBioExpand({ bio, open, tone = "plenary" }) {
   const chipClass =
     tone === "forum"
       ? "bg-sky-50 text-sky-900 border-sky-200"
@@ -100,51 +96,106 @@ function SpeakerBioExpand({ bio, tone = "plenary" }) {
     tone === "forum" ? "bg-sky-50/80 border-sky-200" : "border-amber-200/80";
 
   return (
-    <div className="w-full mt-5 pt-5 border-t border-gray-100 space-y-4 text-left">
-      <BioSection label="Who" tone={tone}>
-        <p className="text-sm text-gray-700 leading-relaxed">{bio.who}</p>
-      </BioSection>
+    <div
+      className={`speaker-bio-fold ${open ? "speaker-bio-fold--open" : ""}`}
+      aria-hidden={!open}
+    >
+      <div className="speaker-bio-fold-inner">
+        <div className="w-full mt-5 pt-5 border-t border-gray-100 space-y-4 text-left">
+          <BioSection label="Who" tone={tone}>
+            <p className="text-sm text-gray-700 leading-relaxed">{bio.who}</p>
+          </BioSection>
 
-      <BioSection label="Focus" tone={tone}>
-        <div className="flex flex-wrap gap-1.5">
-          {bio.focus.map((item) => (
-            <span
-              key={item}
-              className={`inline-block text-xs px-2.5 py-1 rounded-md border ${chipClass}`}
+          <BioSection label="Focus" tone={tone}>
+            <div className="flex flex-wrap gap-1.5">
+              {bio.focus.map((item) => (
+                <span
+                  key={item}
+                  className={`inline-block text-xs px-2.5 py-1 rounded-md border ${chipClass}`}
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+          </BioSection>
+
+          <BioSection label="Why it matters" tone={tone}>
+            <p className="text-sm text-gray-700 leading-relaxed">{bio.why}</p>
+          </BioSection>
+
+          {bio.atIsir && (
+            <div
+              className={`speaker-bio-section rounded-xl border px-3.5 py-3 ${atIsirClass}`}
+              style={
+                tone === "forum"
+                  ? undefined
+                  : {
+                      backgroundColor:
+                        "color-mix(in srgb, var(--color-secondary) 12%, white)",
+                    }
+              }
             >
-              {item}
-            </span>
-          ))}
+              <p
+                className="text-[11px] font-semibold tracking-wider uppercase mb-1"
+                style={{ color: "var(--color-primary)" }}
+              >
+                At ISIR 2026
+              </p>
+              <p className="text-sm text-gray-700 leading-relaxed">
+                {bio.atIsir}
+              </p>
+            </div>
+          )}
         </div>
-      </BioSection>
-
-      <BioSection label="Why it matters" tone={tone}>
-        <p className="text-sm text-gray-700 leading-relaxed">{bio.why}</p>
-      </BioSection>
-
-      {bio.atIsir && (
-        <div
-          className={`rounded-xl border px-3.5 py-3 ${atIsirClass}`}
-          style={
-            tone === "forum"
-              ? undefined
-              : {
-                  backgroundColor:
-                    "color-mix(in srgb, var(--color-secondary) 12%, white)",
-                }
-          }
-        >
-          <p
-            className="text-[11px] font-semibold tracking-wider uppercase mb-1"
-            style={{ color: "var(--color-primary)" }}
-          >
-            At ISIR 2026
-          </p>
-          <p className="text-sm text-gray-700 leading-relaxed">{bio.atIsir}</p>
-        </div>
-      )}
+      </div>
     </div>
   );
+}
+
+function speakerCardClass({ interactive, isSelected, variant }) {
+  // No overflow-hidden — would clip the soft hover lift.
+  const base = "speaker-card flex flex-col relative";
+  const layout = isSelected
+    ? variant === "plenary"
+      ? "md:col-span-3 items-stretch text-left"
+      : variant === "forum"
+        ? "sm:col-span-2 lg:col-span-3 items-stretch text-left"
+        : "md:col-span-2 lg:col-span-3 xl:col-span-4 items-stretch text-left"
+    : "items-center text-center";
+
+  if (variant === "plenary") {
+    return `${base} ${layout} bg-white rounded-2xl p-8 shadow-xl ${
+      interactive
+        ? `speaker-card--interactive cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-secondary)] ${
+            isSelected
+              ? "speaker-card--open ring-2 ring-[var(--color-secondary)] ring-offset-2"
+              : "hover:shadow-2xl hover:bg-slate-50/90"
+          }`
+        : ""
+    }`;
+  }
+
+  if (variant === "forum") {
+    return `${base} ${layout} bg-white rounded-xl p-6 shadow-md border border-sky-100 ${
+      interactive
+        ? `speaker-card--interactive cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-400 ${
+            isSelected
+              ? "speaker-card--open ring-2 ring-sky-400 ring-offset-2"
+              : "hover:shadow-lg hover:bg-sky-50/80 hover:border-sky-200"
+          }`
+        : ""
+    }`;
+  }
+
+  return `${base} ${layout} bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200 p-5 ${
+    interactive
+      ? `speaker-card--interactive cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-secondary)] ${
+          isSelected
+            ? "speaker-card--open ring-2 ring-[var(--color-secondary)] ring-offset-2"
+            : "hover:shadow-md hover:bg-white hover:border-gray-300"
+        }`
+      : ""
+  }`;
 }
 
 function interactiveProps(speaker, selected, onSelect) {
@@ -311,29 +362,21 @@ function SpeakersTab() {
               <div
                 key={speaker.key}
                 ref={isSelected ? expandRef : undefined}
-                className={`bg-white rounded-2xl p-8 shadow-xl flex flex-col relative overflow-hidden ${
-                  isSelected
-                    ? "md:col-span-3 items-stretch text-left"
-                    : "items-center text-center"
-                } ${
-                  interactive
-                    ? `cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-secondary)] ${
-                        isSelected
-                          ? "ring-2 ring-[var(--color-secondary)] ring-offset-2"
-                          : "hover:bg-slate-50"
-                      }`
-                    : ""
-                }`}
+                className={speakerCardClass({
+                  interactive,
+                  isSelected,
+                  variant: "plenary",
+                })}
                 {...(interactive
                   ? interactiveProps(speaker, selectedSpeaker, toggleSpeaker)
                   : {})}
               >
                 <div
-                  className="absolute top-0 left-0 right-0 h-1.5"
+                  className="absolute top-0 left-0 right-0 h-1.5 rounded-t-2xl"
                   style={{ backgroundColor: "var(--color-secondary)" }}
                 />
                 <div
-                  className={`flex w-full ${
+                  className={`flex w-full transition-[gap] duration-300 ${
                     isSelected
                       ? "flex-col sm:flex-row sm:items-start gap-5"
                       : "flex-col items-center"
@@ -343,7 +386,7 @@ function SpeakersTab() {
                     src={imgSrc}
                     alt={speaker.name}
                     eager
-                    className={`rounded-full border-2 flex-shrink-0 ${
+                    className={`speaker-card-photo rounded-full border-2 flex-shrink-0 ${
                       isSelected ? "w-28 h-28" : "w-36 h-36 mb-5"
                     }`}
                     style={{
@@ -354,7 +397,7 @@ function SpeakersTab() {
                     }}
                     fallback={
                       <div
-                        className={`rounded-full flex items-center justify-center border-2 font-bold text-white flex-shrink-0 ${
+                        className={`speaker-card-photo rounded-full flex items-center justify-center border-2 font-bold text-white flex-shrink-0 ${
                           isSelected
                             ? "w-28 h-28 text-2xl"
                             : "w-36 h-36 mb-5 text-3xl"
@@ -374,7 +417,7 @@ function SpeakersTab() {
                     }`}
                   >
                     <h5
-                      className={`font-extrabold mb-2 leading-tight ${
+                      className={`font-extrabold mb-2 leading-tight transition-all duration-300 ${
                         isSelected ? "text-2xl" : "text-xl"
                       }`}
                       style={{
@@ -392,8 +435,12 @@ function SpeakersTab() {
                     <p className="text-gray-500 text-sm leading-relaxed">
                       {speaker.affiliation}
                     </p>
-                    {isSelected && bio && (
-                      <SpeakerBioExpand bio={bio} tone="plenary" />
+                    {bio && (
+                      <SpeakerBioExpand
+                        bio={bio}
+                        open={isSelected}
+                        tone="plenary"
+                      />
                     )}
                   </div>
                 </div>
@@ -443,26 +490,18 @@ function SpeakersTab() {
               <div
                 key={speaker.key}
                 ref={isSelected ? expandRef : undefined}
-                className={`bg-white rounded-xl p-6 shadow-md flex flex-col relative overflow-hidden border border-sky-100 ${
-                  isSelected
-                    ? "sm:col-span-2 lg:col-span-3 items-stretch text-left"
-                    : "items-center text-center"
-                } ${
-                  interactive
-                    ? `cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-400 ${
-                        isSelected
-                          ? "ring-2 ring-sky-400 ring-offset-2"
-                          : "hover:bg-sky-50/80"
-                      }`
-                    : ""
-                }`}
+                className={speakerCardClass({
+                  interactive,
+                  isSelected,
+                  variant: "forum",
+                })}
                 {...(interactive
                   ? interactiveProps(speaker, selectedSpeaker, toggleSpeaker)
                   : {})}
               >
-                <div className="absolute top-0 left-0 right-0 h-1 bg-sky-400" />
+                <div className="absolute top-0 left-0 right-0 h-1 rounded-t-xl bg-sky-400" />
                 <div
-                  className={`flex w-full ${
+                  className={`flex w-full transition-[gap] duration-300 ${
                     isSelected
                       ? "flex-col sm:flex-row sm:items-start gap-4"
                       : "flex-col items-center"
@@ -471,7 +510,7 @@ function SpeakersTab() {
                   <SpeakerPhoto
                     src={imgSrc}
                     alt={speaker.name}
-                    className={`rounded-full border-2 flex-shrink-0 ${
+                    className={`speaker-card-photo rounded-full border-2 flex-shrink-0 ${
                       isSelected ? "w-24 h-24" : "w-28 h-28 mb-4"
                     }`}
                     style={{
@@ -482,7 +521,7 @@ function SpeakersTab() {
                     }}
                     fallback={
                       <div
-                        className={`rounded-full flex items-center justify-center border-2 font-bold text-white flex-shrink-0 ${
+                        className={`speaker-card-photo rounded-full flex items-center justify-center border-2 font-bold text-white flex-shrink-0 ${
                           isSelected
                             ? "w-24 h-24 text-xl"
                             : "w-28 h-28 mb-4 text-2xl"
@@ -502,7 +541,7 @@ function SpeakersTab() {
                     }`}
                   >
                     <h5
-                      className={`font-bold mb-1.5 leading-tight ${
+                      className={`font-bold mb-1.5 leading-tight transition-all duration-300 ${
                         isSelected ? "text-xl" : "text-lg"
                       }`}
                       style={{
@@ -520,8 +559,12 @@ function SpeakersTab() {
                     <p className="text-gray-500 text-sm leading-relaxed">
                       {speaker.affiliation}
                     </p>
-                    {isSelected && bio && (
-                      <SpeakerBioExpand bio={bio} tone="forum" />
+                    {bio && (
+                      <SpeakerBioExpand
+                        bio={bio}
+                        open={isSelected}
+                        tone="forum"
+                      />
                     )}
                   </div>
                 </div>
@@ -561,25 +604,17 @@ function SpeakersTab() {
               <div
                 key={speaker.key}
                 ref={isSelected ? expandRef : undefined}
-                className={`bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200 p-5 flex flex-col ${
-                  isSelected
-                    ? "md:col-span-2 lg:col-span-3 xl:col-span-4 items-stretch text-left"
-                    : "items-center text-center"
-                } ${
-                  interactive
-                    ? `cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-secondary)] ${
-                        isSelected
-                          ? "ring-2 ring-[var(--color-secondary)] ring-offset-2"
-                          : "hover:bg-white"
-                      }`
-                    : ""
-                }`}
+                className={speakerCardClass({
+                  interactive,
+                  isSelected,
+                  variant: "congress",
+                })}
                 {...(interactive
                   ? interactiveProps(speaker, selectedSpeaker, toggleSpeaker)
                   : {})}
               >
                 <div
-                  className={`flex w-full ${
+                  className={`flex w-full transition-[gap] duration-300 ${
                     isSelected
                       ? "flex-col sm:flex-row sm:items-start gap-4"
                       : "flex-col items-center"
@@ -588,7 +623,7 @@ function SpeakersTab() {
                   <SpeakerPhoto
                     src={imgSrc}
                     alt={speaker.name}
-                    className={`rounded-full border-2 flex-shrink-0 ${
+                    className={`speaker-card-photo rounded-full border-2 flex-shrink-0 ${
                       isSelected ? "w-24 h-24" : "w-28 h-28 mb-3"
                     }`}
                     style={{
@@ -599,7 +634,7 @@ function SpeakersTab() {
                     }}
                     fallback={
                       <div
-                        className={`rounded-full flex items-center justify-center border-2 font-bold text-white flex-shrink-0 ${
+                        className={`speaker-card-photo rounded-full flex items-center justify-center border-2 font-bold text-white flex-shrink-0 ${
                           isSelected
                             ? "w-24 h-24 text-xl"
                             : "w-28 h-28 mb-3 text-2xl"
@@ -619,7 +654,7 @@ function SpeakersTab() {
                     }`}
                   >
                     <h5
-                      className={`font-bold mb-1.5 leading-tight ${
+                      className={`font-bold mb-1.5 leading-tight transition-all duration-300 ${
                         isSelected ? "text-lg" : "text-base"
                       }`}
                       style={{
@@ -643,8 +678,12 @@ function SpeakersTab() {
                     >
                       {speaker.affiliation}
                     </p>
-                    {isSelected && bio && (
-                      <SpeakerBioExpand bio={bio} tone="plenary" />
+                    {bio && (
+                      <SpeakerBioExpand
+                        bio={bio}
+                        open={isSelected}
+                        tone="plenary"
+                      />
                     )}
                   </div>
                 </div>
