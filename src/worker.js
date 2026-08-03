@@ -403,6 +403,32 @@ async function handleApiRequest(request, env, url) {
     );
   }
 
+  // PATCH /api/admin/abstracts/:id/young-investigator - Toggle Young Investigator competition
+  const abstractYiMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)\/young-investigator$/,
+  );
+  if (abstractYiMatch && request.method === "PATCH") {
+    return handleUpdateAbstractYoungInvestigator(
+      request,
+      env,
+      corsHeaders,
+      abstractYiMatch[1],
+    );
+  }
+
+  // PATCH /api/admin/abstracts/:id/possible-young-investigator - Admin-only soft flag
+  const abstractPossibleYiMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)\/possible-young-investigator$/,
+  );
+  if (abstractPossibleYiMatch && request.method === "PATCH") {
+    return handleUpdateAbstractPossibleYoungInvestigator(
+      request,
+      env,
+      corsHeaders,
+      abstractPossibleYiMatch[1],
+    );
+  }
+
   // PATCH /api/admin/abstracts/:id/speakers - Change presenting/corresponding authors
   const abstractSpeakersMatch = url.pathname.match(
     /^\/api\/admin\/abstracts\/([^/]+)\/speakers$/,
@@ -2124,6 +2150,8 @@ async function handleGetReviewerAbstracts(request, env, corsHeaders) {
     abstracts.forEach((a) => {
       a.authors = authorsBy[a.id] || [];
       a.affiliations = affBy[a.id] || [];
+      // Admin-only soft flag — never expose to reviewers
+      delete a.possible_young_investigator;
     });
 
     // Keep ordering stable to assignments
@@ -7336,6 +7364,13 @@ async function handleUpdateAbstractStatus(
 }
 
 // Admin endpoint: Set whether an abstract is an invited speaker submission
+function parseAdminBooleanFlag(raw) {
+  if (raw === undefined || raw === null) return null;
+  if (raw === true || raw === 1 || raw === "1" || raw === "true") return 1;
+  if (raw === false || raw === 0 || raw === "0" || raw === "false") return 0;
+  return null;
+}
+
 async function handleUpdateAbstractInvitedSpeaker(
   request,
   env,
@@ -7354,8 +7389,10 @@ async function handleUpdateAbstractInvitedSpeaker(
     }
 
     const data = await request.json();
-    const raw = data?.isInvitedSpeaker ?? data?.is_invited_speaker;
-    if (raw === undefined || raw === null) {
+    const isInvitedSpeaker = parseAdminBooleanFlag(
+      data?.isInvitedSpeaker ?? data?.is_invited_speaker,
+    );
+    if (isInvitedSpeaker === null) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -7364,9 +7401,6 @@ async function handleUpdateAbstractInvitedSpeaker(
         { status: 400, headers: corsHeaders },
       );
     }
-
-    const isInvitedSpeaker =
-      raw === true || raw === 1 || raw === "1" || raw === "true" ? 1 : 0;
 
     const existing = await env.ISIR_DB.prepare(
       `SELECT id FROM abstractions WHERE id = ? AND deleted_at IS NULL`,
@@ -7406,6 +7440,164 @@ async function handleUpdateAbstractInvitedSpeaker(
     );
   } catch (error) {
     console.error("Update abstract invited speaker error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+async function handleUpdateAbstractYoungInvestigator(
+  request,
+  env,
+  corsHeaders,
+  abstractId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!abstractId) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing abstract id" }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const data = await request.json();
+    const youngInvestigator = parseAdminBooleanFlag(
+      data?.youngInvestigator ?? data?.young_investigator,
+    );
+    if (youngInvestigator === null) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "youngInvestigator is required (true/false or 1/0)",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT id FROM abstractions WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!existing) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Abstract not found" }),
+        { status: 404, headers: corsHeaders },
+      );
+    }
+
+    await env.ISIR_DB.prepare(
+      `UPDATE abstractions SET young_investigator = ? WHERE id = ?`,
+    )
+      .bind(youngInvestigator, abstractId)
+      .run();
+
+    // Competition flag is informational for admin/program — does not change peer review
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Abstract ${abstractId} young investigator flag set to ${youngInvestigator}`,
+        youngInvestigator,
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Update abstract young investigator error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+async function handleUpdateAbstractPossibleYoungInvestigator(
+  request,
+  env,
+  corsHeaders,
+  abstractId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!abstractId) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing abstract id" }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const data = await request.json();
+    const possibleYoungInvestigator = parseAdminBooleanFlag(
+      data?.possibleYoungInvestigator ?? data?.possible_young_investigator,
+    );
+    if (possibleYoungInvestigator === null) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            "possibleYoungInvestigator is required (true/false or 1/0)",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT id FROM abstractions WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!existing) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Abstract not found" }),
+        { status: 404, headers: corsHeaders },
+      );
+    }
+
+    try {
+      await env.ISIR_DB.prepare(
+        `UPDATE abstractions SET possible_young_investigator = ? WHERE id = ?`,
+      )
+        .bind(possibleYoungInvestigator, abstractId)
+        .run();
+    } catch (dbError) {
+      const message = String(dbError?.message || dbError || "");
+      if (message.includes("possible_young_investigator")) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error:
+              "Database missing possible_young_investigator column. Run db/migration_add_possible_young_investigator.sql",
+          }),
+          { status: 500, headers: corsHeaders },
+        );
+      }
+      throw dbError;
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Abstract ${abstractId} possible young investigator flag set to ${possibleYoungInvestigator}`,
+        possibleYoungInvestigator,
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Update abstract possible young investigator error:", error);
     return new Response(
       JSON.stringify({
         success: false,

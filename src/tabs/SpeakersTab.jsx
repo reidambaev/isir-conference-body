@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { getSpeakerBio } from "../speakerBios";
 
 function getInitials(name) {
@@ -14,12 +14,6 @@ function speakerImgSrc(speaker) {
   if (speaker.r2_key) return `/${speaker.r2_key}`;
   if (speaker.image) return `/speakers/${speaker.image}`;
   return null;
-}
-
-function sameSpeaker(a, b) {
-  if (!a || !b) return false;
-  if (a.id != null && b.id != null) return String(a.id) === String(b.id);
-  return a.key === b.key;
 }
 
 /** Lazy-loads speaker photos; soft placeholder until the image arrives. */
@@ -86,8 +80,7 @@ function BioSection({ label, children, tone = "default" }) {
   );
 }
 
-/** Layout C: Who / Focus / Why / At ISIR — fold-open inside an expanded card. */
-function SpeakerBioExpand({ bio, open, tone = "plenary" }) {
+function SpeakerBioBody({ bio, tone = "plenary" }) {
   const chipClass =
     tone === "forum"
       ? "bg-sky-50 text-sky-900 border-sky-200"
@@ -96,115 +89,191 @@ function SpeakerBioExpand({ bio, open, tone = "plenary" }) {
     tone === "forum" ? "bg-sky-50/80 border-sky-200" : "border-amber-200/80";
 
   return (
-    <div
-      className={`speaker-bio-fold ${open ? "speaker-bio-fold--open" : ""}`}
-      aria-hidden={!open}
-    >
-      <div className="speaker-bio-fold-inner">
-        <div className="w-full mt-5 pt-5 border-t border-gray-100 space-y-4 text-left">
-          <BioSection label="Who" tone={tone}>
-            <p className="text-sm text-gray-700 leading-relaxed">{bio.who}</p>
-          </BioSection>
+    <div className="space-y-4 text-left">
+      <BioSection label="Who" tone={tone}>
+        <p className="text-sm text-gray-700 leading-relaxed">{bio.who}</p>
+      </BioSection>
 
-          <BioSection label="Focus" tone={tone}>
-            <div className="flex flex-wrap gap-1.5">
-              {bio.focus.map((item) => (
-                <span
-                  key={item}
-                  className={`inline-block text-xs px-2.5 py-1 rounded-md border ${chipClass}`}
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
-          </BioSection>
-
-          <BioSection label="Why it matters" tone={tone}>
-            <p className="text-sm text-gray-700 leading-relaxed">{bio.why}</p>
-          </BioSection>
-
-          {bio.atIsir && (
-            <div
-              className={`speaker-bio-section rounded-xl border px-3.5 py-3 ${atIsirClass}`}
-              style={
-                tone === "forum"
-                  ? undefined
-                  : {
-                      backgroundColor:
-                        "color-mix(in srgb, var(--color-secondary) 12%, white)",
-                    }
-              }
+      <BioSection label="Focus" tone={tone}>
+        <div className="flex flex-wrap gap-1.5">
+          {bio.focus.map((item) => (
+            <span
+              key={item}
+              className={`inline-block text-xs px-2.5 py-1 rounded-md border ${chipClass}`}
             >
-              <p
-                className="text-[11px] font-semibold tracking-wider uppercase mb-1"
+              {item}
+            </span>
+          ))}
+        </div>
+      </BioSection>
+
+      <BioSection label="Why it matters" tone={tone}>
+        <p className="text-sm text-gray-700 leading-relaxed">{bio.why}</p>
+      </BioSection>
+
+      {bio.atIsir && (
+        <div
+          className={`speaker-bio-section rounded-xl border px-3.5 py-3 ${atIsirClass}`}
+          style={
+            tone === "forum"
+              ? undefined
+              : {
+                  backgroundColor:
+                    "color-mix(in srgb, var(--color-secondary) 12%, white)",
+                }
+          }
+        >
+          <p
+            className="text-[11px] font-semibold tracking-wider uppercase mb-1"
+            style={{ color: "var(--color-primary)" }}
+          >
+            At ISIR 2026
+          </p>
+          <p className="text-sm text-gray-700 leading-relaxed">{bio.atIsir}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SpeakerBioModal({ speaker, bio, tone, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  const imgSrc = speakerImgSrc(speaker);
+
+  return (
+    <div
+      className="speaker-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="speaker-bio-title"
+        className="speaker-modal-panel relative w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="h-1.5 w-full"
+          style={{
+            backgroundColor:
+              tone === "forum" ? "#38bdf8" : "var(--color-secondary)",
+          }}
+        />
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-4 right-3 z-10 w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors"
+          aria-label="Close biography"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+
+        <div className="px-6 pt-6 pb-7 sm:px-8 sm:pt-7 sm:pb-8">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-5 mb-6">
+            <SpeakerPhoto
+              src={imgSrc}
+              alt={speaker.name}
+              eager
+              className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-2 flex-shrink-0 mx-auto sm:mx-0"
+              style={{
+                borderColor: "var(--color-secondary)",
+                ...(speaker.image_position && {
+                  objectPosition: speaker.image_position,
+                }),
+              }}
+              fallback={
+                <div
+                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-full flex items-center justify-center border-2 text-2xl font-bold text-white flex-shrink-0 mx-auto sm:mx-0"
+                  style={{
+                    backgroundColor: "var(--color-primary)",
+                    borderColor: "var(--color-secondary)",
+                  }}
+                >
+                  {getInitials(speaker.name)}
+                </div>
+              }
+            />
+            <div className="text-center sm:text-left min-w-0 pt-1">
+              <h3
+                id="speaker-bio-title"
+                className="text-xl sm:text-2xl font-extrabold leading-tight mb-2"
                 style={{ color: "var(--color-primary)" }}
               >
-                At ISIR 2026
-              </p>
-              <p className="text-sm text-gray-700 leading-relaxed">
-                {bio.atIsir}
+                {speaker.name}
+              </h3>
+              <p className="text-gray-500 text-sm leading-relaxed">
+                {speaker.affiliation}
               </p>
             </div>
-          )}
+          </div>
+
+          <div className="border-t border-gray-100 pt-5">
+            <SpeakerBioBody bio={bio} tone={tone} />
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function speakerCardClass({ interactive, isSelected, variant }) {
-  // No overflow-hidden — would clip the soft hover lift.
-  const base = "speaker-card flex flex-col relative";
-  const layout = isSelected
-    ? variant === "plenary"
-      ? "md:col-span-3 items-stretch text-left"
-      : variant === "forum"
-        ? "sm:col-span-2 lg:col-span-3 items-stretch text-left"
-        : "md:col-span-2 lg:col-span-3 xl:col-span-4 items-stretch text-left"
-    : "items-center text-center";
+function speakerCardClass({ interactive, variant }) {
+  const base =
+    "speaker-card flex flex-col items-center text-center relative overflow-hidden";
 
   if (variant === "plenary") {
-    return `${base} ${layout} bg-white rounded-2xl p-8 shadow-xl ${
+    return `${base} bg-white rounded-2xl p-8 shadow-xl ${
       interactive
-        ? `speaker-card--interactive cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-secondary)] ${
-            isSelected
-              ? "speaker-card--open ring-2 ring-[var(--color-secondary)] ring-offset-2"
-              : "hover:shadow-2xl hover:bg-slate-50/90"
-          }`
+        ? "speaker-card--interactive cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-secondary)] hover:shadow-2xl hover:bg-slate-50/90"
         : ""
     }`;
   }
 
   if (variant === "forum") {
-    return `${base} ${layout} bg-white rounded-xl p-6 shadow-md border border-sky-100 ${
+    return `${base} bg-white rounded-xl p-6 shadow-md border border-sky-100 ${
       interactive
-        ? `speaker-card--interactive cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-400 ${
-            isSelected
-              ? "speaker-card--open ring-2 ring-sky-400 ring-offset-2"
-              : "hover:shadow-lg hover:bg-sky-50/80 hover:border-sky-200"
-          }`
+        ? "speaker-card--interactive cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-400 hover:shadow-lg hover:bg-sky-50/80 hover:border-sky-200"
         : ""
     }`;
   }
 
-  return `${base} ${layout} bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200 p-5 ${
+  return `${base} bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200 p-5 ${
     interactive
-      ? `speaker-card--interactive cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-secondary)] ${
-          isSelected
-            ? "speaker-card--open ring-2 ring-[var(--color-secondary)] ring-offset-2"
-            : "hover:shadow-md hover:bg-white hover:border-gray-300"
-        }`
+      ? "speaker-card--interactive cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-secondary)] hover:shadow-md hover:bg-white hover:border-gray-300"
       : ""
   }`;
 }
 
-function interactiveProps(speaker, selected, onSelect) {
-  const isSelected = sameSpeaker(selected, speaker);
+function interactiveProps(speaker, onSelect) {
   return {
     role: "button",
     tabIndex: 0,
-    "aria-expanded": isSelected,
-    "aria-label": `${isSelected ? "Hide" : "Show"} biography for ${speaker.name}`,
+    "aria-haspopup": "dialog",
+    "aria-label": `View biography for ${speaker.name}`,
     onClick: () => onSelect(speaker),
     onKeyDown: (e) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -220,7 +289,7 @@ function SpeakersTab() {
   const [forumSpeakers, setForumSpeakers] = useState([]);
   const [congressSpeakers, setCongressSpeakers] = useState([]);
   const [selectedSpeaker, setSelectedSpeaker] = useState(null);
-  const expandRef = useRef(null);
+  const [selectedTone, setSelectedTone] = useState("plenary");
 
   useEffect(() => {
     let cancelled = false;
@@ -267,26 +336,15 @@ function SpeakersTab() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!selectedSpeaker) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") setSelectedSpeaker(null);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [selectedSpeaker]);
-
-  useEffect(() => {
-    if (selectedSpeaker && expandRef.current) {
-      expandRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  }, [selectedSpeaker]);
-
-  const toggleSpeaker = (speaker) => {
-    setSelectedSpeaker((prev) =>
-      sameSpeaker(prev, speaker) ? null : speaker,
-    );
+  const openSpeaker = (speaker, tone) => {
+    if (!getSpeakerBio(speaker)) return;
+    setSelectedTone(tone);
+    setSelectedSpeaker(speaker);
   };
+
+  const selectedBio = selectedSpeaker
+    ? getSpeakerBio(selectedSpeaker)
+    : null;
 
   const plenaryHasBios = plenarySpeakers.some((s) => getSpeakerBio(s));
   const forumHasBios = forumSpeakers.some((s) => getSpeakerBio(s));
@@ -355,95 +413,62 @@ function SpeakersTab() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {plenarySpeakers.map((speaker) => {
             const imgSrc = speakerImgSrc(speaker);
-            const bio = getSpeakerBio(speaker);
-            const interactive = Boolean(bio);
-            const isSelected = sameSpeaker(selectedSpeaker, speaker);
+            const interactive = Boolean(getSpeakerBio(speaker));
             return (
               <div
                 key={speaker.key}
-                ref={isSelected ? expandRef : undefined}
                 className={speakerCardClass({
                   interactive,
-                  isSelected,
                   variant: "plenary",
                 })}
                 {...(interactive
-                  ? interactiveProps(speaker, selectedSpeaker, toggleSpeaker)
+                  ? interactiveProps(speaker, (s) => openSpeaker(s, "plenary"))
                   : {})}
               >
                 <div
-                  className="absolute top-0 left-0 right-0 h-1.5 rounded-t-2xl"
+                  className="absolute top-0 left-0 right-0 h-1.5"
                   style={{ backgroundColor: "var(--color-secondary)" }}
                 />
-                <div
-                  className={`flex w-full transition-[gap] duration-300 ${
-                    isSelected
-                      ? "flex-col sm:flex-row sm:items-start gap-5"
-                      : "flex-col items-center"
-                  }`}
-                >
-                  <SpeakerPhoto
-                    src={imgSrc}
-                    alt={speaker.name}
-                    eager
-                    className={`speaker-card-photo rounded-full border-2 flex-shrink-0 ${
-                      isSelected ? "w-28 h-28" : "w-36 h-36 mb-5"
-                    }`}
-                    style={{
-                      borderColor: "var(--color-secondary)",
-                      ...(speaker.image_position && {
-                        objectPosition: speaker.image_position,
-                      }),
-                    }}
-                    fallback={
-                      <div
-                        className={`speaker-card-photo rounded-full flex items-center justify-center border-2 font-bold text-white flex-shrink-0 ${
-                          isSelected
-                            ? "w-28 h-28 text-2xl"
-                            : "w-36 h-36 mb-5 text-3xl"
-                        }`}
-                        style={{
-                          backgroundColor: "var(--color-primary)",
-                          borderColor: "var(--color-secondary)",
-                        }}
-                      >
-                        {getInitials(speaker.name)}
-                      </div>
-                    }
-                  />
-                  <div
-                    className={`min-w-0 ${
-                      isSelected ? "text-left flex-1" : "text-center"
-                    }`}
-                  >
-                    <h5
-                      className={`font-extrabold mb-2 leading-tight transition-all duration-300 ${
-                        isSelected ? "text-2xl" : "text-xl"
-                      }`}
+                <SpeakerPhoto
+                  src={imgSrc}
+                  alt={speaker.name}
+                  eager
+                  className="speaker-card-photo w-36 h-36 rounded-full mb-5 border-2 flex-shrink-0"
+                  style={{
+                    borderColor: "var(--color-secondary)",
+                    ...(speaker.image_position && {
+                      objectPosition: speaker.image_position,
+                    }),
+                  }}
+                  fallback={
+                    <div
+                      className="speaker-card-photo w-36 h-36 rounded-full flex items-center justify-center mb-5 border-2 text-3xl font-bold text-white flex-shrink-0"
                       style={{
-                        color: "var(--color-primary)",
-                        textDecoration: interactive ? "underline" : undefined,
-                        textDecorationColor: interactive
-                          ? "color-mix(in srgb, var(--color-secondary) 55%, transparent)"
-                          : undefined,
-                        textDecorationThickness: interactive ? "1px" : undefined,
-                        textUnderlineOffset: interactive ? "4px" : undefined,
+                        backgroundColor: "var(--color-primary)",
+                        borderColor: "var(--color-secondary)",
                       }}
                     >
-                      {speaker.name}
-                    </h5>
-                    <p className="text-gray-500 text-sm leading-relaxed">
-                      {speaker.affiliation}
-                    </p>
-                    {bio && (
-                      <SpeakerBioExpand
-                        bio={bio}
-                        open={isSelected}
-                        tone="plenary"
-                      />
-                    )}
-                  </div>
-                </div>
+                      {getInitials(speaker.name)}
+                    </div>
+                  }
+                />
+                <h5
+                  className="text-xl font-extrabold mb-2 leading-tight"
+                  style={{
+                    color: "var(--color-primary)",
+                    textDecoration: interactive ? "underline" : undefined,
+                    textDecorationColor: interactive
+                      ? "color-mix(in srgb, var(--color-secondary) 55%, transparent)"
+                      : undefined,
+                    textDecorationThickness: interactive ? "1px" : undefined,
+                    textUnderlineOffset: interactive ? "4px" : undefined,
+                  }}
+                >
+                  {speaker.name}
+                </h5>
+                <p className="text-gray-500 text-sm leading-relaxed">
+                  {speaker.affiliation}
+                </p>
               </div>
             );
           })}
@@ -483,91 +508,58 @@ function SpeakersTab() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {forumSpeakers.map((speaker) => {
             const imgSrc = speakerImgSrc(speaker);
-            const bio = getSpeakerBio(speaker);
-            const interactive = Boolean(bio);
-            const isSelected = sameSpeaker(selectedSpeaker, speaker);
+            const interactive = Boolean(getSpeakerBio(speaker));
             return (
               <div
                 key={speaker.key}
-                ref={isSelected ? expandRef : undefined}
                 className={speakerCardClass({
                   interactive,
-                  isSelected,
                   variant: "forum",
                 })}
                 {...(interactive
-                  ? interactiveProps(speaker, selectedSpeaker, toggleSpeaker)
+                  ? interactiveProps(speaker, (s) => openSpeaker(s, "forum"))
                   : {})}
               >
-                <div className="absolute top-0 left-0 right-0 h-1 rounded-t-xl bg-sky-400" />
-                <div
-                  className={`flex w-full transition-[gap] duration-300 ${
-                    isSelected
-                      ? "flex-col sm:flex-row sm:items-start gap-4"
-                      : "flex-col items-center"
-                  }`}
-                >
-                  <SpeakerPhoto
-                    src={imgSrc}
-                    alt={speaker.name}
-                    className={`speaker-card-photo rounded-full border-2 flex-shrink-0 ${
-                      isSelected ? "w-24 h-24" : "w-28 h-28 mb-4"
-                    }`}
-                    style={{
-                      borderColor: "var(--color-secondary)",
-                      ...(speaker.image_position && {
-                        objectPosition: speaker.image_position,
-                      }),
-                    }}
-                    fallback={
-                      <div
-                        className={`speaker-card-photo rounded-full flex items-center justify-center border-2 font-bold text-white flex-shrink-0 ${
-                          isSelected
-                            ? "w-24 h-24 text-xl"
-                            : "w-28 h-28 mb-4 text-2xl"
-                        }`}
-                        style={{
-                          backgroundColor: "var(--color-primary)",
-                          borderColor: "var(--color-secondary)",
-                        }}
-                      >
-                        {getInitials(speaker.name)}
-                      </div>
-                    }
-                  />
-                  <div
-                    className={`min-w-0 ${
-                      isSelected ? "text-left flex-1" : "text-center"
-                    }`}
-                  >
-                    <h5
-                      className={`font-bold mb-1.5 leading-tight transition-all duration-300 ${
-                        isSelected ? "text-xl" : "text-lg"
-                      }`}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-sky-400" />
+                <SpeakerPhoto
+                  src={imgSrc}
+                  alt={speaker.name}
+                  className="speaker-card-photo w-28 h-28 rounded-full mb-4 border-2 flex-shrink-0"
+                  style={{
+                    borderColor: "var(--color-secondary)",
+                    ...(speaker.image_position && {
+                      objectPosition: speaker.image_position,
+                    }),
+                  }}
+                  fallback={
+                    <div
+                      className="speaker-card-photo w-28 h-28 rounded-full flex items-center justify-center mb-4 border-2 text-2xl font-bold text-white flex-shrink-0"
                       style={{
-                        color: "var(--color-primary)",
-                        textDecoration: interactive ? "underline" : undefined,
-                        textDecorationColor: interactive
-                          ? "rgba(56, 189, 248, 0.7)"
-                          : undefined,
-                        textDecorationThickness: interactive ? "1px" : undefined,
-                        textUnderlineOffset: interactive ? "4px" : undefined,
+                        backgroundColor: "var(--color-primary)",
+                        borderColor: "var(--color-secondary)",
                       }}
                     >
-                      {speaker.name}
-                    </h5>
-                    <p className="text-gray-500 text-sm leading-relaxed">
-                      {speaker.affiliation}
-                    </p>
-                    {bio && (
-                      <SpeakerBioExpand
-                        bio={bio}
-                        open={isSelected}
-                        tone="forum"
-                      />
-                    )}
-                  </div>
-                </div>
+                      {getInitials(speaker.name)}
+                    </div>
+                  }
+                />
+                <h5
+                  className="text-lg font-bold mb-1.5 leading-tight"
+                  style={{
+                    color: "var(--color-primary)",
+                    textDecoration: interactive ? "underline" : undefined,
+                    textDecorationColor: interactive
+                      ? "rgba(56, 189, 248, 0.7)"
+                      : undefined,
+                    textDecorationThickness: interactive ? "1px" : undefined,
+                    textUnderlineOffset: interactive ? "4px" : undefined,
+                  }}
+                >
+                  {speaker.name}
+                </h5>
+                <p className="text-gray-500 text-sm leading-relaxed">
+                  {speaker.affiliation}
+                </p>
               </div>
             );
           })}
@@ -597,96 +589,57 @@ function SpeakersTab() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {congressSpeakers.map((speaker) => {
             const imgSrc = speakerImgSrc(speaker);
-            const bio = getSpeakerBio(speaker);
-            const interactive = Boolean(bio);
-            const isSelected = sameSpeaker(selectedSpeaker, speaker);
+            const interactive = Boolean(getSpeakerBio(speaker));
             return (
               <div
                 key={speaker.key}
-                ref={isSelected ? expandRef : undefined}
                 className={speakerCardClass({
                   interactive,
-                  isSelected,
                   variant: "congress",
                 })}
                 {...(interactive
-                  ? interactiveProps(speaker, selectedSpeaker, toggleSpeaker)
+                  ? interactiveProps(speaker, (s) => openSpeaker(s, "plenary"))
                   : {})}
               >
-                <div
-                  className={`flex w-full transition-[gap] duration-300 ${
-                    isSelected
-                      ? "flex-col sm:flex-row sm:items-start gap-4"
-                      : "flex-col items-center"
-                  }`}
-                >
-                  <SpeakerPhoto
-                    src={imgSrc}
-                    alt={speaker.name}
-                    className={`speaker-card-photo rounded-full border-2 flex-shrink-0 ${
-                      isSelected ? "w-24 h-24" : "w-28 h-28 mb-3"
-                    }`}
-                    style={{
-                      borderColor: "var(--color-secondary)",
-                      ...(speaker.image_position && {
-                        objectPosition: speaker.image_position,
-                      }),
-                    }}
-                    fallback={
-                      <div
-                        className={`speaker-card-photo rounded-full flex items-center justify-center border-2 font-bold text-white flex-shrink-0 ${
-                          isSelected
-                            ? "w-24 h-24 text-xl"
-                            : "w-28 h-28 mb-3 text-2xl"
-                        }`}
-                        style={{
-                          backgroundColor: "var(--color-primary)",
-                          borderColor: "var(--color-secondary)",
-                        }}
-                      >
-                        {getInitials(speaker.name)}
-                      </div>
-                    }
-                  />
-                  <div
-                    className={`min-w-0 ${
-                      isSelected ? "text-left flex-1" : "text-center"
-                    }`}
-                  >
-                    <h5
-                      className={`font-bold mb-1.5 leading-tight transition-all duration-300 ${
-                        isSelected ? "text-lg" : "text-base"
-                      }`}
+                <SpeakerPhoto
+                  src={imgSrc}
+                  alt={speaker.name}
+                  className="speaker-card-photo w-28 h-28 rounded-full mb-3 border-2 flex-shrink-0"
+                  style={{
+                    borderColor: "var(--color-secondary)",
+                    ...(speaker.image_position && {
+                      objectPosition: speaker.image_position,
+                    }),
+                  }}
+                  fallback={
+                    <div
+                      className="speaker-card-photo w-28 h-28 rounded-full flex items-center justify-center mb-3 border-2 text-2xl font-bold text-white flex-shrink-0"
                       style={{
-                        color: "var(--color-primary)",
-                        textDecoration: interactive ? "underline" : undefined,
-                        textDecorationColor: interactive
-                          ? "color-mix(in srgb, var(--color-secondary) 50%, transparent)"
-                          : undefined,
-                        textDecorationThickness: interactive ? "1px" : undefined,
-                        textUnderlineOffset: interactive ? "3px" : undefined,
+                        backgroundColor: "var(--color-primary)",
+                        borderColor: "var(--color-secondary)",
                       }}
                     >
-                      {speaker.name}
-                    </h5>
-                    <p
-                      className={`text-gray-600 leading-snug ${
-                        isSelected
-                          ? "text-sm"
-                          : "text-xs line-clamp-3"
-                      }`}
-                    >
-                      {speaker.affiliation}
-                    </p>
-                    {bio && (
-                      <SpeakerBioExpand
-                        bio={bio}
-                        open={isSelected}
-                        tone="plenary"
-                      />
-                    )}
-                  </div>
-                </div>
+                      {getInitials(speaker.name)}
+                    </div>
+                  }
+                />
+                <h5
+                  className="text-base font-bold mb-1.5 leading-tight"
+                  style={{
+                    color: "var(--color-primary)",
+                    textDecoration: interactive ? "underline" : undefined,
+                    textDecorationColor: interactive
+                      ? "color-mix(in srgb, var(--color-secondary) 50%, transparent)"
+                      : undefined,
+                    textDecorationThickness: interactive ? "1px" : undefined,
+                    textUnderlineOffset: interactive ? "3px" : undefined,
+                  }}
+                >
+                  {speaker.name}
+                </h5>
+                <p className="text-gray-600 text-xs leading-snug line-clamp-3">
+                  {speaker.affiliation}
+                </p>
               </div>
             );
           })}
@@ -742,6 +695,15 @@ function SpeakersTab() {
           </button>
         </div>
       </div>
+
+      {selectedSpeaker && selectedBio && (
+        <SpeakerBioModal
+          speaker={selectedSpeaker}
+          bio={selectedBio}
+          tone={selectedTone}
+          onClose={() => setSelectedSpeaker(null)}
+        />
+      )}
     </div>
   );
 }

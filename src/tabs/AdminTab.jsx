@@ -376,6 +376,30 @@ function AbstractSpeakerControls({ abstract, onSave, saving }) {
   );
 }
 
+function AbstractCompetitionBadges({ abstract }) {
+  const isYi = Number(abstract?.young_investigator) === 1;
+  const isPossible = Number(abstract?.possible_young_investigator) === 1;
+  if (!isYi && !isPossible) return null;
+  return (
+    <>
+      {isYi && (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide bg-amber-500 text-white shadow-sm">
+          <span className="h-1.5 w-1.5 rounded-full bg-white" aria-hidden />
+          Young Investigator
+        </span>
+      )}
+      {isPossible && (
+        <span
+          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide bg-amber-100 text-amber-900 ring-1 ring-amber-300"
+          title="Admin-only note — not shown to reviewers and does not affect peer review"
+        >
+          Possibly YI
+        </span>
+      )}
+    </>
+  );
+}
+
 function AbstractCardActions({
   abstract,
   isInvited,
@@ -383,16 +407,22 @@ function AbstractCardActions({
   sendingConfirmationId,
   sendingDecisionId,
   updatingInvitedSpeakerId,
+  updatingYoungInvestigatorId,
+  updatingPossibleYoungInvestigatorId,
   savingAbstractId,
   deletingAbstractId,
   onSendConfirmation,
   onSendDecision,
   onToggleInvited,
+  onToggleYoungInvestigator,
+  onTogglePossibleYoungInvestigator,
   onEdit,
   onDelete,
 }) {
   const status = String(abstract.status || "").toLowerCase();
   const showDecision = status === "accepted" || status === "rejected";
+  const isYi = Number(abstract.young_investigator) === 1;
+  const isPossibleYi = Number(abstract.possible_young_investigator) === 1;
 
   return (
     <div className="md:col-span-2 pt-4 mt-1 border-t border-gray-200">
@@ -493,6 +523,64 @@ function AbstractCardActions({
                 ? "Move to general"
                 : "Mark invited"}
           </button>
+
+          <span className="hidden sm:inline text-gray-300">|</span>
+          <span>
+            <span className="font-semibold text-gray-700">YI competition:</span>{" "}
+            {isYi ? (
+              <span className="text-amber-700">Yes</span>
+            ) : (
+              <span className="text-gray-500">No</span>
+            )}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleYoungInvestigator(abstract.id, !isYi);
+            }}
+            disabled={updatingYoungInvestigatorId === abstract.id}
+            className={`px-2.5 py-1 text-xs font-medium rounded-md text-white disabled:opacity-60 disabled:cursor-not-allowed ${
+              isYi
+                ? "bg-slate-700 hover:bg-slate-800"
+                : "bg-amber-600 hover:bg-amber-700"
+            }`}
+          >
+            {updatingYoungInvestigatorId === abstract.id
+              ? "Updating…"
+              : isYi
+                ? "Remove YI"
+                : "Mark YI"}
+          </button>
+
+          <span>
+            <span className="font-semibold text-gray-700">Possibly YI:</span>{" "}
+            {isPossibleYi ? (
+              <span className="text-amber-800">Yes</span>
+            ) : (
+              <span className="text-gray-500">No</span>
+            )}
+          </span>
+          <button
+            type="button"
+            title="Admin-only note — not shown to reviewers and does not affect peer review"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePossibleYoungInvestigator(abstract.id, !isPossibleYi);
+            }}
+            disabled={updatingPossibleYoungInvestigatorId === abstract.id}
+            className={`px-2.5 py-1 text-xs font-medium rounded-md disabled:opacity-60 disabled:cursor-not-allowed ${
+              isPossibleYi
+                ? "bg-slate-700 text-white hover:bg-slate-800"
+                : "bg-amber-100 text-amber-900 ring-1 ring-amber-300 hover:bg-amber-200"
+            }`}
+          >
+            {updatingPossibleYoungInvestigatorId === abstract.id
+              ? "Updating…"
+              : isPossibleYi
+                ? "Clear possible"
+                : "Mark possible"}
+          </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 ml-auto">
@@ -554,6 +642,8 @@ export default function AdminTab() {
   const [abstractSearch, setAbstractSearch] = useState("");
   const [abstractCategoryFilter, setAbstractCategoryFilter] = useState("all");
   const [abstractStatusFilter, setAbstractStatusFilter] = useState("all");
+  /** all | yes | possible | no — Young Investigator competition filters */
+  const [abstractYiFilter, setAbstractYiFilter] = useState("all");
   const [abstractSortBy, setAbstractSortBy] = useState("date-desc");
   const [abstractViewMode, setAbstractViewMode] = useState("cards"); // "cards", "table", or "review"
   const [invitedAbstractSearch, setInvitedAbstractSearch] = useState("");
@@ -589,6 +679,12 @@ export default function AdminTab() {
   const [decisionSendSummary, setDecisionSendSummary] = useState(null);
   const [updatingInvitedSpeakerId, setUpdatingInvitedSpeakerId] =
     useState(null);
+  const [updatingYoungInvestigatorId, setUpdatingYoungInvestigatorId] =
+    useState(null);
+  const [
+    updatingPossibleYoungInvestigatorId,
+    setUpdatingPossibleYoungInvestigatorId,
+  ] = useState(null);
   const [updatingSpeakersId, setUpdatingSpeakersId] = useState(null);
   const [acceptingAllInvitedSpeakers, setAcceptingAllInvitedSpeakers] =
     useState(false);
@@ -816,9 +912,6 @@ export default function AdminTab() {
       (sum, a) => sum + Number(a.review_summary?.coi_count || 0),
       0,
     );
-    const singleReview = scored.filter(
-      (a) => Number(a.review_summary?.review_count || 0) === 1,
-    ).length;
     const byAvgDesc = [...scored].sort((a, b) => {
       const diff =
         Number(b.review_summary?.avg_total || 0) -
@@ -837,7 +930,6 @@ export default function AdminTab() {
       highestAvg,
       lowestAvg,
       totalCoi,
-      singleReview,
       bestRated: byAvgDesc.slice(0, 5),
       worstRated: [...byAvgDesc].reverse().slice(0, 5),
     };
@@ -1034,6 +1126,15 @@ export default function AdminTab() {
 
   useEffect(() => {
     writeAdminSectionCookie(activeSection);
+    // Keep the short-lived cookie alive while this tab stays open (even if AFK).
+    const refreshMs = Math.max(
+      30_000,
+      Math.floor((ADMIN_SECTION_COOKIE_MAX_AGE_SEC * 1000) / 2),
+    );
+    const id = window.setInterval(() => {
+      writeAdminSectionCookie(activeSection);
+    }, refreshMs);
+    return () => window.clearInterval(id);
   }, [activeSection]);
 
   useEffect(() => {
@@ -2493,6 +2594,21 @@ export default function AdminTab() {
       result = result.filter((a) => a.status === abstractStatusFilter);
     }
 
+    // Young Investigator competition filter
+    if (abstractYiFilter === "yes") {
+      result = result.filter((a) => Number(a.young_investigator) === 1);
+    } else if (abstractYiFilter === "possible") {
+      result = result.filter(
+        (a) => Number(a.possible_young_investigator) === 1,
+      );
+    } else if (abstractYiFilter === "no") {
+      result = result.filter(
+        (a) =>
+          Number(a.young_investigator) !== 1 &&
+          Number(a.possible_young_investigator) !== 1,
+      );
+    }
+
     // Sorting
     result.sort((a, b) => {
       switch (abstractSortBy) {
@@ -2508,6 +2624,15 @@ export default function AdminTab() {
           return (a.category || "").localeCompare(b.category || "");
         case "status":
           return (a.status || "").localeCompare(b.status || "");
+        case "yi-first": {
+          const yiA = Number(a.young_investigator) === 1 ? 0 : 1;
+          const yiB = Number(b.young_investigator) === 1 ? 0 : 1;
+          if (yiA !== yiB) return yiA - yiB;
+          const posA = Number(a.possible_young_investigator) === 1 ? 0 : 1;
+          const posB = Number(b.possible_young_investigator) === 1 ? 0 : 1;
+          if (posA !== posB) return posA - posB;
+          return (b.submission_date || 0) - (a.submission_date || 0);
+        }
         default:
           return 0;
       }
@@ -2519,6 +2644,7 @@ export default function AdminTab() {
     abstractSearch,
     abstractCategoryFilter,
     abstractStatusFilter,
+    abstractYiFilter,
     abstractSortBy,
   ]);
 
@@ -2706,6 +2832,109 @@ export default function AdminTab() {
       alert(err.message || "Failed to update invited speaker status");
     } finally {
       setUpdatingInvitedSpeakerId(null);
+    }
+  };
+
+  const updateAbstractYoungInvestigator = async (
+    abstractId,
+    youngInvestigator,
+  ) => {
+    if (!isLocalDemo && !adminToken) {
+      alert("Admin access token is missing.");
+      return;
+    }
+    const nextValue = youngInvestigator ? 1 : 0;
+    const confirmMsg = youngInvestigator
+      ? "Mark this abstract for the Young Investigator Competition? This does not change reviewer assignment."
+      : "Remove Young Investigator Competition status from this abstract?";
+    if (!window.confirm(confirmMsg)) return;
+
+    setUpdatingYoungInvestigatorId(abstractId);
+    try {
+      if (!isLocalDemo) {
+        const response = await fetch(
+          `/api/admin/abstracts/${abstractId}/young-investigator`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Admin-Token": adminToken,
+            },
+            body: JSON.stringify({ youngInvestigator: nextValue }),
+          },
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result?.success) {
+          throw new Error(
+            result?.error || "Failed to update Young Investigator status",
+          );
+        }
+      }
+
+      setAbstracts((prev) =>
+        prev.map((a) =>
+          a.id === abstractId ? { ...a, young_investigator: nextValue } : a,
+        ),
+      );
+    } catch (err) {
+      console.error("Error updating Young Investigator status:", err);
+      alert(err.message || "Failed to update Young Investigator status");
+    } finally {
+      setUpdatingYoungInvestigatorId(null);
+    }
+  };
+
+  const updateAbstractPossibleYoungInvestigator = async (
+    abstractId,
+    possibleYoungInvestigator,
+  ) => {
+    if (!isLocalDemo && !adminToken) {
+      alert("Admin access token is missing.");
+      return;
+    }
+    const nextValue = possibleYoungInvestigator ? 1 : 0;
+    const confirmMsg = possibleYoungInvestigator
+      ? "Mark as possibly Young Investigator Competition? This is admin-only and is not shown to reviewers."
+      : "Clear the possibly Young Investigator mark?";
+    if (!window.confirm(confirmMsg)) return;
+
+    setUpdatingPossibleYoungInvestigatorId(abstractId);
+    try {
+      if (!isLocalDemo) {
+        const response = await fetch(
+          `/api/admin/abstracts/${abstractId}/possible-young-investigator`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Admin-Token": adminToken,
+            },
+            body: JSON.stringify({ possibleYoungInvestigator: nextValue }),
+          },
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result?.success) {
+          throw new Error(
+            result?.error ||
+              "Failed to update possible Young Investigator mark",
+          );
+        }
+      }
+
+      setAbstracts((prev) =>
+        prev.map((a) =>
+          a.id === abstractId
+            ? { ...a, possible_young_investigator: nextValue }
+            : a,
+        ),
+      );
+    } catch (err) {
+      console.error("Error updating possible Young Investigator mark:", err);
+      alert(
+        err.message || "Failed to update possible Young Investigator mark",
+      );
+    } finally {
+      setUpdatingPossibleYoungInvestigatorId(null);
     }
   };
 
@@ -3751,6 +3980,8 @@ export default function AdminTab() {
       "Category",
       "Abstract Type",
       "Status",
+      "Young Investigator",
+      "Possibly YI",
       "Presenter",
       "Presenter Email",
       "Corresponding Author",
@@ -3765,6 +3996,8 @@ export default function AdminTab() {
       a.category,
       getAbstractTypeLabel(a),
       a.status,
+      Number(a.young_investigator) === 1 ? "Yes" : "No",
+      Number(a.possible_young_investigator) === 1 ? "Yes" : "No",
       a.presenter_name,
       a.presenter_email,
       a.corresponding_name,
@@ -4555,6 +4788,23 @@ export default function AdminTab() {
                 </select>
               </div>
 
+              {/* Young Investigator Competition Filter */}
+              <div className="min-w-[180px]">
+                <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+                  YI Competition
+                </label>
+                <select
+                  value={abstractYiFilter}
+                  onChange={(e) => setAbstractYiFilter(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors appearance-none cursor-pointer"
+                >
+                  <option value="all">All</option>
+                  <option value="yes">Young Investigator</option>
+                  <option value="possible">Possibly YI (admin)</option>
+                  <option value="no">Not competition</option>
+                </select>
+              </div>
+
               {/* Sort By */}
               <div className="min-w-[160px]">
                 <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
@@ -4567,6 +4817,7 @@ export default function AdminTab() {
                 >
                   <option value="date-desc">Newest First</option>
                   <option value="date-asc">Oldest First</option>
+                  <option value="yi-first">YI Competition First</option>
                   <option value="title-asc">Title A-Z</option>
                   <option value="title-desc">Title Z-A</option>
                   <option value="category">By Category</option>
@@ -4810,16 +5061,9 @@ export default function AdminTab() {
                   {/* Abstract Header */}
                   <div className="p-6 border-b border-gray-100">
                     <div className="flex flex-wrap gap-2 mb-4">
-                      {Number(currentReviewAbstract.young_investigator) ===
-                        1 && (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide bg-amber-500 text-white shadow-sm">
-                          <span
-                            className="h-1.5 w-1.5 rounded-full bg-white"
-                            aria-hidden
-                          />
-                          Young Investigator
-                        </span>
-                      )}
+                      <AbstractCompetitionBadges
+                        abstract={currentReviewAbstract}
+                      />
                       {reviewPool === "invited" && (
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 ring-1 ring-orange-200">
                           Invited speaker
@@ -5444,6 +5688,9 @@ export default function AdminTab() {
                         >
                           {abstract.title}
                         </div>
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          <AbstractCompetitionBadges abstract={abstract} />
+                        </div>
                       </td>
                       <td className="px-5 py-4 text-sm">
                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
@@ -5513,15 +5760,7 @@ export default function AdminTab() {
                             {abstract.title}
                           </h3>
                           <div className="flex flex-wrap gap-2">
-                            {Number(abstract.young_investigator) === 1 && (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide bg-amber-500 text-white shadow-sm">
-                                <span
-                                  className="h-1.5 w-1.5 rounded-full bg-white"
-                                  aria-hidden
-                                />
-                                Young Investigator
-                              </span>
-                            )}
+                            <AbstractCompetitionBadges abstract={abstract} />
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 ring-1 ring-slate-200">
                               {abstract.category}
                             </span>
@@ -5705,11 +5944,23 @@ export default function AdminTab() {
                             sendingConfirmationId={sendingConfirmationId}
                             sendingDecisionId={sendingDecisionId}
                             updatingInvitedSpeakerId={updatingInvitedSpeakerId}
+                            updatingYoungInvestigatorId={
+                              updatingYoungInvestigatorId
+                            }
+                            updatingPossibleYoungInvestigatorId={
+                              updatingPossibleYoungInvestigatorId
+                            }
                             savingAbstractId={savingAbstractId}
                             deletingAbstractId={deletingAbstractId}
                             onSendConfirmation={sendAbstractConfirmation}
                             onSendDecision={sendAbstractDecision}
                             onToggleInvited={updateAbstractInvitedSpeaker}
+                            onToggleYoungInvestigator={
+                              updateAbstractYoungInvestigator
+                            }
+                            onTogglePossibleYoungInvestigator={
+                              updateAbstractPossibleYoungInvestigator
+                            }
                             onEdit={openEditAbstractModal}
                             onDelete={openDeleteAbstractModal}
                           />
@@ -5847,6 +6098,7 @@ export default function AdminTab() {
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 ring-1 ring-orange-200">
                               Invited speaker
                             </span>
+                            <AbstractCompetitionBadges abstract={abstract} />
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 ring-1 ring-slate-200">
                               {abstract.category}
                             </span>
@@ -6034,11 +6286,23 @@ export default function AdminTab() {
                             sendingConfirmationId={sendingConfirmationId}
                             sendingDecisionId={sendingDecisionId}
                             updatingInvitedSpeakerId={updatingInvitedSpeakerId}
+                            updatingYoungInvestigatorId={
+                              updatingYoungInvestigatorId
+                            }
+                            updatingPossibleYoungInvestigatorId={
+                              updatingPossibleYoungInvestigatorId
+                            }
                             savingAbstractId={savingAbstractId}
                             deletingAbstractId={deletingAbstractId}
                             onSendConfirmation={sendAbstractConfirmation}
                             onSendDecision={sendAbstractDecision}
                             onToggleInvited={updateAbstractInvitedSpeaker}
+                            onToggleYoungInvestigator={
+                              updateAbstractYoungInvestigator
+                            }
+                            onTogglePossibleYoungInvestigator={
+                              updateAbstractPossibleYoungInvestigator
+                            }
                             onEdit={openEditAbstractModal}
                             onDelete={openDeleteAbstractModal}
                           />
@@ -6064,9 +6328,10 @@ export default function AdminTab() {
               <p className="text-gray-500 text-sm mt-1 max-w-2xl">
                 Peer-review scores for admin-accepted abstracts only (invited
                 speakers, poster-only, and not-yet-accepted submissions are
-                excluded). Average scores by category across reviewers, per-abstract totals, reviewer notes, and
-                conflict-of-interest flags. Submissions (accept/reject, full
-                text) stay under{" "}
+                excluded). Average scores by category across reviewers,
+                per-abstract totals, reviewer notes, and conflicts of interest
+                (COI — when a reviewer cannot score an abstract). Submissions
+                (accept/reject, full text) stay under{" "}
                 <button
                   type="button"
                   onClick={() => setActiveSection("abstracts")}
@@ -6094,7 +6359,7 @@ export default function AdminTab() {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                 Abstracts listed
@@ -6148,24 +6413,13 @@ export default function AdminTab() {
             </div>
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Single-review only
-              </p>
-              <p className="text-2xl font-bold text-amber-700 mt-1">
-                {abstractReviewRollupStats.singleReview}
-              </p>
-              <p className="text-[11px] text-gray-500 mt-1">
-                Thin coverage
-              </p>
-            </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                COI responses
+                Conflicts of interest
               </p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
                 {abstractReviewRollupStats.totalCoi}
               </p>
               <p className="text-[11px] text-gray-500 mt-1">
-                Not counted in averages
+                Reviewer COIs — scores not counted
               </p>
             </div>
           </div>
@@ -6266,7 +6520,7 @@ export default function AdminTab() {
               </h3>
               <p className="text-xs text-gray-500 mt-1">
                 Expand a row for category averages and each reviewer&apos;s
-                scores, notes, and COI details.
+                scores, notes, and conflict of interest details.
               </p>
             </div>
 
@@ -6355,7 +6609,8 @@ export default function AdminTab() {
                               {reviewCount}
                               {coiCount > 0 ? (
                                 <span className="ml-1 text-xs font-medium text-amber-700">
-                                  (+{coiCount} COI)
+                                  (+{coiCount} conflict
+                                  {coiCount === 1 ? "" : "s"} of interest)
                                 </span>
                               ) : null}
                             </p>
@@ -6443,7 +6698,7 @@ export default function AdminTab() {
                                     Additional notes
                                   </th>
                                   <th className="text-left px-3 py-2">
-                                    COI / flags
+                                    Conflict of interest
                                   </th>
                                   <th className="text-left px-3 py-2">
                                     Updated
@@ -6459,7 +6714,7 @@ export default function AdminTab() {
                                     if (rev.coi_same_lab)
                                       coiFlags.push("Same lab");
                                     if (rev.coi_other)
-                                      coiFlags.push("Other COI");
+                                      coiFlags.push("Other conflict");
                                     const isCoi =
                                       rev.has_coi || coiFlags.length > 0;
                                     return (
@@ -6473,7 +6728,7 @@ export default function AdminTab() {
                                         <td className="px-3 py-2 text-gray-700">
                                           {isCoi ? (
                                             <span className="text-amber-700 font-medium">
-                                              Not scored (COI)
+                                              Not scored (conflict of interest)
                                             </span>
                                           ) : (
                                             <>
