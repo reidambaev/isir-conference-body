@@ -1,70 +1,164 @@
 /**
- * Hardcoded bios for plenary / public forum speakers.
+ * Scannable speaker profiles (layout C: Who / Focus / Why / At ISIR).
  * Keys are speaker profile `id` values from the public API.
+ *
+ * @typedef {{
+ *   who: string,
+ *   focus: string[],
+ *   why: string,
+ *   atIsir?: string,
+ * }} SpeakerBio
  */
+
+/** @type {Record<string, SpeakerBio>} */
 const SPEAKER_BIOS = {
-  "seed-cheong-seok-kim": [
-    "Cheong-Seok Kim, PhD is Professor of Sociology and Director of the Center for Collaborative Research on Population and Society at Dongguk University, Republic of Korea. He served as President of the Population Association of Korea (2024–2025) and has also served as Vice President of the Korean Sociological Association and Editor-in-Chief of The Korean Journal of Population Studies.",
-    "Professor Kim received his B.A. from Seoul National University, his M.A. from the University of South Carolina, and his Ph.D. from the University of Michigan, Ann Arbor. His research focuses on population policy, low fertility, population aging, disability, social welfare, and demographic transitions. He currently leads major longitudinal studies on disability and midlife transitions.",
-    "An internationally recognized expert in population studies and social policy, Professor Kim's research provides critical insights into the demographic challenges facing Korea and other aging societies, including declining birth rates, healthcare sustainability, family change, and innovative policy solutions.",
-  ],
-  "seed-sam-richards": [
-    "Samuel Richards, PhD is an award-winning sociologist, Teaching Professor at Penn State University, Distinguished Professor at Konkuk University, and Co-founder of the World in Conversation Center for Public Diplomacy. His internationally renowned SOC 119 course reaches hundreds of thousands of viewers worldwide through YouTube, making it one of the most widely recognized university classrooms globally. His TEDx talk, A Radical Experiment in Empathy, has inspired audiences around the world by demonstrating the power of empathy to address complex social issues.",
-    "Professor Richards received his Ph.D. in Sociology from Rutgers University. His research and public scholarship focus on social change, empathy, cross-cultural dialogue, moral leadership, globalization, and demographic challenges. Widely recognized for his deep understanding of Korean society, he has contributed to educational initiatives addressing Korea's population crisis and has long examined how cultural values, family structures, work-life balance, and social expectations influence declining birth rates. His interdisciplinary perspective bridges sociology, public policy, and global health, offering valuable insights into one of the most pressing challenges facing modern societies.",
-  ],
-  "81d6c431-d364-4c51-bc61-d724923f7824": [
-    "Joanne Kwak-Kim, MD, MPH is Professor and Director of Reproductive Medicine & Immunology at the Chicago Medical School, Rosalind Franklin University of Medicine and Science, and Medical Director of the Reproductive Medicine & Immunology Clinic. An internationally recognized physician-scientist, she is one of the world's leading experts in reproductive immunology and currently serves as President of the International Society for Immunology of Reproduction (ISIR).",
-    "Dr. Kwak-Kim's research focuses on recurrent pregnancy loss, repeated implantation failure, unexplained infertility, ovarian aging, immune tolerance, NK cell biology, and translational reproductive medicine. Her pioneering work has advanced the understanding of immune-mediated reproductive disorders and the development of personalized diagnostic and therapeutic approaches for patients with reproductive failure.",
-    "In 2026, ScholarGPS recognized Dr. Kwak-Kim as the world's highest-ranked currently active clinician-scientist in reproductive immunology and ranked the Reproductive Medicine & Immunology Program at Rosalind Franklin University as the No. 1 reproductive immunology program worldwide. At ISIR 2026, she will present emerging insights into the role of chronic inflammation and immune dysregulation in ovarian aging, highlighting novel strategies to preserve fertility and improve women's reproductive health.",
-  ],
-  "seed-gil-mor": [
-    "Gil Mor, MD, PhD is an internationally renowned physician-scientist and Professor at the Wayne State University School of Medicine. Widely recognized as one of the founders of modern reproductive immunology, his pioneering research has transformed our understanding of immune regulation during implantation, placental development, pregnancy maintenance, and parturition. Previously, he held major academic leadership positions at Yale School of Medicine, where he established internationally recognized programs in reproductive immunology and maternal-fetal health.",
-    "Professor Mor's research focuses on maternal-fetal immunology, trophoblast biology, innate immunity, extracellular vesicles, implantation, preeclampsia, preterm birth, and host defense during pregnancy. He is particularly known for developing the concept of the immune clock of pregnancy, demonstrating that pregnancy is a dynamic sequence of precisely regulated inflammatory and anti-inflammatory phases.",
-    "An internationally respected leader in reproductive immunology, Professor Mor has made fundamental contributions that continue to shape clinical and translational research worldwide. At ISIR 2026, he will present the latest advances in antiviral defense mechanisms at the maternal-fetal interface, highlighting how immune protection is balanced to safeguard both mother and fetus during pregnancy.",
-  ],
-  "24c1f6f0-b400-43ff-965d-2a793c5fad5c": [
-    "Kwang Yol Cha, MD, PhD is the founder of CHA Medical Group and CHA University and is widely recognized as one of the world's leading pioneers in reproductive medicine and regenerative healthcare. Through his visionary leadership, he has built one of Asia's largest healthcare and academic networks dedicated to women's health, fertility care, regenerative medicine, and biomedical innovation, helping establish Korea as a global leader in reproductive medicine.",
-    "Dr. Cha has made pioneering contributions to infertility treatment, in vitro fertilization (IVF), assisted reproductive technology, embryo science, fertility preservation, and stem cell–based medicine. His work has advanced clinical outcomes in reproductive medicine while fostering the integration of scientific discovery, physician education, biotechnology, and translational medicine into a globally recognized healthcare model.",
-    "An internationally respected physician, scientist, and healthcare innovator, Dr. Cha continues to shape the future of reproductive medicine through research, entrepreneurship, and international collaboration. At ISIR 2026, he will share his vision for advancing fertility care, regenerative medicine, and women's health while addressing the global challenges of declining birth rates and population change through innovation and translational science.",
-  ],
-  "e8ca4d46-aec4-4538-9dfc-aba127737f9f": [
-    "Surendra Sharma, MD, PhD is an internationally renowned reproductive immunologist and Professor at the University of Texas Medical Branch (UTMB). Previously, he served as Professor at Brown University, where he established a distinguished program in reproductive immunology. Over the past four decades, his pioneering research has transformed our understanding of maternal-fetal immune regulation, defining key immunological mechanisms underlying implantation, maternal-fetal tolerance, placental development, recurrent pregnancy loss, recurrent implantation failure, preeclampsia, and preterm birth.",
-    "Professor Sharma's research focuses on cytokine networks, uterine natural killer (NK) cells, macrophages, inflammatory signaling, and immune regulation during pregnancy. He has published more than 400 peer-reviewed articles and book chapters, with research continuously supported by the U.S. National Institutes of Health (NIH). His work has advanced innovative diagnostic and therapeutic strategies for pregnancy complications.",
-    "An internationally respected leader in reproductive immunology, Professor Sharma has served as President of the American Society for Reproductive Immunology (ASRI), Editor-in-Chief of the American Journal of Reproductive Immunology, and currently serves as President-Elect of the International Society for Immunology of Reproduction (ISIR). At ISIR 2026, he will present the latest advances in maternal-fetal immune regulation and their implications for improving pregnancy outcomes and women's reproductive health worldwide.",
-  ],
-  "seed-ricardo-barini": [
-    "Ricardo Barini, MD, PhD, FCRI is Collaborating Professor of Obstetrics and Gynecology at the University of Campinas (UNICAMP), Brazil, and one of Latin America's leading experts in reproductive immunology, recurrent pregnancy loss, assisted reproduction, and fetal medicine. Following his Ph.D., he completed fellowship training in Reproductive Immunology at Rosalind Franklin University of Medicine and Science under the mentorship of Dr. Allan E. Beer and was awarded Fellow Clinical Reproductive Immunology (FCRI) by the American Society for Reproductive Immunology (ASRI).",
-    "Professor Barini pioneered reproductive immunology in Brazil by establishing the country's first public clinic dedicated to recurrent pregnancy loss and later founded a specialized reproductive immunology laboratory and clinic that has cared for more than 5,000 patients with recurrent miscarriage and implantation failure. His research and clinical practice focus on immune-mediated infertility, recurrent pregnancy loss, implantation failure, assisted reproduction, and fetal medicine.",
-    "At ISIR 2026, Professor Barini will lead the Public Forum, providing patients and families with evidence-based guidance on recurrent pregnancy loss, unexplained infertility, and implantation failure while promoting communication between experts and the public.",
-  ],
-  "b304fe03-6283-4acb-8e57-700acc42f5eb": [
-    "George Ndukwe, MD, FRCOG, FWACS, FASRI is Associate Medical Director of Harley Street Fertility Clinic in London, United Kingdom, and one of Europe's leading fertility specialists. Internationally recognized for his expertise in recurrent implantation failure, recurrent pregnancy loss, reproductive immunology, and assisted reproduction, he has more than four decades of experience advancing fertility care through clinical innovation, research, and patient-centered practice.",
-    "Dr. Ndukwe previously served as Medical Director of the Nottingham University Research and Treatment Unit in Reproduction (NURTURE) and later as Medical Director of CARE Fertility Nottingham. He played an important role in advancing intracytoplasmic sperm injection (ICSI) and was among the early pioneers to introduce reproductive immunology–based approaches into fertility practice in the United Kingdom through collaboration with the late Dr. Alan E. Beer.",
-    "An internationally respected leader in reproductive medicine, Dr. Ndukwe has been an active member of the International Society for Immunology of Reproduction (ISIR), promoting the translation of reproductive immunology into clinical practice. At ISIR 2026, he will participate in the Public Forum, providing evidence-based guidance on recurrent miscarriage, implantation failure, and unexplained infertility while helping bridge the gap between scientific advances and patient care.",
-  ],
-  "aa467dc5-a47d-4364-9911-1119013f69e2": [
-    "Joon Cheol Park, MD, PhD is Professor and Director of the Division of Infertility and Reproductive Endocrinology at Kyungpook National University School of Medicine, Republic of Korea. A leading reproductive endocrinologist, he is internationally recognized for his expertise in infertility, recurrent pregnancy loss, reproductive immunology, ovarian insufficiency, and assisted reproductive technology.",
-    "Professor Park's research focuses on reproductive endocrinology, implantation, ovarian function, endometriosis, recurrent miscarriage, and immune mechanisms underlying reproductive disorders. His work has contributed to advancing the understanding of fertility treatment, ovarian dysfunction, and reproductive immunology through both clinical and translational research. He has authored numerous peer-reviewed publications and book chapters, including contributions to the field of reproductive immunology.",
-    "An internationally respected clinician-scientist, Professor Park is an active leader in reproductive medicine in Korea and serves on the Local Scientific Committee for ISIR 2026. At ISIR 2026, he will present the latest advances in reproductive endocrinology and reproductive immunology, highlighting translational approaches to improving fertility outcomes and women's reproductive health.",
-  ],
-  "55c6fc80-faac-4367-bbd1-ade9df16f4cd": [
-    "Na Young Kim, MD, PhD is an IVF specialist at HI Fertility Center in Seoul, Republic of Korea, and an internationally recognized expert in reproductive medicine and reproductive immunology. After completing her fellowship training in Reproductive Endocrinology and Infertility at Samsung Cheil Hospital, she pursued advanced training in Reproductive Medicine & Immunology at the Chicago Medical School, Rosalind Franklin University of Medicine and Science, USA, one of the world's leading centers for reproductive immunology. Her clinical expertise includes in vitro fertilization (IVF), recurrent implantation failure, recurrent pregnancy loss, unexplained infertility, and personalized fertility treatment.",
-    "Dr. Kim's research focuses on implantation failure, recurrent miscarriage, assisted reproductive technology, and immunologic approaches to improving pregnancy outcomes. She has co-authored national practice guidelines in reproductive immunology and has actively promoted multidisciplinary, evidence-based care for patients with complex reproductive disorders.",
-    "As a respected clinician and educator, Dr. Kim integrates advances in reproductive immunology with modern IVF practice to provide individualized patient care. She also serves as one of the Representative Cooperation Directors of the 2026 International Society for Immunology of Reproduction (ISIR) World Congress, helping strengthen international collaboration for the meeting. At ISIR 2026, she will present the latest clinical strategies for optimizing implantation and pregnancy outcomes through precision reproductive medicine and immune-based approaches to infertility treatment.",
-  ],
-  "9f9d0232-c4e3-4812-bdba-50a413970060": [
-    "Kuk Sun Han, MD, PhD is Director of Samsung Jeil Women's Clinic in Busan, Republic of Korea, and a leading specialist in reproductive endocrinology and infertility. After completing her fellowship training in Reproductive Endocrinology and Infertility at Samsung Cheil Hospital, she pursued advanced training at Bourn Hall Clinic in Cambridge, United Kingdom, the world's first IVF center, and in Reproductive Medicine & Immunology at the Chicago Medical School, Rosalind Franklin University of Medicine and Science, USA, the world's top Reproductive Immunology Clinic. Her international training has enabled her to integrate cutting-edge assisted reproductive technology with reproductive immunology in clinical practice.",
-    "Dr. Han's clinical interests include in vitro fertilization (IVF), recurrent implantation failure, recurrent pregnancy loss, fertility preservation, ovarian reserve optimization, and personalized reproductive care. She is committed to translating advances in reproductive medicine and immunology into evidence-based, patient-centered fertility treatment to improve pregnancy outcomes for couples with complex infertility.",
-    "As a leading member of the Representative Cooperation Directors for ISIR 2026, Dr. Han is actively supporting the successful organization of the congress. At ISIR 2026, she will share her clinical experience in contemporary infertility management and discuss advances in precision reproductive medicine and personalized approaches to assisted reproduction.",
-  ],
-  "seed-jei-won-moon": [
-    "Jei Won Moon, MD, PhD is Director of M Fertility Center in Seoul, Republic of Korea, and Clinical Professor of Obstetrics and Gynecology at Asan Medical Center. He is an internationally recognized specialist in reproductive endocrinology and infertility, with expertise in in vitro fertilization (IVF), infertility in women of advanced reproductive age, recurrent implantation failure, recurrent pregnancy loss, premature ovarian insufficiency, polycystic ovary syndrome (PCOS), fertility preservation, ovarian preservation, and male infertility. Through his clinical practice and research, he has contributed to advancing evidence-based fertility care and improving reproductive outcomes for patients with complex infertility.",
-    "Dr. Moon's research focuses on implantation biology, recurrent reproductive failure, ovarian function, assisted reproductive technology, and translational reproductive medicine. He has authored numerous scientific publications and actively collaborates in international research aimed at translating scientific advances into clinical fertility care.",
-    "Dr. Moon serves as a Board Member of the International Society for In Vitro Fertilization (ISIVF) and is a member of the International Cooperation Committee, promoting global collaboration in the Korean Society for Reproductive Medicine. At ISIR 2026, he will present contemporary clinical approaches to recurrent implantation failure and infertility, highlighting how precision reproductive medicine and innovative IVF strategies can improve pregnancy outcomes and advance women's reproductive health.",
-  ],
+  "seed-cheong-seok-kim": {
+    who: "Professor of Sociology and Director of the Center for Collaborative Research on Population and Society at Dongguk University. Former President of the Population Association of Korea (2024–2025).",
+    focus: [
+      "Population policy",
+      "Low fertility",
+      "Population aging",
+      "Social welfare",
+    ],
+    why: "His research frames the demographic challenges facing Korea and other aging societies — from declining birth rates to healthcare sustainability and family change.",
+    atIsir:
+      "Insights on demographic transition and policy responses in aging societies.",
+  },
+  "seed-sam-richards": {
+    who: "Award-winning sociologist at Penn State and Distinguished Professor at Konkuk University; co-founder of the World in Conversation Center. Known worldwide for SOC 119 and his TEDx talk on radical empathy.",
+    focus: [
+      "Empathy & dialogue",
+      "Social change",
+      "Korean society",
+      "Demographic challenges",
+    ],
+    why: "He connects culture, family, work-life balance, and social expectations to Korea’s population crisis in a way that reaches far beyond the academy.",
+    atIsir:
+      "How cultural values and social structures shape declining birth rates.",
+  },
+  "81d6c431-d364-4c51-bc61-d724923f7824": {
+    who: "Professor and Director of Reproductive Medicine & Immunology at Rosalind Franklin University, and President of ISIR. One of the world’s leading clinician-scientists in reproductive immunology.",
+    focus: [
+      "Recurrent pregnancy loss",
+      "Implantation failure",
+      "Ovarian aging",
+      "Immune tolerance",
+    ],
+    why: "ScholarGPS (2026) ranked her the world’s top active clinician-scientist in reproductive immunology, and her program No. 1 worldwide — bridging lab insight and patient care.",
+    atIsir:
+      "Chronic inflammation, immune dysregulation, and strategies to preserve fertility in ovarian aging.",
+  },
+  "seed-gil-mor": {
+    who: "Physician-scientist at Wayne State University School of Medicine and a founder of modern reproductive immunology. Previously built major maternal-fetal programs at Yale.",
+    focus: [
+      "Maternal–fetal immunity",
+      "Implantation",
+      "Immune clock",
+      "Preeclampsia",
+    ],
+    why: "His “immune clock of pregnancy” reframed gestation as a timed sequence of inflammatory and anti-inflammatory phases — still shaping the field.",
+    atIsir:
+      "Antiviral defense at the maternal–fetal interface, and how protection is balanced for mother and fetus.",
+  },
+  "24c1f6f0-b400-43ff-965d-2a793c5fad5c": {
+    who: "Founder of CHA Medical Group and CHA University; a pioneering leader in reproductive medicine and regenerative healthcare across Asia.",
+    focus: [
+      "IVF & ART",
+      "Fertility preservation",
+      "Stem cell medicine",
+      "Women’s health systems",
+    ],
+    why: "He built one of Asia’s largest clinical and academic networks for fertility and regenerative care, helping establish Korea as a global leader in the field.",
+    atIsir:
+      "A vision for fertility care, regenerative medicine, and innovation against declining birth rates.",
+  },
+  "e8ca4d46-aec4-4538-9dfc-aba127737f9f": {
+    who: "Reproductive immunologist at UTMB; former Brown University professor. President-Elect of ISIR, past President of ASRI, and former Editor-in-Chief of the American Journal of Reproductive Immunology.",
+    focus: [
+      "Maternal–fetal tolerance",
+      "Uterine NK cells",
+      "RPL & RIF",
+      "Preeclampsia",
+    ],
+    why: "Four decades of NIH-supported work and 400+ publications defined key immune mechanisms of implantation, pregnancy maintenance, and major obstetric complications.",
+    atIsir:
+      "Latest advances in maternal–fetal immune regulation and better pregnancy outcomes.",
+  },
+  "seed-ricardo-barini": {
+    who: "Collaborating Professor at UNICAMP (Brazil) and a leading Latin American expert in reproductive immunology. Trained under Dr. Allan E. Beer; FCRI (ASRI).",
+    focus: [
+      "Recurrent pregnancy loss",
+      "Implantation failure",
+      "Assisted reproduction",
+      "Fetal medicine",
+    ],
+    why: "He founded Brazil’s first public RPL clinic and a specialty lab/clinic that has cared for more than 5,000 patients with miscarriage and implantation failure.",
+    atIsir:
+      "Leads the Public Forum — evidence-based guidance for patients and families on RPL, unexplained infertility, and implantation failure.",
+  },
+  "b304fe03-6283-4acb-8e57-700acc42f5eb": {
+    who: "Associate Medical Director at Harley Street Fertility Clinic (London). Over four decades advancing fertility care as a clinician and early adopter of reproductive immunology in the UK.",
+    focus: [
+      "Recurrent implantation failure",
+      "Recurrent pregnancy loss",
+      "Reproductive immunology",
+      "Assisted reproduction",
+    ],
+    why: "Former Medical Director of NURTURE and CARE Fertility Nottingham; helped bring ICSI and Beer-inspired immune approaches into UK fertility practice.",
+    atIsir:
+      "Public Forum clinician bridging scientific advances with patient care for miscarriage, RIF, and unexplained infertility.",
+  },
+  "aa467dc5-a47d-4364-9911-1119013f69e2": {
+    who: "Professor and Director of Infertility and Reproductive Endocrinology at Kyungpook National University School of Medicine. Local Scientific Committee member for ISIR 2026.",
+    focus: [
+      "Reproductive endocrinology",
+      "Recurrent miscarriage",
+      "Ovarian insufficiency",
+      "ART",
+    ],
+    why: "A leading Korean clinician-scientist linking endocrine care, implantation biology, and immune mechanisms in complex infertility.",
+    atIsir:
+      "Translational advances in reproductive endocrinology and immunology to improve fertility outcomes.",
+  },
+  "55c6fc80-faac-4367-bbd1-ade9df16f4cd": {
+    who: "IVF specialist at HI Fertility Center (Seoul); fellowship-trained in reproductive immunology at Rosalind Franklin University. Representative Cooperation Director for ISIR 2026.",
+    focus: [
+      "IVF",
+      "Implantation failure",
+      "Recurrent pregnancy loss",
+      "Precision fertility care",
+    ],
+    why: "She co-authored national practice guidelines in reproductive immunology and integrates immune-based strategies into modern IVF for complex cases.",
+    atIsir:
+      "Clinical strategies for optimizing implantation and pregnancy through precision and immune-informed care.",
+  },
+  "9f9d0232-c4e3-4812-bdba-50a413970060": {
+    who: "Director of Samsung Jeil Women’s Clinic (Busan). Trained at Samsung Cheil, Bourn Hall (Cambridge), and Rosalind Franklin’s reproductive immunology clinic. Representative Cooperation Director for ISIR 2026.",
+    focus: [
+      "IVF",
+      "RIF & RPL",
+      "Fertility preservation",
+      "Ovarian reserve",
+    ],
+    why: "International training lets her combine cutting-edge ART with reproductive immunology in day-to-day patient care.",
+    atIsir:
+      "Contemporary infertility management and personalized approaches to assisted reproduction.",
+  },
+  "seed-jei-won-moon": {
+    who: "Director of M Fertility Center (Seoul) and Clinical Professor at Asan Medical Center. Board member of ISIVF; active in international collaboration for Korean reproductive medicine.",
+    focus: [
+      "Advanced maternal age",
+      "RIF & RPL",
+      "POI & PCOS",
+      "Fertility preservation",
+    ],
+    why: "His practice and research target complex infertility — from implantation failure to ovarian dysfunction — with an eye toward translational IVF strategies.",
+    atIsir:
+      "Clinical approaches to recurrent implantation failure and precision IVF to improve pregnancy outcomes.",
+  },
 };
 
-/** Resolve bio paragraphs for a public speaker row (by profile id). */
+/** Resolve a scannable bio for a public speaker row (by profile id). */
 export function getSpeakerBio(speaker) {
   if (!speaker) return null;
   const byId = SPEAKER_BIOS[speaker.id];
