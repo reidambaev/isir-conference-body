@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import * as XLSX from "xlsx";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
@@ -487,7 +487,7 @@ function AbstractIssueBadges({ abstract, duplicateMatches }) {
   );
 }
 
-function AbstractDuplicateNotice({ matches, onOpenMatch }) {
+function AbstractDuplicateNotice({ matches, onOpenMatch, onCompareMatch }) {
   if (!matches?.length) return null;
   return (
     <div className="md:col-span-2 rounded-lg border border-rose-200 bg-rose-50 p-4">
@@ -513,19 +513,232 @@ function AbstractDuplicateNotice({ matches, onOpenMatch }) {
                   {match.reasons.join(" · ")}
                 </div>
               </div>
-              {typeof onOpenMatch === "function" && (
-                <button
-                  type="button"
-                  onClick={() => onOpenMatch(match.id)}
-                  className="px-2.5 py-1 text-xs font-medium rounded-md bg-rose-600 text-white hover:bg-rose-700"
-                >
-                  Open
-                </button>
-              )}
+              <div className="flex items-center gap-1.5">
+                {typeof onCompareMatch === "function" && (
+                  <button
+                    type="button"
+                    onClick={() => onCompareMatch(match)}
+                    className="px-2.5 py-1 text-xs font-medium rounded-md bg-rose-600 text-white hover:bg-rose-700"
+                  >
+                    Compare
+                  </button>
+                )}
+                {typeof onOpenMatch === "function" && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenMatch(match.id)}
+                    className="px-2.5 py-1 text-xs font-medium rounded-md bg-white border border-rose-200 text-rose-800 hover:bg-rose-50"
+                  >
+                    Open
+                  </button>
+                )}
+              </div>
             </div>
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function AbstractCompareColumn({
+  abstract,
+  label,
+  formatAbstractText,
+  formatDate,
+  getAbstractTypeLabel,
+}) {
+  if (!abstract) {
+    return (
+      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-sm text-gray-500">
+        Abstract not found (it may have been deleted).
+      </div>
+    );
+  }
+
+  const authors = [...(abstract.authors || [])].sort(
+    (a, b) => (a.position ?? 0) - (b.position ?? 0),
+  );
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden flex flex-col min-h-0">
+      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+          {label}
+        </div>
+        <h3 className="text-base font-bold text-gray-900 leading-snug break-words">
+          {abstract.title}
+        </h3>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {Number(abstract.is_invited_speaker || 0) === 1 ? (
+            <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-800">
+              Invited
+            </span>
+          ) : null}
+          <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
+            {abstract.category || "—"}
+          </span>
+          <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-cyan-100 text-cyan-700">
+            {getAbstractTypeLabel(abstract)}
+          </span>
+          <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700">
+            {abstract.status || "—"}
+          </span>
+          <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-600">
+            {abstract.presentation_preference || "—"}
+          </span>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0 text-sm">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+            Submitted
+          </div>
+          <div className="text-gray-700">
+            {formatDate(abstract.submission_date)}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+            Presenter
+          </div>
+          <div className="text-gray-900 font-medium">
+            {abstract.presenter_name || "—"}
+          </div>
+          <div className="text-gray-500 text-xs">
+            {abstract.presenter_email || ""}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+            Corresponding
+          </div>
+          <div className="text-gray-900 font-medium">
+            {abstract.corresponding_name || "—"}
+          </div>
+          <div className="text-gray-500 text-xs">
+            {abstract.corresponding_email || ""}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+            Authors
+          </div>
+          {authors.length === 0 ? (
+            <div className="text-gray-500">No authors listed</div>
+          ) : (
+            <ul className="space-y-1">
+              {authors.map((author, index) => (
+                <li
+                  key={author.id || index}
+                  className="text-gray-800"
+                >
+                  {formatAuthorDisplayName(author)}
+                  {author.email ? (
+                    <span className="text-gray-400 text-xs">
+                      {" "}
+                      ({author.email})
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+            Keywords
+          </div>
+          <div className="text-gray-700 break-words">
+            {abstract.keywords || "—"}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+            Abstract
+          </div>
+          <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+            {formatAbstractText(abstract.abstract) || (
+              <span className="text-gray-400">No abstract text</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AbstractDuplicateCompareModal({
+  left,
+  right,
+  reasons,
+  formatAbstractText,
+  formatDate,
+  getAbstractTypeLabel,
+  onClose,
+  onSwap,
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-6">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-xl font-bold text-gray-900">
+              Compare likely duplicates
+            </h3>
+            {reasons?.length ? (
+              <p className="text-sm text-rose-700 mt-1">
+                {reasons.join(" · ")}
+              </p>
+            ) : (
+              <p className="text-sm text-gray-500 mt-1">
+                Side-by-side review of authors, keywords, and abstract text.
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {typeof onSwap === "function" && (
+              <button
+                type="button"
+                onClick={onSwap}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
+              >
+                Swap sides
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-y-auto flex-1 min-h-0">
+          <AbstractCompareColumn
+            abstract={left}
+            label="Submission A"
+            formatAbstractText={formatAbstractText}
+            formatDate={formatDate}
+            getAbstractTypeLabel={getAbstractTypeLabel}
+          />
+          <AbstractCompareColumn
+            abstract={right}
+            label="Submission B"
+            formatAbstractText={formatAbstractText}
+            formatDate={formatDate}
+            getAbstractTypeLabel={getAbstractTypeLabel}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -904,6 +1117,9 @@ export default function AdminTab() {
   const [abstractIssueFilter, setAbstractIssueFilter] = useState("all");
   const [abstractSortBy, setAbstractSortBy] = useState("date-desc");
   const [abstractViewMode, setAbstractViewMode] = useState("cards"); // "cards", "table", or "review"
+  const [abstractActionsMenuOpen, setAbstractActionsMenuOpen] = useState(false);
+  const [abstractMoreFiltersOpen, setAbstractMoreFiltersOpen] = useState(false);
+  const abstractActionsMenuRef = useRef(null);
   const [invitedAbstractSearch, setInvitedAbstractSearch] = useState("");
   const [expandedInvitedAbstracts, setExpandedInvitedAbstracts] = useState(
     new Set(),
@@ -949,6 +1165,8 @@ export default function AdminTab() {
   const [abstractToDelete, setAbstractToDelete] = useState(null);
   const [deleteConfirmTitle, setDeleteConfirmTitle] = useState("");
   const [deletingAbstractId, setDeletingAbstractId] = useState(null);
+  /** { leftId, rightId, reasons: string[] } | null */
+  const [duplicateCompare, setDuplicateCompare] = useState(null);
   const [abstractToEdit, setAbstractToEdit] = useState(null);
   const [editAbstractForm, setEditAbstractForm] = useState(null);
   const [editAbstractError, setEditAbstractError] = useState("");
@@ -2988,6 +3206,25 @@ export default function AdminTab() {
     };
   }, [generalAbstracts]);
 
+  const abstractMoreFiltersActive =
+    abstractYiFilter !== "all" ||
+    abstractIssueFilter !== "all" ||
+    abstractSortBy !== "date-desc";
+
+  useEffect(() => {
+    if (!abstractActionsMenuOpen) return;
+    const onPointerDown = (event) => {
+      if (
+        abstractActionsMenuRef.current &&
+        !abstractActionsMenuRef.current.contains(event.target)
+      ) {
+        setAbstractActionsMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [abstractActionsMenuOpen]);
+
   // Pending review abstracts — one pool at a time (general XOR invited)
   const allInvitedAbstracts = useMemo(() => {
     return abstracts.filter((a) => Number(a.is_invited_speaker || 0) === 1);
@@ -4684,35 +4921,31 @@ export default function AdminTab() {
                 .
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setActiveSection("abstractReviewScores")}
-                className="px-4 py-2.5 bg-white border border-teal-200 text-teal-800 rounded-lg hover:bg-teal-50 transition-colors shadow-sm flex items-center gap-2 font-medium"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                  />
-                </svg>
-                Reviewer scores ({abstractReviewRollupStats.withReviews}/
-                {abstractReviewRollupStats.total})
-              </button>
+            <div className="flex flex-wrap items-center gap-2">
               {pendingGeneralReviewAbstracts.length > 0 && (
                 <button
+                  type="button"
                   onClick={() => startReviewMode("general")}
                   className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2 font-medium"
                 >
+                  Review ({pendingGeneralReviewAbstracts.length})
+                </button>
+              )}
+              <div className="relative" ref={abstractActionsMenuRef}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setAbstractActionsMenuOpen((open) => !open)
+                  }
+                  className="px-4 py-2.5 bg-white border border-gray-200 text-gray-800 rounded-lg hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2 font-medium"
+                  aria-expanded={abstractActionsMenuOpen}
+                  aria-haspopup="menu"
+                >
+                  Actions
                   <svg
-                    className="w-5 h-5"
+                    className={`w-4 h-4 text-gray-500 transition-transform ${
+                      abstractActionsMenuOpen ? "rotate-180" : ""
+                    }`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -4721,77 +4954,71 @@ export default function AdminTab() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                      d="M19 9l-7 7-7-7"
                     />
                   </svg>
-                  Review general ({pendingGeneralReviewAbstracts.length})
                 </button>
-              )}
-              <button
-                onClick={() => bulkSendAbstractConfirmations(true)}
-                disabled={bulkSendingConfirmations}
-                className="px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-2 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
-                title="Send confirmation emails retroactively to every abstract that doesn't have one yet"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-2 11H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2z"
-                  />
-                </svg>
-                {bulkSendingConfirmations
-                  ? "Sending…"
-                  : `Send missing confirmations (${missingConfirmationAbstracts.length})`}
-              </button>
-              <button
-                onClick={() => bulkSendAbstractDecisions(true)}
-                disabled={bulkSendingDecisions}
-                className="px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-sm flex items-center gap-2 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
-                title="Manually email authors whose abstracts are accepted or rejected and have not yet received a decision email"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-2 11H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2z"
-                  />
-                </svg>
-                {bulkSendingDecisions
-                  ? "Sending decisions…"
-                  : `Send missing decisions (${decidedAbstractsNeedingEmail.length})`}
-              </button>
-              <button
-                onClick={exportToCSV}
-                className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-2 font-medium"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                Export CSV
-              </button>
+                {abstractActionsMenuOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-1 overflow-hidden"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setAbstractActionsMenuOpen(false);
+                        setActiveSection("abstractReviewScores");
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-800 hover:bg-gray-50"
+                    >
+                      Reviewer scores (
+                      {abstractReviewRollupStats.withReviews}/
+                      {abstractReviewRollupStats.total})
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setAbstractActionsMenuOpen(false);
+                        bulkSendAbstractConfirmations(true);
+                      }}
+                      disabled={bulkSendingConfirmations}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      {bulkSendingConfirmations
+                        ? "Sending confirmations…"
+                        : `Send missing confirmations (${missingConfirmationAbstracts.length})`}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setAbstractActionsMenuOpen(false);
+                        bulkSendAbstractDecisions(true);
+                      }}
+                      disabled={bulkSendingDecisions}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      {bulkSendingDecisions
+                        ? "Sending decisions…"
+                        : `Send missing decisions (${decidedAbstractsNeedingEmail.length})`}
+                    </button>
+                    <div className="border-t border-gray-100 my-1" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setAbstractActionsMenuOpen(false);
+                        exportToCSV();
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-800 hover:bg-gray-50"
+                    >
+                      Export CSV
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -5001,76 +5228,61 @@ export default function AdminTab() {
             </div>
           </div>
 
-          {/* Filters and Search */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-5">
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setAbstractIssueFilter((prev) =>
-                    prev === "missing-confirmation"
-                      ? "all"
-                      : "missing-confirmation",
-                  )
-                }
-                className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors ${
-                  abstractIssueFilter === "missing-confirmation"
-                    ? "bg-indigo-600 text-white border-indigo-600"
-                    : "bg-indigo-50 text-indigo-800 border-indigo-200 hover:bg-indigo-100"
-                }`}
-              >
-                Missing confirmations ({missingConfirmationAbstracts.length})
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setAbstractIssueFilter((prev) =>
-                    prev === "missing-decision" ? "all" : "missing-decision",
-                  )
-                }
-                className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors ${
-                  abstractIssueFilter === "missing-decision"
-                    ? "bg-orange-600 text-white border-orange-600"
-                    : "bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100"
-                }`}
-              >
-                Missing decisions ({decidedAbstractsNeedingEmail.length})
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setAbstractIssueFilter((prev) =>
-                    prev === "likely-duplicates" ? "all" : "likely-duplicates",
-                  )
-                }
-                className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors ${
-                  abstractIssueFilter === "likely-duplicates"
-                    ? "bg-rose-600 text-white border-rose-600"
-                    : "bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100"
-                }`}
-              >
-                Likely duplicates ({likelyDuplicateAbstractIds.size})
-              </button>
-              {abstractIssueFilter !== "all" && (
-                <button
-                  type="button"
-                  onClick={() => setAbstractIssueFilter("all")}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-full border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+          {likelyDuplicateAbstractIds.size > 0 && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                <svg
+                  className="w-5 h-5 text-rose-600 mt-0.5 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  Clear issue filter
-                </button>
-              )}
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                  />
+                </svg>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-rose-900">
+                    {likelyDuplicateAbstractIds.size} abstract
+                    {likelyDuplicateAbstractIds.size === 1 ? "" : "s"} may be
+                    duplicates
+                  </p>
+                  <p className="text-xs text-rose-700 mt-0.5">
+                    Based on overlapping authors, keywords, title, or abstract
+                    text. Expand a flagged card and use Compare to review
+                    side by side.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setAbstractIssueFilter("likely-duplicates");
+                  setAbstractMoreFiltersOpen(true);
+                  setAbstractViewMode("cards");
+                }}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700 flex-shrink-0"
+              >
+                {abstractIssueFilter === "likely-duplicates"
+                  ? "Showing duplicates"
+                  : "View likely duplicates"}
+              </button>
             </div>
+          )}
 
-            <div className="flex flex-wrap gap-4">
-              {/* Search */}
-              <div className="flex-1 min-w-[250px]">
-                <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+          {/* Filters and Search */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-3">
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[220px]">
+                <label className="sr-only" htmlFor="abstract-search">
                   Search
                 </label>
                 <div className="relative">
                   <svg
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -5083,26 +5295,27 @@ export default function AdminTab() {
                     />
                   </svg>
                   <input
+                    id="abstract-search"
                     type="text"
                     placeholder="Search title, author, keywords..."
                     value={abstractSearch}
                     onChange={(e) => setAbstractSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors"
+                    className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors"
                   />
                 </div>
               </div>
 
-              {/* Category Filter */}
-              <div className="min-w-[180px]">
-                <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+              <div className="min-w-[150px]">
+                <label className="sr-only" htmlFor="abstract-category">
                   Category
                 </label>
                 <select
+                  id="abstract-category"
                   value={abstractCategoryFilter}
                   onChange={(e) => setAbstractCategoryFilter(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors appearance-none cursor-pointer"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors appearance-none cursor-pointer"
                 >
-                  <option value="all">All Categories</option>
+                  <option value="all">All categories</option>
                   {abstractCategories.map((cat) => (
                     <option key={cat} value={cat}>
                       {cat}
@@ -5111,17 +5324,17 @@ export default function AdminTab() {
                 </select>
               </div>
 
-              {/* Status Filter */}
-              <div className="min-w-[140px]">
-                <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+              <div className="min-w-[130px]">
+                <label className="sr-only" htmlFor="abstract-status">
                   Status
                 </label>
                 <select
+                  id="abstract-status"
                   value={abstractStatusFilter}
                   onChange={(e) => setAbstractStatusFilter(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors appearance-none cursor-pointer"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors appearance-none cursor-pointer"
                 >
-                  <option value="all">All Status</option>
+                  <option value="all">All status</option>
                   {abstractStatuses.map((status) => (
                     <option key={status} value={status}>
                       {status}
@@ -5130,67 +5343,132 @@ export default function AdminTab() {
                 </select>
               </div>
 
-              {/* Young Investigator Competition Filter */}
-              <div className="min-w-[180px]">
-                <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
-                  YI Competition
-                </label>
-                <select
-                  value={abstractYiFilter}
-                  onChange={(e) => setAbstractYiFilter(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors appearance-none cursor-pointer"
+              <button
+                type="button"
+                onClick={() =>
+                  setAbstractMoreFiltersOpen((open) => !open)
+                }
+                className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors inline-flex items-center gap-1.5 ${
+                  abstractMoreFiltersOpen || abstractMoreFiltersActive
+                    ? "bg-slate-800 text-white border-slate-800"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                }`}
+                aria-expanded={abstractMoreFiltersOpen}
+              >
+                More
+                {abstractMoreFiltersActive ? (
+                  <span className="inline-flex items-center justify-center min-w-[1.1rem] h-4 px-1 rounded-full text-[10px] font-bold bg-white/20">
+                    !
+                  </span>
+                ) : null}
+                <svg
+                  className={`w-3.5 h-3.5 transition-transform ${
+                    abstractMoreFiltersOpen ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  <option value="all">All</option>
-                  <option value="yes">Young Investigator</option>
-                  <option value="possible">Possibly YI (admin)</option>
-                  <option value="no">Not competition</option>
-                </select>
-              </div>
-
-              {/* Issues Filter */}
-              <div className="min-w-[200px]">
-                <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
-                  Issues
-                </label>
-                <select
-                  value={abstractIssueFilter}
-                  onChange={(e) => setAbstractIssueFilter(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors appearance-none cursor-pointer"
-                >
-                  <option value="all">All abstracts</option>
-                  <option value="missing-confirmation">
-                    Missing confirmation
-                  </option>
-                  <option value="missing-decision">
-                    Missing decision email
-                  </option>
-                  <option value="likely-duplicates">Likely duplicates</option>
-                </select>
-              </div>
-
-              {/* Sort By */}
-              <div className="min-w-[160px]">
-                <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
-                  Sort By
-                </label>
-                <select
-                  value={abstractSortBy}
-                  onChange={(e) => setAbstractSortBy(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors appearance-none cursor-pointer"
-                >
-                  <option value="date-desc">Newest First</option>
-                  <option value="date-asc">Oldest First</option>
-                  <option value="yi-first">YI Competition First</option>
-                  <option value="title-asc">Title A-Z</option>
-                  <option value="title-desc">Title Z-A</option>
-                  <option value="category">By Category</option>
-                  <option value="status">By Status</option>
-                </select>
-              </div>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
             </div>
 
+            {abstractMoreFiltersOpen && (
+              <div className="grid sm:grid-cols-3 gap-3 pt-1">
+                <div>
+                  <label
+                    htmlFor="abstract-yi"
+                    className="block text-xs font-semibold text-gray-500 mb-1"
+                  >
+                    YI competition
+                  </label>
+                  <select
+                    id="abstract-yi"
+                    value={abstractYiFilter}
+                    onChange={(e) => setAbstractYiFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white appearance-none cursor-pointer"
+                  >
+                    <option value="all">All</option>
+                    <option value="yes">Young Investigator</option>
+                    <option value="possible">Possibly YI (admin)</option>
+                    <option value="no">Not competition</option>
+                  </select>
+                </div>
+                <div>
+                  <label
+                    htmlFor="abstract-issues"
+                    className="block text-xs font-semibold text-gray-500 mb-1"
+                  >
+                    Issues
+                  </label>
+                  <select
+                    id="abstract-issues"
+                    value={abstractIssueFilter}
+                    onChange={(e) => setAbstractIssueFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white appearance-none cursor-pointer"
+                  >
+                    <option value="all">All abstracts</option>
+                    <option value="missing-confirmation">
+                      Missing confirmation (
+                      {missingConfirmationAbstracts.length})
+                    </option>
+                    <option value="missing-decision">
+                      Missing decision email (
+                      {decidedAbstractsNeedingEmail.length})
+                    </option>
+                    <option value="likely-duplicates">
+                      Likely duplicates ({likelyDuplicateAbstractIds.size})
+                    </option>
+                  </select>
+                </div>
+                <div>
+                  <label
+                    htmlFor="abstract-sort"
+                    className="block text-xs font-semibold text-gray-500 mb-1"
+                  >
+                    Sort by
+                  </label>
+                  <select
+                    id="abstract-sort"
+                    value={abstractSortBy}
+                    onChange={(e) => setAbstractSortBy(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white appearance-none cursor-pointer"
+                  >
+                    <option value="date-desc">Newest first</option>
+                    <option value="date-asc">Oldest first</option>
+                    <option value="yi-first">YI competition first</option>
+                    <option value="title-asc">Title A–Z</option>
+                    <option value="title-desc">Title Z–A</option>
+                    <option value="category">By category</option>
+                    <option value="status">By status</option>
+                  </select>
+                </div>
+                {abstractMoreFiltersActive && (
+                  <div className="sm:col-span-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAbstractYiFilter("all");
+                        setAbstractIssueFilter("all");
+                        setAbstractSortBy("date-desc");
+                      }}
+                      className="text-xs font-medium text-gray-500 hover:text-gray-800"
+                    >
+                      Reset more filters
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* View Controls */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-100">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100">
               <div className="text-sm text-gray-500">
                 Showing{" "}
                 <span className="font-bold text-gray-900">
@@ -5201,6 +5479,15 @@ export default function AdminTab() {
                   {generalAbstracts.length}
                 </span>{" "}
                 abstracts
+                {abstractIssueFilter !== "all" ? (
+                  <button
+                    type="button"
+                    onClick={() => setAbstractIssueFilter("all")}
+                    className="ml-2 text-xs font-medium text-blue-700 hover:underline"
+                  >
+                    Clear issue filter
+                  </button>
+                ) : null}
               </div>
               <div className="flex items-center gap-2">
                 <div className="bg-gray-100 rounded-lg p-1 flex gap-1">
@@ -5208,38 +5495,12 @@ export default function AdminTab() {
                     onClick={() => setAbstractViewMode("cards")}
                     className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${abstractViewMode === "cards" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"}`}
                   >
-                    <svg
-                      className="w-4 h-4 inline-block mr-1.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
-                      />
-                    </svg>
                     Cards
                   </button>
                   <button
                     onClick={() => setAbstractViewMode("table")}
                     className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${abstractViewMode === "table" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"}`}
                   >
-                    <svg
-                      className="w-4 h-4 inline-block mr-1.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 6h16M4 10h16M4 14h16M4 18h16"
-                      />
-                    </svg>
                     Table
                   </button>
                 </div>
@@ -6209,6 +6470,13 @@ export default function AdminTab() {
                         <div className="grid md:grid-cols-2 gap-6 pt-5">
                           <AbstractDuplicateNotice
                             matches={abstractDuplicateMap[abstract.id] || []}
+                            onCompareMatch={(match) => {
+                              setDuplicateCompare({
+                                leftId: abstract.id,
+                                rightId: match.id,
+                                reasons: match.reasons || [],
+                              });
+                            }}
                             onOpenMatch={(matchId) => {
                               setAbstractViewMode("cards");
                               setExpandedAbstracts(new Set([matchId]));
@@ -6592,6 +6860,13 @@ export default function AdminTab() {
                         <div className="grid md:grid-cols-2 gap-6 pt-5">
                           <AbstractDuplicateNotice
                             matches={abstractDuplicateMap[abstract.id] || []}
+                            onCompareMatch={(match) => {
+                              setDuplicateCompare({
+                                leftId: abstract.id,
+                                rightId: match.id,
+                                reasons: match.reasons || [],
+                              });
+                            }}
                             onOpenMatch={(matchId) => {
                               setAbstractViewMode("cards");
                               const match = abstracts.find(
@@ -10302,6 +10577,29 @@ export default function AdminTab() {
             </div>
           </div>
         </div>
+      )}
+
+      {duplicateCompare && (
+        <AbstractDuplicateCompareModal
+          left={abstracts.find((a) => a.id === duplicateCompare.leftId)}
+          right={abstracts.find((a) => a.id === duplicateCompare.rightId)}
+          reasons={duplicateCompare.reasons}
+          formatAbstractText={formatAbstractText}
+          formatDate={formatDate}
+          getAbstractTypeLabel={getAbstractTypeLabel}
+          onClose={() => setDuplicateCompare(null)}
+          onSwap={() =>
+            setDuplicateCompare((prev) =>
+              prev
+                ? {
+                    leftId: prev.rightId,
+                    rightId: prev.leftId,
+                    reasons: prev.reasons,
+                  }
+                : null,
+            )
+          }
+        />
       )}
 
       {abstractToDelete && (
