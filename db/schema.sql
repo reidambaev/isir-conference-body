@@ -143,6 +143,9 @@ CREATE TABLE
         abstract TEXT NOT NULL,
         word_count INTEGER NOT NULL,
         presentation_preference TEXT NOT NULL,
+        -- Committee final format (oral|poster); null until assigned after review
+        assigned_format TEXT,
+        format_assigned_at INTEGER,
         presenter_role TEXT,
         presenter_name TEXT NOT NULL,
         presenter_email TEXT NOT NULL,
@@ -216,6 +219,17 @@ CREATE INDEX IF NOT EXISTS idx_abstractions_category ON abstractions (category);
 CREATE INDEX IF NOT EXISTS idx_abstractions_date ON abstractions (submission_date);
 
 CREATE INDEX IF NOT EXISTS idx_abstractions_deleted_at ON abstractions (deleted_at);
+
+-- Shared admin dismissals for likely-duplicate abstract pairs
+CREATE TABLE
+    IF NOT EXISTS abstract_duplicate_dismissals (
+        abstract_id_a TEXT NOT NULL,
+        abstract_id_b TEXT NOT NULL,
+        dismissed_at INTEGER NOT NULL,
+        PRIMARY KEY (abstract_id_a, abstract_id_b)
+    );
+
+CREATE INDEX IF NOT EXISTS idx_abstract_duplicate_dismissals_b ON abstract_duplicate_dismissals (abstract_id_b);
 
 -- Index for common queries
 CREATE INDEX IF NOT EXISTS idx_registrations_email ON registrations (email);

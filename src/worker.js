@@ -296,6 +296,22 @@ async function handleApiRequest(request, env, url) {
     return handleGetTrashedAbstracts(request, env, corsHeaders);
   }
 
+  // GET /api/admin/abstracts/duplicate-dismissals - Shared "not a duplicate" pairs
+  if (
+    url.pathname === "/api/admin/abstracts/duplicate-dismissals" &&
+    request.method === "GET"
+  ) {
+    return handleGetAbstractDuplicateDismissals(request, env, corsHeaders);
+  }
+
+  // POST /api/admin/abstracts/duplicate-dismissals - Dismiss a likely-duplicate pair
+  if (
+    url.pathname === "/api/admin/abstracts/duplicate-dismissals" &&
+    request.method === "POST"
+  ) {
+    return handleDismissAbstractDuplicatePair(request, env, corsHeaders);
+  }
+
   // POST /api/admin/abstracts/send-confirmations - Bulk (re)send confirmation emails
   if (
     url.pathname === "/api/admin/abstracts/send-confirmations" &&
@@ -388,6 +404,27 @@ async function handleApiRequest(request, env, url) {
       corsHeaders,
       abstractStatusMatch[1],
     );
+  }
+
+  // PATCH /api/admin/abstracts/:id/assigned-format - Set oral/poster assignment
+  const abstractAssignedFormatMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)\/assigned-format$/,
+  );
+  if (abstractAssignedFormatMatch && request.method === "PATCH") {
+    return handleUpdateAbstractAssignedFormat(
+      request,
+      env,
+      corsHeaders,
+      abstractAssignedFormatMatch[1],
+    );
+  }
+
+  // POST /api/admin/abstracts/assigned-format - Bulk set oral/poster assignment
+  if (
+    url.pathname === "/api/admin/abstracts/assigned-format" &&
+    request.method === "POST"
+  ) {
+    return handleBulkUpdateAbstractAssignedFormat(request, env, corsHeaders);
   }
 
   // PATCH /api/admin/abstracts/:id/invited-speaker - Toggle invited speaker flag
@@ -7363,6 +7400,237 @@ async function handleUpdateAbstractStatus(
   }
 }
 
+/** Normalize assigned_format: oral | poster | null (clear). */
+function parseAssignedFormat(raw) {
+  if (raw === null || raw === "") return { ok: true, value: null };
+  const value = String(raw || "")
+    .trim()
+    .toLowerCase();
+  if (value === "oral" || value === "poster") {
+    return { ok: true, value };
+  }
+  if (value === "clear" || value === "none" || value === "unassigned") {
+    return { ok: true, value: null };
+  }
+  return { ok: false, value: null };
+}
+
+async function setAbstractAssignedFormat(env, abstractId, assignedFormat) {
+  const formatAssignedAt = assignedFormat ? Date.now() : null;
+  try {
+    const result = await env.ISIR_DB.prepare(
+      `UPDATE abstractions
+       SET assigned_format = ?, format_assigned_at = ?, updated_at = ?
+       WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(assignedFormat, formatAssignedAt, Date.now(), abstractId)
+      .run();
+    return { ok: true, changes: result?.meta?.changes ?? 0 };
+  } catch (error) {
+    const message = String(error?.message || error || "");
+    if (/no such column/i.test(message)) {
+      return {
+        ok: false,
+        migrationPending: true,
+        error:
+          "assigned_format column missing — run db/migration_add_assigned_format.sql",
+      };
+    }
+    throw error;
+  }
+}
+
+async function handleUpdateAbstractAssignedFormat(
+  request,
+  env,
+  corsHeaders,
+  abstractId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!abstractId) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing abstract id" }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const data = await request.json();
+    const parsed = parseAssignedFormat(
+      data?.assigned_format ?? data?.assignedFormat,
+    );
+    if (!parsed.ok) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            "assigned_format must be oral, poster, or null/clear to unassign",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT id, status, is_invited_speaker FROM abstractions
+       WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!existing) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Abstract not found" }),
+        { status: 404, headers: corsHeaders },
+      );
+    }
+
+    if (String(existing.status || "").toLowerCase() !== "accepted") {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Only accepted abstracts can be assigned oral or poster format",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const updated = await setAbstractAssignedFormat(
+      env,
+      abstractId,
+      parsed.value,
+    );
+    if (!updated.ok) {
+      return new Response(
+        JSON.stringify({ success: false, error: updated.error }),
+        { status: 500, headers: corsHeaders },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        id: abstractId,
+        assigned_format: parsed.value,
+        format_assigned_at: parsed.value ? Date.now() : null,
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Update abstract assigned format error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || "Failed to update assigned format",
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+async function handleBulkUpdateAbstractAssignedFormat(
+  request,
+  env,
+  corsHeaders,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    const data = await request.json();
+    const ids = Array.isArray(data?.ids)
+      ? data.ids.map((id) => String(id || "").trim()).filter(Boolean)
+      : [];
+    const parsed = parseAssignedFormat(
+      data?.assigned_format ?? data?.assignedFormat,
+    );
+
+    if (ids.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "ids must be a non-empty array of abstract ids",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (!parsed.ok) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            "assigned_format must be oral, poster, or null/clear to unassign",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (ids.length > 500) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Cannot update more than 500 abstracts at once",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    let updated = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const id of ids) {
+      const existing = await env.ISIR_DB.prepare(
+        `SELECT id, status FROM abstractions
+         WHERE id = ? AND deleted_at IS NULL`,
+      )
+        .bind(id)
+        .first();
+
+      if (!existing) {
+        skipped += 1;
+        errors.push({ id, error: "not found" });
+        continue;
+      }
+      if (String(existing.status || "").toLowerCase() !== "accepted") {
+        skipped += 1;
+        errors.push({ id, error: "not accepted" });
+        continue;
+      }
+
+      const result = await setAbstractAssignedFormat(env, id, parsed.value);
+      if (!result.ok) {
+        return new Response(
+          JSON.stringify({ success: false, error: result.error }),
+          { status: 500, headers: corsHeaders },
+        );
+      }
+      if ((result.changes || 0) > 0) updated += 1;
+      else skipped += 1;
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        assigned_format: parsed.value,
+        updated,
+        skipped,
+        errors: errors.slice(0, 20),
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Bulk update abstract assigned format error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || "Failed to bulk update assigned format",
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
 // Admin endpoint: Set whether an abstract is an invited speaker submission
 function parseAdminBooleanFlag(raw) {
   if (raw === undefined || raw === null) return null;
@@ -7794,6 +8062,144 @@ async function handleUpdateAbstractSpeakers(
         error: error.message,
       }),
       { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+async function ensureAbstractDuplicateDismissalsTable(env) {
+  if (!env?.ISIR_DB) return;
+  await env.ISIR_DB.prepare(
+    `CREATE TABLE IF NOT EXISTS abstract_duplicate_dismissals (
+      abstract_id_a TEXT NOT NULL,
+      abstract_id_b TEXT NOT NULL,
+      dismissed_at INTEGER NOT NULL,
+      PRIMARY KEY (abstract_id_a, abstract_id_b)
+    )`,
+  ).run();
+  await env.ISIR_DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_abstract_duplicate_dismissals_b
+     ON abstract_duplicate_dismissals (abstract_id_b)`,
+  ).run();
+}
+
+function normalizeDuplicatePairIds(idA, idB) {
+  const a = String(idA || "").trim();
+  const b = String(idB || "").trim();
+  if (!a || !b || a === b) return null;
+  return a < b ? [a, b] : [b, a];
+}
+
+async function handleGetAbstractDuplicateDismissals(
+  request,
+  env,
+  corsHeaders,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    await ensureAbstractDuplicateDismissalsTable(env);
+    const result = await env.ISIR_DB.prepare(
+      `SELECT abstract_id_a, abstract_id_b, dismissed_at
+       FROM abstract_duplicate_dismissals
+       ORDER BY dismissed_at DESC`,
+    ).all();
+
+    const pairs = (result.results || []).map((row) => ({
+      abstractIdA: row.abstract_id_a,
+      abstractIdB: row.abstract_id_b,
+      pairKey: `${row.abstract_id_a}|${row.abstract_id_b}`,
+      dismissedAt: row.dismissed_at,
+    }));
+
+    return jsonResponse({ success: true, data: pairs }, 200, corsHeaders);
+  } catch (error) {
+    console.error("Get abstract duplicate dismissals error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to load dismissals" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleDismissAbstractDuplicatePair(
+  request,
+  env,
+  corsHeaders,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
+
+    const normalized = normalizeDuplicatePairIds(
+      body?.abstractIdA || body?.leftId,
+      body?.abstractIdB || body?.rightId,
+    );
+    if (!normalized) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Two different abstract ids are required",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const [abstractIdA, abstractIdB] = normalized;
+    await ensureAbstractDuplicateDismissalsTable(env);
+    const dismissedAt = Date.now();
+    await env.ISIR_DB.prepare(
+      `INSERT OR REPLACE INTO abstract_duplicate_dismissals
+        (abstract_id_a, abstract_id_b, dismissed_at)
+       VALUES (?, ?, ?)`,
+    )
+      .bind(abstractIdA, abstractIdB, dismissedAt)
+      .run();
+
+    return jsonResponse(
+      {
+        success: true,
+        data: {
+          abstractIdA,
+          abstractIdB,
+          pairKey: `${abstractIdA}|${abstractIdB}`,
+          dismissedAt,
+        },
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Dismiss abstract duplicate pair error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to dismiss pair" },
+      500,
+      corsHeaders,
     );
   }
 }

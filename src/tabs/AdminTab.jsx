@@ -12,6 +12,7 @@ import {
   buildLocalAdminDemoData,
   isAdminLocalhost,
 } from "./adminLocalDemoData";
+import FormatAssignmentSection from "./FormatAssignmentSection";
 
 const REGISTRATION_TICKET_LABELS = {
   "isir-member": "ISIR Member",
@@ -114,6 +115,7 @@ const ADMIN_SECTION_IDS = new Set([
   "abstracts",
   "invitedSpeakerAbstracts",
   "abstractReviewScores",
+  "formatAssignment",
   "visa",
   "speakerHotel",
   "speakerInvites",
@@ -355,56 +357,98 @@ function compareAbstractFingerprints(a, b) {
   const titleSim = jaccardSimilarity(a.titleWords, b.titleWords);
   const bodySim = jaccardSimilarity(a.bodyWords, b.bodyWords);
 
-  const minNames = Math.min(a.names.size, b.names.size);
+  const exactSameAuthorEmails =
+    a.emails.size > 0 &&
+    a.emails.size === b.emails.size &&
+    sharedEmails === a.emails.size;
+  const exactSameAuthorNames =
+    a.names.size > 0 &&
+    a.names.size === b.names.size &&
+    sharedNames === a.names.size;
+  const exactSameAuthors = exactSameAuthorEmails || exactSameAuthorNames;
+
   const authorOverlap =
     sharedEmails > 0 ||
     sharedNames >= 2 ||
-    (sharedNames >= 1 && minNames > 0 && sharedNames / minNames >= 0.5);
+    (sharedNames >= 1 &&
+      Math.min(a.names.size, b.names.size) > 0 &&
+      sharedNames / Math.min(a.names.size, b.names.size) >= 0.5);
+
+  const strongKeyword =
+    keywordSim >= 0.5 && a.keywordSet.size >= 2 && b.keywordSet.size >= 2;
+  const strongTitle = titleSim >= 0.55 && a.titleWords.size >= 3;
+  const strongBody = bodySim >= 0.45 && a.bodyWords.size >= 20;
+  const contentHits = [strongKeyword, strongTitle, strongBody].filter(
+    Boolean,
+  ).length;
+  const hasSimilarContent = contentHits >= 1;
+
+  // Partial author/email overlap alone is not enough — need similar content,
+  // or an identical author list (emails or names).
+  const isLikely =
+    exactSameAuthors ||
+    (hasSimilarContent && authorOverlap) ||
+    contentHits >= 2;
+
+  if (!isLikely) return null;
 
   const reasons = [];
-  if (sharedEmails > 0) {
+  if (exactSameAuthors) {
     reasons.push(
-      `shared author email${sharedEmails > 1 ? `s (${sharedEmails})` : ""}`,
+      exactSameAuthorEmails
+        ? "identical author emails"
+        : "identical author names",
     );
+  } else {
+    if (sharedEmails > 0) {
+      reasons.push(
+        `shared author email${sharedEmails > 1 ? `s (${sharedEmails})` : ""}`,
+      );
+    }
+    if (sharedNames >= 2) {
+      reasons.push(`shared author names (${sharedNames})`);
+    } else if (sharedNames === 1 && authorOverlap) {
+      reasons.push("shared author name");
+    }
   }
-  if (sharedNames >= 2) {
-    reasons.push(`shared author names (${sharedNames})`);
-  } else if (sharedNames === 1 && authorOverlap) {
-    reasons.push("shared author name");
-  }
-  if (keywordSim >= 0.5 && a.keywordSet.size >= 2 && b.keywordSet.size >= 2) {
+  if (strongKeyword) {
     reasons.push(`similar keywords (${Math.round(keywordSim * 100)}%)`);
   }
-  if (titleSim >= 0.55 && a.titleWords.size >= 3) {
+  if (strongTitle) {
     reasons.push(`similar title (${Math.round(titleSim * 100)}%)`);
   }
-  if (bodySim >= 0.45 && a.bodyWords.size >= 20) {
+  if (strongBody) {
     reasons.push(`similar abstract text (${Math.round(bodySim * 100)}%)`);
   }
 
-  const contentHits = [
-    keywordSim >= 0.5 && a.keywordSet.size >= 2 && b.keywordSet.size >= 2,
-    titleSim >= 0.55 && a.titleWords.size >= 3,
-    bodySim >= 0.45 && a.bodyWords.size >= 20,
-  ].filter(Boolean).length;
-
-  const isLikely =
-    (authorOverlap && contentHits >= 1) ||
-    contentHits >= 2 ||
-    (sharedEmails > 0 &&
-      (titleSim >= 0.4 || bodySim >= 0.35 || keywordSim >= 0.4));
-
-  if (!isLikely || reasons.length === 0) return null;
+  if (reasons.length === 0) return null;
 
   return {
     reasons,
     score:
+      (exactSameAuthors ? 5 : 0) +
       sharedEmails * 3 +
       sharedNames +
       keywordSim +
       titleSim +
       bodySim,
   };
+}
+
+function duplicatePairKey(idA, idB) {
+  return [String(idA), String(idB)].sort().join("|");
+}
+
+function filterDismissedDuplicateMap(map, dismissedPairKeys) {
+  if (!dismissedPairKeys?.size) return map || {};
+  const next = {};
+  Object.entries(map || {}).forEach(([id, matches]) => {
+    const kept = (matches || []).filter(
+      (match) => !dismissedPairKeys.has(duplicatePairKey(id, match.id)),
+    );
+    if (kept.length > 0) next[id] = kept;
+  });
+  return next;
 }
 
 function buildLikelyDuplicateMap(abstractList) {
@@ -527,7 +571,12 @@ function AbstractIssueBadges({ abstract, duplicateMatches }) {
   );
 }
 
-function AbstractDuplicateNotice({ matches, onOpenMatch, onCompareMatch }) {
+function AbstractDuplicateNotice({
+  matches,
+  onOpenMatch,
+  onCompareMatch,
+  onUnflagMatch,
+}) {
   if (!matches?.length) return null;
   return (
     <div className="md:col-span-2 rounded-lg border border-rose-200 bg-rose-50 p-4">
@@ -535,8 +584,8 @@ function AbstractDuplicateNotice({ matches, onOpenMatch, onCompareMatch }) {
         Likely duplicates
       </h4>
       <p className="text-sm text-rose-700 mb-3">
-        Flagged by overlapping authors, keywords, title, and/or abstract text.
-        Review before accepting or emailing.
+        Flagged by identical authors and/or similar keywords, title, or
+        abstract text. Review before accepting or emailing.
       </p>
       <ul className="space-y-2">
         {matches.map((match) => (
@@ -554,6 +603,15 @@ function AbstractDuplicateNotice({ matches, onOpenMatch, onCompareMatch }) {
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
+                {typeof onUnflagMatch === "function" && (
+                  <button
+                    type="button"
+                    onClick={() => onUnflagMatch(match)}
+                    className="px-2.5 py-1 text-xs font-medium rounded-md border border-rose-200 bg-white text-rose-800 hover:bg-rose-50"
+                  >
+                    Not a duplicate
+                  </button>
+                )}
                 {typeof onCompareMatch === "function" && (
                   <button
                     type="button"
@@ -722,6 +780,7 @@ function AbstractDuplicateCompareModal({
   formatDate,
   getAbstractTypeLabel,
   onClose,
+  onUnflag,
 }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-6">
@@ -741,13 +800,24 @@ function AbstractDuplicateCompareModal({
               </p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 flex-shrink-0"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {typeof onUnflag === "function" && left?.id && right?.id ? (
+              <button
+                type="button"
+                onClick={() => onUnflag(left.id, right.id)}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-800"
+              >
+                Not a duplicate
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-y-auto flex-1 min-h-0">
@@ -1056,63 +1126,74 @@ function AbstractCardActions({
                 : "Mark invited"}
           </button>
 
-          <span className="hidden sm:inline text-gray-300">|</span>
-          <span>
-            <span className="font-semibold text-gray-700">YI competition:</span>{" "}
-            {isYi ? (
-              <span className="text-amber-700">Yes</span>
-            ) : (
-              <span className="text-gray-500">No</span>
-            )}
-          </span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleYoungInvestigator(abstract.id, !isYi);
-            }}
-            disabled={updatingYoungInvestigatorId === abstract.id}
-            className={`px-2.5 py-1 text-xs font-medium rounded-md text-white disabled:opacity-60 disabled:cursor-not-allowed ${
-              isYi
-                ? "bg-slate-700 hover:bg-slate-800"
-                : "bg-amber-600 hover:bg-amber-700"
-            }`}
-          >
-            {updatingYoungInvestigatorId === abstract.id
-              ? "Updating…"
-              : isYi
-                ? "Remove YI"
-                : "Mark YI"}
-          </button>
+          {!isInvited && (
+            <>
+              <span className="hidden sm:inline text-gray-300">|</span>
+              <span>
+                <span className="font-semibold text-gray-700">
+                  YI competition:
+                </span>{" "}
+                {isYi ? (
+                  <span className="text-amber-700">Yes</span>
+                ) : (
+                  <span className="text-gray-500">No</span>
+                )}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleYoungInvestigator(abstract.id, !isYi);
+                }}
+                disabled={updatingYoungInvestigatorId === abstract.id}
+                className={`px-2.5 py-1 text-xs font-medium rounded-md text-white disabled:opacity-60 disabled:cursor-not-allowed ${
+                  isYi
+                    ? "bg-slate-700 hover:bg-slate-800"
+                    : "bg-amber-600 hover:bg-amber-700"
+                }`}
+              >
+                {updatingYoungInvestigatorId === abstract.id
+                  ? "Updating…"
+                  : isYi
+                    ? "Remove YI"
+                    : "Mark YI"}
+              </button>
 
-          <span>
-            <span className="font-semibold text-gray-700">Possibly YI:</span>{" "}
-            {isPossibleYi ? (
-              <span className="text-amber-800">Yes</span>
-            ) : (
-              <span className="text-gray-500">No</span>
-            )}
-          </span>
-          <button
-            type="button"
-            title="Admin-only note — not shown to reviewers and does not affect peer review"
-            onClick={(e) => {
-              e.stopPropagation();
-              onTogglePossibleYoungInvestigator(abstract.id, !isPossibleYi);
-            }}
-            disabled={updatingPossibleYoungInvestigatorId === abstract.id}
-            className={`px-2.5 py-1 text-xs font-medium rounded-md disabled:opacity-60 disabled:cursor-not-allowed ${
-              isPossibleYi
-                ? "bg-slate-700 text-white hover:bg-slate-800"
-                : "bg-amber-100 text-amber-900 ring-1 ring-amber-300 hover:bg-amber-200"
-            }`}
-          >
-            {updatingPossibleYoungInvestigatorId === abstract.id
-              ? "Updating…"
-              : isPossibleYi
-                ? "Clear possible"
-                : "Mark possible"}
-          </button>
+              <span>
+                <span className="font-semibold text-gray-700">Possibly YI:</span>{" "}
+                {isPossibleYi ? (
+                  <span className="text-amber-800">Yes</span>
+                ) : (
+                  <span className="text-gray-500">No</span>
+                )}
+              </span>
+              <button
+                type="button"
+                title="Admin-only note — not shown to reviewers and does not affect peer review"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTogglePossibleYoungInvestigator(
+                    abstract.id,
+                    !isPossibleYi,
+                  );
+                }}
+                disabled={
+                  updatingPossibleYoungInvestigatorId === abstract.id
+                }
+                className={`px-2.5 py-1 text-xs font-medium rounded-md disabled:opacity-60 disabled:cursor-not-allowed ${
+                  isPossibleYi
+                    ? "bg-slate-700 text-white hover:bg-slate-800"
+                    : "bg-amber-100 text-amber-900 ring-1 ring-amber-300 hover:bg-amber-200"
+                }`}
+              >
+                {updatingPossibleYoungInvestigatorId === abstract.id
+                  ? "Updating…"
+                  : isPossibleYi
+                    ? "Clear possible"
+                    : "Mark possible"}
+              </button>
+            </>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 ml-auto">
@@ -1184,6 +1265,19 @@ export default function AdminTab() {
   const [abstractMoreFiltersOpen, setAbstractMoreFiltersOpen] = useState(false);
   const abstractActionsMenuRef = useRef(null);
   const [invitedAbstractSearch, setInvitedAbstractSearch] = useState("");
+  const [invitedAbstractCategoryFilter, setInvitedAbstractCategoryFilter] =
+    useState("all");
+  const [invitedAbstractStatusFilter, setInvitedAbstractStatusFilter] =
+    useState("all");
+  /** all | missing-confirmation | missing-decision | likely-duplicates */
+  const [invitedAbstractIssueFilter, setInvitedAbstractIssueFilter] =
+    useState("all");
+  const [invitedAbstractSortBy, setInvitedAbstractSortBy] =
+    useState("date-desc");
+  const [invitedAbstractViewMode, setInvitedAbstractViewMode] =
+    useState("cards"); // "cards" or "table"
+  const [invitedAbstractMoreFiltersOpen, setInvitedAbstractMoreFiltersOpen] =
+    useState(false);
   const [expandedInvitedAbstracts, setExpandedInvitedAbstracts] = useState(
     new Set(),
   );
@@ -1230,6 +1324,9 @@ export default function AdminTab() {
   const [deletingAbstractId, setDeletingAbstractId] = useState(null);
   /** { leftId, rightId, reasons: string[] } | null */
   const [duplicateCompare, setDuplicateCompare] = useState(null);
+  const [dismissedDuplicatePairs, setDismissedDuplicatePairs] = useState(
+    () => new Set(),
+  );
   const [abstractToEdit, setAbstractToEdit] = useState(null);
   const [editAbstractForm, setEditAbstractForm] = useState(null);
   const [editAbstractError, setEditAbstractError] = useState("");
@@ -1661,6 +1758,7 @@ export default function AdminTab() {
     setReviewerAbstractScores(demo.reviewerAbstractScores);
     setSpeakerProfileSubmissions(demo.speakerProfileSubmissions);
     setReviewerOverviewError("");
+    setDismissedDuplicatePairs(new Set());
   }, []);
 
   useEffect(() => {
@@ -1753,6 +1851,7 @@ export default function AdminTab() {
         reviewersRes,
         reviewerAbstractScoresRes,
         speakerProfilesRes,
+        duplicateDismissalsRes,
       ] = await Promise.all([
         fetch("/api/admin/abstracts", { headers: authHeaders }),
         fetch("/api/admin/visa-requests", { headers: authHeaders }),
@@ -1763,6 +1862,9 @@ export default function AdminTab() {
         fetch("/api/admin/reviewers/overview", { headers: authHeaders }),
         fetch("/api/admin/reviewers/abstract-scores", { headers: authHeaders }),
         fetch("/api/admin/speaker-profiles", { headers: authHeaders }),
+        fetch("/api/admin/abstracts/duplicate-dismissals", {
+          headers: authHeaders,
+        }),
       ]);
 
       const failureDetails = [];
@@ -1796,6 +1898,10 @@ export default function AdminTab() {
           reviewerAbstractScoresRes,
         ),
         addFailure("GET /api/admin/speaker-profiles", speakerProfilesRes),
+        addFailure(
+          "GET /api/admin/abstracts/duplicate-dismissals",
+          duplicateDismissalsRes,
+        ),
       ]);
 
       if (failureDetails.length > 0) {
@@ -1811,10 +1917,18 @@ export default function AdminTab() {
       const reviewersData = await reviewersRes.json();
       const reviewerAbstractScoresData = await reviewerAbstractScoresRes.json();
       const speakerProfilesData = await speakerProfilesRes.json();
+      const duplicateDismissalsData = await duplicateDismissalsRes.json();
 
       setIsLocalDemo(false);
       setAbstracts(abstractsData.data || []);
       setVisaRequests(visaData.data || []);
+      setDismissedDuplicatePairs(
+        new Set(
+          (duplicateDismissalsData.data || [])
+            .map((row) => row.pairKey || duplicatePairKey(row.abstractIdA, row.abstractIdB))
+            .filter(Boolean),
+        ),
+      );
       setSpeakerHotelRegistrations(speakerHotelData.data || []);
       setRegistrations(registrationsData.data || []);
       setReviewerOverview(reviewersData || null);
@@ -3110,9 +3224,62 @@ export default function AdminTab() {
   );
 
   const abstractDuplicateMap = useMemo(
-    () => buildLikelyDuplicateMap(abstracts),
-    [abstracts],
+    () =>
+      filterDismissedDuplicateMap(
+        buildLikelyDuplicateMap(abstracts),
+        dismissedDuplicatePairs,
+      ),
+    [abstracts, dismissedDuplicatePairs],
   );
+
+  const unflagDuplicatePair = async (idA, idB) => {
+    if (!idA || !idB) return;
+    const pairKey = duplicatePairKey(idA, idB);
+
+    if (!isLocalDemo) {
+      if (!adminToken) {
+        alert("Admin access token is missing.");
+        return;
+      }
+      try {
+        const response = await fetch(
+          "/api/admin/abstracts/duplicate-dismissals",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Admin-Token": adminToken,
+            },
+            body: JSON.stringify({
+              abstractIdA: idA,
+              abstractIdB: idB,
+            }),
+          },
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error || "Failed to dismiss duplicate pair");
+        }
+      } catch (err) {
+        console.error("Error dismissing duplicate pair:", err);
+        alert(err.message || "Failed to dismiss duplicate pair");
+        return;
+      }
+    }
+
+    setDismissedDuplicatePairs((prev) => {
+      const next = new Set(prev);
+      next.add(pairKey);
+      return next;
+    });
+    setDuplicateCompare((prev) => {
+      if (!prev) return null;
+      if (duplicatePairKey(prev.leftId, prev.rightId) === pairKey) {
+        return null;
+      }
+      return prev;
+    });
+  };
 
   const likelyDuplicateAbstractIds = useMemo(() => {
     const ids = new Set();
@@ -3227,11 +3394,47 @@ export default function AdminTab() {
     return buildDuplicatePairGroups(filteredAbstracts, abstractDuplicateMap);
   }, [abstractIssueFilter, filteredAbstracts, abstractDuplicateMap]);
 
-  // Invited speaker abstracts
-  const invitedSpeakerAbstracts = useMemo(() => {
-    let result = abstracts.filter(
-      (a) => Number(a.is_invited_speaker || 0) === 1,
+  // Pending review abstracts — one pool at a time (general XOR invited)
+  const allInvitedAbstracts = useMemo(() => {
+    return abstracts.filter((a) => Number(a.is_invited_speaker || 0) === 1);
+  }, [abstracts]);
+
+  const invitedAbstractCategories = useMemo(() => {
+    const cats = new Set(
+      allInvitedAbstracts.map((a) => a.category).filter(Boolean),
     );
+    return Array.from(cats).sort();
+  }, [allInvitedAbstracts]);
+
+  const invitedAbstractStatuses = useMemo(() => {
+    const stats = new Set(
+      allInvitedAbstracts.map((a) => a.status).filter(Boolean),
+    );
+    return Array.from(stats).sort();
+  }, [allInvitedAbstracts]);
+
+  const missingConfirmationInvitedAbstracts = useMemo(
+    () => allInvitedAbstracts.filter((a) => !a.confirmation_sent_at),
+    [allInvitedAbstracts],
+  );
+
+  const decidedInvitedAbstractsNeedingEmail = useMemo(() => {
+    return allInvitedAbstracts.filter((a) => abstractNeedsDecisionEmail(a));
+  }, [allInvitedAbstracts]);
+
+  const likelyDuplicateInvitedAbstractIds = useMemo(() => {
+    const ids = new Set();
+    allInvitedAbstracts.forEach((abstract) => {
+      if ((abstractDuplicateMap[abstract.id] || []).length > 0) {
+        ids.add(abstract.id);
+      }
+    });
+    return ids;
+  }, [allInvitedAbstracts, abstractDuplicateMap]);
+
+  // Filtered and sorted invited speaker abstracts (no YI filters)
+  const invitedSpeakerAbstracts = useMemo(() => {
+    let result = [...allInvitedAbstracts];
 
     if (invitedAbstractSearch.trim()) {
       const search = invitedAbstractSearch.toLowerCase();
@@ -3247,11 +3450,55 @@ export default function AdminTab() {
       );
     }
 
-    result.sort(
-      (a, b) => (b.submission_date || 0) - (a.submission_date || 0),
-    );
+    if (invitedAbstractCategoryFilter !== "all") {
+      result = result.filter(
+        (a) => a.category === invitedAbstractCategoryFilter,
+      );
+    }
+
+    if (invitedAbstractStatusFilter !== "all") {
+      result = result.filter((a) => a.status === invitedAbstractStatusFilter);
+    }
+
+    if (invitedAbstractIssueFilter === "missing-confirmation") {
+      result = result.filter((a) => !a.confirmation_sent_at);
+    } else if (invitedAbstractIssueFilter === "missing-decision") {
+      result = result.filter((a) => abstractNeedsDecisionEmail(a));
+    } else if (invitedAbstractIssueFilter === "likely-duplicates") {
+      result = result.filter(
+        (a) => (abstractDuplicateMap[a.id] || []).length > 0,
+      );
+    }
+
+    result.sort((a, b) => {
+      switch (invitedAbstractSortBy) {
+        case "date-desc":
+          return (b.submission_date || 0) - (a.submission_date || 0);
+        case "date-asc":
+          return (a.submission_date || 0) - (b.submission_date || 0);
+        case "title-asc":
+          return (a.title || "").localeCompare(b.title || "");
+        case "title-desc":
+          return (b.title || "").localeCompare(a.title || "");
+        case "category":
+          return (a.category || "").localeCompare(b.category || "");
+        case "status":
+          return (a.status || "").localeCompare(b.status || "");
+        default:
+          return 0;
+      }
+    });
+
     return result;
-  }, [abstracts, invitedAbstractSearch]);
+  }, [
+    allInvitedAbstracts,
+    invitedAbstractSearch,
+    invitedAbstractCategoryFilter,
+    invitedAbstractStatusFilter,
+    invitedAbstractIssueFilter,
+    abstractDuplicateMap,
+    invitedAbstractSortBy,
+  ]);
 
   // Abstract statistics (general submissions only)
   const abstractStats = useMemo(() => {
@@ -3281,6 +3528,10 @@ export default function AdminTab() {
     abstractIssueFilter !== "all" ||
     abstractSortBy !== "date-desc";
 
+  const invitedAbstractMoreFiltersActive =
+    invitedAbstractIssueFilter !== "all" ||
+    invitedAbstractSortBy !== "date-desc";
+
   useEffect(() => {
     if (!abstractActionsMenuOpen) return;
     const onPointerDown = (event) => {
@@ -3294,11 +3545,6 @@ export default function AdminTab() {
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [abstractActionsMenuOpen]);
-
-  // Pending review abstracts — one pool at a time (general XOR invited)
-  const allInvitedAbstracts = useMemo(() => {
-    return abstracts.filter((a) => Number(a.is_invited_speaker || 0) === 1);
-  }, [abstracts]);
 
   const pendingGeneralReviewAbstracts = useMemo(() => {
     return generalAbstracts.filter((a) => a.status === "submitted");
@@ -4566,6 +4812,16 @@ export default function AdminTab() {
     setExpandedAbstracts(new Set());
   };
 
+  const expandAllInvited = () => {
+    setExpandedInvitedAbstracts(
+      new Set(invitedSpeakerAbstracts.map((a) => a.id)),
+    );
+  };
+
+  const collapseAllInvited = () => {
+    setExpandedInvitedAbstracts(new Set());
+  };
+
   const exportToCSV = () => {
     const headers = [
       "ID",
@@ -4850,6 +5106,10 @@ export default function AdminTab() {
                       reviewPool === "invited"),
                 },
                 { id: "abstractReviewScores", label: "Review scores" },
+                {
+                  id: "formatAssignment",
+                  label: "Oral / Poster",
+                },
               ],
             },
             {
@@ -5742,9 +6002,11 @@ export default function AdminTab() {
                   {/* Abstract Header */}
                   <div className="p-6 border-b border-gray-100">
                     <div className="flex flex-wrap gap-2 mb-4">
-                      <AbstractCompetitionBadges
-                        abstract={currentReviewAbstract}
-                      />
+                      {reviewPool !== "invited" && (
+                        <AbstractCompetitionBadges
+                          abstract={currentReviewAbstract}
+                        />
+                      )}
                       {reviewPool === "invited" && (
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 ring-1 ring-orange-200">
                           Invited speaker
@@ -6337,19 +6599,30 @@ export default function AdminTab() {
                           "Likely duplicate match"}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setDuplicateCompare({
-                          leftId: pair.left.id,
-                          rightId: pair.right.id,
-                          reasons: pair.reasons || [],
-                        })
-                      }
-                      className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700"
-                    >
-                      Compare
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          unflagDuplicatePair(pair.left.id, pair.right.id)
+                        }
+                        className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-rose-200 bg-white text-rose-800 hover:bg-rose-50"
+                      >
+                        Not a duplicate
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDuplicateCompare({
+                            leftId: pair.left.id,
+                            rightId: pair.right.id,
+                            reasons: pair.reasons || [],
+                          })
+                        }
+                        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700"
+                      >
+                        Compare
+                      </button>
+                    </div>
                   </div>
                   <div className="grid lg:grid-cols-2 gap-3">
                     <AbstractDuplicatePairSummary
@@ -6383,19 +6656,33 @@ export default function AdminTab() {
                           formatDate={formatDate}
                         />
                         {matches[0] ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setDuplicateCompare({
-                                leftId: abstract.id,
-                                rightId: matches[0].id,
-                                reasons: matches[0].reasons || [],
-                              })
-                            }
-                            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700"
-                          >
-                            Compare best match
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                unflagDuplicatePair(
+                                  abstract.id,
+                                  matches[0].id,
+                                )
+                              }
+                              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-rose-200 bg-white text-rose-800 hover:bg-rose-50"
+                            >
+                              Not a duplicate
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDuplicateCompare({
+                                  leftId: abstract.id,
+                                  rightId: matches[0].id,
+                                  reasons: matches[0].reasons || [],
+                                })
+                              }
+                              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700"
+                            >
+                              Compare best match
+                            </button>
+                          </div>
                         ) : null}
                       </div>
                     );
@@ -6617,6 +6904,9 @@ export default function AdminTab() {
                                 reasons: match.reasons || [],
                               });
                             }}
+                            onUnflagMatch={(match) =>
+                              unflagDuplicatePair(abstract.id, match.id)
+                            }
                             onOpenMatch={(matchId) => {
                               setAbstractViewMode("cards");
                               setExpandedAbstracts(new Set([matchId]));
@@ -6851,27 +7141,241 @@ export default function AdminTab() {
                   ? "Accepting…"
                   : "Accept all invited speakers"}
               </button>
-              <div className="text-sm text-gray-500">
-                <span className="font-semibold text-gray-800">
-                  {invitedSpeakerAbstracts.length}
-                </span>{" "}
-                invited abstract
-                {invitedSpeakerAbstracts.length === 1 ? "" : "s"}
-              </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-              Search
-            </label>
-            <input
-              type="search"
-              value={invitedAbstractSearch}
-              onChange={(e) => setInvitedAbstractSearch(e.target.value)}
-              placeholder="Title, presenter, keywords…"
-              className="w-full max-w-md px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-            />
+          {/* Filters and Search */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-3">
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[220px]">
+                <label className="sr-only" htmlFor="invited-abstract-search">
+                  Search
+                </label>
+                <div className="relative">
+                  <svg
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  <input
+                    id="invited-abstract-search"
+                    type="text"
+                    placeholder="Search title, author, keywords..."
+                    value={invitedAbstractSearch}
+                    onChange={(e) => setInvitedAbstractSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="min-w-[150px]">
+                <label className="sr-only" htmlFor="invited-abstract-category">
+                  Category
+                </label>
+                <select
+                  id="invited-abstract-category"
+                  value={invitedAbstractCategoryFilter}
+                  onChange={(e) =>
+                    setInvitedAbstractCategoryFilter(e.target.value)
+                  }
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors appearance-none cursor-pointer"
+                >
+                  <option value="all">All categories</option>
+                  {invitedAbstractCategories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="min-w-[130px]">
+                <label className="sr-only" htmlFor="invited-abstract-status">
+                  Status
+                </label>
+                <select
+                  id="invited-abstract-status"
+                  value={invitedAbstractStatusFilter}
+                  onChange={(e) =>
+                    setInvitedAbstractStatusFilter(e.target.value)
+                  }
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors appearance-none cursor-pointer"
+                >
+                  <option value="all">All status</option>
+                  {invitedAbstractStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setInvitedAbstractMoreFiltersOpen((open) => !open)
+                }
+                className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors inline-flex items-center gap-1.5 ${
+                  invitedAbstractMoreFiltersOpen ||
+                  invitedAbstractMoreFiltersActive
+                    ? "bg-slate-800 text-white border-slate-800"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                }`}
+                aria-expanded={invitedAbstractMoreFiltersOpen}
+              >
+                More
+                {invitedAbstractMoreFiltersActive ? (
+                  <span className="inline-flex items-center justify-center min-w-[1.1rem] h-4 px-1 rounded-full text-[10px] font-bold bg-white/20">
+                    !
+                  </span>
+                ) : null}
+                <svg
+                  className={`w-3.5 h-3.5 transition-transform ${
+                    invitedAbstractMoreFiltersOpen ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {invitedAbstractMoreFiltersOpen && (
+              <div className="grid sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label
+                    htmlFor="invited-abstract-issues"
+                    className="block text-xs font-semibold text-gray-500 mb-1"
+                  >
+                    Issues
+                  </label>
+                  <select
+                    id="invited-abstract-issues"
+                    value={invitedAbstractIssueFilter}
+                    onChange={(e) =>
+                      setInvitedAbstractIssueFilter(e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white appearance-none cursor-pointer"
+                  >
+                    <option value="all">All abstracts</option>
+                    <option value="missing-confirmation">
+                      Missing confirmation (
+                      {missingConfirmationInvitedAbstracts.length})
+                    </option>
+                    <option value="missing-decision">
+                      Missing decision email (
+                      {decidedInvitedAbstractsNeedingEmail.length})
+                    </option>
+                    <option value="likely-duplicates">
+                      Likely duplicates ({likelyDuplicateInvitedAbstractIds.size}
+                      )
+                    </option>
+                  </select>
+                </div>
+                <div>
+                  <label
+                    htmlFor="invited-abstract-sort"
+                    className="block text-xs font-semibold text-gray-500 mb-1"
+                  >
+                    Sort by
+                  </label>
+                  <select
+                    id="invited-abstract-sort"
+                    value={invitedAbstractSortBy}
+                    onChange={(e) => setInvitedAbstractSortBy(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white appearance-none cursor-pointer"
+                  >
+                    <option value="date-desc">Newest first</option>
+                    <option value="date-asc">Oldest first</option>
+                    <option value="title-asc">Title A–Z</option>
+                    <option value="title-desc">Title Z–A</option>
+                    <option value="category">By category</option>
+                    <option value="status">By status</option>
+                  </select>
+                </div>
+                {invitedAbstractMoreFiltersActive && (
+                  <div className="sm:col-span-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInvitedAbstractIssueFilter("all");
+                        setInvitedAbstractSortBy("date-desc");
+                      }}
+                      className="text-xs font-medium text-gray-500 hover:text-gray-800"
+                    >
+                      Reset more filters
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100">
+              <div className="text-sm text-gray-500">
+                Showing{" "}
+                <span className="font-bold text-gray-900">
+                  {invitedSpeakerAbstracts.length}
+                </span>{" "}
+                of{" "}
+                <span className="font-bold text-gray-900">
+                  {allInvitedAbstracts.length}
+                </span>{" "}
+                abstracts
+                {invitedAbstractIssueFilter !== "all" ? (
+                  <button
+                    type="button"
+                    onClick={() => setInvitedAbstractIssueFilter("all")}
+                    className="ml-2 text-xs font-medium text-blue-700 hover:underline"
+                  >
+                    Clear issue filter
+                  </button>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="bg-gray-100 rounded-lg p-1 flex gap-1">
+                  <button
+                    onClick={() => setInvitedAbstractViewMode("cards")}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${invitedAbstractViewMode === "cards" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"}`}
+                  >
+                    Cards
+                  </button>
+                  <button
+                    onClick={() => setInvitedAbstractViewMode("table")}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${invitedAbstractViewMode === "table" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"}`}
+                  >
+                    Table
+                  </button>
+                </div>
+                <div className="w-px h-8 bg-gray-200"></div>
+                <button
+                  onClick={expandAllInvited}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Expand All
+                </button>
+                <button
+                  onClick={collapseAllInvited}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Collapse All
+                </button>
+              </div>
+            </div>
           </div>
 
           {loading ? (
@@ -6880,14 +7384,136 @@ export default function AdminTab() {
             </div>
           ) : invitedSpeakerAbstracts.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center">
+              <svg
+                className="w-16 h-16 text-gray-300 mx-auto mb-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
               <p className="text-gray-500 text-lg">
-                {invitedAbstractSearch.trim()
-                  ? "No invited speaker abstracts match your search"
-                  : "No invited speaker abstracts yet"}
+                {allInvitedAbstracts.length === 0
+                  ? "No invited speaker abstracts yet"
+                  : "No abstracts match your filters"}
               </p>
               <p className="text-gray-400 text-sm mt-1">
-                Abstracts marked as invited speaker submissions will appear here.
+                {allInvitedAbstracts.length === 0
+                  ? "Abstracts marked as invited speaker submissions will appear here."
+                  : "Try adjusting your search or filter criteria"}
               </p>
+            </div>
+          ) : invitedAbstractViewMode === "table" ? (
+            <div className="overflow-x-auto bg-white rounded-xl border border-gray-100 shadow-sm">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Title
+                    </th>
+                    <th className="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Category
+                    </th>
+                    <th className="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Presenter
+                    </th>
+                    <th className="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Preference
+                    </th>
+                    <th className="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Words
+                    </th>
+                    <th className="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Submitted
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {invitedSpeakerAbstracts.map((abstract, idx) => (
+                    <tr
+                      key={abstract.id}
+                      className={`hover:bg-blue-50/50 cursor-pointer transition-colors ${idx % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`}
+                      onClick={() => {
+                        setInvitedAbstractViewMode("cards");
+                        setExpandedInvitedAbstracts(new Set([abstract.id]));
+                      }}
+                    >
+                      <td className="px-5 py-4 text-sm">
+                        <div
+                          className="font-semibold text-gray-900 max-w-xs truncate"
+                          title={abstract.title}
+                        >
+                          {abstract.title}
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-800">
+                            Invited
+                          </span>
+                          <AbstractIssueBadges
+                            abstract={abstract}
+                            duplicateMatches={
+                              abstractDuplicateMap[abstract.id] || []
+                            }
+                          />
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-sm">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                          {abstract.category}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-sm">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-700">
+                          {getAbstractTypeLabel(abstract)}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-sm">
+                        <div className="font-medium text-gray-900">
+                          {abstract.presenter_name}
+                        </div>
+                        <div className="text-gray-400 text-xs mt-0.5">
+                          {abstract.presenter_email}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                            abstract.presentation_preference === "oral"
+                              ? "bg-amber-100 text-amber-700 ring-1 ring-amber-200"
+                              : abstract.presentation_preference === "poster"
+                                ? "bg-violet-100 text-violet-700 ring-1 ring-violet-200"
+                                : "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {abstract.presentation_preference}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 ring-1 ring-blue-200">
+                          {abstract.status}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-sm font-medium text-gray-600">
+                        {abstract.word_count}
+                      </td>
+                      <td className="px-5 py-4 text-sm text-gray-400">
+                        {formatDate(abstract.submission_date)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
             <div className="space-y-4">
@@ -6912,7 +7538,6 @@ export default function AdminTab() {
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 ring-1 ring-orange-200">
                               Invited speaker
                             </span>
-                            <AbstractCompetitionBadges abstract={abstract} />
                             <AbstractIssueBadges
                               abstract={abstract}
                               duplicateMatches={
@@ -6944,15 +7569,6 @@ export default function AdminTab() {
                               {formatDate(abstract.submission_date)}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-500 mt-3">
-                            {abstract.presenter_name}
-                            {abstract.presenter_email ? (
-                              <span className="text-gray-400">
-                                {" "}
-                                ({abstract.presenter_email})
-                              </span>
-                            ) : null}
-                          </p>
                         </div>
                         <button
                           type="button"
@@ -7007,6 +7623,9 @@ export default function AdminTab() {
                                 reasons: match.reasons || [],
                               });
                             }}
+                            onUnflagMatch={(match) =>
+                              unflagDuplicatePair(abstract.id, match.id)
+                            }
                             onOpenMatch={(matchId) => {
                               setAbstractViewMode("cards");
                               const match = abstracts.find(
@@ -7017,6 +7636,7 @@ export default function AdminTab() {
                                 Number(match.is_invited_speaker || 0) === 1
                               ) {
                                 setActiveSection("invitedSpeakerAbstracts");
+                                setInvitedAbstractViewMode("cards");
                                 setExpandedInvitedAbstracts(
                                   new Set([matchId]),
                                 );
@@ -7206,13 +7826,22 @@ export default function AdminTab() {
                 .
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setActiveSection("abstracts")}
-              className="px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50"
-            >
-              Back to submissions
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveSection("formatAssignment")}
+                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-violet-600 text-white hover:bg-violet-700"
+              >
+                Oral / Poster assignment
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection("abstracts")}
+                className="px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50"
+              >
+                Back to submissions
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
@@ -7633,6 +8262,21 @@ export default function AdminTab() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Oral / Poster assignment (post peer-review scoreboard) */}
+      {activeSection === "formatAssignment" && (
+        <FormatAssignmentSection
+          abstracts={abstracts}
+          setAbstracts={setAbstracts}
+          reviewerAbstractScores={reviewerAbstractScores}
+          adminToken={adminToken}
+          isLocalDemo={isLocalDemo}
+          formatAbstractText={formatAbstractText}
+          formatDate={formatDate}
+          getAbstractTypeLabel={getAbstractTypeLabel}
+          onGoToReviewScores={() => setActiveSection("abstractReviewScores")}
+        />
       )}
 
       {/* Visa Requests Section */}
@@ -10728,6 +11372,7 @@ export default function AdminTab() {
           formatDate={formatDate}
           getAbstractTypeLabel={getAbstractTypeLabel}
           onClose={() => setDuplicateCompare(null)}
+          onUnflag={unflagDuplicatePair}
         />
       )}
 
