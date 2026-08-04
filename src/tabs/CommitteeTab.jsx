@@ -1,5 +1,43 @@
 import React from "react";
 import headshots from "../assets/congress_chairs.png";
+import hyejinChoPhoto from "../assets/committee/hyejin-cho.png";
+import hoKeunKwonPhoto from "../assets/committee/ho-keun-kwon.png";
+
+const COOPERATION_DIRECTORS = [
+  {
+    name: "Hyejin Cho",
+    photo: hyejinChoPhoto,
+  },
+  {
+    name: "Kuk Sun Han",
+    photo: "/speaker-photos/nsp-9f9d0232_1782857502008_VCR8DRVHQ.png",
+  },
+  {
+    name: "Ho-Keun Kwon",
+    photo: hoKeunKwonPhoto,
+  },
+  {
+    name: "Aera Han",
+    photo: "/speaker-photos/nsp-2f4c26ef_1781292187990_MW5Z2UNEZ.jpg",
+  },
+];
+
+function DirectorCard({ name, photo }) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2 border-blue-100 shadow-sm bg-blue-50 mb-3">
+        <img
+          src={photo}
+          alt={name}
+          className="w-full h-full object-cover"
+          loading="lazy"
+          decoding="async"
+        />
+      </div>
+      <span className="text-sm font-medium text-gray-800">{name}</span>
+    </div>
+  );
+}
 
 const CommitteeTab = () => (
   <div role="tabpanel">
@@ -29,6 +67,20 @@ const CommitteeTab = () => (
           alt="Headshots of congress chairs"
           className="rounded-lg shadow-md"
         />
+      </div>
+    </div>
+
+    <h4
+      className="text-xl font-semibold text-blue-800 mb-4"
+      style={{ color: "var(--color-primary)" }}
+    >
+      Representative Cooperation Directors
+    </h4>
+    <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-xl border border-blue-100 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 justify-items-center">
+        {COOPERATION_DIRECTORS.map((director) => (
+          <DirectorCard key={director.name} {...director} />
+        ))}
       </div>
     </div>
 
@@ -97,61 +149,6 @@ const CommitteeTab = () => (
         <p className="py-1">Ja Young Kwon (Korea)</p>
         <p className="py-1">Haeng Seok Song (Korea)</p>
         <p className="py-1">Joon Cheol Park (Korea)</p>
-      </div>
-    </div>
-
-    <h4
-      className="text-xl font-semibold text-blue-800 mt-8 mb-4"
-      style={{ color: "var(--color-primary)" }}
-    >
-      Representative Cooperation Directors
-    </h4>
-    <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-xl border border-blue-100">
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 text-gray-700 text-sm">
-        <div className="flex items-center py-1 justify-center">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3 flex-shrink-0">
-            <span
-              className="text-xs font-semibold"
-              style={{ color: "var(--color-primary)" }}
-            >
-              HC
-            </span>
-          </div>
-          <span>Hyejin Cho</span>
-        </div>
-        <div className="flex items-center py-1 justify-center">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3 flex-shrink-0">
-            <span
-              className="text-xs font-semibold"
-              style={{ color: "var(--color-primary)" }}
-            >
-              KH
-            </span>
-          </div>
-          <span>Kuksun Han</span>
-        </div>
-        <div className="flex items-center py-1 justify-center">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3 flex-shrink-0">
-            <span
-              className="text-xs font-semibold"
-              style={{ color: "var(--color-primary)" }}
-            >
-              NK
-            </span>
-          </div>
-          <span>Nayoung Kim</span>
-        </div>
-        <div className="flex items-center py-1 justify-center">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3 flex-shrink-0">
-            <span
-              className="text-xs font-semibold"
-              style={{ color: "var(--color-primary)" }}
-            >
-              AH
-            </span>
-          </div>
-          <span>Aera Han</span>
-        </div>
       </div>
     </div>
   </div>
