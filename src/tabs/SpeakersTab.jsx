@@ -65,6 +65,35 @@ function SpeakerPhoto({
   );
 }
 
+function SelectSpeakerCue({ tone = "plenary" }) {
+  const isForum = tone === "forum";
+  return (
+    <p
+      className={`mt-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold tracking-wide ${
+        isForum
+          ? "bg-sky-900/10 text-sky-950 border border-sky-300/70"
+          : "bg-white/15 text-white border border-white/35"
+      }`}
+    >
+      <svg
+        className="w-4 h-4 flex-shrink-0 opacity-90"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
+        />
+      </svg>
+      Click a speaker to read their bio
+    </p>
+  );
+}
+
 function BioSection({ label, children, tone = "default" }) {
   const labelClass =
     tone === "forum" ? "text-sky-800/70" : "text-gray-500";
@@ -400,15 +429,8 @@ function SpeakersTab() {
           <p className="text-blue-200 text-base max-w-xl mx-auto">
             Our distinguished plenary speakers will present keynotes at the
             congress.
-            {plenaryHasBios && (
-              <>
-                {" "}
-                <span className="text-blue-100/90">
-                  Select a speaker to learn more.
-                </span>
-              </>
-            )}
           </p>
+          {plenaryHasBios && <SelectSpeakerCue tone="plenary" />}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {plenarySpeakers.map((speaker) => {
@@ -495,15 +517,8 @@ function SpeakersTab() {
           <p className="text-sky-900/70 text-sm max-w-xl mx-auto">
             Featured clinicians joining the Public Forum sessions throughout the
             congress.
-            {forumHasBios && (
-              <>
-                {" "}
-                <span className="text-sky-900/55">
-                  Select a speaker to learn more.
-                </span>
-              </>
-            )}
           </p>
+          {forumHasBios && <SelectSpeakerCue tone="forum" />}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {forumSpeakers.map((speaker) => {

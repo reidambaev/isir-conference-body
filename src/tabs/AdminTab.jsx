@@ -8213,19 +8213,6 @@ export default function AdminTab() {
                           {abstractAssignmentBalance.max}
                         </span>
                       </span>
-                      {abstractAssignmentBalance.max -
-                        abstractAssignmentBalance.min <=
-                      1 ? (
-                        <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
-                          Evenly balanced
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">
-                          Spread:{" "}
-                          {abstractAssignmentBalance.max -
-                            abstractAssignmentBalance.min}
-                        </span>
-                      )}
                     </div>
                   )}
                 </div>
