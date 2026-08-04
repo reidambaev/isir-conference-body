@@ -444,6 +444,46 @@ function buildLikelyDuplicateMap(abstractList) {
   return map;
 }
 
+/** Greedy pairing of flagged abstracts using strongest matches first. */
+function buildDuplicatePairGroups(abstractList, duplicateMap) {
+  const list = abstractList || [];
+  const byId = new Map(list.map((abstract) => [abstract.id, abstract]));
+  const idSet = new Set(list.map((abstract) => abstract.id));
+  const edges = [];
+
+  list.forEach((abstract) => {
+    (duplicateMap[abstract.id] || []).forEach((match) => {
+      if (!idSet.has(match.id)) return;
+      if (String(abstract.id) >= String(match.id)) return;
+      edges.push({
+        leftId: abstract.id,
+        rightId: match.id,
+        reasons: match.reasons || [],
+        score: Number(match.score || 0),
+      });
+    });
+  });
+
+  edges.sort((a, b) => b.score - a.score);
+
+  const used = new Set();
+  const pairs = [];
+  edges.forEach((edge) => {
+    if (used.has(edge.leftId) || used.has(edge.rightId)) return;
+    used.add(edge.leftId);
+    used.add(edge.rightId);
+    pairs.push({
+      key: `${edge.leftId}__${edge.rightId}`,
+      left: byId.get(edge.leftId),
+      right: byId.get(edge.rightId),
+      reasons: edge.reasons,
+    });
+  });
+
+  const leftovers = list.filter((abstract) => !used.has(abstract.id));
+  return { pairs, leftovers };
+}
+
 function abstractNeedsDecisionEmail(abstract) {
   const status = String(abstract?.status || "").toLowerCase();
   return (
@@ -682,7 +722,6 @@ function AbstractDuplicateCompareModal({
   formatDate,
   getAbstractTypeLabel,
   onClose,
-  onSwap,
 }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-6">
@@ -702,24 +741,13 @@ function AbstractDuplicateCompareModal({
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {typeof onSwap === "function" && (
-              <button
-                type="button"
-                onClick={onSwap}
-                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
-              >
-                Swap sides
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200"
-            >
-              Close
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 flex-shrink-0"
+          >
+            Close
+          </button>
         </div>
 
         <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-y-auto flex-1 min-h-0">
@@ -738,6 +766,41 @@ function AbstractDuplicateCompareModal({
             getAbstractTypeLabel={getAbstractTypeLabel}
           />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AbstractDuplicatePairSummary({
+  abstract,
+  getAbstractTypeLabel,
+  formatDate,
+}) {
+  if (!abstract) return null;
+  return (
+    <div className="bg-white rounded-lg border border-gray-100 p-4 h-full">
+      <h3 className="text-sm font-bold text-gray-900 leading-snug break-words">
+        {abstract.title}
+      </h3>
+      <p className="text-xs text-gray-500 mt-1.5">
+        {abstract.presenter_name}
+        {abstract.presenter_email ? (
+          <span className="text-gray-400"> ({abstract.presenter_email})</span>
+        ) : null}
+      </p>
+      <div className="flex flex-wrap gap-1.5 mt-2">
+        <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
+          {abstract.category || "—"}
+        </span>
+        <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-cyan-100 text-cyan-700">
+          {getAbstractTypeLabel(abstract)}
+        </span>
+        <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700">
+          {abstract.status || "—"}
+        </span>
+        <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium text-gray-500">
+          {formatDate(abstract.submission_date)}
+        </span>
       </div>
     </div>
   );
@@ -3157,6 +3220,13 @@ export default function AdminTab() {
     abstractSortBy,
   ]);
 
+  const filteredDuplicatePairs = useMemo(() => {
+    if (abstractIssueFilter !== "likely-duplicates") {
+      return { pairs: [], leftovers: [] };
+    }
+    return buildDuplicatePairGroups(filteredAbstracts, abstractDuplicateMap);
+  }, [abstractIssueFilter, filteredAbstracts, abstractDuplicateMap]);
+
   // Invited speaker abstracts
   const invitedSpeakerAbstracts = useMemo(() => {
     let result = abstracts.filter(
@@ -5229,48 +5299,35 @@ export default function AdminTab() {
           </div>
 
           {likelyDuplicateAbstractIds.size > 0 && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-start gap-3 min-w-0">
-                <svg
-                  className="w-5 h-5 text-rose-600 mt-0.5 flex-shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-                  />
-                </svg>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-rose-900">
-                    {likelyDuplicateAbstractIds.size} abstract
-                    {likelyDuplicateAbstractIds.size === 1 ? "" : "s"} may be
-                    duplicates
-                  </p>
-                  <p className="text-xs text-rose-700 mt-0.5">
-                    Based on overlapping authors, keywords, title, or abstract
-                    text. Expand a flagged card and use Compare to review
-                    side by side.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setAbstractIssueFilter("likely-duplicates");
+            <button
+              type="button"
+              onClick={() => {
+                setAbstractIssueFilter((prev) =>
+                  prev === "likely-duplicates" ? "all" : "likely-duplicates",
+                );
+                if (abstractIssueFilter !== "likely-duplicates") {
                   setAbstractMoreFiltersOpen(true);
                   setAbstractViewMode("cards");
-                }}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700 flex-shrink-0"
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-full text-xs font-semibold ring-1 transition-colors ${
+                abstractIssueFilter === "likely-duplicates"
+                  ? "bg-rose-600 text-white ring-rose-600"
+                  : "bg-rose-50 text-rose-800 ring-rose-200 hover:bg-rose-100"
+              }`}
+              title="Filter to abstracts flagged as likely duplicates"
+            >
+              Likely duplicates
+              <span
+                className={`inline-flex items-center justify-center min-w-[1.25rem] px-1 rounded-full text-[10px] font-bold ${
+                  abstractIssueFilter === "likely-duplicates"
+                    ? "bg-white/20 text-white"
+                    : "bg-rose-200/80 text-rose-900"
+                }`}
               >
-                {abstractIssueFilter === "likely-duplicates"
-                  ? "Showing duplicates"
-                  : "View likely duplicates"}
-              </button>
-            </div>
+                {likelyDuplicateAbstractIds.size}
+              </span>
+            </button>
           )}
 
           {/* Filters and Search */}
@@ -6262,6 +6319,89 @@ export default function AdminTab() {
               <p className="text-gray-400 text-sm mt-1">
                 Try adjusting your search or filter criteria
               </p>
+            </div>
+          ) : abstractIssueFilter === "likely-duplicates" ? (
+            <div className="space-y-4">
+              {filteredDuplicatePairs.pairs.map((pair, index) => (
+                <div
+                  key={pair.key}
+                  className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 space-y-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-wider text-rose-800">
+                        Pair {index + 1}
+                      </p>
+                      <p className="text-xs text-rose-700 mt-0.5">
+                        {(pair.reasons || []).join(" · ") ||
+                          "Likely duplicate match"}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDuplicateCompare({
+                          leftId: pair.left.id,
+                          rightId: pair.right.id,
+                          reasons: pair.reasons || [],
+                        })
+                      }
+                      className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700"
+                    >
+                      Compare
+                    </button>
+                  </div>
+                  <div className="grid lg:grid-cols-2 gap-3">
+                    <AbstractDuplicatePairSummary
+                      abstract={pair.left}
+                      getAbstractTypeLabel={getAbstractTypeLabel}
+                      formatDate={formatDate}
+                    />
+                    <AbstractDuplicatePairSummary
+                      abstract={pair.right}
+                      getAbstractTypeLabel={getAbstractTypeLabel}
+                      formatDate={formatDate}
+                    />
+                  </div>
+                </div>
+              ))}
+              {filteredDuplicatePairs.leftovers.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Also flagged (no unused pair partner)
+                  </p>
+                  {filteredDuplicatePairs.leftovers.map((abstract) => {
+                    const matches = abstractDuplicateMap[abstract.id] || [];
+                    return (
+                      <div
+                        key={abstract.id}
+                        className="rounded-xl border border-rose-100 bg-white p-4 flex flex-wrap items-start justify-between gap-3"
+                      >
+                        <AbstractDuplicatePairSummary
+                          abstract={abstract}
+                          getAbstractTypeLabel={getAbstractTypeLabel}
+                          formatDate={formatDate}
+                        />
+                        {matches[0] ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDuplicateCompare({
+                                leftId: abstract.id,
+                                rightId: matches[0].id,
+                                reasons: matches[0].reasons || [],
+                              })
+                            }
+                            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700"
+                          >
+                            Compare best match
+                          </button>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ) : abstractViewMode === "table" ? (
             /* Table View */
@@ -10588,17 +10728,6 @@ export default function AdminTab() {
           formatDate={formatDate}
           getAbstractTypeLabel={getAbstractTypeLabel}
           onClose={() => setDuplicateCompare(null)}
-          onSwap={() =>
-            setDuplicateCompare((prev) =>
-              prev
-                ? {
-                    leftId: prev.rightId,
-                    rightId: prev.leftId,
-                    reasons: prev.reasons,
-                  }
-                : null,
-            )
-          }
         />
       )}
 
