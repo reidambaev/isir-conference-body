@@ -133,29 +133,37 @@ const SubmissionTab = () => {
     if (!formData.keywords.trim()) return "Keywords are required";
     if (!formData.abstract.trim()) return "Abstract text is required";
 
-    // Check for required sections
-    const abstractText = formData.abstract.toLowerCase();
-    const requiredSections = [
-      "objectives:",
-      "methods:",
-      "results:",
-      "conclusions:",
-    ];
-    const missingSections = requiredSections.filter(
-      (section) => !abstractText.includes(section),
-    );
-    if (missingSections.length > 0) {
-      const missing = missingSections.map((s) => s.replace(":", "")).join(", ");
-      return `Abstract must include all sections: ${missing} ${missingSections.length === 1 ? "is" : "are"} missing`;
+    // Structured sections required for general submissions only;
+    // invited speakers may submit free-form abstracts of their talk.
+    if (!formData.isInvitedSpeaker) {
+      const abstractText = formData.abstract.toLowerCase();
+      const requiredSections = [
+        "objectives:",
+        "methods:",
+        "results:",
+        "conclusions:",
+      ];
+      const missingSections = requiredSections.filter(
+        (section) => !abstractText.includes(section),
+      );
+      if (missingSections.length > 0) {
+        const missing = missingSections
+          .map((s) => s.replace(":", ""))
+          .join(", ");
+        return `Abstract must include all sections: ${missing} ${missingSections.length === 1 ? "is" : "are"} missing`;
+      }
     }
 
-    // Check word count
-    const wordCount = formData.abstract.split(/\s+/).filter((w) => w).length;
-    if (wordCount > 300) {
-      return `Abstract exceeds 300 word limit (current: ${wordCount} words)`;
-    }
-    if (wordCount < 50) {
-      return "Abstract must be at least 50 words";
+    // Word limits apply to general submissions only;
+    // invited speakers have no min/max word count.
+    if (!formData.isInvitedSpeaker) {
+      const wordCount = formData.abstract.split(/\s+/).filter((w) => w).length;
+      if (wordCount > 300) {
+        return `Abstract exceeds 300 word limit (current: ${wordCount} words)`;
+      }
+      if (wordCount < 50) {
+        return "Abstract must be at least 50 words";
+      }
     }
 
     return null;
@@ -412,7 +420,8 @@ const SubmissionTab = () => {
               3
             </div>
             <div>
-              <strong>Body:</strong> Maximum 300 words.
+              <strong>Body:</strong> Maximum 300 words (50–300). Invited
+              speakers have no word limit.
             </div>
           </div>
           <div className="flex items-start">
@@ -424,7 +433,8 @@ const SubmissionTab = () => {
             </div>
             <div>
               <strong>Structure:</strong> Include Objectives, Methods, Results,
-              and Conclusions sections in your abstract.
+              and Conclusions sections in your abstract. Invited speakers may
+              submit a free-form abstract of their talk instead.
             </div>
           </div>
           <div className="flex items-start">
@@ -1218,40 +1228,6 @@ const SubmissionTab = () => {
             </div>
           </div>
 
-          {/* Abstract Body */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Abstract <span className="text-red-500">*</span>
-              <span className="font-normal text-gray-500 ml-2">
-                (Maximum 300 words)
-              </span>
-            </label>
-            <textarea
-              name="abstract"
-              value={formData.abstract}
-              onChange={handleInputChange}
-              placeholder="Objectives:&#10;&#10;Methods:&#10;&#10;Results:&#10;&#10;Conclusions:"
-              rows={10}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none font-mono text-sm"
-              required
-            />
-            <div className="flex justify-between items-center mt-1">
-              <p className="text-xs text-gray-500">
-                Include Objectives, Methods, Results, and Conclusions sections.
-              </p>
-              <p
-                className={`text-xs font-medium ${
-                  formData.abstract.split(/\s+/).filter((w) => w).length > 300
-                    ? "text-red-500"
-                    : "text-gray-500"
-                }`}
-              >
-                {formData.abstract.split(/\s+/).filter((w) => w).length} / 300
-                words
-              </p>
-            </div>
-          </div>
-
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <label className="flex items-start gap-3 cursor-pointer">
               <input
@@ -1286,10 +1262,65 @@ const SubmissionTab = () => {
                       <strong>TALK</strong> (you may submit additional abstracts
                       separately).
                     </li>
+                    <li>
+                      Invited speaker abstracts may be written in{" "}
+                      <strong>free-form</strong> with no word limit
+                      (Objectives / Methods / Results / Conclusions sections
+                      are optional).
+                    </li>
                   </ul>
                 </div>
               </div>
             </label>
+          </div>
+
+          {/* Abstract Body */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Abstract <span className="text-red-500">*</span>
+              {!formData.isInvitedSpeaker && (
+                <span className="font-normal text-gray-500 ml-2">
+                  (Maximum 300 words)
+                </span>
+              )}
+              {formData.isInvitedSpeaker && (
+                <span className="font-normal text-gray-500 ml-2">
+                  (No word limit)
+                </span>
+              )}
+            </label>
+            <textarea
+              name="abstract"
+              value={formData.abstract}
+              onChange={handleInputChange}
+              placeholder={
+                formData.isInvitedSpeaker
+                  ? "Describe your invited talk in free-form text."
+                  : "Objectives:\n\nMethods:\n\nResults:\n\nConclusions:"
+              }
+              rows={10}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none font-mono text-sm"
+              required
+            />
+            <div className="flex justify-between items-center mt-1">
+              <p className="text-xs text-gray-500">
+                {formData.isInvitedSpeaker
+                  ? "Free-form text is allowed for invited speaker abstracts. Structured sections and word limits do not apply."
+                  : "Include Objectives, Methods, Results, and Conclusions sections."}
+              </p>
+              <p
+                className={`text-xs font-medium ${
+                  !formData.isInvitedSpeaker &&
+                  formData.abstract.split(/\s+/).filter((w) => w).length > 300
+                    ? "text-red-500"
+                    : "text-gray-500"
+                }`}
+              >
+                {formData.isInvitedSpeaker
+                  ? `${formData.abstract.split(/\s+/).filter((w) => w).length} words`
+                  : `${formData.abstract.split(/\s+/).filter((w) => w).length} / 300 words`}
+              </p>
+            </div>
           </div>
 
           {/* Presentation Preference */}

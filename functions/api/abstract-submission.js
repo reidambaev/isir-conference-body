@@ -119,9 +119,9 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Validate word count (max 300 words)
+    // Validate word count (max 300 words) — invited speakers have no limit
     const wordCount = data.abstract.split(/\s+/).filter((w) => w).length;
-    if (wordCount > 300) {
+    if (!data.isInvitedSpeaker && wordCount > 300) {
       return new Response(
         JSON.stringify({
           error: `Abstract exceeds 300 word limit (current: ${wordCount} words)`,
@@ -448,7 +448,7 @@ export async function onRequestPost(context) {
       <tr><td style="padding: 4px 0; vertical-align: top;">Title</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(title)}</td></tr>
       <tr><td style="padding: 4px 0;">Category</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(category)}</td></tr>
       <tr><td style="padding: 4px 0;">Presentation preference</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(prefLabel)}</td></tr>
-      <tr><td style="padding: 4px 0;">Word count</td><td style="padding: 4px 0; text-align: right;">${wordCount} / 300</td></tr>
+      <tr><td style="padding: 4px 0;">Word count</td><td style="padding: 4px 0; text-align: right;">${data.isInvitedSpeaker ? wordCount : `${wordCount} / 300`}</td></tr>
     </table>
     ${abstractDisplay ? `<p style="margin: 12px 0 0 0; font-size: 0.9rem; color: #555;"><strong>Abstract (excerpt):</strong><br/>${escapeHtml(abstractDisplay)}</p>` : ""}
   </div>

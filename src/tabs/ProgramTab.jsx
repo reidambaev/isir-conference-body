@@ -647,8 +647,8 @@ const ProgramTab = () => {
           <Talk
             time="2:55 – 3:20 PM"
             title="Microbiome-Host Interactions and Pregnancy Outcomes"
-            speaker="David McIntyre"
-            affiliation="Robinson Research Institute, University of Adelaide, Australia"
+            speaker="David MacIntyre"
+            affiliation="Robinson Research Institute, Adelaide University, Australia"
           />
           <Talk
             time="3:20 – 3:45 PM"

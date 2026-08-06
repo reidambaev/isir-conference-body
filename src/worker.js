@@ -3457,9 +3457,9 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
       );
     }
 
-    // Validate word count (max 300 words)
+    // Validate word count (max 300 words) — invited speakers have no limit
     const wordCount = data.abstract.split(/\s+/).filter((w) => w).length;
-    if (wordCount > 300) {
+    if (!data.isInvitedSpeaker && wordCount > 300) {
       return new Response(
         JSON.stringify({
           error: `Abstract exceeds 300 word limit (current: ${wordCount} words)`,
@@ -3791,6 +3791,7 @@ async function handleAbstractSubmission(request, env, corsHeaders) {
         presenter_email: data.presenterEmail.trim(),
         corresponding_name: data.correspondingName.trim(),
         corresponding_email: data.correspondingEmail.trim(),
+        is_invited_speaker: data.isInvitedSpeaker ? 1 : 0,
       });
     } catch (emailError) {
       console.error("Abstract confirmation email error:", emailError);
@@ -3875,7 +3876,7 @@ async function sendAbstractConfirmationEmail(env, abstract) {
       <tr><td style="padding: 4px 0; vertical-align: top;">Title</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(title)}</td></tr>
       <tr><td style="padding: 4px 0;">Category</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(category)}</td></tr>
       <tr><td style="padding: 4px 0;">Presentation preference</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(prefLabel)}</td></tr>
-      <tr><td style="padding: 4px 0;">Word count</td><td style="padding: 4px 0; text-align: right;">${wordCount} / 300</td></tr>
+      <tr><td style="padding: 4px 0;">Word count</td><td style="padding: 4px 0; text-align: right;">${Number(abstract.is_invited_speaker || 0) === 1 ? wordCount : `${wordCount} / 300`}</td></tr>
     </table>
     ${abstractDisplay ? `<p style="margin: 12px 0 0 0; font-size: 0.9rem; color: #555;"><strong>Abstract (excerpt):</strong><br/>${escapeHtml(abstractDisplay)}</p>` : ""}
   </div>
@@ -6815,7 +6816,7 @@ async function handleUpdateAbstract(request, env, corsHeaders, abstractId) {
     }
 
     const existing = await env.ISIR_DB.prepare(
-      `SELECT id FROM abstractions WHERE id = ? AND deleted_at IS NULL`,
+      `SELECT id, is_invited_speaker FROM abstractions WHERE id = ? AND deleted_at IS NULL`,
     )
       .bind(abstractId)
       .first();
@@ -6932,7 +6933,8 @@ async function handleUpdateAbstract(request, env, corsHeaders, abstractId) {
     }
 
     const wordCount = abstractText.split(/\s+/).filter((w) => w).length;
-    if (wordCount > 300) {
+    const isInvitedAbstract = Number(existing.is_invited_speaker || 0) === 1;
+    if (!isInvitedAbstract && wordCount > 300) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -6941,7 +6943,7 @@ async function handleUpdateAbstract(request, env, corsHeaders, abstractId) {
         { status: 400, headers: corsHeaders },
       );
     }
-    if (wordCount < 50) {
+    if (!isInvitedAbstract && wordCount < 50) {
       return new Response(
         JSON.stringify({
           success: false,

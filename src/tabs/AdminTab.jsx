@@ -3983,13 +3983,15 @@ export default function AdminTab() {
     }
 
     const wordCount = abstractText.split(/\s+/).filter((w) => w).length;
-    if (wordCount > 300) {
+    const isInvitedAbstract =
+      Number(abstractToEdit?.is_invited_speaker || 0) === 1;
+    if (!isInvitedAbstract && wordCount > 300) {
       setEditAbstractError(
         `Abstract exceeds 300 word limit (current: ${wordCount} words)`,
       );
       return;
     }
-    if (wordCount < 50) {
+    if (!isInvitedAbstract && wordCount < 50) {
       setEditAbstractError("Abstract must be at least 50 words");
       return;
     }
@@ -11060,7 +11062,9 @@ export default function AdminTab() {
                       .split(/\s+/)
                       .filter((w) => w).length
                   }
-                  /300 words
+                  {Number(abstractToEdit?.is_invited_speaker || 0) === 1
+                    ? " words (no limit for invited speakers)"
+                    : "/300 words"}
                 </p>
               </div>
 
