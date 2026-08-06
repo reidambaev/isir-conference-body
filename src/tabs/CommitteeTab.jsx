@@ -1,7 +1,6 @@
 import React from "react";
 import headshots from "../assets/congress_chairs.png";
 import hyejinChoPhoto from "../assets/committee/hyejin-cho.png";
-import hoKeunKwonPhoto from "../assets/committee/ho-keun-kwon.png";
 
 const COOPERATION_DIRECTORS = [
   {
@@ -13,8 +12,8 @@ const COOPERATION_DIRECTORS = [
     photo: "/speaker-photos/nsp-9f9d0232_1782857502008_VCR8DRVHQ.png",
   },
   {
-    name: "Ho-Keun Kwon",
-    photo: hoKeunKwonPhoto,
+    name: "Nayoung Kim",
+    photo: "/speaker-photos/nsp-55c6fc80_1785802299882_0H9M1PZW1.png",
   },
   {
     name: "Aera Han",

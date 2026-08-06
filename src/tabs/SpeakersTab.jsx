@@ -25,15 +25,44 @@ function SpeakerPhoto({
   eager = false,
   fallback,
 }) {
-  const [loaded, setLoaded] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [status, setStatus] = useState("loading"); // loading | loaded | error
 
+  // Probe with Image() so cached URLs (shared Committee/Speakers) still resolve;
+  // DOM img onLoad is unreliable when the browser serves from cache.
   useEffect(() => {
-    setLoaded(false);
-    setFailed(false);
+    if (!src) {
+      setStatus("error");
+      return;
+    }
+
+    let cancelled = false;
+    setStatus("loading");
+
+    const probe = new Image();
+    const markLoaded = () => {
+      if (!cancelled) setStatus("loaded");
+    };
+    const markError = () => {
+      if (!cancelled) setStatus("error");
+    };
+
+    probe.onload = markLoaded;
+    probe.onerror = markError;
+    probe.src = src;
+
+    if (probe.complete) {
+      if (probe.naturalWidth > 0) markLoaded();
+      else markError();
+    }
+
+    return () => {
+      cancelled = true;
+      probe.onload = null;
+      probe.onerror = null;
+    };
   }, [src]);
 
-  if (!src || failed) return fallback;
+  if (!src || status === "error") return fallback;
 
   const { objectPosition, ...wrapperStyle } = style || {};
 
@@ -42,25 +71,23 @@ function SpeakerPhoto({
       className={`relative inline-block overflow-hidden ${className}`}
       style={wrapperStyle}
     >
-      {!loaded && (
+      {status !== "loaded" && (
         <span
           aria-hidden
           className="absolute inset-0 animate-pulse bg-gray-200"
         />
       )}
-      <img
-        src={src}
-        alt={alt}
-        className={`h-full w-full object-cover transition-opacity duration-300 ${
-          loaded ? "opacity-100" : "opacity-0"
-        }`}
-        style={objectPosition ? { objectPosition } : undefined}
-        loading={eager ? "eager" : "lazy"}
-        decoding="async"
-        fetchPriority={eager ? "high" : "low"}
-        onLoad={() => setLoaded(true)}
-        onError={() => setFailed(true)}
-      />
+      {status === "loaded" && (
+        <img
+          src={src}
+          alt={alt}
+          className="h-full w-full object-cover"
+          style={objectPosition ? { objectPosition } : undefined}
+          loading={eager ? "eager" : "lazy"}
+          decoding="async"
+          fetchPriority={eager ? "high" : "low"}
+        />
+      )}
     </span>
   );
 }

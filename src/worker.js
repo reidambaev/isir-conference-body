@@ -129,9 +129,12 @@ async function handleR2PublicGet(request, env, url) {
       "Content-Type",
       object.httpMetadata?.contentType || "application/octet-stream",
     );
-    // Speaker headshots can be removed from R2; avoid year-long browser cache so deletes show up.
+    // Short TTL so admin photo replaces show up soon; SWR avoids blank flashes on remount.
     if (key.startsWith("speaker-photos/")) {
-      headers.set("Cache-Control", "private, max-age=0, must-revalidate");
+      headers.set(
+        "Cache-Control",
+        "public, max-age=600, stale-while-revalidate=86400",
+      );
     } else {
       headers.set("Cache-Control", "public, max-age=31536000");
     }
