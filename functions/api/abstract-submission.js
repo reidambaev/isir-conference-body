@@ -167,11 +167,14 @@ export async function onRequestPost(context) {
     }
 
     // Check submission window (aligned with SubmissionTab copy)
-    // Open at start of March 15 UTC, close at end of August 7 UTC.
+    // Open at start of March 15 UTC, close at end of August 7 UTC for general
+    // submissions. Invited speaker talk abstracts may still be submitted after
+    // the general deadline.
     const submissionOpens = Date.parse("2026-03-15T00:00:00Z");
     const submissionDeadline = Date.parse("2026-08-07T23:59:59Z");
     const now = Date.now();
-    if (now > submissionDeadline) {
+    const isInvitedSpeakerSubmission = Boolean(data.isInvitedSpeaker);
+    if (now > submissionDeadline && !isInvitedSpeakerSubmission) {
       return new Response(
         JSON.stringify({
           error: "Submission deadline has passed",

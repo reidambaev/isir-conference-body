@@ -1,6 +1,13 @@
 // Feature flags: set to true when registration/submission are open
 export const REGISTRATION_OPEN = true;
-export const SUBMISSION_OPEN = true;
+/** General (peer-reviewed) abstract submissions. */
+export const SUBMISSION_OPEN = false;
+/**
+ * When general submission is closed, invited speakers may still submit talk
+ * abstracts if this is true. Server also allows invited speakers past the
+ * general deadline when this path is used.
+ */
+export const INVITED_SPEAKER_SUBMISSION_OPEN = true;
 
 // Secret preview key for testing (add ?preview=YOUR_SECRET_KEY to URL)
 // Keep in sync with worker: `env.PREVIEW_KEY` or default in handleRegistration.
@@ -19,7 +26,8 @@ export const isPreviewMode = () => {
 // Use these in components instead of the raw flags
 export const isRegistrationAccessible = () =>
   REGISTRATION_OPEN || isPreviewMode();
-export const isSubmissionAccessible = () => SUBMISSION_OPEN || isPreviewMode();
+export const isSubmissionAccessible = () =>
+  SUBMISSION_OPEN || INVITED_SPEAKER_SUBMISSION_OPEN || isPreviewMode();
 
 // API Configuration for ISIR Member Verification
 export const ISIR_API_CONFIG = {

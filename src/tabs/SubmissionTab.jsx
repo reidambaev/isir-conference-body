@@ -1,7 +1,15 @@
-import React, { useState, useMemo } from "react";
-import { SUBMISSION_OPEN, isPreviewMode } from "../config/constants";
+import React, { useState, useEffect } from "react";
+import {
+  SUBMISSION_OPEN,
+  INVITED_SPEAKER_SUBMISSION_OPEN,
+  isPreviewMode,
+} from "../config/constants";
 
 const SubmissionTab = () => {
+  const generalSubmissionOpen = SUBMISSION_OPEN || isPreviewMode();
+  const invitedOnlyOpen =
+    !SUBMISSION_OPEN && INVITED_SPEAKER_SUBMISSION_OPEN && !isPreviewMode();
+
   const [formData, setFormData] = useState({
     title: "",
     allAuthors: [
@@ -27,9 +35,23 @@ const SubmissionTab = () => {
     keywords: "",
     abstract: "",
     presentationPreference: "oral",
-    isInvitedSpeaker: false,
+    isInvitedSpeaker: invitedOnlyOpen,
     youngInvestigator: false,
   });
+
+  // Keep invited-speaker mode locked when general submission is closed.
+  useEffect(() => {
+    if (!invitedOnlyOpen) return;
+    setFormData((prev) =>
+      prev.isInvitedSpeaker
+        ? prev
+        : {
+            ...prev,
+            isInvitedSpeaker: true,
+            presentationPreference: "oral",
+          },
+    );
+  }, [invitedOnlyOpen]);
   const [loading, setLoading] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -277,7 +299,7 @@ const SubmissionTab = () => {
           abstract: "",
           presentationPreference: "oral",
           youngInvestigator: false,
-          isInvitedSpeaker: false,
+          isInvitedSpeaker: invitedOnlyOpen,
         });
       }
     } catch (error) {
@@ -290,8 +312,10 @@ const SubmissionTab = () => {
   };
 
   // Check submission access on every render to catch URL parameter changes
-  const submissionOpen = SUBMISSION_OPEN || isPreviewMode();
   const inPreviewMode = isPreviewMode();
+  const canSubmit =
+    generalSubmissionOpen ||
+    (INVITED_SPEAKER_SUBMISSION_OPEN && formData.isInvitedSpeaker);
 
   return (
     <div role="tabpanel">
@@ -303,8 +327,32 @@ const SubmissionTab = () => {
         </div>
       )}
 
-      {/* Submission closed banner */}
-      {!submissionOpen && (
+      {/* Invited speakers only */}
+      {invitedOnlyOpen && (
+        <div className="mb-6 p-4 rounded-xl bg-blue-50 border-2 border-blue-300 text-blue-900 flex items-center gap-3">
+          <svg
+            className="w-8 h-8 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <div>
+            <strong>General abstract submission is closed.</strong> Invited
+            speakers may still submit an abstract of their talk using the form
+            below.
+          </div>
+        </div>
+      )}
+
+      {/* Submission fully closed banner */}
+      {!generalSubmissionOpen && !INVITED_SPEAKER_SUBMISSION_OPEN && (
         <div className="mb-6 p-4 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-800 flex items-center gap-3">
           <svg
             className="w-8 h-8 flex-shrink-0"
@@ -321,8 +369,7 @@ const SubmissionTab = () => {
           </svg>
           <div>
             <strong>Abstract submission is currently closed.</strong> All
-            details below are for your information. Please check back when
-            submission opens on March 15th, 2026.
+            details below are for your information.
           </div>
         </div>
       )}
@@ -1229,11 +1276,16 @@ const SubmissionTab = () => {
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <label className="flex items-start gap-3 cursor-pointer">
+            <label
+              className={`flex items-start gap-3 ${
+                invitedOnlyOpen ? "cursor-default" : "cursor-pointer"
+              }`}
+            >
               <input
                 type="checkbox"
                 name="isInvitedSpeaker"
                 checked={formData.isInvitedSpeaker}
+                disabled={invitedOnlyOpen}
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
@@ -1244,31 +1296,43 @@ const SubmissionTab = () => {
                       : prev.presentationPreference,
                   }))
                 }
-                className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-900 focus:ring-blue-900"
+                className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-900 focus:ring-blue-900 disabled:opacity-80"
               />
               <div>
                 <span className="font-bold text-gray-900">
                   Invited Speaker Submission
                 </span>
                 <div className="text-sm text-gray-700 mt-1 space-y-1">
-                  <p>Please only check this box if:</p>
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li>
-                      You have received an <strong>official invitation</strong>{" "}
-                      from ISIR to speak.
-                    </li>
-                    <li>
-                      This submission is an abstract of your{" "}
-                      <strong>TALK</strong> (you may submit additional abstracts
-                      separately).
-                    </li>
-                    <li>
-                      Invited speaker abstracts may be written in{" "}
-                      <strong>free-form</strong> with no word limit
-                      (Objectives / Methods / Results / Conclusions sections
-                      are optional).
-                    </li>
-                  </ul>
+                  {invitedOnlyOpen ? (
+                    <p>
+                      Only invited speaker talk abstracts are accepted right
+                      now. Free-form text is allowed (no word limit;
+                      Objectives / Methods / Results / Conclusions are
+                      optional).
+                    </p>
+                  ) : (
+                    <>
+                      <p>Please only check this box if:</p>
+                      <ul className="list-disc pl-5 space-y-1">
+                        <li>
+                          You have received an{" "}
+                          <strong>official invitation</strong> from ISIR to
+                          speak.
+                        </li>
+                        <li>
+                          This submission is an abstract of your{" "}
+                          <strong>TALK</strong> (you may submit additional
+                          abstracts separately).
+                        </li>
+                        <li>
+                          Invited speaker abstracts may be written in{" "}
+                          <strong>free-form</strong> with no word limit
+                          (Objectives / Methods / Results / Conclusions sections
+                          are optional).
+                        </li>
+                      </ul>
+                    </>
+                  )}
                 </div>
               </div>
             </label>
@@ -1404,9 +1468,9 @@ const SubmissionTab = () => {
           <div className="pt-4 border-t border-gray-100">
             <button
               type="submit"
-              disabled={loading || !submissionOpen}
+              disabled={loading || !canSubmit}
               className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${
-                loading || !submissionOpen
+                loading || !canSubmit
                   ? "bg-blue-400 cursor-not-allowed opacity-75"
                   : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 cursor-pointer"
               }`}
@@ -1428,14 +1492,18 @@ const SubmissionTab = () => {
                   </svg>
                   Submitting...
                 </span>
-              ) : !submissionOpen ? (
+              ) : !canSubmit ? (
                 "Submission Closed"
+              ) : invitedOnlyOpen ? (
+                "Submit Invited Speaker Abstract"
               ) : (
                 "Submit Abstract"
               )}
             </button>
             <p className="text-center text-sm text-gray-500 mt-3">
-              Submission deadline: August 7, 2026
+              {invitedOnlyOpen
+                ? "General submission closed August 7, 2026 — invited speakers may still submit."
+                : "Submission deadline: August 7, 2026"}
             </p>
           </div>
         </form>

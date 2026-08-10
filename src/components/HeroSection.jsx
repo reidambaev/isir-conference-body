@@ -67,18 +67,6 @@ const HeroSection = () => {
               />
             </svg>
           </div>
-          <div className="text-white">
-            <p
-              className="font-bold text-base uppercase tracking-wide"
-              style={{ color: "var(--color-secondary)" }}
-            >
-              Deadline Extended
-            </p>
-            <p className="text-sm md:text-base text-blue-50">
-              The abstract submission deadline has been extended to{" "}
-              <strong>August 7, 2026</strong>.
-            </p>
-          </div>
         </div>
 
         <div className="flex flex-wrap justify-center gap-4">
