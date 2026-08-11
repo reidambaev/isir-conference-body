@@ -35,39 +35,9 @@ const HeroSection = () => {
           Global Dialogue on
           <br className="hidden md:block" /> Women's Health
         </h2>
-        <p className="text-2xl text-blue-200 mb-6 max-w-2xl mx-auto">
+        <p className="text-2xl text-blue-200 mb-8 max-w-2xl mx-auto">
           Join leading researchers and clinicians from around the world
         </p>
-
-        {/* Abstract Deadline Extension Notice */}
-        <div
-          role="status"
-          className="max-w-2xl mx-auto mb-8 flex items-start gap-3 rounded-xl border backdrop-blur-sm px-5 py-4 text-left shadow-lg"
-          style={{
-            backgroundColor: "rgba(243, 183, 44, 0.18)",
-            borderColor: "var(--color-secondary)",
-          }}
-        >
-          <div
-            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: "var(--color-secondary)" }}
-          >
-            <svg
-              className="w-5 h-5"
-              style={{ color: "var(--color-primary)" }}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"
-              />
-            </svg>
-          </div>
-        </div>
 
         <div className="flex flex-wrap justify-center gap-4">
           <button
