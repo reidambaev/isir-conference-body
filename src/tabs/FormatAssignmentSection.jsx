@@ -62,6 +62,8 @@ export default function FormatAssignmentSection({
 }) {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  /** all | Clinical Studies | Basic Studies | unspecified */
+  const [typeFilter, setTypeFilter] = useState("all");
   const [formatFilter, setFormatFilter] = useState("unassigned");
   const [preferenceFilter, setPreferenceFilter] = useState("all");
   const [sortBy, setSortBy] = useState("avg_desc");
@@ -143,6 +145,17 @@ export default function FormatAssignmentSection({
     if (categoryFilter !== "all") {
       result = result.filter((a) => a.category === categoryFilter);
     }
+    if (typeFilter !== "all") {
+      result = result.filter((a) => {
+        const label = getAbstractTypeLabel
+          ? getAbstractTypeLabel(a)
+          : String(a.abstract_submission_type || "").trim() || "Not specified";
+        if (typeFilter === "unspecified") {
+          return label === "Not specified" || !label;
+        }
+        return label === typeFilter;
+      });
+    }
     if (preferenceFilter !== "all") {
       result = result.filter(
         (a) =>
@@ -189,9 +202,11 @@ export default function FormatAssignmentSection({
     pool,
     search,
     categoryFilter,
+    typeFilter,
     preferenceFilter,
     formatFilter,
     sortBy,
+    getAbstractTypeLabel,
   ]);
 
   const viewingAbstract = useMemo(() => {
@@ -428,6 +443,16 @@ export default function FormatAssignmentSection({
                   {cat}
                 </option>
               ))}
+            </select>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="min-w-[150px] px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+            >
+              <option value="all">All types</option>
+              <option value="Clinical Studies">Clinical</option>
+              <option value="Basic Studies">Basic</option>
+              <option value="unspecified">Not specified</option>
             </select>
             <select
               value={sortBy}

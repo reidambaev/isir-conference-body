@@ -1256,6 +1256,8 @@ export default function AdminTab() {
   // Abstract filtering/sorting state
   const [abstractSearch, setAbstractSearch] = useState("");
   const [abstractCategoryFilter, setAbstractCategoryFilter] = useState("all");
+  /** all | Clinical Studies | Basic Studies | unspecified */
+  const [abstractTypeFilter, setAbstractTypeFilter] = useState("all");
   const [abstractStatusFilter, setAbstractStatusFilter] = useState("all");
   /** all | yes | possible | no — Young Investigator competition filters */
   const [abstractYiFilter, setAbstractYiFilter] = useState("all");
@@ -3317,6 +3319,17 @@ export default function AdminTab() {
       result = result.filter((a) => a.category === abstractCategoryFilter);
     }
 
+    // Clinical / Basic research type filter
+    if (abstractTypeFilter !== "all") {
+      result = result.filter((a) => {
+        const type = normalizeAbstractSubmissionType(
+          a.abstract_submission_type || a.abstractSubmissionType || "",
+        );
+        if (abstractTypeFilter === "unspecified") return !type;
+        return type === abstractTypeFilter;
+      });
+    }
+
     // Status filter
     if (abstractStatusFilter !== "all") {
       result = result.filter((a) => a.status === abstractStatusFilter);
@@ -3382,6 +3395,7 @@ export default function AdminTab() {
     generalAbstracts,
     abstractSearch,
     abstractCategoryFilter,
+    abstractTypeFilter,
     abstractStatusFilter,
     abstractYiFilter,
     abstractIssueFilter,
@@ -4827,6 +4841,15 @@ export default function AdminTab() {
   };
 
   const exportToCSV = () => {
+    const esc = (v) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const scoreById = new Map(
+      (reviewerAbstractScores || [])
+        .filter((row) => row?.id)
+        .map((row) => [row.id, row]),
+    );
     const headers = [
       "ID",
       "Title",
@@ -4840,25 +4863,46 @@ export default function AdminTab() {
       "Corresponding Author",
       "Corresponding Email",
       "Preference",
+      "Assigned Format",
+      "Avg Total",
+      "Review Count",
+      "Avg Originality",
+      "Avg Clarity",
+      "Avg Study Design",
+      "Avg Data Analysis",
+      "Avg Significance",
       "Word Count",
       "Submitted",
     ];
-    const rows = filteredAbstracts.map((a) => [
-      a.id,
-      `"${(a.title || "").replace(/"/g, '""')}"`,
-      a.category,
-      getAbstractTypeLabel(a),
-      a.status,
-      Number(a.young_investigator) === 1 ? "Yes" : "No",
-      Number(a.possible_young_investigator) === 1 ? "Yes" : "No",
-      a.presenter_name,
-      a.presenter_email,
-      a.corresponding_name,
-      a.corresponding_email,
-      a.presentation_preference,
-      a.word_count,
-      formatDate(a.submission_date),
-    ]);
+    const rows = filteredAbstracts.map((a) => {
+      const summary = scoreById.get(a.id)?.review_summary || {};
+      const num = (v) =>
+        v != null && !Number.isNaN(Number(v)) ? Number(v).toFixed(2) : "";
+      return [
+        a.id,
+        esc(a.title),
+        esc(a.category),
+        esc(getAbstractTypeLabel(a)),
+        esc(a.status),
+        Number(a.young_investigator) === 1 ? "Yes" : "No",
+        Number(a.possible_young_investigator) === 1 ? "Yes" : "No",
+        esc(a.presenter_name),
+        esc(a.presenter_email),
+        esc(a.corresponding_name),
+        esc(a.corresponding_email),
+        esc(a.presentation_preference),
+        esc(a.assigned_format || ""),
+        num(summary.avg_total),
+        Number(summary.review_count || 0) || "",
+        num(summary.avg_originality),
+        num(summary.avg_clarity),
+        num(summary.avg_study_design),
+        num(summary.avg_data_analysis),
+        num(summary.avg_significance),
+        a.word_count ?? "",
+        esc(formatDate(a.submission_date)),
+      ];
+    });
 
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -5657,6 +5701,23 @@ export default function AdminTab() {
                       {cat}
                     </option>
                   ))}
+                </select>
+              </div>
+
+              <div className="min-w-[150px]">
+                <label className="sr-only" htmlFor="abstract-type">
+                  Research type
+                </label>
+                <select
+                  id="abstract-type"
+                  value={abstractTypeFilter}
+                  onChange={(e) => setAbstractTypeFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors appearance-none cursor-pointer"
+                >
+                  <option value="all">All types</option>
+                  <option value="Clinical Studies">Clinical</option>
+                  <option value="Basic Studies">Basic</option>
+                  <option value="unspecified">Not specified</option>
                 </select>
               </div>
 
@@ -8298,11 +8359,12 @@ export default function AdminTab() {
         />
       )}
 
-      {/* Extract selected abstracts (sort + top-N + CSV/Excel) */}
+      {/* Extract selected abstracts (sort + top-N + PDF/CSV) */}
       {activeSection === "abstractExtract" && (
         <AbstractExtractSection
           abstracts={abstracts}
           reviewerAbstractScores={reviewerAbstractScores}
+          getAbstractTypeLabel={getAbstractTypeLabel}
           onGoToSubmissions={() => setActiveSection("abstracts")}
         />
       )}

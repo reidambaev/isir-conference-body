@@ -95,15 +95,18 @@ const SORT_PILLS = [
 ];
 
 /**
- * Admin: pick abstracts (with sort + top-N select) and extract to PDF.
+ * Admin: pick abstracts (with sort + top-N select) and extract to PDF/CSV.
  */
 export default function AbstractExtractSection({
   abstracts,
   reviewerAbstractScores,
+  getAbstractTypeLabel,
   onGoToSubmissions,
 }) {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  /** all | Clinical Studies | Basic Studies | unspecified */
+  const [typeFilter, setTypeFilter] = useState("all");
   const [yiFilter, setYiFilter] = useState("all");
   const [formatFilter, setFormatFilter] = useState("both");
   const [sortBy, setSortBy] = useState("avg_desc");
@@ -112,6 +115,21 @@ export default function AbstractExtractSection({
   const [message, setMessage] = useState(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [splitByCategory, setSplitByCategory] = useState(false);
+
+  const typeLabelOf = (abstract) => {
+    if (typeof getAbstractTypeLabel === "function") {
+      return getAbstractTypeLabel(abstract);
+    }
+    const raw = String(
+      abstract?.abstract_submission_type ||
+        abstract?.abstractSubmissionType ||
+        "",
+    ).trim();
+    if (!raw) return "Not specified";
+    if (raw === "Clinical Research") return "Clinical Studies";
+    if (raw === "Basic Research") return "Basic Studies";
+    return raw;
+  };
 
   const scoreById = useMemo(() => {
     const map = new Map();
@@ -166,6 +184,15 @@ export default function AbstractExtractSection({
     if (categoryFilter !== "all") {
       result = result.filter((a) => a.category === categoryFilter);
     }
+    if (typeFilter !== "all") {
+      result = result.filter((a) => {
+        const label = typeLabelOf(a);
+        if (typeFilter === "unspecified") {
+          return label === "Not specified";
+        }
+        return label === typeFilter;
+      });
+    }
     if (yiFilter === "yes") {
       result = result.filter((a) => Number(a.young_investigator) === 1);
     } else if (yiFilter === "possible") {
@@ -197,9 +224,11 @@ export default function AbstractExtractSection({
     pool,
     search,
     categoryFilter,
+    typeFilter,
     yiFilter,
     formatFilter,
     sortBy,
+    getAbstractTypeLabel,
   ]);
 
   const visibleIds = filteredRows.map((r) => r.id);
@@ -291,6 +320,86 @@ export default function AbstractExtractSection({
     }
   };
 
+  const exportSelectedCsv = () => {
+    const rowsToExport =
+      selectedRows.length > 0 ? selectedRows : filteredRows;
+    if (rowsToExport.length === 0) {
+      setMessage({ type: "error", text: "Nothing to export." });
+      return;
+    }
+    const esc = (v) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const num = (v) =>
+      v != null && !Number.isNaN(Number(v)) ? Number(v).toFixed(2) : "";
+    const headers = [
+      "Rank",
+      "ID",
+      "Title",
+      "Category",
+      "Abstract Type",
+      "Presenter",
+      "Presenter Email",
+      "Corresponding Author",
+      "Corresponding Email",
+      "Format",
+      "Preference",
+      "Assigned Format",
+      "Young Investigator",
+      "Possibly YI",
+      "Avg Total",
+      "Review Count",
+      "Avg Originality",
+      "Avg Clarity",
+      "Avg Study Design",
+      "Avg Data Analysis",
+      "Avg Significance",
+      "Status",
+    ];
+    const csvRows = rowsToExport.map((a, index) => {
+      const summary = a.review_summary || {};
+      return [
+        index + 1,
+        a.id,
+        esc(a.title),
+        esc(a.category),
+        esc(typeLabelOf(a)),
+        esc(a.presenter_name),
+        esc(a.presenter_email),
+        esc(a.corresponding_name),
+        esc(a.corresponding_email),
+        esc(formatLabel(a)),
+        esc(a.presentation_preference),
+        esc(a.assigned_format || ""),
+        Number(a.young_investigator) === 1 ? "Yes" : "No",
+        Number(a.possible_young_investigator) === 1 ? "Yes" : "No",
+        num(summary.avg_total),
+        Number(summary.review_count || 0) || "",
+        num(summary.avg_originality),
+        num(summary.avg_clarity),
+        num(summary.avg_study_design),
+        num(summary.avg_data_analysis),
+        num(summary.avg_significance),
+        esc(a.status),
+      ];
+    });
+    const csv = [headers.join(","), ...csvRows.map((r) => r.join(","))].join(
+      "\n",
+    );
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `abstracts-extract-${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setMessage({
+      type: "ok",
+      text: `Exported ${rowsToExport.length} abstract${rowsToExport.length === 1 ? "" : "s"} to CSV${selectedRows.length > 0 ? " (selection)" : " (all matching filters)"}.`,
+    });
+  };
+
   const pillClass = (active) =>
     `px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
       active
@@ -304,8 +413,9 @@ export default function AbstractExtractSection({
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Extract abstracts</h2>
           <p className="text-gray-500 text-sm mt-1 max-w-2xl">
-            Accepted abstracts only. Filter oral / poster / both, pick a sort,
-            select the top N, and export a print-ready PDF.
+            Accepted abstracts only. Filter oral / poster / clinical / basic,
+            pick a sort, select the top N, and export PDF or CSV (category,
+            names, scores).
           </p>
         </div>
         {onGoToSubmissions ? (
@@ -395,6 +505,32 @@ export default function AbstractExtractSection({
                 className={pillClass(formatFilter === "both")}
               >
                 Both
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide mr-1">
+                Type
+              </span>
+              <button
+                type="button"
+                onClick={() => setTypeFilter("all")}
+                className={pillClass(typeFilter === "all")}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setTypeFilter("Clinical Studies")}
+                className={pillClass(typeFilter === "Clinical Studies")}
+              >
+                Clinical
+              </button>
+              <button
+                type="button"
+                onClick={() => setTypeFilter("Basic Studies")}
+                className={pillClass(typeFilter === "Basic Studies")}
+              >
+                Basic
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -496,6 +632,16 @@ export default function AbstractExtractSection({
             </button>
             <button
               type="button"
+              onClick={exportSelectedCsv}
+              disabled={filteredRows.length === 0}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {selectedList.length > 0
+                ? `Extract CSV (${selectedList.length})`
+                : "Extract CSV"}
+            </button>
+            <button
+              type="button"
               onClick={exportSelectedPdf}
               disabled={selectedList.length === 0 || pdfBusy}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-50"
@@ -540,6 +686,9 @@ export default function AbstractExtractSection({
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Category
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Format
@@ -593,6 +742,14 @@ export default function AbstractExtractSection({
                         <span className="line-clamp-2">
                           {row.category || "—"}
                         </span>
+                      </td>
+                      <td className="px-3 py-3 text-gray-600 whitespace-nowrap text-xs">
+                        {(() => {
+                          const label = typeLabelOf(row);
+                          if (label === "Clinical Studies") return "Clinical";
+                          if (label === "Basic Studies") return "Basic";
+                          return "—";
+                        })()}
                       </td>
                       <td className="px-3 py-3">
                         <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-700 capitalize">
