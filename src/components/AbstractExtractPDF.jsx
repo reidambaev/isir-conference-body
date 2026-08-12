@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   },
   coverTitle: {
     fontFamily: "DocSerif-Bold",
-    fontSize: 22,
+    fontSize: 18,
     textAlign: "center",
     marginBottom: 10,
   },
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: "DocSerif-Bold",
-    fontSize: 13,
+    fontSize: 11,
     textAlign: "center",
     lineHeight: 1.35,
     marginBottom: 6,
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontFamily: "DocSerif-Bold",
-    fontSize: 16,
+    fontSize: 14,
     textAlign: "center",
     lineHeight: 1.35,
   },
