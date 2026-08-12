@@ -550,11 +550,15 @@ export default function AbstractExtractSection({
                   <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Avg
                   </th>
+                  <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Reviews
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
                 {filteredRows.map((row, index) => {
                   const avg = avgTotalOf(row);
+                  const reviews = Number(row.review_summary?.review_count || 0);
                   const checked = selectedIds.has(row.id);
                   const fmt = formatLabel(row);
                   return (
@@ -610,6 +614,9 @@ export default function AbstractExtractSection({
                       </td>
                       <td className="px-3 py-3 text-right tabular-nums font-semibold text-gray-900">
                         {avg != null ? avg.toFixed(2) : "—"}
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums text-gray-700">
+                        {reviews > 0 ? reviews : "—"}
                       </td>
                     </tr>
                   );

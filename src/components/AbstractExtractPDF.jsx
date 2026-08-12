@@ -512,10 +512,11 @@ function AbstractPage({ abstract, number, showCategory = true }) {
     avg != null && !Number.isNaN(Number(avg))
       ? Number(avg).toFixed(2)
       : null;
+  const reviewCount = Number(abstract?.review_summary?.review_count || 0);
   const isYi = Number(abstract?.young_investigator) === 1;
   const afterTitleBits = [
     showCategory && category,
-    scoreLabel,
+    scoreLabel || reviewCount > 0,
     isYi,
   ].filter(Boolean).length;
   const title = pdfSafeText(
@@ -536,14 +537,17 @@ function AbstractPage({ abstract, number, showCategory = true }) {
           {category}
         </Text>
       ) : null}
-      {scoreLabel ? (
+      {scoreLabel || reviewCount > 0 ? (
         <Text
           style={[
             styles.score,
             isYi ? { marginBottom: 4 } : null,
           ]}
         >
-          Score {scoreLabel}
+          {scoreLabel ? `Score ${scoreLabel}` : "Score —"}
+          {reviewCount > 0
+            ? ` · ${reviewCount} review${reviewCount === 1 ? "" : "s"}`
+            : ""}
         </Text>
       ) : null}
       {isYi ? (
