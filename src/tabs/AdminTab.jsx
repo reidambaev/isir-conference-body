@@ -13,6 +13,7 @@ import {
   isAdminLocalhost,
 } from "./adminLocalDemoData";
 import FormatAssignmentSection from "./FormatAssignmentSection";
+import AbstractExtractSection from "./AbstractExtractSection";
 
 const REGISTRATION_TICKET_LABELS = {
   "isir-member": "ISIR Member",
@@ -116,6 +117,7 @@ const ADMIN_SECTION_IDS = new Set([
   "invitedSpeakerAbstracts",
   "abstractReviewScores",
   "formatAssignment",
+  "abstractExtract",
   "visa",
   "speakerHotel",
   "speakerInvites",
@@ -5112,6 +5114,10 @@ export default function AdminTab() {
                   id: "formatAssignment",
                   label: "Oral / Poster",
                 },
+                {
+                  id: "abstractExtract",
+                  label: "Extract",
+                },
               ],
             },
             {
@@ -5307,6 +5313,17 @@ export default function AdminTab() {
                       Reviewer scores (
                       {abstractReviewRollupStats.withReviews}/
                       {abstractReviewRollupStats.total})
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setAbstractActionsMenuOpen(false);
+                        setActiveSection("abstractExtract");
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-800 hover:bg-gray-50"
+                    >
+                      Extract selected abstracts
                     </button>
                     <button
                       type="button"
@@ -8278,6 +8295,15 @@ export default function AdminTab() {
           formatDate={formatDate}
           getAbstractTypeLabel={getAbstractTypeLabel}
           onGoToReviewScores={() => setActiveSection("abstractReviewScores")}
+        />
+      )}
+
+      {/* Extract selected abstracts (sort + top-N + CSV/Excel) */}
+      {activeSection === "abstractExtract" && (
+        <AbstractExtractSection
+          abstracts={abstracts}
+          reviewerAbstractScores={reviewerAbstractScores}
+          onGoToSubmissions={() => setActiveSection("abstracts")}
         />
       )}
 
