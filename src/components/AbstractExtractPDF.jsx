@@ -411,55 +411,24 @@ function buildNumberedList(abstracts, splitByCategory) {
 }
 
 function buildTocEntries(itemsWithPages) {
-  const hasSections = itemsWithPages.some((item) => item.type === "section");
-
-  if (hasSections) {
-    const entries = [];
-    for (let i = 0; i < itemsWithPages.length; i += 1) {
-      const item = itemsWithPages[i];
-      if (item.type !== "section") continue;
-      let endPage = item.page;
-      for (let j = i + 1; j < itemsWithPages.length; j += 1) {
-        if (itemsWithPages[j].type === "section") break;
-        endPage = itemsWithPages[j].page;
-      }
-      entries.push({
-        label: pdfSafeText(item.category || "Uncategorized"),
-        pageLabel:
-          endPage && endPage !== item.page
-            ? `${item.page} - ${endPage}`
-            : String(item.page || ""),
-      });
+  const entries = [];
+  for (let i = 0; i < itemsWithPages.length; i += 1) {
+    const item = itemsWithPages[i];
+    if (item.type !== "section") continue;
+    let endPage = item.page;
+    for (let j = i + 1; j < itemsWithPages.length; j += 1) {
+      if (itemsWithPages[j].type === "section") break;
+      endPage = itemsWithPages[j].page;
     }
-    return entries;
-  }
-
-  // Flat extract: group by category for TOC ranges only
-  const byCategory = new Map();
-  for (const item of itemsWithPages) {
-    if (item.type !== "abstract") continue;
-    const label =
-      pdfSafeText(String(item.abstract?.category || "").trim()) ||
-      "Uncategorized";
-    const page = Number(item.page) || 0;
-    if (!byCategory.has(label)) {
-      byCategory.set(label, { label, start: page, end: page });
-    } else {
-      const row = byCategory.get(label);
-      row.start = Math.min(row.start, page);
-      row.end = Math.max(row.end, page);
-    }
-  }
-
-  return Array.from(byCategory.values())
-    .sort((a, b) => a.label.localeCompare(b.label))
-    .map((row) => ({
-      label: row.label,
+    entries.push({
+      label: pdfSafeText(item.category || "Uncategorized"),
       pageLabel:
-        row.end && row.end !== row.start
-          ? `${row.start} - ${row.end}`
-          : String(row.start || ""),
-    }));
+        endPage && endPage !== item.page
+          ? `${item.page} - ${endPage}`
+          : String(item.page || ""),
+    });
+  }
+  return entries;
 }
 
 function chunk(arr, size) {
@@ -634,10 +603,12 @@ export default function AbstractExtractPDF({
 }) {
   const list = abstracts || [];
   const items = buildNumberedList(list, splitByCategory);
-  const tocPageCount = estimateTocPageCount(items);
+  const tocPageCount = splitByCategory ? estimateTocPageCount(items) : 0;
   const itemsWithPages = assignPages(items, tocPageCount);
-  const tocEntries = buildTocEntries(itemsWithPages);
-  const tocChunks = chunk(tocEntries, TOC_ENTRIES_PER_PAGE);
+  const tocEntries = splitByCategory ? buildTocEntries(itemsWithPages) : [];
+  const tocChunks = splitByCategory
+    ? chunk(tocEntries, TOC_ENTRIES_PER_PAGE)
+    : [];
 
   const abstractCount = items.filter((i) => i.type === "abstract").length;
   const generatedDate = new Date().toLocaleDateString(undefined, {
