@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Image,
   Font,
+  Link,
 } from "@react-pdf/renderer";
 import logo from "../assets/logo.png";
 import dejavuSerif from "dejavu-fonts-ttf/ttf/DejaVuSerif.ttf";
@@ -32,10 +33,10 @@ function pdfSafeText(value) {
 
 const styles = StyleSheet.create({
   page: {
-    paddingTop: 56,
-    paddingBottom: 64,
-    paddingHorizontal: 64,
-    fontSize: 11,
+    paddingTop: 48,
+    paddingBottom: 56,
+    paddingHorizontal: 56,
+    fontSize: 10,
     fontFamily: "DocSerif",
     color: "#000",
   },
@@ -110,50 +111,22 @@ const styles = StyleSheet.create({
     textDecoration: "underline",
     marginBottom: 28,
   },
-  tocHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginBottom: 10,
-  },
-  tocPageHeader: {
-    fontFamily: "Helvetica",
-    fontSize: 11,
-    textDecoration: "underline",
-    width: 56,
-    textAlign: "right",
-  },
-  tocCategory: {
-    fontFamily: "Helvetica-Bold",
-    fontSize: 11,
-    flexGrow: 1,
-    flexShrink: 1,
-    paddingRight: 16,
-    lineHeight: 1.35,
-  },
-  tocCategoryRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginTop: 14,
-    marginBottom: 6,
-  },
   tocRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   tocTitle: {
     fontFamily: "Helvetica",
     fontSize: 11,
     flexGrow: 1,
     flexShrink: 1,
-    paddingRight: 16,
     lineHeight: 1.35,
+    color: "#000",
   },
-  tocPage: {
-    fontFamily: "Helvetica",
-    fontSize: 11,
-    width: 56,
-    textAlign: "right",
+  tocLink: {
+    textDecoration: "none",
+    color: "#000",
   },
   abstractNum: {
     fontFamily: "DocSerif-Bold",
@@ -165,8 +138,8 @@ const styles = StyleSheet.create({
     fontFamily: "DocSerif-Bold",
     fontSize: 11,
     textAlign: "center",
-    lineHeight: 1.35,
-    marginBottom: 6,
+    lineHeight: 1.3,
+    marginBottom: 4,
   },
   category: {
     fontFamily: "DocSerif-Italic",
@@ -189,10 +162,10 @@ const styles = StyleSheet.create({
   },
   authors: {
     fontFamily: "DocSerif",
-    fontSize: 11,
+    fontSize: 10,
     textAlign: "center",
-    lineHeight: 1.45,
-    marginBottom: 8,
+    lineHeight: 1.35,
+    marginBottom: 6,
   },
   super: {
     fontSize: 7,
@@ -201,27 +174,27 @@ const styles = StyleSheet.create({
   },
   affiliation: {
     fontFamily: "DocSerif-Italic",
-    fontSize: 9,
+    fontSize: 8,
     textAlign: "center",
-    lineHeight: 1.4,
-    marginBottom: 2,
+    lineHeight: 1.3,
+    marginBottom: 1,
   },
   keywords: {
     fontFamily: "DocSerif",
-    fontSize: 10,
-    marginTop: 14,
-    marginBottom: 10,
-    lineHeight: 1.4,
+    fontSize: 9,
+    marginTop: 10,
+    marginBottom: 8,
+    lineHeight: 1.35,
   },
   keywordsLabel: {
     fontFamily: "DocSerif-BoldItalic",
   },
   body: {
     fontFamily: "DocSerif",
-    fontSize: 11,
-    lineHeight: 1.5,
+    fontSize: 10,
+    lineHeight: 1.4,
     textAlign: "justify",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   bodyHead: {
     fontFamily: "DocSerif-Bold",
@@ -358,10 +331,10 @@ function splitAbstractSections(text) {
   return sections.length > 0 ? sections : [{ heading: null, body: raw }];
 }
 
-function AuthorsLine({ authorBlocks }) {
+function AuthorsLine({ authorBlocks, style }) {
   if (authorBlocks.length === 0) return null;
   return (
-    <Text style={styles.authors}>
+    <Text style={[styles.authors, style]}>
       {authorBlocks.map((block, i) => (
         <Text key={`${block.name}-${i}`}>
           {block.name}
@@ -410,25 +383,21 @@ function buildNumberedList(abstracts, splitByCategory) {
   return items;
 }
 
-function buildTocEntries(itemsWithPages) {
-  const entries = [];
-  for (let i = 0; i < itemsWithPages.length; i += 1) {
-    const item = itemsWithPages[i];
-    if (item.type !== "section") continue;
-    let endPage = item.page;
-    for (let j = i + 1; j < itemsWithPages.length; j += 1) {
-      if (itemsWithPages[j].type === "section") break;
-      endPage = itemsWithPages[j].page;
-    }
-    entries.push({
+function categoryDestId(category) {
+  const slug = String(category || "uncategorized")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `section-${slug || "uncategorized"}`;
+}
+
+function buildTocEntries(items) {
+  return (items || [])
+    .filter((item) => item.type === "section")
+    .map((item) => ({
       label: pdfSafeText(item.category || "Uncategorized"),
-      pageLabel:
-        endPage && endPage !== item.page
-          ? `${item.page} - ${endPage}`
-          : String(item.page || ""),
-    });
-  }
-  return entries;
+      destId: categoryDestId(item.category),
+    }));
 }
 
 function chunk(arr, size) {
@@ -439,27 +408,66 @@ function chunk(arr, size) {
   return out.length > 0 ? out : [[]];
 }
 
-function assignPages(items, tocPageCount) {
-  // Page 1 = title, then TOC pages, then content (1 page per content item)
-  let page = 1 + tocPageCount + 1;
-  return items.map((item) => {
-    const withPage = { ...item, page };
-    page += 1;
-    return withPage;
-  });
+/**
+ * Heuristic load for Letter fit. Higher = denser page; we tighten type to keep
+ * one abstract on one page so layout stays stable (no spill pages).
+ */
+function abstractFitLevel(abstract) {
+  const body = String(abstract?.abstract || abstract?.abstract_text || "");
+  const words = body.split(/\s+/).filter(Boolean).length;
+  const authors = (abstract?.authors || []).length;
+  const affs = (abstract?.affiliations || []).length;
+  const titleLen = String(abstract?.title || "").length;
+  const load =
+    words + authors * 14 + affs * 12 + Math.ceil(titleLen / 6);
+  if (load > 480) return 2;
+  if (load > 340) return 1;
+  return 0;
 }
 
-/** Estimate TOC page count from the eventual entry list shape. */
-function estimateTocPageCount(items) {
-  const entryCount = buildTocEntries(
-    items.map((item, i) => ({ ...item, page: i + 1 })),
-  ).length;
-  return Math.max(1, Math.ceil(Math.max(entryCount, 1) / TOC_ENTRIES_PER_PAGE));
+function abstractFitStyles(level) {
+  if (level >= 2) {
+    return {
+      page: {
+        paddingTop: 36,
+        paddingBottom: 48,
+        paddingHorizontal: 44,
+      },
+      abstractNum: { fontSize: 9, marginBottom: 4 },
+      title: { fontSize: 9, lineHeight: 1.2, marginBottom: 2 },
+      category: { fontSize: 8, marginBottom: 2 },
+      score: { fontSize: 8, marginBottom: 6 },
+      yiTag: { fontSize: 8, marginBottom: 6 },
+      authors: { fontSize: 8, lineHeight: 1.25, marginBottom: 3 },
+      affiliation: { fontSize: 7, lineHeight: 1.2 },
+      keywords: { fontSize: 8, marginTop: 6, marginBottom: 4, lineHeight: 1.25 },
+      body: { fontSize: 8, lineHeight: 1.28, marginBottom: 3 },
+    };
+  }
+  if (level >= 1) {
+    return {
+      page: {
+        paddingTop: 40,
+        paddingBottom: 52,
+        paddingHorizontal: 48,
+      },
+      abstractNum: { fontSize: 9, marginBottom: 6 },
+      title: { fontSize: 10, lineHeight: 1.25, marginBottom: 3 },
+      category: { fontSize: 9, marginBottom: 3 },
+      score: { fontSize: 9, marginBottom: 8 },
+      yiTag: { fontSize: 8, marginBottom: 8 },
+      authors: { fontSize: 9, lineHeight: 1.3, marginBottom: 4 },
+      affiliation: { fontSize: 7.5, lineHeight: 1.25 },
+      keywords: { fontSize: 8, marginTop: 8, marginBottom: 6, lineHeight: 1.3 },
+      body: { fontSize: 9, lineHeight: 1.32, marginBottom: 4 },
+    };
+  }
+  return {};
 }
 
 function TitlePage({ abstractCount, splitByCategory, generatedDate }) {
   return (
-    <Page size="A4" style={styles.coverPage}>
+    <Page size="LETTER" style={styles.coverPage}>
       <Image src={logo} style={styles.coverLogo} />
       <Text style={styles.coverCongress}>
         International Society for Immunology of Reproduction
@@ -481,18 +489,20 @@ function TitlePage({ abstractCount, splitByCategory, generatedDate }) {
 
 function TocPage({ entries, pageIndex, pageCount }) {
   return (
-    <Page size="A4" style={styles.page}>
+    <Page size="LETTER" style={styles.page}>
       <Text style={styles.tocHeading}>
         Table of Contents{pageCount > 1 ? ` (${pageIndex + 1})` : ""}
       </Text>
-      <View style={styles.tocHeaderRow}>
-        <Text style={styles.tocPageHeader}>Page</Text>
-      </View>
       {entries.map((entry, i) => (
-        <View key={`${entry.label}-${i}`} style={styles.tocRow}>
-          <Text style={styles.tocTitle}>{entry.label}</Text>
-          <Text style={styles.tocPage}>{entry.pageLabel}</Text>
-        </View>
+        <Link
+          key={`${entry.destId}-${i}`}
+          src={`#${entry.destId}`}
+          style={styles.tocLink}
+        >
+          <View style={styles.tocRow}>
+            <Text style={styles.tocTitle}>{entry.label}</Text>
+          </View>
+        </Link>
       ))}
       <PageFooter />
     </Page>
@@ -500,6 +510,7 @@ function TocPage({ entries, pageIndex, pageCount }) {
 }
 
 function AbstractPage({ abstract, number, showCategory = true }) {
+  const fit = abstractFitStyles(abstractFitLevel(abstract));
   const { authorBlocks, unique } = buildAuthorAffiliationBlocks(abstract);
   const category = pdfSafeText(String(abstract?.category || "").trim());
   const keywords = pdfSafeText(String(abstract?.keywords || "").trim());
@@ -524,13 +535,16 @@ function AbstractPage({ abstract, number, showCategory = true }) {
   );
 
   return (
-    <Page size="A4" style={styles.page} wrap>
-      <Text style={styles.abstractNum}>{number}</Text>
-      <Text style={styles.title}>{title}</Text>
+    <Page size="LETTER" style={[styles.page, fit.page]}>
+      <Text style={[styles.abstractNum, fit.abstractNum]}>
+        {`Abstract #${number}`}
+      </Text>
+      <Text style={[styles.title, fit.title]}>{title}</Text>
       {showCategory && category ? (
         <Text
           style={[
             styles.category,
+            fit.category,
             afterTitleBits === 1 ? { marginBottom: 12 } : null,
           ]}
         >
@@ -541,6 +555,7 @@ function AbstractPage({ abstract, number, showCategory = true }) {
         <Text
           style={[
             styles.score,
+            fit.score,
             isYi ? { marginBottom: 4 } : null,
           ]}
         >
@@ -551,29 +566,34 @@ function AbstractPage({ abstract, number, showCategory = true }) {
         </Text>
       ) : null}
       {isYi ? (
-        <Text style={styles.yiTag}>Young Investigator Competition</Text>
+        <Text style={[styles.yiTag, fit.yiTag]}>
+          Young Investigator Competition
+        </Text>
       ) : null}
 
-      <AuthorsLine authorBlocks={authorBlocks} />
+      <AuthorsLine authorBlocks={authorBlocks} style={fit.authors} />
 
       {unique.map((aff) => (
-        <Text key={aff.n} style={styles.affiliation}>
+        <Text key={aff.n} style={[styles.affiliation, fit.affiliation]}>
           {`${aff.n} ${aff.line}`}
         </Text>
       ))}
 
       {keywords ? (
-        <Text style={styles.keywords}>
+        <Text style={[styles.keywords, fit.keywords]}>
           <Text style={styles.keywordsLabel}>Keywords: </Text>
           {keywords}
         </Text>
       ) : null}
 
       {sections.length === 0 || !String(bodyText).trim() ? (
-        <Text style={styles.body}>No abstract text.</Text>
+        <Text style={[styles.body, fit.body]}>No abstract text.</Text>
       ) : (
         sections.map((section, i) => (
-          <Text key={`${section.heading || "body"}-${i}`} style={styles.body}>
+          <Text
+            key={`${section.heading || "body"}-${i}`}
+            style={[styles.body, fit.body]}
+          >
             {section.heading ? (
               <Text style={styles.bodyHead}>
                 {pdfSafeText(section.heading)}:{" "}
@@ -589,8 +609,13 @@ function AbstractPage({ abstract, number, showCategory = true }) {
 }
 
 function CategorySectionPage({ category }) {
+  const destId = categoryDestId(category);
   return (
-    <Page size="A4" style={styles.sectionPage}>
+    <Page size="LETTER" style={styles.sectionPage}>
+      {/* Anchor so TOC links land on this section page */}
+      <Text id={destId} style={{ fontSize: 1, color: "#fff", height: 1 }}>
+        {" "}
+      </Text>
       <View style={styles.sectionRule} />
       <Text style={styles.sectionTitle}>
         {pdfSafeText(category || "Uncategorized")}
@@ -607,9 +632,7 @@ export default function AbstractExtractPDF({
 }) {
   const list = abstracts || [];
   const items = buildNumberedList(list, splitByCategory);
-  const tocPageCount = splitByCategory ? estimateTocPageCount(items) : 0;
-  const itemsWithPages = assignPages(items, tocPageCount);
-  const tocEntries = splitByCategory ? buildTocEntries(itemsWithPages) : [];
+  const tocEntries = splitByCategory ? buildTocEntries(items) : [];
   const tocChunks = splitByCategory
     ? chunk(tocEntries, TOC_ENTRIES_PER_PAGE)
     : [];
@@ -641,7 +664,7 @@ export default function AbstractExtractPDF({
     );
   });
 
-  itemsWithPages.forEach((item, index) => {
+  items.forEach((item, index) => {
     if (item.type === "section") {
       pages.push(
         <CategorySectionPage
