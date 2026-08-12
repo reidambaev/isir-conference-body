@@ -6,10 +6,29 @@ import {
   Text,
   StyleSheet,
   Image,
+  Font,
 } from "@react-pdf/renderer";
 import logo from "../assets/logo.png";
+import dejavuSerif from "dejavu-fonts-ttf/ttf/DejaVuSerif.ttf";
+import dejavuSerifBold from "dejavu-fonts-ttf/ttf/DejaVuSerif-Bold.ttf";
+import dejavuSerifItalic from "dejavu-fonts-ttf/ttf/DejaVuSerif-Italic.ttf";
+import dejavuSerifBoldItalic from "dejavu-fonts-ttf/ttf/DejaVuSerif-BoldItalic.ttf";
 
-const TOC_ENTRIES_PER_PAGE = 28;
+Font.register({ family: "DocSerif", src: dejavuSerif });
+Font.register({ family: "DocSerif-Bold", src: dejavuSerifBold });
+Font.register({ family: "DocSerif-Italic", src: dejavuSerifItalic });
+Font.register({ family: "DocSerif-BoldItalic", src: dejavuSerifBoldItalic });
+
+const TOC_ENTRIES_PER_PAGE = 30;
+
+/** Light cleanup only — Greek and other Unicode stay intact (DocSerif supports them). */
+function pdfSafeText(value) {
+  if (value == null) return "";
+  return String(value)
+    .replace(/\u00A0/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/ {2,}/g, " ");
+}
 
 const styles = StyleSheet.create({
   page: {
@@ -17,7 +36,7 @@ const styles = StyleSheet.create({
     paddingBottom: 64,
     paddingHorizontal: 64,
     fontSize: 11,
-    fontFamily: "Times-Roman",
+    fontFamily: "DocSerif",
     color: "#000",
   },
   pageFooter: {
@@ -28,13 +47,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   pageNotice: {
-    fontFamily: "Times-Italic",
+    fontFamily: "DocSerif-Italic",
     fontSize: 8,
     textAlign: "center",
     marginBottom: 3,
   },
   pageNumber: {
-    fontFamily: "Times-Roman",
+    fontFamily: "DocSerif",
     fontSize: 9,
     textAlign: "center",
   },
@@ -42,7 +61,7 @@ const styles = StyleSheet.create({
     paddingTop: 72,
     paddingBottom: 64,
     paddingHorizontal: 64,
-    fontFamily: "Times-Roman",
+    fontFamily: "DocSerif",
     color: "#000",
     alignItems: "center",
   },
@@ -53,7 +72,7 @@ const styles = StyleSheet.create({
     objectFit: "contain",
   },
   coverCongress: {
-    fontFamily: "Times-Roman",
+    fontFamily: "DocSerif",
     fontSize: 12,
     textAlign: "center",
     letterSpacing: 1.5,
@@ -67,104 +86,109 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   coverTitle: {
-    fontFamily: "Times-Bold",
+    fontFamily: "DocSerif-Bold",
     fontSize: 22,
     textAlign: "center",
     marginBottom: 10,
   },
   coverSubtitle: {
-    fontFamily: "Times-Italic",
+    fontFamily: "DocSerif-Italic",
     fontSize: 12,
     textAlign: "center",
     marginBottom: 28,
   },
   coverMeta: {
-    fontFamily: "Times-Roman",
+    fontFamily: "DocSerif",
     fontSize: 11,
     textAlign: "center",
     lineHeight: 1.5,
   },
   tocHeading: {
-    fontFamily: "Times-Bold",
+    fontFamily: "Helvetica-Bold",
     fontSize: 16,
     textAlign: "center",
-    marginBottom: 20,
+    textDecoration: "underline",
+    marginBottom: 28,
+  },
+  tocHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginBottom: 10,
+  },
+  tocPageHeader: {
+    fontFamily: "Helvetica",
+    fontSize: 11,
+    textDecoration: "underline",
+    width: 56,
+    textAlign: "right",
   },
   tocCategory: {
-    fontFamily: "Times-Bold",
+    fontFamily: "Helvetica-Bold",
     fontSize: 11,
+    flexGrow: 1,
+    flexShrink: 1,
+    paddingRight: 16,
+    lineHeight: 1.35,
   },
   tocCategoryRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    marginTop: 10,
-    marginBottom: 4,
+    alignItems: "flex-start",
+    marginTop: 14,
+    marginBottom: 6,
   },
   tocRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    marginBottom: 5,
-  },
-  tocNum: {
-    fontFamily: "Times-Bold",
-    fontSize: 10,
-    width: 28,
+    alignItems: "flex-start",
+    marginBottom: 8,
   },
   tocTitle: {
-    fontFamily: "Times-Roman",
-    fontSize: 10,
+    fontFamily: "Helvetica",
+    fontSize: 11,
     flexGrow: 1,
     flexShrink: 1,
-    paddingRight: 8,
-    lineHeight: 1.3,
-  },
-  tocDots: {
-    fontFamily: "Times-Roman",
-    fontSize: 9,
-    color: "#666",
-    flexGrow: 1,
-    letterSpacing: 1.5,
+    paddingRight: 16,
+    lineHeight: 1.35,
   },
   tocPage: {
-    fontFamily: "Times-Roman",
-    fontSize: 10,
-    width: 28,
+    fontFamily: "Helvetica",
+    fontSize: 11,
+    width: 56,
     textAlign: "right",
   },
   abstractNum: {
-    fontFamily: "Times-Bold",
+    fontFamily: "DocSerif-Bold",
     fontSize: 10,
     textAlign: "center",
     marginBottom: 8,
   },
   title: {
-    fontFamily: "Times-Bold",
+    fontFamily: "DocSerif-Bold",
     fontSize: 13,
     textAlign: "center",
     lineHeight: 1.35,
     marginBottom: 6,
   },
   category: {
-    fontFamily: "Times-Italic",
+    fontFamily: "DocSerif-Italic",
     fontSize: 10,
     textAlign: "center",
     marginBottom: 4,
   },
   score: {
-    fontFamily: "Times-Bold",
+    fontFamily: "DocSerif-Bold",
     fontSize: 10,
     textAlign: "center",
     marginBottom: 12,
   },
   yiTag: {
-    fontFamily: "Times-Bold",
+    fontFamily: "DocSerif-Bold",
     fontSize: 9,
     textAlign: "center",
     marginBottom: 10,
     letterSpacing: 0.8,
   },
   authors: {
-    fontFamily: "Times-Roman",
+    fontFamily: "DocSerif",
     fontSize: 11,
     textAlign: "center",
     lineHeight: 1.45,
@@ -172,42 +196,42 @@ const styles = StyleSheet.create({
   },
   super: {
     fontSize: 7,
-    fontFamily: "Times-Roman",
+    fontFamily: "DocSerif",
     verticalAlign: "super",
   },
   affiliation: {
-    fontFamily: "Times-Italic",
+    fontFamily: "DocSerif-Italic",
     fontSize: 9,
     textAlign: "center",
     lineHeight: 1.4,
     marginBottom: 2,
   },
   keywords: {
-    fontFamily: "Times-Roman",
+    fontFamily: "DocSerif",
     fontSize: 10,
     marginTop: 14,
     marginBottom: 10,
     lineHeight: 1.4,
   },
   keywordsLabel: {
-    fontFamily: "Times-BoldItalic",
+    fontFamily: "DocSerif-BoldItalic",
   },
   body: {
-    fontFamily: "Times-Roman",
+    fontFamily: "DocSerif",
     fontSize: 11,
     lineHeight: 1.5,
     textAlign: "justify",
     marginBottom: 8,
   },
   bodyHead: {
-    fontFamily: "Times-Bold",
+    fontFamily: "DocSerif-Bold",
   },
   sectionPage: {
     paddingTop: 64,
     paddingBottom: 64,
     paddingHorizontal: 64,
     justifyContent: "center",
-    fontFamily: "Times-Roman",
+    fontFamily: "DocSerif",
     color: "#000",
   },
   sectionRule: {
@@ -218,7 +242,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontFamily: "Times-Bold",
+    fontFamily: "DocSerif-Bold",
     fontSize: 16,
     textAlign: "center",
     lineHeight: 1.35,
@@ -241,19 +265,23 @@ function PageFooter() {
 
 function authorName(author) {
   if (!author) return "";
-  return `${author.first_name || author.firstName || ""}${
-    author.middle_name || author.middleName
-      ? ` ${author.middle_name || author.middleName}`
-      : ""
-  } ${author.last_name || author.lastName || ""}`
-    .replace(/\s+/g, " ")
-    .trim();
+  return pdfSafeText(
+    `${author.first_name || author.firstName || ""}${
+      author.middle_name || author.middleName
+        ? ` ${author.middle_name || author.middleName}`
+        : ""
+    } ${author.last_name || author.lastName || ""}`
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
 }
 
 function affiliationLine(aff) {
-  return [aff?.department, aff?.institution, aff?.city, aff?.country]
-    .filter(Boolean)
-    .join(", ");
+  return pdfSafeText(
+    [aff?.department, aff?.institution, aff?.city, aff?.country]
+      .filter(Boolean)
+      .join(", "),
+  );
 }
 
 function affiliationKey(aff) {
@@ -383,25 +411,55 @@ function buildNumberedList(abstracts, splitByCategory) {
 }
 
 function buildTocEntries(itemsWithPages) {
-  const entries = [];
-  for (const item of itemsWithPages) {
-    if (item.type === "section") {
+  const hasSections = itemsWithPages.some((item) => item.type === "section");
+
+  if (hasSections) {
+    const entries = [];
+    for (let i = 0; i < itemsWithPages.length; i += 1) {
+      const item = itemsWithPages[i];
+      if (item.type !== "section") continue;
+      let endPage = item.page;
+      for (let j = i + 1; j < itemsWithPages.length; j += 1) {
+        if (itemsWithPages[j].type === "section") break;
+        endPage = itemsWithPages[j].page;
+      }
       entries.push({
-        kind: "category",
-        label: item.category || "Uncategorized",
-        page: item.page,
+        label: pdfSafeText(item.category || "Uncategorized"),
+        pageLabel:
+          endPage && endPage !== item.page
+            ? `${item.page} - ${endPage}`
+            : String(item.page || ""),
       });
-      continue;
     }
-    entries.push({
-      kind: "abstract",
-      number: item.number,
-      title: String(item.abstract?.title || "").trim() || "Untitled",
-      presenter: String(item.abstract?.presenter_name || "").trim(),
-      page: item.page,
-    });
+    return entries;
   }
-  return entries;
+
+  // Flat extract: group by category for TOC ranges only
+  const byCategory = new Map();
+  for (const item of itemsWithPages) {
+    if (item.type !== "abstract") continue;
+    const label =
+      pdfSafeText(String(item.abstract?.category || "").trim()) ||
+      "Uncategorized";
+    const page = Number(item.page) || 0;
+    if (!byCategory.has(label)) {
+      byCategory.set(label, { label, start: page, end: page });
+    } else {
+      const row = byCategory.get(label);
+      row.start = Math.min(row.start, page);
+      row.end = Math.max(row.end, page);
+    }
+  }
+
+  return Array.from(byCategory.values())
+    .sort((a, b) => a.label.localeCompare(b.label))
+    .map((row) => ({
+      label: row.label,
+      pageLabel:
+        row.end && row.end !== row.start
+          ? `${row.start} - ${row.end}`
+          : String(row.start || ""),
+    }));
 }
 
 function chunk(arr, size) {
@@ -442,7 +500,7 @@ function TitlePage({ abstractCount, splitByCategory, generatedDate }) {
       <Text style={styles.coverSubtitle}>Selected Abstracts</Text>
       <Text style={styles.coverMeta}>
         {abstractCount} {abstractCount === 1 ? "abstract" : "abstracts"}
-        {splitByCategory ? " · arranged by category" : ""}
+        {splitByCategory ? " - arranged by category" : ""}
       </Text>
       {generatedDate ? (
         <Text style={[styles.coverMeta, { marginTop: 8 }]}>{generatedDate}</Text>
@@ -456,30 +514,17 @@ function TocPage({ entries, pageIndex, pageCount }) {
   return (
     <Page size="A4" style={styles.page}>
       <Text style={styles.tocHeading}>
-        Contents{pageCount > 1 ? ` (${pageIndex + 1})` : ""}
+        Table of Contents{pageCount > 1 ? ` (${pageIndex + 1})` : ""}
       </Text>
-      {entries.map((entry, i) => {
-        if (entry.kind === "category") {
-          return (
-            <View key={`cat-${entry.label}-${i}`} style={styles.tocCategoryRow}>
-              <Text style={[styles.tocCategory, { flexGrow: 1 }]}>
-                {entry.label}
-              </Text>
-              <Text style={styles.tocPage}>{entry.page}</Text>
-            </View>
-          );
-        }
-        const titleLine = entry.presenter
-          ? `${entry.title} — ${entry.presenter}`
-          : entry.title;
-        return (
-          <View key={`abs-${entry.number}-${i}`} style={styles.tocRow}>
-            <Text style={styles.tocNum}>{entry.number}.</Text>
-            <Text style={styles.tocTitle}>{titleLine}</Text>
-            <Text style={styles.tocPage}>{entry.page}</Text>
-          </View>
-        );
-      })}
+      <View style={styles.tocHeaderRow}>
+        <Text style={styles.tocPageHeader}>Page</Text>
+      </View>
+      {entries.map((entry, i) => (
+        <View key={`${entry.label}-${i}`} style={styles.tocRow}>
+          <Text style={styles.tocTitle}>{entry.label}</Text>
+          <Text style={styles.tocPage}>{entry.pageLabel}</Text>
+        </View>
+      ))}
       <PageFooter />
     </Page>
   );
@@ -487,9 +532,11 @@ function TocPage({ entries, pageIndex, pageCount }) {
 
 function AbstractPage({ abstract, number, showCategory = true }) {
   const { authorBlocks, unique } = buildAuthorAffiliationBlocks(abstract);
-  const category = String(abstract?.category || "").trim();
-  const keywords = String(abstract?.keywords || "").trim();
-  const bodyText = abstract?.abstract || abstract?.abstract_text || "";
+  const category = pdfSafeText(String(abstract?.category || "").trim());
+  const keywords = pdfSafeText(String(abstract?.keywords || "").trim());
+  const bodyText = pdfSafeText(
+    abstract?.abstract || abstract?.abstract_text || "",
+  );
   const sections = splitAbstractSections(bodyText);
   const avg = abstract?.review_summary?.avg_total;
   const scoreLabel =
@@ -502,13 +549,14 @@ function AbstractPage({ abstract, number, showCategory = true }) {
     scoreLabel,
     isYi,
   ].filter(Boolean).length;
+  const title = pdfSafeText(
+    String(abstract.title || "").trim() || "Untitled",
+  );
 
   return (
     <Page size="A4" style={styles.page} wrap>
       <Text style={styles.abstractNum}>{number}</Text>
-      <Text style={styles.title}>
-        {String(abstract.title || "").trim() || "Untitled"}
-      </Text>
+      <Text style={styles.title}>{title}</Text>
       {showCategory && category ? (
         <Text
           style={[
@@ -554,9 +602,11 @@ function AbstractPage({ abstract, number, showCategory = true }) {
         sections.map((section, i) => (
           <Text key={`${section.heading || "body"}-${i}`} style={styles.body}>
             {section.heading ? (
-              <Text style={styles.bodyHead}>{section.heading}: </Text>
+              <Text style={styles.bodyHead}>
+                {pdfSafeText(section.heading)}:{" "}
+              </Text>
             ) : null}
-            {section.body}
+            {pdfSafeText(section.body)}
           </Text>
         ))
       )}
@@ -569,7 +619,9 @@ function CategorySectionPage({ category }) {
   return (
     <Page size="A4" style={styles.sectionPage}>
       <View style={styles.sectionRule} />
-      <Text style={styles.sectionTitle}>{category || "Uncategorized"}</Text>
+      <Text style={styles.sectionTitle}>
+        {pdfSafeText(category || "Uncategorized")}
+      </Text>
       <View style={[styles.sectionRule, { marginTop: 16, marginBottom: 0 }]} />
       <PageFooter />
     </Page>
