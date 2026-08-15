@@ -40,6 +40,8 @@ In **Cloudflare Pages**: same variable names under **Settings → Environment va
 
 - **Registration payment succeeded** (`payment_intent.succeeded`): the Stripe webhook updates the registration and, if `RESEND_API_KEY` and `CONFIRMATION_FROM_EMAIL` are set, sends one confirmation email to the registrant’s email.
 - **Abstract submitted** (`/api/abstract-submission`): after the abstract is saved, if the same env vars are set, a confirmation email is sent to the **corresponding author** email with the submission ID, title, category, and presentation preference.
+- **Abstract accept/reject** (admin): from the Abstracts admin list, send acceptance or rejection emails manually (`POST /api/admin/abstracts/:id/send-decision` or bulk `/api/admin/abstracts/send-decisions`).
+- **Oral / poster selection** (admin): after assigning format in **Oral / Poster assignment**, send selection emails manually (`POST /api/admin/abstracts/:id/send-format-notification` or bulk `/api/admin/abstracts/send-format-notifications`). Requires D1 column `format_email_sent_at` (`db/migration_add_format_email_sent_at.sql`).
 
 If either env var is missing, the request still succeeds; it just skips sending the email.
 

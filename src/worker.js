@@ -331,6 +331,18 @@ async function handleApiRequest(request, env, url) {
     return handleBulkSendAbstractDecisions(request, env, corsHeaders);
   }
 
+  // POST /api/admin/abstracts/send-format-notifications - Bulk (re)send oral/poster emails
+  if (
+    url.pathname === "/api/admin/abstracts/send-format-notifications" &&
+    request.method === "POST"
+  ) {
+    return handleBulkSendAbstractFormatNotifications(
+      request,
+      env,
+      corsHeaders,
+    );
+  }
+
   // POST /api/admin/abstracts/:id/send-confirmation - (Re)send a single confirmation email
   const sendConfirmationMatch = url.pathname.match(
     /^\/api\/admin\/abstracts\/([^/]+)\/send-confirmation$/,
@@ -354,6 +366,19 @@ async function handleApiRequest(request, env, url) {
       env,
       corsHeaders,
       sendDecisionMatch[1],
+    );
+  }
+
+  // POST /api/admin/abstracts/:id/send-format-notification - Oral/poster selection email
+  const sendFormatNotificationMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)\/send-format-notification$/,
+  );
+  if (sendFormatNotificationMatch && request.method === "POST") {
+    return handleSendAbstractFormatNotification(
+      request,
+      env,
+      corsHeaders,
+      sendFormatNotificationMatch[1],
     );
   }
 
@@ -4091,6 +4116,144 @@ async function sendAbstractDecisionEmail(env, abstract) {
   }
 }
 
+/** Notify author that their accepted abstract was assigned oral or poster. */
+async function sendAbstractFormatSelectionEmail(env, abstract) {
+  if (!env.RESEND_API_KEY || !env.CONFIRMATION_FROM_EMAIL) {
+    return {
+      success: false,
+      error:
+        "Email service not configured (missing RESEND_API_KEY or CONFIRMATION_FROM_EMAIL).",
+    };
+  }
+  if (!abstract || !abstract.id) {
+    return { success: false, error: "Missing abstract record" };
+  }
+
+  const status = String(abstract.status || "")
+    .trim()
+    .toLowerCase();
+  if (status !== "accepted") {
+    return {
+      success: false,
+      error:
+        "Abstract must be accepted before sending a format selection email.",
+    };
+  }
+
+  const format = String(abstract.assigned_format || "")
+    .trim()
+    .toLowerCase();
+  if (format !== "oral" && format !== "poster") {
+    return {
+      success: false,
+      error:
+        "Abstract must be assigned oral or poster before sending a format selection email.",
+    };
+  }
+
+  const toEmail =
+    (abstract.corresponding_email || "").trim() ||
+    (abstract.presenter_email || "").trim();
+  if (!toEmail) {
+    return { success: false, error: "No recipient email on file" };
+  }
+
+  const name =
+    (abstract.corresponding_name || "").trim() ||
+    (abstract.presenter_name || "").trim() ||
+    "Author";
+  const submissionId = abstract.id;
+  const title = (abstract.title || "").trim();
+  const category = (abstract.category || "").trim();
+  const isOral = format === "oral";
+  const formatLabel = isOral ? "oral presentation" : "poster presentation";
+  const subject = isOral
+    ? "ISIR 2026 – Selected for oral presentation"
+    : "ISIR 2026 – Assigned as poster presentation";
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>${
+    isOral ? "Oral Presentation" : "Poster Presentation"
+  } – ISIR 2026</title></head>
+<body style="font-family: Georgia, 'Times New Roman', serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.6;">
+  <p>Dear ${escapeHtml(name)},</p>
+  ${
+    isOral
+      ? `<p>On behalf of the organizing committee, we are pleased to inform you that your abstract has been <strong>selected for an oral presentation</strong> at the ISIR 2026 Congress in Busan, Korea (November 5th–8th, 2026).</p>
+  <p>Further details regarding your session time and presentation guidelines will be shared closer to the meeting.</p>`
+      : `<p>On behalf of the organizing committee, this letter confirms that your accepted abstract has been <strong>assigned as a poster presentation</strong> at the ISIR 2026 Congress in Busan, Korea (November 5th–8th, 2026).</p>
+  <p>Further details regarding poster display and presentation guidelines will be shared closer to the meeting.</p>`
+  }
+  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0; font-family: system-ui, -apple-system, sans-serif; line-height: 1.5;">
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Submission details</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+      <tr><td style="padding: 4px 0; vertical-align: top;">Submission ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(submissionId)}</strong></td></tr>
+      <tr><td style="padding: 4px 0; vertical-align: top;">Title</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(title)}</td></tr>
+      <tr><td style="padding: 4px 0;">Category</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(category)}</td></tr>
+      <tr><td style="padding: 4px 0;">Format</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(formatLabel)}</strong></td></tr>
+    </table>
+  </div>
+  <p>If you have any questions, please contact the organizers at <a href="mailto:support@theisir.org" style="color: #1a3a6c;">support@theisir.org</a> and quote your submission ID.</p>
+  <p style="margin-top: 28px;">Sincerely,<br/>The ISIR 2026 Organizing Committee</p>
+</body>
+</html>`;
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: env.CONFIRMATION_FROM_EMAIL,
+        to: [toEmail],
+        subject,
+        html,
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.error(
+        "Resend abstract format selection failed:",
+        res.status,
+        errText,
+      );
+      return {
+        success: false,
+        error: `Resend ${res.status}: ${errText || "email send failed"}`,
+      };
+    }
+
+    const sentAt = Date.now();
+    try {
+      await env.ISIR_DB.prepare(
+        `UPDATE abstractions SET format_email_sent_at = ? WHERE id = ?`,
+      )
+        .bind(sentAt, submissionId)
+        .run();
+    } catch (e) {
+      console.warn(
+        "Could not update format_email_sent_at (migration pending?):",
+        e?.message || e,
+      );
+    }
+
+    console.log(
+      `Abstract format selection email (${format}) sent to ${toEmail} for ${submissionId}`,
+    );
+    return { success: true, toEmail, sentAt, format };
+  } catch (emailError) {
+    console.error("Abstract format selection email error:", emailError);
+    return {
+      success: false,
+      error: String(emailError?.message || emailError),
+    };
+  }
+}
+
 const VISA_NOTIFY_EMAILS = [
   "sklee@kyuh.ac.kr",
   "office@the-ksri.org", // Ms. Lee, KSRI office
@@ -7425,17 +7588,44 @@ function parseAssignedFormat(raw) {
 
 async function setAbstractAssignedFormat(env, abstractId, assignedFormat) {
   const formatAssignedAt = assignedFormat ? Date.now() : null;
+  const updatedAt = Date.now();
+  // Clear format_email_sent_at so a reassignment can be notified again.
   try {
     const result = await env.ISIR_DB.prepare(
       `UPDATE abstractions
-       SET assigned_format = ?, format_assigned_at = ?, updated_at = ?
+       SET assigned_format = ?, format_assigned_at = ?, format_email_sent_at = NULL, updated_at = ?
        WHERE id = ? AND deleted_at IS NULL`,
     )
-      .bind(assignedFormat, formatAssignedAt, Date.now(), abstractId)
+      .bind(assignedFormat, formatAssignedAt, updatedAt, abstractId)
       .run();
     return { ok: true, changes: result?.meta?.changes ?? 0 };
   } catch (error) {
     const message = String(error?.message || error || "");
+    if (/no such column.*format_email_sent_at/i.test(message)) {
+      try {
+        const result = await env.ISIR_DB.prepare(
+          `UPDATE abstractions
+           SET assigned_format = ?, format_assigned_at = ?, updated_at = ?
+           WHERE id = ? AND deleted_at IS NULL`,
+        )
+          .bind(assignedFormat, formatAssignedAt, updatedAt, abstractId)
+          .run();
+        return { ok: true, changes: result?.meta?.changes ?? 0 };
+      } catch (fallbackError) {
+        const fallbackMessage = String(
+          fallbackError?.message || fallbackError || "",
+        );
+        if (/no such column/i.test(fallbackMessage)) {
+          return {
+            ok: false,
+            migrationPending: true,
+            error:
+              "assigned_format column missing — run db/migration_add_assigned_format.sql",
+          };
+        }
+        throw fallbackError;
+      }
+    }
     if (/no such column/i.test(message)) {
       return {
         ok: false,
@@ -8821,6 +9011,198 @@ async function handleBulkSendAbstractDecisions(request, env, corsHeaders) {
     );
   } catch (error) {
     console.error("Bulk send abstract decisions error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Internal error" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+// Admin endpoint: Manually send oral/poster selection email for one abstract.
+async function handleSendAbstractFormatNotification(
+  request,
+  env,
+  corsHeaders,
+  abstractId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!abstractId) {
+      return jsonResponse(
+        { success: false, error: "Missing abstract id" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const row = await env.ISIR_DB.prepare(
+      `SELECT * FROM abstractions WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!row) {
+      return jsonResponse(
+        { success: false, error: "Abstract not found" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    const result = await sendAbstractFormatSelectionEmail(env, row);
+    if (!result.success) {
+      return jsonResponse(
+        { success: false, error: result.error || "Failed to send email" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        id: abstractId,
+        format: result.format,
+        sentTo: result.toEmail,
+        sentAt: result.sentAt,
+        message: `Format selection email (${result.format}) sent to ${result.toEmail}`,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Send abstract format notification error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Internal error" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+// Admin endpoint: Bulk send oral/poster selection emails.
+// Body (JSON, all optional):
+//   - onlyMissing (boolean, default true): only send when format_email_sent_at is empty
+//   - abstractIds (string[]): restrict to the provided ids
+async function handleBulkSendAbstractFormatNotifications(
+  request,
+  env,
+  corsHeaders,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
+
+    const onlyMissing = body?.onlyMissing !== false;
+    const ids = Array.isArray(body?.abstractIds)
+      ? body.abstractIds.filter((x) => typeof x === "string" && x.trim())
+      : null;
+
+    let rows = [];
+    if (ids && ids.length > 0) {
+      rows = await d1AllWhereIn(
+        env.ISIR_DB,
+        (ph) =>
+          `SELECT * FROM abstractions WHERE id IN (${ph}) AND deleted_at IS NULL ORDER BY submission_date ASC`,
+        ids,
+      );
+    } else {
+      const res = await env.ISIR_DB.prepare(
+        `SELECT * FROM abstractions
+         WHERE deleted_at IS NULL
+           AND lower(status) = 'accepted'
+           AND lower(assigned_format) IN ('oral', 'poster')
+         ORDER BY submission_date ASC
+         LIMIT 1000`,
+      ).all();
+      rows = res.results || [];
+    }
+
+    let sent = 0;
+    let skipped = 0;
+    let failed = 0;
+    const results = [];
+
+    for (const row of rows) {
+      const status = String(row.status || "")
+        .trim()
+        .toLowerCase();
+      const format = String(row.assigned_format || "")
+        .trim()
+        .toLowerCase();
+
+      if (status !== "accepted") {
+        skipped++;
+        results.push({
+          id: row.id,
+          status: "skipped",
+          reason: "not accepted",
+        });
+        continue;
+      }
+
+      if (format !== "oral" && format !== "poster") {
+        skipped++;
+        results.push({
+          id: row.id,
+          status: "skipped",
+          reason: "format not assigned",
+        });
+        continue;
+      }
+
+      if (onlyMissing && row.format_email_sent_at) {
+        skipped++;
+        results.push({
+          id: row.id,
+          status: "skipped",
+          reason: "already sent",
+          sentAt: row.format_email_sent_at,
+        });
+        continue;
+      }
+
+      const r = await sendAbstractFormatSelectionEmail(env, row);
+      if (r.success) {
+        sent++;
+        results.push({
+          id: row.id,
+          status: "sent",
+          format: r.format,
+          to: r.toEmail,
+          sentAt: r.sentAt,
+        });
+      } else {
+        failed++;
+        results.push({ id: row.id, status: "failed", error: r.error });
+      }
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        total: rows.length,
+        sent,
+        skipped,
+        failed,
+        onlyMissing,
+        results,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Bulk send abstract format notifications error:", error);
     return jsonResponse(
       { success: false, error: error.message || "Internal error" },
       500,

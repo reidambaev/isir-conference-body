@@ -162,6 +162,7 @@ CREATE TABLE
         possible_young_investigator INTEGER DEFAULT 0,
         confirmation_sent_at INTEGER,
         decision_email_sent_at INTEGER,
+        format_email_sent_at INTEGER,
         deleted_at INTEGER,
         created_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000),
         updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)

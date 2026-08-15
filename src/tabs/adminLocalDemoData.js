@@ -61,6 +61,7 @@ export function buildLocalAdminDemoData() {
       corresponding_author_id: "AUTH-6",
       confirmation_sent_at: now - 4 * day,
       decision_email_sent_at: null,
+      format_email_sent_at: null,
       authors: [
         {
           id: "AUTH-1",
@@ -204,6 +205,7 @@ export function buildLocalAdminDemoData() {
       corresponding_author_id: "AUTH-3",
       confirmation_sent_at: now - 11 * day,
       decision_email_sent_at: now - 2 * day,
+      format_email_sent_at: now - 1 * day,
       authors: [
         {
           id: "AUTH-3",
@@ -253,6 +255,7 @@ export function buildLocalAdminDemoData() {
       corresponding_author_id: "AUTH-5",
       confirmation_sent_at: now - 8 * day,
       decision_email_sent_at: now - 1 * day,
+      format_email_sent_at: null,
       authors: [
         {
           id: "AUTH-5",
@@ -304,6 +307,7 @@ export function buildLocalAdminDemoData() {
       corresponding_author_id: "AUTH-2b",
       confirmation_sent_at: null,
       decision_email_sent_at: null,
+      format_email_sent_at: null,
       authors: [
         {
           id: "AUTH-1b",
@@ -372,6 +376,7 @@ export function buildLocalAdminDemoData() {
       corresponding_author_id: "AUTH-4",
       confirmation_sent_at: now - 19 * day,
       decision_email_sent_at: null,
+      format_email_sent_at: null,
       authors: [
         {
           id: "AUTH-4",
@@ -418,6 +423,7 @@ export function buildLocalAdminDemoData() {
       corresponding_author_id: "AUTH-6",
       confirmation_sent_at: null,
       decision_email_sent_at: null,
+      format_email_sent_at: null,
       authors: [
         {
           id: "AUTH-6",

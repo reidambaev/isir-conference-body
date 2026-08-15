@@ -71,6 +71,7 @@ export default function FormatAssignmentSection({
   const [viewingId, setViewingId] = useState(null);
   const [expandedScoreId, setExpandedScoreId] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [sendingFormatId, setSendingFormatId] = useState(null);
   const [message, setMessage] = useState(null);
 
   const scoreById = useMemo(() => {
@@ -109,12 +110,14 @@ export default function FormatAssignmentSection({
     let poster = 0;
     let unassigned = 0;
     let withScores = 0;
+    let formatEmailPending = 0;
     for (const row of pool) {
       const fmt = normalizeFormat(row.assigned_format);
       if (fmt === "oral") oral += 1;
       else if (fmt === "poster") poster += 1;
       else unassigned += 1;
       if (Number(row.review_summary?.review_count || 0) > 0) withScores += 1;
+      if (fmt && !row.format_email_sent_at) formatEmailPending += 1;
     }
     return {
       total: pool.length,
@@ -122,6 +125,7 @@ export default function FormatAssignmentSection({
       poster,
       unassigned,
       withScores,
+      formatEmailPending,
     };
   }, [pool]);
 
@@ -250,10 +254,197 @@ export default function FormatAssignmentSection({
               ...a,
               assigned_format: assignedFormat,
               format_assigned_at: formatAssignedAt,
+              format_email_sent_at: null,
             }
           : a,
       ),
     );
+  };
+
+  const applyLocalFormatEmailSent = (sentAtById) => {
+    setAbstracts((prev) =>
+      prev.map((a) =>
+        sentAtById[a.id]
+          ? { ...a, format_email_sent_at: sentAtById[a.id] }
+          : a,
+      ),
+    );
+  };
+
+  const sendFormatNotification = async (abstractId) => {
+    if (!isLocalDemo && !adminToken) {
+      setMessage({ type: "error", text: "Admin access token is missing." });
+      return;
+    }
+
+    const abstract = (abstracts || []).find((a) => a.id === abstractId);
+    const format = normalizeFormat(abstract?.assigned_format);
+    if (!format) {
+      setMessage({
+        type: "error",
+        text: "Assign oral or poster before sending a format notification.",
+      });
+      return;
+    }
+
+    const recipient =
+      abstract?.corresponding_email ||
+      abstract?.presenter_email ||
+      "the author";
+    const alreadySent = Boolean(abstract?.format_email_sent_at);
+    const confirmed = window.confirm(
+      alreadySent
+        ? `Resend ${format} selection email to ${recipient}?`
+        : `Send ${format} selection email to ${recipient}?`,
+    );
+    if (!confirmed) return;
+
+    setSendingFormatId(abstractId);
+    setMessage(null);
+    try {
+      if (isLocalDemo) {
+        const sentAt = Date.now();
+        applyLocalFormatEmailSent({ [abstractId]: sentAt });
+        setMessage({
+          type: "success",
+          text: `${format === "oral" ? "Oral" : "Poster"} notification marked sent to ${recipient} (demo).`,
+        });
+        return;
+      }
+
+      const response = await fetch(
+        `/api/admin/abstracts/${abstractId}/send-format-notification`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Token": adminToken,
+          },
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "Failed to send format notification");
+      }
+
+      applyLocalFormatEmailSent({
+        [abstractId]: result.sentAt || Date.now(),
+      });
+      setMessage({
+        type: "success",
+        text: `${format === "oral" ? "Oral" : "Poster"} notification sent to ${result.sentTo || recipient}.`,
+      });
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err.message || "Failed to send format notification.",
+      });
+    } finally {
+      setSendingFormatId(null);
+    }
+  };
+
+  const bulkSendFormatNotifications = async ({
+    onlyMissing = true,
+    abstractIds = null,
+  } = {}) => {
+    if (!isLocalDemo && !adminToken) {
+      setMessage({ type: "error", text: "Admin access token is missing." });
+      return;
+    }
+
+    const assigned = pool.filter((a) => normalizeFormat(a.assigned_format));
+    const candidates = abstractIds
+      ? assigned.filter((a) => abstractIds.includes(a.id))
+      : assigned;
+    const missing = candidates.filter((a) => !a.format_email_sent_at);
+    const targets = onlyMissing ? missing : candidates;
+
+    if (targets.length === 0) {
+      setMessage({
+        type: "error",
+        text: onlyMissing
+          ? "No assigned abstracts are missing a format notification."
+          : "No assigned abstracts to email.",
+      });
+      return;
+    }
+
+    const verb = onlyMissing ? "send" : "resend";
+    const confirmed = window.confirm(
+      `About to ${verb} oral/poster selection emails for ${targets.length} abstract${
+        targets.length === 1 ? "" : "s"
+      }. Continue?`,
+    );
+    if (!confirmed) return;
+
+    setBusy(true);
+    setMessage(null);
+    try {
+      if (isLocalDemo) {
+        const sentAt = Date.now();
+        const sentAtById = {};
+        targets.forEach((a) => {
+          sentAtById[a.id] = sentAt;
+        });
+        applyLocalFormatEmailSent(sentAtById);
+        setMessage({
+          type: "success",
+          text: `Marked ${targets.length} format notification${
+            targets.length === 1 ? "" : "s"
+          } as sent (demo).`,
+        });
+        return;
+      }
+
+      const response = await fetch(
+        "/api/admin/abstracts/send-format-notifications",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Token": adminToken,
+          },
+          body: JSON.stringify({
+            onlyMissing,
+            abstractIds: candidates.map((a) => a.id),
+          }),
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(
+          result?.error || "Failed to send format notifications",
+        );
+      }
+
+      const sentAtById = {};
+      (result.results || []).forEach((r) => {
+        if (r.status === "sent" && r.sentAt) {
+          sentAtById[r.id] = r.sentAt;
+        }
+      });
+      if (Object.keys(sentAtById).length > 0) {
+        applyLocalFormatEmailSent(sentAtById);
+      }
+
+      setMessage({
+        type:
+          (result.failed || 0) > 0 && (result.sent || 0) === 0
+            ? "error"
+            : "success",
+        text: `Format emails: ${result.sent || 0} sent, ${
+          result.skipped || 0
+        } skipped, ${result.failed || 0} failed.`,
+      });
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err.message || "Failed to send format notifications.",
+      });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const assignFormat = async (ids, assignedFormat) => {
@@ -339,7 +530,9 @@ export default function FormatAssignmentSection({
             After peer review, assign accepted abstracts as oral presentations
             or posters. Author preference is shown for reference and is never
             overwritten. Sort by score, multi-select rows, then bulk-assign —
-            or open any abstract to read the full text before deciding.
+            or open any abstract to read the full text before deciding. After
+            assigning, send oral/poster selection emails from this page
+            (manual; not automatic).
           </p>
         </div>
         {onGoToReviewScores ? (
@@ -353,7 +546,7 @@ export default function FormatAssignmentSection({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
             Accepted pool
@@ -386,6 +579,14 @@ export default function FormatAssignmentSection({
           </p>
           <p className="text-2xl font-bold text-teal-700 mt-1">
             {stats.withScores}
+          </p>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Email pending
+          </p>
+          <p className="text-2xl font-bold text-rose-700 mt-1">
+            {stats.formatEmailPending}
           </p>
         </div>
       </div>
@@ -497,6 +698,50 @@ export default function FormatAssignmentSection({
             >
               Clear assignment
             </button>
+            <span className="hidden sm:inline text-gray-300 mx-1">|</span>
+            <button
+              type="button"
+              disabled={
+                busy ||
+                selectedList.length === 0 ||
+                !selectedList.some((id) => {
+                  const row = pool.find((a) => a.id === id);
+                  return (
+                    normalizeFormat(row?.assigned_format) &&
+                    !row?.format_email_sent_at
+                  );
+                })
+              }
+              onClick={() =>
+                bulkSendFormatNotifications({
+                  onlyMissing: true,
+                  abstractIds: selectedList,
+                })
+              }
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              Email selected
+            </button>
+            <button
+              type="button"
+              disabled={busy || stats.formatEmailPending === 0}
+              onClick={() =>
+                bulkSendFormatNotifications({ onlyMissing: true })
+              }
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+            >
+              Email all pending ({stats.formatEmailPending})
+            </button>
+            <button
+              type="button"
+              disabled={busy || stats.oral + stats.poster === 0}
+              onClick={() =>
+                bulkSendFormatNotifications({ onlyMissing: false })
+              }
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Resend all assigned
+            </button>
           </div>
         </div>
 
@@ -528,6 +773,7 @@ export default function FormatAssignmentSection({
                   <th className="px-4 py-3">Avg score</th>
                   <th className="px-4 py-3">Reviews</th>
                   <th className="px-4 py-3">Assigned</th>
+                  <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Details</th>
                   <th className="px-4 py-3 text-right">Assign</th>
                 </tr>
@@ -615,6 +861,28 @@ export default function FormatAssignmentSection({
                       </td>
                       <td className="px-4 py-3">
                         {formatBadge(normalizeFormat(row.assigned_format))}
+                      </td>
+                      <td className="px-4 py-3">
+                        {normalizeFormat(row.assigned_format) ? (
+                          row.format_email_sent_at ? (
+                            <div>
+                              <p className="text-xs font-semibold text-emerald-700">
+                                Sent
+                              </p>
+                              <p className="text-[11px] text-gray-500 mt-0.5">
+                                {formatDate
+                                  ? formatDate(row.format_email_sent_at)
+                                  : ""}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-xs font-semibold text-amber-700">
+                              Not sent
+                            </p>
+                          )
+                        ) : (
+                          <span className="text-[11px] text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1.5">
@@ -735,6 +1003,25 @@ export default function FormatAssignmentSection({
                     {viewingAbstract.id}
                   </p>
                 </div>
+                {normalizeFormat(viewingAbstract.assigned_format) ? (
+                  <div className="sm:col-span-2">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                      Format notification
+                    </p>
+                    <p className="text-gray-700">
+                      {viewingAbstract.format_email_sent_at ? (
+                        <span className="text-emerald-700">
+                          Sent{" "}
+                          {formatDate
+                            ? formatDate(viewingAbstract.format_email_sent_at)
+                            : ""}
+                        </span>
+                      ) : (
+                        <span className="text-amber-700">Not sent yet</span>
+                      )}
+                    </p>
+                  </div>
+                ) : null}
               </div>
 
               {viewingAbstract.review_summary ? (
@@ -854,6 +1141,22 @@ export default function FormatAssignmentSection({
             </div>
 
             <div className="px-5 py-4 border-t border-gray-100 bg-gray-50 flex flex-wrap justify-end gap-2">
+              {normalizeFormat(viewingAbstract.assigned_format) ? (
+                <button
+                  type="button"
+                  disabled={
+                    busy || sendingFormatId === viewingAbstract.id
+                  }
+                  onClick={() => sendFormatNotification(viewingAbstract.id)}
+                  className="mr-auto px-3 py-2 text-sm font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {sendingFormatId === viewingAbstract.id
+                    ? "Sending…"
+                    : viewingAbstract.format_email_sent_at
+                      ? "Resend format email"
+                      : "Send format email"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 disabled={busy}
