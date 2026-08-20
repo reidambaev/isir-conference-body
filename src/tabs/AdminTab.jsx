@@ -13,6 +13,7 @@ import {
   isAdminLocalhost,
 } from "./adminLocalDemoData";
 import FormatAssignmentSection from "./FormatAssignmentSection";
+import OralSessionAssignmentSection from "./OralSessionAssignmentSection";
 import AbstractExtractSection from "./AbstractExtractSection";
 
 const REGISTRATION_TICKET_LABELS = {
@@ -117,6 +118,7 @@ const ADMIN_SECTION_IDS = new Set([
   "invitedSpeakerAbstracts",
   "abstractReviewScores",
   "formatAssignment",
+  "oralSessions",
   "abstractExtract",
   "visa",
   "speakerHotel",
@@ -5159,6 +5161,10 @@ export default function AdminTab() {
                   label: "Oral / Poster",
                 },
                 {
+                  id: "oralSessions",
+                  label: "Sessions",
+                },
+                {
                   id: "abstractExtract",
                   label: "Extract",
                 },
@@ -5368,6 +5374,17 @@ export default function AdminTab() {
                       className="w-full text-left px-4 py-2.5 text-sm text-gray-800 hover:bg-gray-50"
                     >
                       Extract selected abstracts
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setAbstractActionsMenuOpen(false);
+                        setActiveSection("oralSessions");
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-800 hover:bg-gray-50"
+                    >
+                      Oral & poster sessions
                     </button>
                     <button
                       type="button"
@@ -7916,6 +7933,13 @@ export default function AdminTab() {
               </button>
               <button
                 type="button"
+                onClick={() => setActiveSection("oralSessions")}
+                className="px-4 py-2.5 text-sm font-medium rounded-lg border border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100"
+              >
+                Oral & poster sessions
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveSection("abstracts")}
                 className="px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50"
               >
@@ -8356,6 +8380,20 @@ export default function AdminTab() {
           formatDate={formatDate}
           getAbstractTypeLabel={getAbstractTypeLabel}
           onGoToReviewScores={() => setActiveSection("abstractReviewScores")}
+          onGoToOralSessions={() => setActiveSection("oralSessions")}
+        />
+      )}
+
+      {activeSection === "oralSessions" && (
+        <OralSessionAssignmentSection
+          abstracts={abstracts}
+          setAbstracts={setAbstracts}
+          adminToken={adminToken}
+          isLocalDemo={isLocalDemo}
+          formatAbstractText={formatAbstractText}
+          formatDate={formatDate}
+          getAbstractTypeLabel={getAbstractTypeLabel}
+          onGoToFormatAssignment={() => setActiveSection("formatAssignment")}
         />
       )}
 

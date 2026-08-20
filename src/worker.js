@@ -3,6 +3,16 @@
  * Handles static assets + API routes
  */
 import bundledSpeakerSeed from "./speakersSeed.js";
+import {
+  parseOralSession,
+  getOralSession,
+  collectOralSessionRecipients,
+  buildOralSessionLetter,
+  formatRecipientList,
+  parsePosterSession,
+  getPosterSession,
+  buildPosterSessionLetter,
+} from "./config/oralSessions.js";
 
 const SPEAKER_PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MiB cap for R2 headshots (JPEG/PNG)
 const SPEAKER_CV_MAX_BYTES = 10 * 1024 * 1024; // 10 MiB cap for brief CV (PDF/Word)
@@ -343,6 +353,23 @@ async function handleApiRequest(request, env, url) {
     );
   }
 
+  // POST /api/admin/abstracts/send-oral-session-notifications - Bulk oral session letters
+  if (
+    url.pathname === "/api/admin/abstracts/send-oral-session-notifications" &&
+    request.method === "POST"
+  ) {
+    return handleBulkSendOralSessionNotifications(request, env, corsHeaders);
+  }
+
+  // POST /api/admin/abstracts/send-poster-session-notifications
+  if (
+    url.pathname ===
+      "/api/admin/abstracts/send-poster-session-notifications" &&
+    request.method === "POST"
+  ) {
+    return handleBulkSendPosterSessionNotifications(request, env, corsHeaders);
+  }
+
   // POST /api/admin/abstracts/:id/send-confirmation - (Re)send a single confirmation email
   const sendConfirmationMatch = url.pathname.match(
     /^\/api\/admin\/abstracts\/([^/]+)\/send-confirmation$/,
@@ -379,6 +406,32 @@ async function handleApiRequest(request, env, url) {
       env,
       corsHeaders,
       sendFormatNotificationMatch[1],
+    );
+  }
+
+  // POST /api/admin/abstracts/:id/send-oral-session-notification
+  const sendOralSessionNotificationMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)\/send-oral-session-notification$/,
+  );
+  if (sendOralSessionNotificationMatch && request.method === "POST") {
+    return handleSendOralSessionNotification(
+      request,
+      env,
+      corsHeaders,
+      sendOralSessionNotificationMatch[1],
+    );
+  }
+
+  // POST /api/admin/abstracts/:id/send-poster-session-notification
+  const sendPosterSessionNotificationMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)\/send-poster-session-notification$/,
+  );
+  if (sendPosterSessionNotificationMatch && request.method === "POST") {
+    return handleSendPosterSessionNotification(
+      request,
+      env,
+      corsHeaders,
+      sendPosterSessionNotificationMatch[1],
     );
   }
 
@@ -453,6 +506,48 @@ async function handleApiRequest(request, env, url) {
     request.method === "POST"
   ) {
     return handleBulkUpdateAbstractAssignedFormat(request, env, corsHeaders);
+  }
+
+  // PATCH /api/admin/abstracts/:id/oral-session - Set N1–N6 session
+  const abstractOralSessionMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)\/oral-session$/,
+  );
+  if (abstractOralSessionMatch && request.method === "PATCH") {
+    return handleUpdateAbstractOralSession(
+      request,
+      env,
+      corsHeaders,
+      abstractOralSessionMatch[1],
+    );
+  }
+
+  // POST /api/admin/abstracts/oral-session - Bulk set N1–N6 session
+  if (
+    url.pathname === "/api/admin/abstracts/oral-session" &&
+    request.method === "POST"
+  ) {
+    return handleBulkUpdateAbstractOralSession(request, env, corsHeaders);
+  }
+
+  // PATCH /api/admin/abstracts/:id/poster-session - Set P1 / P2
+  const abstractPosterSessionMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)\/poster-session$/,
+  );
+  if (abstractPosterSessionMatch && request.method === "PATCH") {
+    return handleUpdateAbstractPosterSession(
+      request,
+      env,
+      corsHeaders,
+      abstractPosterSessionMatch[1],
+    );
+  }
+
+  // POST /api/admin/abstracts/poster-session - Bulk set P1 / P2
+  if (
+    url.pathname === "/api/admin/abstracts/poster-session" &&
+    request.method === "POST"
+  ) {
+    return handleBulkUpdateAbstractPosterSession(request, env, corsHeaders);
   }
 
   // PATCH /api/admin/abstracts/:id/invited-speaker - Toggle invited speaker flag
@@ -3913,7 +4008,7 @@ async function sendAbstractConfirmationEmail(env, abstract) {
     <li><strong>Save your Submission ID</strong> (${escapeHtml(submissionId)}) — you may need it when contacting us or checking status.</li>
     <li>Your abstract will be reviewed by the scientific committee. You will be notified of the outcome by email.</li>
   </ul>
-  <p>If you have any questions, please contact the organizers at <a href="mailto:support@theisir.org" style="color: #1a3a6c;">support@theisir.org</a> and quote your submission ID.</p>
+  <p>If you have any questions, please contact the organizers at <a href="mailto:support@isir2026.org" style="color: #1a3a6c;">support@isir2026.org</a> and quote your submission ID.</p>
   <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
 </body>
 </html>`;
@@ -4061,7 +4156,7 @@ async function sendAbstractDecisionEmail(env, abstract) {
       <tr><td style="padding: 4px 0;">Decision</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(outcomeLabel)}</strong></td></tr>
     </table>
   </div>
-  <p>If you have any questions, please contact the organizers at <a href="mailto:support@theisir.org" style="color: #1a3a6c;">support@theisir.org</a> and quote your submission ID.</p>
+  <p>If you have any questions, please contact the organizers at <a href="mailto:support@isir2026.org" style="color: #1a3a6c;">support@isir2026.org</a> and quote your submission ID.</p>
   <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
 </body>
 </html>`;
@@ -4195,7 +4290,7 @@ async function sendAbstractFormatSelectionEmail(env, abstract) {
       <tr><td style="padding: 4px 0;">Format</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(formatLabel)}</strong></td></tr>
     </table>
   </div>
-  <p>If you have any questions, please contact the organizers at <a href="mailto:support@theisir.org" style="color: #1a3a6c;">support@theisir.org</a> and quote your submission ID.</p>
+  <p>If you have any questions, please contact the organizers at <a href="mailto:support@isir2026.org" style="color: #1a3a6c;">support@isir2026.org</a> and quote your submission ID.</p>
   <p style="margin-top: 28px;">Sincerely,<br/>The ISIR 2026 Organizing Committee</p>
 </body>
 </html>`;
@@ -4247,6 +4342,236 @@ async function sendAbstractFormatSelectionEmail(env, abstract) {
     return { success: true, toEmail, sentAt, format };
   } catch (emailError) {
     console.error("Abstract format selection email error:", emailError);
+    return {
+      success: false,
+      error: String(emailError?.message || emailError),
+    };
+  }
+}
+
+/** Oral speaker session letter (N1–N6). Emails presenting + corresponding authors. */
+async function sendOralSessionLetterEmail(env, abstract) {
+  if (!env.RESEND_API_KEY || !env.CONFIRMATION_FROM_EMAIL) {
+    return {
+      success: false,
+      error:
+        "Email service not configured (missing RESEND_API_KEY or CONFIRMATION_FROM_EMAIL).",
+    };
+  }
+  if (!abstract || !abstract.id) {
+    return { success: false, error: "Missing abstract record" };
+  }
+
+  const status = String(abstract.status || "")
+    .trim()
+    .toLowerCase();
+  if (status !== "accepted") {
+    return {
+      success: false,
+      error: "Abstract must be accepted before sending an oral session letter.",
+    };
+  }
+
+  const format = String(abstract.assigned_format || "")
+    .trim()
+    .toLowerCase();
+  if (format !== "oral") {
+    return {
+      success: false,
+      error: "Abstract must be assigned as oral before sending a session letter.",
+    };
+  }
+
+  const session = getOralSession(abstract.oral_session);
+  if (!session) {
+    return {
+      success: false,
+      error: "Assign an oral session (N1–N6) before sending the speaker letter.",
+    };
+  }
+
+  const letter = buildOralSessionLetter(abstract, session);
+  const recipients = letter?.recipients || collectOralSessionRecipients(abstract);
+  if (!recipients.length) {
+    return {
+      success: false,
+      error: "No presenting or corresponding author email on file",
+    };
+  }
+
+  const toEmails = recipients.map((r) => r.email);
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: env.CONFIRMATION_FROM_EMAIL,
+        to: toEmails,
+        subject: letter.subject,
+        html: letter.html,
+        text: letter.text,
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.error(
+        "Resend oral session letter failed:",
+        res.status,
+        errText,
+      );
+      return {
+        success: false,
+        error: `Resend ${res.status}: ${errText || "email send failed"}`,
+      };
+    }
+
+    const sentAt = Date.now();
+    try {
+      await env.ISIR_DB.prepare(
+        `UPDATE abstractions SET oral_session_email_sent_at = ? WHERE id = ?`,
+      )
+        .bind(sentAt, abstract.id)
+        .run();
+    } catch (e) {
+      console.warn(
+        "Could not update oral_session_email_sent_at (migration pending?):",
+        e?.message || e,
+      );
+    }
+
+    const sentTo = formatRecipientList(recipients);
+    console.log(
+      `Oral session letter (${session.code}) sent to ${sentTo} for ${abstract.id}`,
+    );
+    return {
+      success: true,
+      toEmail: sentTo,
+      toEmails,
+      sentAt,
+      session: session.code,
+    };
+  } catch (emailError) {
+    console.error("Oral session letter email error:", emailError);
+    return {
+      success: false,
+      error: String(emailError?.message || emailError),
+    };
+  }
+}
+
+async function sendPosterSessionLetterEmail(env, abstract) {
+  if (!env.RESEND_API_KEY || !env.CONFIRMATION_FROM_EMAIL) {
+    return {
+      success: false,
+      error:
+        "Email service not configured (missing RESEND_API_KEY or CONFIRMATION_FROM_EMAIL).",
+    };
+  }
+  if (!abstract || !abstract.id) {
+    return { success: false, error: "Missing abstract record" };
+  }
+
+  const status = String(abstract.status || "")
+    .trim()
+    .toLowerCase();
+  if (status !== "accepted") {
+    return {
+      success: false,
+      error:
+        "Abstract must be accepted before sending a poster session letter.",
+    };
+  }
+
+  const format = String(abstract.assigned_format || "")
+    .trim()
+    .toLowerCase();
+  if (format !== "poster") {
+    return {
+      success: false,
+      error:
+        "Abstract must be assigned as poster before sending a session letter.",
+    };
+  }
+
+  const session = getPosterSession(abstract.poster_session);
+  if (!session) {
+    return {
+      success: false,
+      error: "Assign poster session #1 or #2 before sending the letter.",
+    };
+  }
+
+  const letter = buildPosterSessionLetter(abstract, session);
+  const recipients =
+    letter?.recipients || collectOralSessionRecipients(abstract);
+  if (!recipients.length) {
+    return {
+      success: false,
+      error: "No presenting or corresponding author email on file",
+    };
+  }
+
+  const toEmails = recipients.map((r) => r.email);
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: env.CONFIRMATION_FROM_EMAIL,
+        to: toEmails,
+        subject: letter.subject,
+        html: letter.html,
+        text: letter.text,
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.error(
+        "Resend poster session letter failed:",
+        res.status,
+        errText,
+      );
+      return {
+        success: false,
+        error: `Resend ${res.status}: ${errText || "email send failed"}`,
+      };
+    }
+
+    const sentAt = Date.now();
+    try {
+      await env.ISIR_DB.prepare(
+        `UPDATE abstractions SET poster_session_email_sent_at = ? WHERE id = ?`,
+      )
+        .bind(sentAt, abstract.id)
+        .run();
+    } catch (e) {
+      console.warn(
+        "Could not update poster_session_email_sent_at (migration pending?):",
+        e?.message || e,
+      );
+    }
+
+    const sentTo = formatRecipientList(recipients);
+    console.log(
+      `Poster session letter (${session.code}) sent to ${sentTo} for ${abstract.id}`,
+    );
+    return {
+      success: true,
+      toEmail: sentTo,
+      toEmails,
+      sentAt,
+      session: session.code,
+    };
+  } catch (emailError) {
+    console.error("Poster session letter email error:", emailError);
     return {
       success: false,
       error: String(emailError?.message || emailError),
@@ -7589,18 +7914,85 @@ function parseAssignedFormat(raw) {
 async function setAbstractAssignedFormat(env, abstractId, assignedFormat) {
   const formatAssignedAt = assignedFormat ? Date.now() : null;
   const updatedAt = Date.now();
-  // Clear format_email_sent_at so a reassignment can be notified again.
-  try {
-    const result = await env.ISIR_DB.prepare(
-      `UPDATE abstractions
+  const sqlOral = `UPDATE abstractions
+       SET assigned_format = ?, format_assigned_at = ?, format_email_sent_at = NULL,
+           poster_session = NULL, poster_session_assigned_at = NULL, poster_session_email_sent_at = NULL,
+           updated_at = ?
+       WHERE id = ? AND deleted_at IS NULL`;
+  const sqlPoster = `UPDATE abstractions
+       SET assigned_format = ?, format_assigned_at = ?, format_email_sent_at = NULL,
+           oral_session = NULL, oral_session_assigned_at = NULL, oral_session_email_sent_at = NULL,
+           updated_at = ?
+       WHERE id = ? AND deleted_at IS NULL`;
+  const sqlClear = `UPDATE abstractions
+       SET assigned_format = ?, format_assigned_at = ?, format_email_sent_at = NULL,
+           oral_session = NULL, oral_session_assigned_at = NULL, oral_session_email_sent_at = NULL,
+           poster_session = NULL, poster_session_assigned_at = NULL, poster_session_email_sent_at = NULL,
+           updated_at = ?
+       WHERE id = ? AND deleted_at IS NULL`;
+  const sqlKeepOralSession = `UPDATE abstractions
        SET assigned_format = ?, format_assigned_at = ?, format_email_sent_at = NULL, updated_at = ?
-       WHERE id = ? AND deleted_at IS NULL`,
-    )
+       WHERE id = ? AND deleted_at IS NULL`;
+  const sql =
+    assignedFormat === "oral"
+      ? sqlOral
+      : assignedFormat === "poster"
+        ? sqlPoster
+        : sqlClear;
+  try {
+    const result = await env.ISIR_DB.prepare(sql)
       .bind(assignedFormat, formatAssignedAt, updatedAt, abstractId)
       .run();
     return { ok: true, changes: result?.meta?.changes ?? 0 };
   } catch (error) {
     const message = String(error?.message || error || "");
+    if (
+      /no such column.*poster_session/i.test(message) ||
+      /no such column.*oral_session/i.test(message)
+    ) {
+      try {
+        const result = await env.ISIR_DB.prepare(sqlKeepOralSession)
+          .bind(assignedFormat, formatAssignedAt, updatedAt, abstractId)
+          .run();
+        return { ok: true, changes: result?.meta?.changes ?? 0 };
+      } catch (fallbackError) {
+        const fallbackMessage = String(
+          fallbackError?.message || fallbackError || "",
+        );
+        if (/no such column.*format_email_sent_at/i.test(fallbackMessage)) {
+          try {
+            const result = await env.ISIR_DB.prepare(
+              `UPDATE abstractions
+               SET assigned_format = ?, format_assigned_at = ?, updated_at = ?
+               WHERE id = ? AND deleted_at IS NULL`,
+            )
+              .bind(assignedFormat, formatAssignedAt, updatedAt, abstractId)
+              .run();
+            return { ok: true, changes: result?.meta?.changes ?? 0 };
+          } catch (innerError) {
+            const innerMessage = String(innerError?.message || innerError || "");
+            if (/no such column/i.test(innerMessage)) {
+              return {
+                ok: false,
+                migrationPending: true,
+                error:
+                  "assigned_format column missing — run db/migration_add_assigned_format.sql",
+              };
+            }
+            throw innerError;
+          }
+        }
+        if (/no such column/i.test(fallbackMessage)) {
+          return {
+            ok: false,
+            migrationPending: true,
+            error:
+              "assigned_format column missing — run db/migration_add_assigned_format.sql",
+          };
+        }
+        throw fallbackError;
+      }
+    }
     if (/no such column.*format_email_sent_at/i.test(message)) {
       try {
         const result = await env.ISIR_DB.prepare(
@@ -7823,6 +8215,499 @@ async function handleBulkUpdateAbstractAssignedFormat(
       JSON.stringify({
         success: false,
         error: error.message || "Failed to bulk update assigned format",
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+async function setAbstractOralSession(env, abstractId, oralSession) {
+  const assignedAt = oralSession ? Date.now() : null;
+  const updatedAt = Date.now();
+  try {
+    const result = await env.ISIR_DB.prepare(
+      `UPDATE abstractions
+       SET oral_session = ?, oral_session_assigned_at = ?, oral_session_email_sent_at = NULL, updated_at = ?
+       WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(oralSession, assignedAt, updatedAt, abstractId)
+      .run();
+    return { ok: true, changes: result?.meta?.changes ?? 0 };
+  } catch (error) {
+    const message = String(error?.message || error || "");
+    if (/no such column/i.test(message)) {
+      return {
+        ok: false,
+        migrationPending: true,
+        error:
+          "oral_session column missing — run db/migration_add_oral_session.sql",
+      };
+    }
+    throw error;
+  }
+}
+
+function oralSessionAssignError(existing) {
+  if (!existing) return "Abstract not found";
+  if (String(existing.status || "").toLowerCase() !== "accepted") {
+    return "Only accepted abstracts can be assigned an oral session";
+  }
+  if (String(existing.assigned_format || "").toLowerCase() !== "oral") {
+    return "Assign oral format before choosing a session";
+  }
+  return null;
+}
+
+async function handleUpdateAbstractOralSession(
+  request,
+  env,
+  corsHeaders,
+  abstractId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!abstractId) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing abstract id" }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const data = await request.json();
+    const parsed = parseOralSession(data?.oral_session ?? data?.oralSession);
+    if (!parsed.ok) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "oral_session must be N1–N6, or null/clear to unassign",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT id, status, assigned_format FROM abstractions
+       WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!existing) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Abstract not found" }),
+        { status: 404, headers: corsHeaders },
+      );
+    }
+
+    const assignError = oralSessionAssignError(existing);
+    if (assignError && parsed.value) {
+      return new Response(
+        JSON.stringify({ success: false, error: assignError }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const updated = await setAbstractOralSession(
+      env,
+      abstractId,
+      parsed.value,
+    );
+    if (!updated.ok) {
+      return new Response(
+        JSON.stringify({ success: false, error: updated.error }),
+        { status: 500, headers: corsHeaders },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        id: abstractId,
+        oral_session: parsed.value,
+        oral_session_assigned_at: parsed.value ? Date.now() : null,
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Update abstract oral session error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || "Failed to update oral session",
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+async function handleBulkUpdateAbstractOralSession(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    const data = await request.json();
+    const ids = Array.isArray(data?.ids)
+      ? data.ids.map((id) => String(id || "").trim()).filter(Boolean)
+      : [];
+    const parsed = parseOralSession(data?.oral_session ?? data?.oralSession);
+
+    if (ids.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "ids must be a non-empty array of abstract ids",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (!parsed.ok) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "oral_session must be N1–N6, or null/clear to unassign",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (ids.length > 500) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Cannot update more than 500 abstracts at once",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    let updated = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const id of ids) {
+      const existing = await env.ISIR_DB.prepare(
+        `SELECT id, status, assigned_format FROM abstractions
+         WHERE id = ? AND deleted_at IS NULL`,
+      )
+        .bind(id)
+        .first();
+
+      if (!existing) {
+        skipped += 1;
+        errors.push({ id, error: "not found" });
+        continue;
+      }
+      const assignError = oralSessionAssignError(existing);
+      if (assignError && parsed.value) {
+        skipped += 1;
+        errors.push({ id, error: assignError });
+        continue;
+      }
+
+      const result = await setAbstractOralSession(env, id, parsed.value);
+      if (!result.ok) {
+        return new Response(
+          JSON.stringify({ success: false, error: result.error }),
+          { status: 500, headers: corsHeaders },
+        );
+      }
+      if ((result.changes || 0) > 0) updated += 1;
+      else skipped += 1;
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        oral_session: parsed.value,
+        updated,
+        skipped,
+        errors: errors.slice(0, 20),
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Bulk update abstract oral session error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || "Failed to bulk update oral session",
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+async function setAbstractPosterSession(env, abstractId, posterSession) {
+  const assignedAt = posterSession ? Date.now() : null;
+  const updatedAt = Date.now();
+  try {
+    const result = await env.ISIR_DB.prepare(
+      `UPDATE abstractions
+       SET poster_session = ?, poster_session_assigned_at = ?, poster_session_email_sent_at = NULL, updated_at = ?
+       WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(posterSession, assignedAt, updatedAt, abstractId)
+      .run();
+    return { ok: true, changes: result?.meta?.changes ?? 0 };
+  } catch (error) {
+    const message = String(error?.message || error || "");
+    if (/no such column/i.test(message)) {
+      return {
+        ok: false,
+        migrationPending: true,
+        error:
+          "poster_session column missing — run db/migration_add_poster_session.sql",
+      };
+    }
+    throw error;
+  }
+}
+
+function posterSessionAssignError(existing) {
+  if (!existing) return "Abstract not found";
+  if (String(existing.status || "").toLowerCase() !== "accepted") {
+    return "Only accepted abstracts can be assigned a poster session";
+  }
+  if (String(existing.assigned_format || "").toLowerCase() !== "poster") {
+    return "Assign poster format before choosing a session";
+  }
+  return null;
+}
+
+async function handleUpdateAbstractPosterSession(
+  request,
+  env,
+  corsHeaders,
+  abstractId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!abstractId) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing abstract id" }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const data = await request.json();
+    const parsed = parsePosterSession(
+      data?.poster_session ?? data?.posterSession,
+    );
+    if (!parsed.ok) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "poster_session must be P1, P2, or null/clear to unassign",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT id, status, assigned_format FROM abstractions
+       WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!existing) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Abstract not found" }),
+        { status: 404, headers: corsHeaders },
+      );
+    }
+
+    const assignError = posterSessionAssignError(existing);
+    if (assignError && parsed.value) {
+      return new Response(
+        JSON.stringify({ success: false, error: assignError }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const updated = await setAbstractPosterSession(
+      env,
+      abstractId,
+      parsed.value,
+    );
+    if (!updated.ok) {
+      return new Response(
+        JSON.stringify({ success: false, error: updated.error }),
+        { status: 500, headers: corsHeaders },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        id: abstractId,
+        poster_session: parsed.value,
+        poster_session_assigned_at: parsed.value ? Date.now() : null,
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Update abstract poster session error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || "Failed to update poster session",
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+async function applyPosterSessionAssignments(env, items) {
+  let updated = 0;
+  let skipped = 0;
+  const errors = [];
+
+  for (const item of items) {
+    const id = String(item?.id || "").trim();
+    const parsed = parsePosterSession(item?.poster_session);
+    if (!id || !parsed.ok) {
+      skipped += 1;
+      errors.push({ id: id || "(missing)", error: "invalid assignment" });
+      continue;
+    }
+
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT id, status, assigned_format FROM abstractions
+       WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(id)
+      .first();
+
+    if (!existing) {
+      skipped += 1;
+      errors.push({ id, error: "not found" });
+      continue;
+    }
+    const assignError = posterSessionAssignError(existing);
+    if (assignError && parsed.value) {
+      skipped += 1;
+      errors.push({ id, error: assignError });
+      continue;
+    }
+
+    const result = await setAbstractPosterSession(env, id, parsed.value);
+    if (!result.ok) {
+      return { ok: false, error: result.error };
+    }
+    if ((result.changes || 0) > 0) updated += 1;
+    else skipped += 1;
+  }
+
+  return { ok: true, updated, skipped, errors };
+}
+
+async function handleBulkUpdateAbstractPosterSession(request, env, corsHeaders) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    const data = await request.json();
+    const assignmentItems = Array.isArray(data?.assignments)
+      ? data.assignments.map((row) => ({
+          id: String(row?.id || "").trim(),
+          poster_session: row?.poster_session ?? row?.posterSession,
+        }))
+      : null;
+
+    if (assignmentItems && assignmentItems.length > 0) {
+      if (assignmentItems.length > 500) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Cannot update more than 500 abstracts at once",
+          }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+      const result = await applyPosterSessionAssignments(env, assignmentItems);
+      if (!result.ok) {
+        return new Response(
+          JSON.stringify({ success: false, error: result.error }),
+          { status: 500, headers: corsHeaders },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          success: true,
+          updated: result.updated,
+          skipped: result.skipped,
+          errors: result.errors.slice(0, 20),
+        }),
+        { status: 200, headers: corsHeaders },
+      );
+    }
+
+    const ids = Array.isArray(data?.ids)
+      ? data.ids.map((id) => String(id || "").trim()).filter(Boolean)
+      : [];
+    const parsed = parsePosterSession(
+      data?.poster_session ?? data?.posterSession,
+    );
+
+    if (ids.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "ids must be a non-empty array of abstract ids",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (!parsed.ok) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "poster_session must be P1, P2, or null/clear to unassign",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (ids.length > 500) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Cannot update more than 500 abstracts at once",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const result = await applyPosterSessionAssignments(
+      env,
+      ids.map((id) => ({ id, poster_session: parsed.value })),
+    );
+    if (!result.ok) {
+      return new Response(
+        JSON.stringify({ success: false, error: result.error }),
+        { status: 500, headers: corsHeaders },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        poster_session: parsed.value,
+        updated: result.updated,
+        skipped: result.skipped,
+        errors: result.errors.slice(0, 20),
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Bulk update abstract poster session error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || "Failed to bulk update poster session",
       }),
       { status: 500, headers: corsHeaders },
     );
@@ -9203,6 +10088,406 @@ async function handleBulkSendAbstractFormatNotifications(
     );
   } catch (error) {
     console.error("Bulk send abstract format notifications error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Internal error" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleSendOralSessionNotification(
+  request,
+  env,
+  corsHeaders,
+  abstractId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!abstractId) {
+      return jsonResponse(
+        { success: false, error: "Missing abstract id" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const row = await env.ISIR_DB.prepare(
+      `SELECT * FROM abstractions WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!row) {
+      return jsonResponse(
+        { success: false, error: "Abstract not found" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    const result = await sendOralSessionLetterEmail(env, row);
+    if (!result.success) {
+      return jsonResponse(
+        { success: false, error: result.error || "Failed to send email" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        id: abstractId,
+        session: result.session,
+        sentTo: result.toEmail,
+        sentAt: result.sentAt,
+        message: `Oral session letter (${result.session}) sent to ${result.toEmail}`,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Send oral session notification error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Internal error" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleBulkSendOralSessionNotifications(
+  request,
+  env,
+  corsHeaders,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
+
+    const onlyMissing = body?.onlyMissing !== false;
+    const ids = Array.isArray(body?.abstractIds)
+      ? body.abstractIds.filter((x) => typeof x === "string" && x.trim())
+      : null;
+
+    let rows = [];
+    if (ids && ids.length > 0) {
+      rows = await d1AllWhereIn(
+        env.ISIR_DB,
+        (ph) =>
+          `SELECT * FROM abstractions WHERE id IN (${ph}) AND deleted_at IS NULL ORDER BY submission_date ASC`,
+        ids,
+      );
+    } else {
+      const res = await env.ISIR_DB.prepare(
+        `SELECT * FROM abstractions
+         WHERE deleted_at IS NULL
+           AND lower(status) = 'accepted'
+           AND lower(assigned_format) = 'oral'
+           AND oral_session IS NOT NULL
+           AND trim(oral_session) != ''
+         ORDER BY submission_date ASC
+         LIMIT 1000`,
+      ).all();
+      rows = res.results || [];
+    }
+
+    let sent = 0;
+    let skipped = 0;
+    let failed = 0;
+    const results = [];
+
+    for (const row of rows) {
+      const status = String(row.status || "")
+        .trim()
+        .toLowerCase();
+      const format = String(row.assigned_format || "")
+        .trim()
+        .toLowerCase();
+      const session = getOralSession(row.oral_session);
+
+      if (status !== "accepted") {
+        skipped++;
+        results.push({
+          id: row.id,
+          status: "skipped",
+          reason: "not accepted",
+        });
+        continue;
+      }
+
+      if (format !== "oral") {
+        skipped++;
+        results.push({
+          id: row.id,
+          status: "skipped",
+          reason: "not oral",
+        });
+        continue;
+      }
+
+      if (!session) {
+        skipped++;
+        results.push({
+          id: row.id,
+          status: "skipped",
+          reason: "session not assigned",
+        });
+        continue;
+      }
+
+      if (onlyMissing && row.oral_session_email_sent_at) {
+        skipped++;
+        results.push({
+          id: row.id,
+          status: "skipped",
+          reason: "already sent",
+          sentAt: row.oral_session_email_sent_at,
+        });
+        continue;
+      }
+
+      const r = await sendOralSessionLetterEmail(env, row);
+      if (r.success) {
+        sent++;
+        results.push({
+          id: row.id,
+          status: "sent",
+          session: r.session,
+          to: r.toEmail,
+          sentAt: r.sentAt,
+        });
+      } else {
+        failed++;
+        results.push({ id: row.id, status: "failed", error: r.error });
+      }
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        total: rows.length,
+        sent,
+        skipped,
+        failed,
+        onlyMissing,
+        results,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Bulk send oral session notifications error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Internal error" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleSendPosterSessionNotification(
+  request,
+  env,
+  corsHeaders,
+  abstractId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!abstractId) {
+      return jsonResponse(
+        { success: false, error: "Missing abstract id" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const row = await env.ISIR_DB.prepare(
+      `SELECT * FROM abstractions WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!row) {
+      return jsonResponse(
+        { success: false, error: "Abstract not found" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    const result = await sendPosterSessionLetterEmail(env, row);
+    if (!result.success) {
+      return jsonResponse(
+        { success: false, error: result.error || "Failed to send email" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        id: abstractId,
+        session: result.session,
+        sentTo: result.toEmail,
+        sentAt: result.sentAt,
+        message: `Poster session letter (${result.session}) sent to ${result.toEmail}`,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Send poster session notification error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Internal error" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleBulkSendPosterSessionNotifications(
+  request,
+  env,
+  corsHeaders,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
+
+    const onlyMissing = body?.onlyMissing !== false;
+    const ids = Array.isArray(body?.abstractIds)
+      ? body.abstractIds.filter((x) => typeof x === "string" && x.trim())
+      : null;
+
+    let rows = [];
+    if (ids && ids.length > 0) {
+      rows = await d1AllWhereIn(
+        env.ISIR_DB,
+        (ph) =>
+          `SELECT * FROM abstractions WHERE id IN (${ph}) AND deleted_at IS NULL ORDER BY submission_date ASC`,
+        ids,
+      );
+    } else {
+      const res = await env.ISIR_DB.prepare(
+        `SELECT * FROM abstractions
+         WHERE deleted_at IS NULL
+           AND lower(status) = 'accepted'
+           AND lower(assigned_format) = 'poster'
+           AND poster_session IS NOT NULL
+           AND trim(poster_session) != ''
+         ORDER BY submission_date ASC
+         LIMIT 1000`,
+      ).all();
+      rows = res.results || [];
+    }
+
+    let sent = 0;
+    let skipped = 0;
+    let failed = 0;
+    const results = [];
+
+    for (const row of rows) {
+      const status = String(row.status || "")
+        .trim()
+        .toLowerCase();
+      const format = String(row.assigned_format || "")
+        .trim()
+        .toLowerCase();
+      const session = getPosterSession(row.poster_session);
+
+      if (status !== "accepted") {
+        skipped++;
+        results.push({
+          id: row.id,
+          status: "skipped",
+          reason: "not accepted",
+        });
+        continue;
+      }
+
+      if (format !== "poster") {
+        skipped++;
+        results.push({
+          id: row.id,
+          status: "skipped",
+          reason: "not poster",
+        });
+        continue;
+      }
+
+      if (!session) {
+        skipped++;
+        results.push({
+          id: row.id,
+          status: "skipped",
+          reason: "session not assigned",
+        });
+        continue;
+      }
+
+      if (onlyMissing && row.poster_session_email_sent_at) {
+        skipped++;
+        results.push({
+          id: row.id,
+          status: "skipped",
+          reason: "already sent",
+          sentAt: row.poster_session_email_sent_at,
+        });
+        continue;
+      }
+
+      const r = await sendPosterSessionLetterEmail(env, row);
+      if (r.success) {
+        sent++;
+        results.push({
+          id: row.id,
+          status: "sent",
+          session: r.session,
+          to: r.toEmail,
+          sentAt: r.sentAt,
+        });
+      } else {
+        failed++;
+        results.push({ id: row.id, status: "failed", error: r.error });
+      }
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        total: rows.length,
+        sent,
+        skipped,
+        failed,
+        onlyMissing,
+        results,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Bulk send poster session notifications error:", error);
     return jsonResponse(
       { success: false, error: error.message || "Internal error" },
       500,

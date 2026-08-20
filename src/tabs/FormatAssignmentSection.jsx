@@ -59,6 +59,7 @@ export default function FormatAssignmentSection({
   formatDate,
   getAbstractTypeLabel,
   onGoToReviewScores,
+  onGoToOralSessions,
 }) {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -255,6 +256,26 @@ export default function FormatAssignmentSection({
               assigned_format: assignedFormat,
               format_assigned_at: formatAssignedAt,
               format_email_sent_at: null,
+              ...(assignedFormat === "oral"
+                ? {
+                    poster_session: null,
+                    poster_session_assigned_at: null,
+                    poster_session_email_sent_at: null,
+                  }
+                : assignedFormat === "poster"
+                  ? {
+                      oral_session: null,
+                      oral_session_assigned_at: null,
+                      oral_session_email_sent_at: null,
+                    }
+                  : {
+                      oral_session: null,
+                      oral_session_assigned_at: null,
+                      oral_session_email_sent_at: null,
+                      poster_session: null,
+                      poster_session_assigned_at: null,
+                      poster_session_email_sent_at: null,
+                    }),
             }
           : a,
       ),
@@ -535,14 +556,27 @@ export default function FormatAssignmentSection({
             (manual; not automatic).
           </p>
         </div>
-        {onGoToReviewScores ? (
-          <button
-            type="button"
-            onClick={onGoToReviewScores}
-            className="px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50"
-          >
-            Review scores
-          </button>
+        {onGoToReviewScores || onGoToOralSessions ? (
+          <div className="flex flex-wrap gap-2">
+            {onGoToOralSessions ? (
+              <button
+                type="button"
+                onClick={onGoToOralSessions}
+                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-violet-600 text-white hover:bg-violet-700"
+              >
+                Oral & poster sessions
+              </button>
+            ) : null}
+            {onGoToReviewScores ? (
+              <button
+                type="button"
+                onClick={onGoToReviewScores}
+                className="px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50"
+              >
+                Review scores
+              </button>
+            ) : null}
+          </div>
         ) : null}
       </div>
 

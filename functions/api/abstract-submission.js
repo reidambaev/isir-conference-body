@@ -460,7 +460,7 @@ export async function onRequestPost(context) {
     <li><strong>Save your Submission ID</strong> (${escapeHtml(submissionId)}) — you may need it when contacting us or checking status.</li>
     <li>Your abstract will be reviewed by the scientific committee. You will be notified of the outcome by email.</li>
   </ul>
-  <p>If you have any questions, please contact the organizers at <a href="mailto:support@theisir.org" style="color: #1a3a6c;">support@theisir.org</a> and quote your submission ID.</p>
+  <p>If you have any questions, please contact the organizers at <a href="mailto:support@isir2026.org" style="color: #1a3a6c;">support@isir2026.org</a> and quote your submission ID.</p>
   <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
 </body>
 </html>`;
