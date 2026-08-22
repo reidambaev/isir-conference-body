@@ -5,48 +5,49 @@ export const ORAL_SESSIONS = [
     code: "N1",
     title: "Young Investigator Award competition",
     sessionLine: "Session N1, Young Investigator Award competition.",
-    dateLine: "Friday, November 6, 2026, 4:05 PM – 5:06 PM",
+    dateLine: "Friday, November 6, 2026, 4:00 PM – 5:06 PM",
     isYoungInvestigator: true,
   },
   {
     code: "N2",
     title:
-      "New Research Findings. Pre-Conception, Fertility & Reproductive Disorders",
+      "New Research Findings I. Pre-Conception, Fertility & Reproductive Disorders",
     sessionLine:
-      "Session N2, New Research Findings. Pre-Conception, Fertility & Reproductive Disorders",
-    dateLine: "Friday, November 6, 2026, 4:05 PM – 5:00 PM",
+      "Session N2, New Research Findings I. Pre-Conception, Fertility & Reproductive Disorders",
+    dateLine: "Friday, November 6, 2026, 4:00 PM – 5:06 PM",
     isYoungInvestigator: false,
   },
   {
     code: "N3",
-    title: "New Research Findings. Early Pregnancy and Implantation",
-    sessionLine: "Session N3, New Research Findings. Early Pregnancy and Implantation",
-    dateLine: "Friday, November 6, 2026, 4:05 PM – 5:00 PM",
+    title: "New Research Findings II. Immune Regulation in Reproduction",
+    sessionLine:
+      "Session N3, New Research Findings II. Immune Regulation in Reproduction",
+    dateLine: "Friday, November 6, 2026, 4:00 PM – 5:06 PM",
     isYoungInvestigator: false,
   },
   {
     code: "N4",
-    title: "New Research Findings. Immune Regulation in Reproduction",
+    title: "New Research Findings III. Immune Regulation in Reproduction",
     sessionLine:
-      "Session N4, New Research Findings. Immune Regulation in Reproduction",
-    dateLine: "Saturday, November 7, 2026, 4:05 PM – 5:06 PM",
+      "Session N4, New Research Findings III. Immune Regulation in Reproduction",
+    dateLine: "Saturday, November 7, 2026, 4:00 PM – 5:06 PM",
     isYoungInvestigator: false,
   },
   {
     code: "N5",
-    title: "New Research Findings. Placental Development and Function",
+    title: "New Research Findings IV. Placental Development and Function",
     sessionLine:
-      "Session N5, New Research Findings. Placental Development and Function",
-    dateLine: "Saturday, November 7, 2026, 4:05 PM – 5:00 PM",
+      "Session N5, New Research Findings IV. Placental Development and Function",
+    dateLine: "Saturday, November 7, 2026, 4:00 PM – 5:06 PM",
     isYoungInvestigator: false,
   },
   {
     code: "N6",
     title:
-      "New Research Findings. Maternal-Fetal Immunology & Gestational Complications",
+      "New Research Findings V. Maternal-Fetal Immunology & Gestational Complications",
     sessionLine:
-      "Session N6, New Research Findings. Maternal-Fetal Immunology & Gestational Complications.",
-    dateLine: "Saturday, November 7, 2026, 4:05 PM – 5:06 PM",
+      "Session N6, New Research Findings V. Maternal-Fetal Immunology & Gestational Complications.",
+    dateLine: "Saturday, November 7, 2026, 4:00 PM – 5:06 PM",
     isYoungInvestigator: false,
   },
 ];
@@ -161,18 +162,18 @@ export const POSTER_SESSIONS = [
   {
     code: "P1",
     number: 1,
-    title: "Poster Session #1",
-    sessionLine: "Poster Session #1",
-    dateLine: "To be announced",
-    emailReady: false,
+    title: "Poster Session I",
+    sessionLine: "Poster Session I",
+    dateLine: "Friday, November 6, 2026, 11:45 AM – 1:30 PM",
+    emailReady: true,
   },
   {
     code: "P2",
     number: 2,
-    title: "Poster Session #2",
-    sessionLine: "Poster Session #2",
-    dateLine: "To be announced",
-    emailReady: false,
+    title: "Poster Session II",
+    sessionLine: "Poster Session II",
+    dateLine: "Saturday, November 7, 2026, 11:45 AM – 1:00 PM",
+    emailReady: true,
   },
 ];
 

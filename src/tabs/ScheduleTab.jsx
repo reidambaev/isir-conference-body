@@ -180,9 +180,9 @@ function groupParallelByColor(sessions) {
 
 const dayThemes = {
   0: "Arrivals & Welcome",
-  1: "Discovering the Immune Foundations of Reproductive Health",
-  2: "Translating Science into Care",
-  3: "Shaping Population Health through Reproductive Innovation",
+  1: "Reproductive Immunology at the Forefront of Population Health",
+  2: "Translating Reproductive Immunology into Clinical Practice",
+  3: "Advancing Women's Health and Population Sustainability Through Global Collaboration",
 };
 
 const legendItems = [
@@ -231,8 +231,8 @@ const ScheduleTab = () => {
       {
         time: "1:00 PM",
         endTime: "5:00 PM",
-        type: "social",
-        title: "Registration Open",
+        type: "registration",
+        title: "Registration",
       },
       {
         time: "2:30 PM",
@@ -279,7 +279,7 @@ const ScheduleTab = () => {
           {
             type: "symposium",
             number: "S2",
-            title: "Early Pregnancy and Placental Development",
+            title: "Gynecologic Malignancies and Immune Abnormalities",
           },
           {
             type: "symposium",
@@ -291,36 +291,32 @@ const ScheduleTab = () => {
       },
       {
         time: "11:45 AM",
-        endTime: "1:00 PM",
+        endTime: "1:30 PM",
         type: "break",
         title: "Lunch",
       },
       {
-        time: "1:00 PM",
-        endTime: "2:15 PM",
+        time: "1:30 PM",
+        endTime: "2:20 PM",
         type: "population",
-        title: "Population & Aging I",
+        title: "Population Forum I",
       },
       {
-        time: "2:15 PM",
+        time: "2:20 PM",
         endTime: "2:30 PM",
         type: "break",
-        title: "Break",
+        title: "Intermission",
       },
       {
         time: "2:30 PM",
         endTime: "3:45 PM",
         type: "parallel",
         sessions: [
-          {
-            type: "symposium",
-            number: "S4",
-            title: "KAI/KSRI Joint Symposium",
-          },
+          { type: "symposium", number: "S4", title: "KI Symposium" },
           {
             type: "symposium",
             number: "S5",
-            title: "Microbiome and Pregnancy",
+            title: "Microbiome and Pregnancy Outcomes",
           },
           { type: "symposium", number: "S6", title: "Male Infertility" },
         ],
@@ -338,42 +334,48 @@ const ScheduleTab = () => {
         sessions: [
           {
             type: "oral",
-            title: "Young Investigator Session",
+            number: "N1",
+            title: "Young Investigator Award",
           },
-          { type: "oral", number: "Oral II", title: "Oral Presentation II" },
-          { type: "oral", number: "Oral III", title: "Oral Presentation III" },
+          {
+            type: "oral",
+            number: "N2",
+            title: "New Research Findings I",
+          },
+          {
+            type: "oral",
+            number: "N3",
+            title: "New Research Findings II",
+          },
         ],
       },
       {
-        time: "6:00 PM",
+        time: "5:30 PM",
         endTime: "8:00 PM",
-        type: "parallel",
-        sessions: [
-          { type: "meeting", title: "JRI Editorial Meeting" },
-          { type: "social", title: "Trainee Social Event" },
-        ],
+        type: "social",
+        title: "Trainee Social",
       },
     ],
     2: [
       {
-        time: "8:30 AM",
+        time: "8:35 AM",
         endTime: "9:50 AM",
         type: "parallel",
         sessions: [
           {
             type: "symposium",
             number: "S7",
-            title: "Ovarian Inflammatory Disease and Aging",
+            title: "Immune Mechanisms of Female Reproductive Aging",
           },
           {
             type: "symposium",
             number: "S8",
-            title: "Current Therapeutic Options for Reproductive Health",
+            title: "Preeclampsia and Its Systemic Consequences",
           },
           {
             type: "symposium",
             number: "S9",
-            title: "Preeclampsia and Its Systemic Consequences",
+            title: "Rheumatic Conditions and Reproductive Outcomes",
           },
         ],
       },
@@ -397,17 +399,17 @@ const ScheduleTab = () => {
           {
             type: "symposium",
             number: "S10",
-            title: "Fetal Outcome with Inflammatory Insult",
+            title: "Ovarian Inflammatory Disease and Aging",
           },
           {
             type: "symposium",
             number: "S11",
-            title: "T Cell Immunity and Pregnancy",
+            title: "Preeclampsia and Its Systemic Consequences",
           },
           {
             type: "symposium",
             number: "S12",
-            title: "Gynecologic Malignancies and Immune Abnormalities",
+            title: "Current Immunotherapeutic Options for Reproductive Health",
           },
         ],
       },
@@ -425,19 +427,17 @@ const ScheduleTab = () => {
           {
             type: "symposium",
             number: "S13",
-            title:
-              "Immune Regulation and Therapeutic Application of Human Reproduction",
+            title: "Exosome, Mitochondrial Function, and Cell-Based Therapies",
           },
           {
             type: "symposium",
             number: "S14",
-            title: "High Risk OB: 2nd and 3rd Trimester Complications",
+            title: "Infection, Inflammation, and Pregnancy",
           },
           {
             type: "symposium",
             number: "S15",
-            title:
-              "Current Immunotherapeutic Options for Reproductive Failure",
+            title: "Update on Reproductive Disorders and Management",
           },
         ],
       },
@@ -449,18 +449,17 @@ const ScheduleTab = () => {
           {
             type: "symposium",
             number: "S16",
-            title:
-              "Exosomes, Mitochondrial Function, and Cell-Based Therapies",
+            title: "T Cell Immunity and Pregnancy",
           },
           {
             type: "symposium",
             number: "S17",
-            title: "Preeclampsia and Its Systemic Consequences",
+            title: "Fetal Outcome with Inflammatory Insult",
           },
           {
             type: "symposium",
             number: "S18",
-            title: "Rheumatic Conditions and Reproductive Outcomes",
+            title: "Early Pregnancy and Placental Development",
           },
         ],
       },
@@ -471,13 +470,25 @@ const ScheduleTab = () => {
         title: "Coffee Break",
       },
       {
-        time: "4:05 PM",
-        endTime: "5:00 PM",
+        time: "4:00 PM",
+        endTime: "5:06 PM",
         type: "parallel",
         sessions: [
-          { type: "oral", number: "Oral IV", title: "Oral Presentation IV" },
-          { type: "oral", number: "Oral V", title: "Oral Presentation V" },
-          { type: "oral", number: "Oral VI", title: "Oral Presentation VI" },
+          {
+            type: "oral",
+            number: "N4",
+            title: "New Research Findings III",
+          },
+          {
+            type: "oral",
+            number: "N5",
+            title: "New Research Findings IV",
+          },
+          {
+            type: "oral",
+            number: "N6",
+            title: "New Research Findings V",
+          },
         ],
       },
     ],
@@ -502,24 +513,24 @@ const ScheduleTab = () => {
           type: "forum",
           number: "PF III",
           title: "Public Forum III",
-          endTime: "11:20 AM",
+          endTime: "11:45 AM",
         },
         sessions: [
           {
             type: "symposium",
             number: "S19",
-            title: "Update on Reproductive Disorders and Their Management",
+            title:
+              "Immune Regulation and Therapeutic Application of Human Reproduction",
           },
           {
             type: "symposium",
             number: "S20",
-            title:
-              "Interplay Between Hormones, Immune System and Vascular Dysfunction in Women's Health",
+            title: "High Risk OB, 2nd/3rd Trimester Complications",
           },
           {
             type: "symposium",
             number: "S21",
-            title: "Infection, Vaccination, and Pregnancy",
+            title: "Immunotherapeutic Options for Reproductive Failures",
           },
         ],
       },
@@ -534,28 +545,22 @@ const ScheduleTab = () => {
       },
       {
         time: "1:00 PM",
-        endTime: "2:15 PM",
+        endTime: "2:20 PM",
         type: "population",
         title: "Population Forum II",
       },
       {
-        time: "2:15 PM",
-        endTime: "2:30 PM",
-        type: "break",
-        title: "Ready for Transportation",
-      },
-      {
-        time: "2:30 PM",
+        time: "2:00 PM",
         endTime: "6:00 PM",
         type: "social",
-        title: "Transportation to the Gala",
+        title: "Enjoy Busan — Go to the Gala!",
       },
       {
         time: "6:00 PM",
         endTime: "9:00 PM",
         type: "social",
         title: "Award Gala",
-        subtitle: "Celebration at Busan Cinema Center",
+        subtitle: "Busan Cinema Center",
       },
     ],
   };
@@ -564,7 +569,7 @@ const ScheduleTab = () => {
     1: [
       {
         time: "11:45 AM",
-        endTime: "1:00 PM",
+        endTime: "1:30 PM",
         type: "social",
         title: "Poster Session I",
       },
