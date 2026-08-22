@@ -207,6 +207,11 @@ export default function App() {
         url.pathname === "/hotel/" ||
         url.pathname === "/travel-v2" ||
         url.pathname === "/travel-v2/";
+      const wantsSubmission =
+        url.pathname === "/abstract" ||
+        url.pathname === "/abstract/" ||
+        url.pathname === "/submission" ||
+        url.pathname === "/submission/";
 
       if (wantsDisclosure) {
         setActiveTab("commerce-disclosure");
@@ -222,6 +227,8 @@ export default function App() {
         setActiveTab("program");
       } else if (wantsTravel) {
         setActiveTab("travel");
+      } else if (wantsSubmission) {
+        setActiveTab("submission");
       } else if (wantsRegistration) {
         setActiveTab("registration");
       } else {
