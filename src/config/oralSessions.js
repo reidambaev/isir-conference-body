@@ -1,52 +1,58 @@
-/** Oral abstract sessions (N1–N6) used for assignment and speaker letters. */
+/** Oral abstract sessions (YI + N1–N5) used for assignment and speaker letters. */
 
 export const ORAL_SESSIONS = [
   {
-    code: "N1",
-    title: "Young Investigator Award competition",
-    sessionLine: "Session N1, Young Investigator Award competition.",
+    code: "YI",
+    title: "Young Investigator Award Competition",
+    sessionLine: "Young Investigator Award Competition",
     dateLine: "Friday, November 6, 2026, 4:00 PM – 5:06 PM",
     isYoungInvestigator: true,
   },
   {
-    code: "N2",
+    code: "N1",
+    roman: "I",
     title:
       "New Research Findings I. Pre-Conception, Fertility & Reproductive Disorders",
     sessionLine:
-      "Session N2, New Research Findings I. Pre-Conception, Fertility & Reproductive Disorders",
+      "Session N1, New Research Findings I. Pre-Conception, Fertility & Reproductive Disorders",
+    dateLine: "Friday, November 6, 2026, 4:00 PM – 5:06 PM",
+    isYoungInvestigator: false,
+  },
+  {
+    code: "N2",
+    roman: "II",
+    title: "New Research Findings II. Early Pregnancy and Implantation",
+    sessionLine:
+      "Session N2, New Research Findings II. Early Pregnancy and Implantation",
     dateLine: "Friday, November 6, 2026, 4:00 PM – 5:06 PM",
     isYoungInvestigator: false,
   },
   {
     code: "N3",
-    title: "New Research Findings II. Immune Regulation in Reproduction",
+    roman: "III",
+    title: "New Research Findings III. Immune Regulation in Reproduction",
     sessionLine:
-      "Session N3, New Research Findings II. Immune Regulation in Reproduction",
-    dateLine: "Friday, November 6, 2026, 4:00 PM – 5:06 PM",
+      "Session N3, New Research Findings III. Immune Regulation in Reproduction",
+    dateLine: "Saturday, November 7, 2026, 4:00 PM – 5:06 PM",
     isYoungInvestigator: false,
   },
   {
     code: "N4",
-    title: "New Research Findings III. Immune Regulation in Reproduction",
+    roman: "IV",
+    title:
+      "New Research Findings IV. Immunity, Environment, and Reproductive Fate",
     sessionLine:
-      "Session N4, New Research Findings III. Immune Regulation in Reproduction",
+      "Session N4, New Research Findings IV. Immunity, Environment, and Reproductive Fate",
     dateLine: "Saturday, November 7, 2026, 4:00 PM – 5:06 PM",
     isYoungInvestigator: false,
   },
   {
     code: "N5",
-    title: "New Research Findings IV. Placental Development and Function",
-    sessionLine:
-      "Session N5, New Research Findings IV. Placental Development and Function",
-    dateLine: "Saturday, November 7, 2026, 4:00 PM – 5:06 PM",
-    isYoungInvestigator: false,
-  },
-  {
-    code: "N6",
+    roman: "V",
     title:
       "New Research Findings V. Maternal-Fetal Immunology & Gestational Complications",
     sessionLine:
-      "Session N6, New Research Findings V. Maternal-Fetal Immunology & Gestational Complications.",
+      "Session N5, New Research Findings V. Maternal-Fetal Immunology & Gestational Complications",
     dateLine: "Saturday, November 7, 2026, 4:00 PM – 5:06 PM",
     isYoungInvestigator: false,
   },
@@ -65,7 +71,7 @@ export function getOralSession(code) {
   return SESSION_BY_CODE[key] || null;
 }
 
-/** Normalize assigned session: N1–N6 | null (clear). */
+/** Normalize assigned session: YI | N1–N5 | null (clear). */
 export function parseOralSession(raw) {
   if (raw === null || raw === "" || raw === undefined) {
     return { ok: true, value: null };

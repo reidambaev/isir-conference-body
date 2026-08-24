@@ -508,7 +508,7 @@ async function handleApiRequest(request, env, url) {
     return handleBulkUpdateAbstractAssignedFormat(request, env, corsHeaders);
   }
 
-  // PATCH /api/admin/abstracts/:id/oral-session - Set N1–N6 session
+  // PATCH /api/admin/abstracts/:id/oral-session - Set YI / N1–N5 session
   const abstractOralSessionMatch = url.pathname.match(
     /^\/api\/admin\/abstracts\/([^/]+)\/oral-session$/,
   );
@@ -521,7 +521,7 @@ async function handleApiRequest(request, env, url) {
     );
   }
 
-  // POST /api/admin/abstracts/oral-session - Bulk set N1–N6 session
+  // POST /api/admin/abstracts/oral-session - Bulk set YI / N1–N5 session
   if (
     url.pathname === "/api/admin/abstracts/oral-session" &&
     request.method === "POST"
@@ -4349,7 +4349,7 @@ async function sendAbstractFormatSelectionEmail(env, abstract) {
   }
 }
 
-/** Oral speaker session letter (N1–N6). Emails presenting + corresponding authors. */
+/** Oral speaker session letter (YI / N1–N5). Emails presenting + corresponding authors. */
 async function sendOralSessionLetterEmail(env, abstract) {
   if (!env.RESEND_API_KEY || !env.CONFIRMATION_FROM_EMAIL) {
     return {
@@ -4386,7 +4386,7 @@ async function sendOralSessionLetterEmail(env, abstract) {
   if (!session) {
     return {
       success: false,
-      error: "Assign an oral session (N1–N6) before sending the speaker letter.",
+      error: "Assign an oral session (YI or N1–N5) before sending the speaker letter.",
     };
   }
 
@@ -8281,7 +8281,7 @@ async function handleUpdateAbstractOralSession(
       return new Response(
         JSON.stringify({
           success: false,
-          error: "oral_session must be N1–N6, or null/clear to unassign",
+          error: "oral_session must be YI or N1–N5, or null/clear to unassign",
         }),
         { status: 400, headers: corsHeaders },
       );
@@ -8366,7 +8366,7 @@ async function handleBulkUpdateAbstractOralSession(request, env, corsHeaders) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: "oral_session must be N1–N6, or null/clear to unassign",
+          error: "oral_session must be YI or N1–N5, or null/clear to unassign",
         }),
         { status: 400, headers: corsHeaders },
       );

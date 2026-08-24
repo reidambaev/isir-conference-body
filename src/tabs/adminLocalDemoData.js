@@ -249,7 +249,7 @@ export function buildLocalAdminDemoData() {
       presentation_preference: "either",
       assigned_format: "oral",
       format_assigned_at: now - 1 * day,
-      oral_session: "N4",
+      oral_session: "N3",
       oral_session_assigned_at: now - 1 * day,
       oral_session_email_sent_at: null,
       submission_date: now - 9 * day,

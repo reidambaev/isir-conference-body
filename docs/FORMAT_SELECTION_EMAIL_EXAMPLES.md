@@ -67,17 +67,17 @@ The ISIR 2026 Organizing Committee
 
 ---
 
-# Oral session speaker letters (N1–N6)
+# Oral session speaker letters (YI + N1–N5)
 
 These are the emails admins send from **Admin → Sessions** after an oral abstract is placed in a session. Sending is manual. Recipients: presenting author and corresponding author (one email if they share an address).
 
-N1 uses a different opening (Young Investigator Award Competition). Session title and date are filled from the assigned session.
+**YI** (Young Investigator Award Competition) is its own track — not an N-session — and uses a different opening. N1–N5 are New Research Findings I–V.
 
 ---
 
-## N2–N6 oral presentation
+## N1–N5 oral presentation
 
-**Subject:** ISIR 2026 – Oral presentation, Session N2
+**Subject:** ISIR 2026 – Oral presentation, Session N1
 
 ```text
 Dear Khaliun Dashdeleg and Joanne Kwak-Kim,
@@ -90,8 +90,8 @@ Below are the tentative details of the presentation:
 
 Your presentation is scheduled as follows:
 Title: IVF outcomes by the age-adjusted AMH ratio in women receiving immunomodulatory treatment versus untreated controls: a pilot two-center study
-Session N2, New Research Findings. Pre-Conception, Fertility & Reproductive Disorders
-Session Date: Friday, November 6, 2026, 4:05 PM – 5:00 PM
+Session N1, New Research Findings I. Pre-Conception, Fertility & Reproductive Disorders
+Session Date: Friday, November 6, 2026, 4:00 PM – 5:06 PM
 
 Important Notes and Guidelines:
 At the meeting, on the date and time of your presentation above, you will give an 8-minute presentation of your abstract followed by 3 minutes of discussion. Total time of your presentation is 11 min. No virtual/pre-recorded presentation is allowed.
@@ -109,18 +109,18 @@ The ISIR 2026 Organizing Committee
 
 ---
 
-## N1 Young Investigator Award Competition
+## YI Young Investigator Award Competition
 
 **Subject:** ISIR 2026 – Young Investigator Award Competition
 
-Opening paragraph (the rest of the letter is the same, with N1 session lines):
+Opening paragraph (the rest of the letter is the same, with the YI session line):
 
 ```text
 CONGRATULATIONS! Your abstract, ABS-DEMO-001: IVF outcomes by the age-adjusted AMH ratio…, has been selected for Young Investigator Award Competition at the ISIR 2026 Congress, taking place November 5 - 8, 2026, in Busan, Korea.
 ```
 
-Session N1, Young Investigator Award competition.
-Session Date: Friday, November 6, 2026, 4:05 PM – 5:06 PM
+Young Investigator Award Competition
+Session Date: Friday, November 6, 2026, 4:00 PM – 5:06 PM
 
 ---
 
@@ -128,12 +128,12 @@ Session Date: Friday, November 6, 2026, 4:05 PM – 5:06 PM
 
 | Session | Title | Date |
 | --- | --- | --- |
-| N1 | Young Investigator Award competition | Friday, November 6, 2026, 4:05 PM – 5:06 PM |
-| N2 | New Research Findings. Pre-Conception, Fertility & Reproductive Disorders | Friday, November 6, 2026, 4:05 PM – 5:00 PM |
-| N3 | New Research Findings. Early Pregnancy and Implantation | Friday, November 6, 2026, 4:05 PM – 5:00 PM |
-| N4 | New Research Findings. Immune Regulation in Reproduction | Saturday, November 7, 2026, 4:05 PM – 5:06 PM |
-| N5 | New Research Findings. Placental Development and Function | Saturday, November 7, 2026, 4:05 PM – 5:00 PM |
-| N6 | New Research Findings. Maternal-Fetal Immunology & Gestational Complications | Saturday, November 7, 2026, 4:05 PM – 5:06 PM |
+| YI | Young Investigator Award Competition | Friday, November 6, 2026, 4:00 PM – 5:06 PM |
+| N1 | New Research Findings I. Pre-Conception, Fertility & Reproductive Disorders | Friday, November 6, 2026, 4:00 PM – 5:06 PM |
+| N2 | New Research Findings II. Early Pregnancy and Implantation | Friday, November 6, 2026, 4:00 PM – 5:06 PM |
+| N3 | New Research Findings III. Immune Regulation in Reproduction | Saturday, November 7, 2026, 4:00 PM – 5:06 PM |
+| N4 | New Research Findings IV. Immunity, Environment, and Reproductive Fate | Saturday, November 7, 2026, 4:00 PM – 5:06 PM |
+| N5 | New Research Findings V. Maternal-Fetal Immunology & Gestational Complications | Saturday, November 7, 2026, 4:00 PM – 5:06 PM |
 
 Implementation: `buildOralSessionLetter` in `src/config/oralSessions.js`, sent by `sendOralSessionLetterEmail` in `src/worker.js`. Requires `db/migration_add_oral_session.sql`.
 

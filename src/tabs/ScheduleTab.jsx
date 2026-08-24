@@ -334,17 +334,16 @@ const ScheduleTab = () => {
         sessions: [
           {
             type: "oral",
-            number: "N1",
             title: "Young Investigator Award",
           },
           {
             type: "oral",
-            number: "N2",
+            number: "N1",
             title: "New Research Findings I",
           },
           {
             type: "oral",
-            number: "N3",
+            number: "N2",
             title: "New Research Findings II",
           },
         ],
@@ -476,17 +475,17 @@ const ScheduleTab = () => {
         sessions: [
           {
             type: "oral",
-            number: "N4",
+            number: "N3",
             title: "New Research Findings III",
           },
           {
             type: "oral",
-            number: "N5",
+            number: "N4",
             title: "New Research Findings IV",
           },
           {
             type: "oral",
-            number: "N6",
+            number: "N5",
             title: "New Research Findings V",
           },
         ],

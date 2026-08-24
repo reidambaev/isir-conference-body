@@ -14,12 +14,12 @@ import {
 } from "../config/oralSessions.js";
 
 const SESSION_BADGE = {
-  N1: "bg-amber-100 text-amber-900",
-  N2: "bg-violet-100 text-violet-800",
-  N3: "bg-sky-100 text-sky-800",
-  N4: "bg-teal-100 text-teal-800",
-  N5: "bg-rose-100 text-rose-800",
-  N6: "bg-orange-100 text-orange-800",
+  YI: "bg-amber-100 text-amber-900",
+  N1: "bg-violet-100 text-violet-800",
+  N2: "bg-sky-100 text-sky-800",
+  N3: "bg-teal-100 text-teal-800",
+  N4: "bg-rose-100 text-rose-800",
+  N5: "bg-orange-100 text-orange-800",
   P1: "bg-sky-100 text-sky-800",
   P2: "bg-emerald-100 text-emerald-800",
 };
@@ -46,7 +46,11 @@ function sessionBadge(session, fallbackLabel = "Unassigned") {
         SESSION_BADGE[session.code] || "bg-gray-100 text-gray-800"
       }`}
     >
-      {session.title?.startsWith("Poster") ? session.title : session.code}
+      {session.title?.startsWith("Poster")
+        ? session.title
+        : session.isYoungInvestigator
+          ? "YI"
+          : session.code}
     </span>
   );
 }
@@ -60,7 +64,7 @@ function yiMismatchWarning(ids, sessionCode, pool) {
     if (nonYi.length > 0) {
       return `${nonYi.length} selected abstract${
         nonYi.length === 1 ? " is" : "s are"
-      } not flagged as Young Investigator. N1 is the YI competition. Continue anyway?`;
+      } not flagged as Young Investigator. YI is the Young Investigator competition. Continue anyway?`;
     }
     return null;
   }
@@ -68,13 +72,13 @@ function yiMismatchWarning(ids, sessionCode, pool) {
   if (yi.length > 0) {
     return `${yi.length} selected abstract${
       yi.length === 1 ? " is" : "s are"
-    } flagged as Young Investigator. N1 is the YI competition. Assign to ${session.code} anyway?`;
+    } flagged as Young Investigator. YI is the Young Investigator competition. Assign to ${session.code} anyway?`;
   }
   return null;
 }
 
 /**
- * Admin tab: assign oral abstracts to N1–N6 and posters to #1 / #2, then send letters.
+ * Admin tab: assign oral abstracts to YI / N1–N5 and posters to #1 / #2, then send letters.
  */
 export default function OralSessionAssignmentSection({
   abstracts,
@@ -114,7 +118,7 @@ export default function OralSessionAssignmentSection({
   const [sessionFilter, setSessionFilter] = useState("unassigned");
   const [yiFilter, setYiFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState(() => new Set());
-  const [bulkSession, setBulkSession] = useState("N2");
+  const [bulkSession, setBulkSession] = useState("N1");
   const [viewingId, setViewingId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [sendingId, setSendingId] = useState(null);
@@ -126,7 +130,7 @@ export default function OralSessionAssignmentSection({
     setSessionFilter("unassigned");
     setYiFilter("all");
     setSelectedIds(new Set());
-    setBulkSession(next === "poster" ? "P1" : "N2");
+    setBulkSession(next === "poster" ? "P1" : "N1");
     setViewingId(null);
     setMessage(null);
   };
@@ -315,7 +319,7 @@ export default function OralSessionAssignmentSection({
         type: "error",
         text: isPoster
           ? "Choose poster session #1 or #2."
-          : "Choose a valid session (N1–N6).",
+          : "Choose a valid session (YI or N1–N5).",
       });
       return false;
     }
@@ -491,7 +495,7 @@ export default function OralSessionAssignmentSection({
         type: "error",
         text: isPoster
           ? "Assign poster session #1 or #2 before sending the letter."
-          : "Assign a session (N1–N6) before sending the speaker letter.",
+          : "Assign a session (YI or N1–N5) before sending the speaker letter.",
       });
       return;
     }
@@ -666,7 +670,7 @@ export default function OralSessionAssignmentSection({
           <p className="text-gray-500 text-sm mt-1 max-w-2xl">
             {isPoster
               ? "Place each poster abstract into Poster Session #1 or #2. Use random equal split to divide unassigned (or selected) posters evenly. Letters email both presenting and corresponding authors. Official #1 / #2 letter copy is still TBA — previews use a placeholder."
-              : "Place each oral abstract into a New Research Findings session (N1–N6), then send the speaker letter. N1 is the Young Investigator Award competition and uses a different opening. Letters email both the presenting and corresponding authors."}
+              : "Place each oral abstract into the Young Investigator Award (YI) or a New Research Findings session (N1–N5), then send the speaker letter. YI uses a different opening. Letters email both the presenting and corresponding authors."}
           </p>
         </div>
         {onGoToFormatAssignment ? (
@@ -690,7 +694,7 @@ export default function OralSessionAssignmentSection({
               : "text-gray-600 hover:text-gray-900"
           }`}
         >
-          Oral (N1–N6)
+          Oral (YI · N1–N5)
         </button>
         <button
           type="button"
@@ -766,7 +770,7 @@ export default function OralSessionAssignmentSection({
             "Oral / Poster assignment"
           )}
           , then return here to place them in{" "}
-          {isPoster ? "Poster Session #1 or #2" : "N1–N6"}.
+          {isPoster ? "Poster Session #1 or #2" : "YI or N1–N5"}.
         </div>
       ) : null}
 

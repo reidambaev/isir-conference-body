@@ -732,7 +732,7 @@ const ProgramTab = () => {
 
         <ParallelSessions equalHeight={false}>
         <Session
-          code="N1"
+          type="oral"
           title="Young Investigator Award Competition"
           room="Room A"
           moderators="Svetlana Dambaeva, Chicago Medical School, RFUMS, USA; Atsushi Fukui"
@@ -742,7 +742,7 @@ const ProgramTab = () => {
         </Session>
 
         <Session
-          code="N2"
+          code="N1"
           title="New Research Findings I · Pre-Conception, Fertility & Reproductive Disorders"
           room="Room B"
           note="Oral presentations (will be selected from abstracts)"
@@ -751,8 +751,8 @@ const ProgramTab = () => {
         </Session>
 
         <Session
-          code="N3"
-          title="New Research Findings II · Immune Regulation in Reproduction"
+          code="N2"
+          title="New Research Findings II · Early Pregnancy and Implantation"
           room="Room C"
           note="Oral presentations (will be selected from abstracts)"
         >
@@ -1011,7 +1011,7 @@ const ProgramTab = () => {
           />
           <Talk
             time="1:50 – 2:15 PM"
-            title="TBD"
+            title="Placenta-derived Extracellular Vesicles: Dialogue with Maternal Immune Cells"
             speaker="Udo Markert"
             affiliation="University Hospital Jena, Germany"
           />
@@ -1077,7 +1077,7 @@ const ProgramTab = () => {
           code="S16"
           title="T Cell Immunity and Pregnancy"
           room="Room A"
-          moderators="Birdie Lamarca, University of Mississippi Medical Center, USA; Aera Han, CHA University, Korea"
+          moderators="Birdie LaMarca, University of Mississippi Medical Center, USA; Aera Han, CHA University, Korea"
         >
           <Talk
             time="2:15 – 2:40 PM"
@@ -1175,7 +1175,7 @@ const ProgramTab = () => {
         <BlockLabel>New Research Findings · 4:00 – 5:06 PM</BlockLabel>
         <ParallelSessions equalHeight={false}>
         <Session
-          code="N4"
+          code="N3"
           title="New Research Findings III · Immune Regulation in Reproduction"
           room="Room A"
           note="Oral presentations (will be selected from abstracts)"
@@ -1183,15 +1183,15 @@ const ProgramTab = () => {
           <OralSlotList />
         </Session>
         <Session
-          code="N5"
-          title="New Research Findings IV · Placental Development and Function"
+          code="N4"
+          title="New Research Findings IV · Immunity, Environment, and Reproductive Fate"
           room="Room B"
           note="Oral presentations (will be selected from abstracts)"
         >
           <OralSlotList />
         </Session>
         <Session
-          code="N6"
+          code="N5"
           title="New Research Findings V · Maternal-Fetal Immunology & Gestational Complications"
           room="Room C"
           note="Oral presentations (will be selected from abstracts)"
