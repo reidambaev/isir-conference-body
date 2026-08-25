@@ -225,15 +225,14 @@ const RegistrationForm = ({ onClose }) => {
   });
   const isVerifiedMember = React.useMemo(() => {
     if (!membershipData) return false;
-    // Only consider verified if is_member is true AND membership_level is not "Non-Member"
+    // Email-only: active paid membership on the account unlocks member tickets.
     const level = (membershipData.membership_level || "").toLowerCase();
     const isNonMemberLevel =
       level.includes("non-member") ||
       level.includes("non member") ||
-      level === "none" ||
-      !membershipData.has_membership;
+      level === "none";
 
-    return membershipData.is_member === true && !isNonMemberLevel;
+    return membershipData.has_membership === true && !isNonMemberLevel;
   }, [membershipData]);
   const isTrainee = React.useMemo(
     () => membershipData?.is_trainee === true,
@@ -521,10 +520,10 @@ const RegistrationForm = ({ onClose }) => {
       }
 
       // Persist the entire "data" payload, plus top-level flags we care about.
-      // We use `is_member` (active membership + name match) to gate member discounts.
+      // Member discounts are gated by has_membership (email), not name match.
       setMembershipData({
         ...(data.data || {}),
-        is_member: Boolean(data.is_member),
+        is_member: Boolean(data.is_member ?? data.data?.has_membership),
         api_message: data.message,
       });
 
@@ -1582,9 +1581,9 @@ const RegistrationForm = ({ onClose }) => {
                                 Non-Member Registration
                               </p>
                               <p className="text-amber-700 text-xs mt-1">
-                                Member prices are shown for reference. Verify
-                                membership (name + email) to unlock member
-                                tickets, or join ISIR to access member pricing.
+                                Member prices are shown for reference. Use your
+                                ISIR member email to unlock member tickets, or
+                                join ISIR to access member pricing.
                               </p>
                               {membershipData.membership_level && (
                                 <p className="text-amber-700 text-xs mt-1">

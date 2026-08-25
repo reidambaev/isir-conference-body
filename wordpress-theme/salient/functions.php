@@ -315,6 +315,7 @@ function isir_build_check_member_response( $email, $name ) {
 		);
 	}
 
+	// Name is accepted for prefill compatibility but membership is email-only.
 	$name_matches = true;
 	if ( ! empty( $name ) ) {
 		$name_matches = isir_verify_user_name( $user, $name );
@@ -325,7 +326,8 @@ function isir_build_check_member_response( $email, $name ) {
 	$is_actual_member = $membership_data['has_active_membership'] &&
 						! isir_is_non_member_level( $membership_data['level_name'] );
 
-	$is_member = $is_actual_member && $name_matches;
+	// Unlock member tickets by email membership alone (do not require name match).
+	$is_member = $is_actual_member;
 
 	$user_info = array(
 		'first_name'   => get_user_meta( $user->ID, 'first_name', true ),
@@ -502,12 +504,12 @@ function isir_get_ticket_options( $membership_data ) {
 		$trainee_non_member['is_early_bird']      = $is_early_bird;
 		$available_tickets[]                      = $trainee_non_member;
 	} else {
-		$isir_member                      = $all_tickets['isir-member'];
-		$isir_member['available']         = false;
+		$isir_member                       = $all_tickets['isir-member'];
+		$isir_member['available']          = false;
 		$isir_member['unavailable_reason'] = 'ISIR membership required. Join ISIR to access member pricing!';
-		$isir_member['current_price']     = $is_early_bird ? $isir_member['early_price'] : $isir_member['standard_price'];
-		$isir_member['is_early_bird']     = $is_early_bird;
-		$available_tickets[]              = $isir_member;
+		$isir_member['current_price']      = $is_early_bird ? $isir_member['early_price'] : $isir_member['standard_price'];
+		$isir_member['is_early_bird']      = $is_early_bird;
+		$available_tickets[]               = $isir_member;
 
 		$trainee_member                       = $all_tickets['trainee-member'];
 		$trainee_member['available']          = false;
@@ -652,10 +654,6 @@ function isir_get_status_message( $membership_data, $name_matches, $provided_nam
 			return 'No active ISIR membership found';
 		}
 		return 'No active membership found';
-	}
-
-	if ( ! empty( $provided_name ) && ! $name_matches ) {
-		return 'Email is registered but name does not match';
 	}
 
 	return 'Valid member with active ' . $membership_data['level_name'] . ' membership';

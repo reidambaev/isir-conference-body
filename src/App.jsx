@@ -32,6 +32,7 @@ import {
 } from "./tabs";
 import SpeakerProfileTab from "./tabs/SpeakerProfileTab";
 import SpeakerHotelTab from "./tabs/SpeakerHotelTab";
+import AccompanyingTab from "./tabs/AccompanyingTab";
 import { isAdminLocalhost } from "./tabs/adminLocalDemoData";
 
 function hasAdminAccessToken() {
@@ -104,6 +105,14 @@ export default function App() {
       pathname.startsWith("/speaker-hotel")
     );
   });
+  const [isAccompanyingPage, setIsAccompanyingPage] = useState(() => {
+    const pathname = window.location.pathname || document.location.pathname;
+    return (
+      pathname === "/accompanying" ||
+      pathname === "/accompanying/" ||
+      pathname.startsWith("/accompanying")
+    );
+  });
   const [isVisaPage, setIsVisaPage] = useState(() => {
     const pathname = window.location.pathname || document.location.pathname;
     return (
@@ -151,6 +160,11 @@ export default function App() {
           pathname === "/speaker-hotel/" ||
           pathname.startsWith("/speaker-hotel");
         setIsSpeakerHotelPage(isSpeakerHotel);
+        const isAccompanying =
+          pathname === "/accompanying" ||
+          pathname === "/accompanying/" ||
+          pathname.startsWith("/accompanying");
+        setIsAccompanyingPage(isAccompanying);
         const isVisa =
           pathname === "/visa" ||
           pathname === "/visa/" ||
@@ -432,6 +446,18 @@ export default function App() {
         <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
             <SpeakerHotelTab />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (isAccompanyingPage) {
+    return (
+      <div ref={appRef} className="min-h-screen bg-gray-50">
+        <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
+            <AccompanyingTab />
           </div>
         </main>
       </div>

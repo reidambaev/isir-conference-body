@@ -268,6 +268,19 @@ async function handleApiRequest(request, env, url) {
     return handleSpeakerHotelRegistration(request, env, corsHeaders);
   }
 
+  // POST /api/accompanying/lookup — find paid registration by email or registration ID
+  if (url.pathname === "/api/accompanying/lookup" && request.method === "POST") {
+    return handleAccompanyingLookup(request, env, corsHeaders);
+  }
+
+  // POST /api/accompanying/create-payment-intent — pay for add-on accompanying persons
+  if (
+    url.pathname === "/api/accompanying/create-payment-intent" &&
+    request.method === "POST"
+  ) {
+    return handleAccompanyingCreatePaymentIntent(request, env, corsHeaders);
+  }
+
   // POST /api/upload-trainee-letter
   if (url.pathname === "/api/upload-trainee-letter") {
     if (request.method === "POST") {
@@ -6564,6 +6577,602 @@ async function handleAdminEnvVars(request, env, corsHeaders) {
   }
 }
 
+const ACCOMPANYING_MAX_PER_REGISTRATION = 10;
+const ACCOMPANYING_EARLY_BIRD_USD = 250;
+const ACCOMPANYING_STANDARD_USD = 350;
+
+async function ensureAccompanyingPurchasesTable(env) {
+  if (!env?.ISIR_DB) return;
+  await env.ISIR_DB.prepare(
+    `CREATE TABLE IF NOT EXISTS accompanying_purchases (
+      id TEXT PRIMARY KEY,
+      registration_id TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      unit_price INTEGER NOT NULL,
+      total_price INTEGER NOT NULL,
+      is_early_bird INTEGER DEFAULT 0,
+      payment_status TEXT DEFAULT 'pending',
+      payment_intent_id TEXT,
+      payment_date INTEGER,
+      guest_names TEXT,
+      created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+      updated_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+    )`,
+  ).run();
+  await env.ISIR_DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_accompanying_purchases_registration
+     ON accompanying_purchases (registration_id)`,
+  ).run();
+  await env.ISIR_DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_accompanying_purchases_payment_intent
+     ON accompanying_purchases (payment_intent_id)`,
+  ).run();
+}
+
+function getAccompanyingUnitPriceUsd(nowMs = Date.now()) {
+  const earlyBirdDeadline = new Date("2026-09-01").getTime();
+  const isEarlyBird = nowMs < earlyBirdDeadline;
+  return {
+    unitPrice: isEarlyBird
+      ? ACCOMPANYING_EARLY_BIRD_USD
+      : ACCOMPANYING_STANDARD_USD,
+    isEarlyBird,
+  };
+}
+
+function maskRegistrationEmail(email) {
+  const e = String(email || "").trim().toLowerCase();
+  const at = e.indexOf("@");
+  if (at <= 0) return "***";
+  const local = e.slice(0, at);
+  const domain = e.slice(at + 1);
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}***@${domain}`;
+}
+
+/**
+ * POST /api/accompanying/lookup
+ * Body: { email?: string, registrationId?: string }
+ * Finds a confirmed registration so the attendee can add accompanying persons.
+ */
+async function handleAccompanyingLookup(request, env, corsHeaders) {
+  try {
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    const data = await request.json().catch(() => ({}));
+    const email = normalizeEmail(data?.email);
+    const registrationId = String(data?.registrationId || "").trim();
+
+    if (!email && !registrationId) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Enter the email used for registration, or your registration ID.",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
+    let row = null;
+    if (registrationId) {
+      row = await env.ISIR_DB.prepare(
+        `SELECT id, email, first_name, last_name, ticket_type, accompanying_count,
+                payment_status, is_early_bird
+         FROM registrations WHERE id = ? LIMIT 1`,
+      )
+        .bind(registrationId)
+        .first();
+      if (row && email && normalizeEmail(row.email) !== email) {
+        return jsonResponse(
+          {
+            success: false,
+            error:
+              "That registration ID does not match the email you entered. Use the same email as on your registration.",
+          },
+          404,
+          corsHeaders,
+        );
+      }
+    } else {
+      row = await env.ISIR_DB.prepare(
+        `SELECT id, email, first_name, last_name, ticket_type, accompanying_count,
+                payment_status, is_early_bird
+         FROM registrations WHERE email = ? LIMIT 1`,
+      )
+        .bind(email)
+        .first();
+    }
+
+    if (!row?.id) {
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "No registration found. Check the email or registration ID from your confirmation.",
+        },
+        404,
+        corsHeaders,
+      );
+    }
+
+    const paymentStatus = String(row.payment_status || "").toLowerCase();
+    if (paymentStatus !== "completed") {
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "Your registration payment is not complete yet. Finish registering first, then add accompanying persons here.",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
+    if (row.ticket_type === "korea-day-pass") {
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "Accompanying persons cannot be added to a Korean local day pass registration.",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const currentCount = Number(row.accompanying_count || 0);
+    const remaining = Math.max(
+      0,
+      ACCOMPANYING_MAX_PER_REGISTRATION - currentCount,
+    );
+    const { unitPrice, isEarlyBird } = getAccompanyingUnitPriceUsd();
+
+    return jsonResponse(
+      {
+        success: true,
+        registration: {
+          id: row.id,
+          emailMasked: maskRegistrationEmail(row.email),
+          firstName: row.first_name || "",
+          lastName: row.last_name || "",
+          ticketType: row.ticket_type,
+          accompanyingCount: currentCount,
+          remainingSlots: remaining,
+        },
+        pricing: {
+          unitPriceUsd: unitPrice,
+          isEarlyBird,
+          currency: "USD",
+          maxPerRegistration: ACCOMPANYING_MAX_PER_REGISTRATION,
+        },
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Accompanying lookup error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Lookup failed" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+/**
+ * POST /api/accompanying/create-payment-intent
+ * Body: { registrationId, email, quantity, guestNames?: string[] }
+ */
+async function handleAccompanyingCreatePaymentIntent(
+  request,
+  env,
+  corsHeaders,
+) {
+  try {
+    if (!env.STRIPE_SECRET_KEY) {
+      throw new Error("Stripe secret key not configured");
+    }
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    await ensureAccompanyingPurchasesTable(env);
+
+    const data = await request.json().catch(() => ({}));
+    const registrationId = String(data?.registrationId || "").trim();
+    const email = normalizeEmail(data?.email);
+    const quantityRaw = Number(data?.quantity);
+    const quantity = Math.floor(quantityRaw);
+    const guestNamesRaw = Array.isArray(data?.guestNames)
+      ? data.guestNames
+      : [];
+
+    if (!registrationId || !email) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "registrationId and email are required",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+    if (!Number.isFinite(quantity) || quantity < 1 || quantity > 10) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Quantity must be between 1 and 10",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const row = await env.ISIR_DB.prepare(
+      `SELECT id, email, ticket_type, accompanying_count, payment_status
+       FROM registrations WHERE id = ? LIMIT 1`,
+    )
+      .bind(registrationId)
+      .first();
+
+    if (!row?.id) {
+      return jsonResponse(
+        { success: false, error: "Registration not found" },
+        404,
+        corsHeaders,
+      );
+    }
+    if (normalizeEmail(row.email) !== email) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Email does not match this registration",
+        },
+        403,
+        corsHeaders,
+      );
+    }
+    if (String(row.payment_status || "").toLowerCase() !== "completed") {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Registration payment must be completed first",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+    if (row.ticket_type === "korea-day-pass") {
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "Accompanying persons cannot be added to a Korean local day pass registration.",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const currentCount = Number(row.accompanying_count || 0);
+    const remaining = ACCOMPANYING_MAX_PER_REGISTRATION - currentCount;
+    if (remaining <= 0) {
+      return jsonResponse(
+        {
+          success: false,
+          error: `This registration already has the maximum of ${ACCOMPANYING_MAX_PER_REGISTRATION} accompanying persons.`,
+        },
+        400,
+        corsHeaders,
+      );
+    }
+    if (quantity > remaining) {
+      return jsonResponse(
+        {
+          success: false,
+          error: `Only ${remaining} accompanying person slot(s) remaining on this registration.`,
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const { unitPrice, isEarlyBird } = getAccompanyingUnitPriceUsd();
+    const totalPrice = unitPrice * quantity;
+    const guestNames = guestNamesRaw
+      .slice(0, quantity)
+      .map((n) => String(n || "").trim())
+      .filter(Boolean);
+
+    const purchaseId = `ACC-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 9)}`;
+
+    await env.ISIR_DB.prepare(
+      `INSERT INTO accompanying_purchases (
+        id, registration_id, quantity, unit_price, total_price, is_early_bird,
+        payment_status, guest_names, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
+    )
+      .bind(
+        purchaseId,
+        registrationId,
+        quantity,
+        unitPrice,
+        totalPrice,
+        isEarlyBird ? 1 : 0,
+        guestNames.length ? JSON.stringify(guestNames) : null,
+        Date.now(),
+        Date.now(),
+      )
+      .run();
+
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+      apiVersion: "2024-11-20.acacia",
+    });
+
+    const paymentIntent = await stripe.paymentIntents.create(
+      {
+        amount: Math.round(totalPrice * 100),
+        currency: "usd",
+        metadata: {
+          paymentType: "accompanying_addon",
+          purchaseId,
+          registrationId,
+          quantity: String(quantity),
+          email,
+        },
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      },
+      {
+        idempotencyKey: `accompanying-${purchaseId}`,
+      },
+    );
+
+    await env.ISIR_DB.prepare(
+      `UPDATE accompanying_purchases
+       SET payment_intent_id = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+      .bind(paymentIntent.id, Date.now(), purchaseId)
+      .run();
+
+    return jsonResponse(
+      {
+        success: true,
+        purchaseId,
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amountUsd: totalPrice,
+        unitPriceUsd: unitPrice,
+        quantity,
+        currency: "USD",
+        isEarlyBird,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Accompanying payment intent error:", error);
+    return jsonResponse(
+      {
+        success: false,
+        error: error.message || "Failed to create payment intent",
+      },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function applyAccompanyingPurchasePayment(
+  env,
+  paymentIntent,
+  { markFailed = false } = {},
+) {
+  if (!env?.ISIR_DB) return { applied: false };
+
+  await ensureAccompanyingPurchasesTable(env);
+
+  const purchaseId = paymentIntent.metadata?.purchaseId;
+  const registrationId = paymentIntent.metadata?.registrationId;
+  const paymentIntentId = paymentIntent.id;
+
+  let purchase = null;
+  if (purchaseId) {
+    purchase = await env.ISIR_DB.prepare(
+      `SELECT * FROM accompanying_purchases WHERE id = ? LIMIT 1`,
+    )
+      .bind(purchaseId)
+      .first();
+  }
+  if (!purchase && paymentIntentId) {
+    purchase = await env.ISIR_DB.prepare(
+      `SELECT * FROM accompanying_purchases WHERE payment_intent_id = ? LIMIT 1`,
+    )
+      .bind(paymentIntentId)
+      .first();
+  }
+
+  if (!purchase?.id) {
+    return { applied: false };
+  }
+
+  if (markFailed) {
+    await env.ISIR_DB.prepare(
+      `UPDATE accompanying_purchases
+       SET payment_status = 'failed', updated_at = ?
+       WHERE id = ?`,
+    )
+      .bind(Date.now(), purchase.id)
+      .run();
+    return { applied: true, purchaseId: purchase.id, failed: true };
+  }
+
+  if (String(purchase.payment_status || "").toLowerCase() === "completed") {
+    return { applied: true, purchaseId: purchase.id, alreadyCompleted: true };
+  }
+
+  const qty = Number(purchase.quantity || 0);
+  const addTotal = Number(purchase.total_price || 0);
+  const regId = purchase.registration_id || registrationId;
+
+  await env.ISIR_DB.prepare(
+    `UPDATE accompanying_purchases
+     SET payment_status = 'completed',
+         payment_intent_id = ?,
+         payment_date = ?,
+         updated_at = ?
+     WHERE id = ?`,
+  )
+    .bind(paymentIntentId, Date.now(), Date.now(), purchase.id)
+    .run();
+
+  if (regId && qty > 0) {
+    await env.ISIR_DB.prepare(
+      `UPDATE registrations
+       SET accompanying_count = COALESCE(accompanying_count, 0) + ?,
+           total_price = COALESCE(total_price, 0) + ?,
+           updated_at = ?
+       WHERE id = ?`,
+    )
+      .bind(qty, addTotal, Date.now(), regId)
+      .run();
+  }
+
+  // Optional named guests into accompanying_persons
+  try {
+    let names = [];
+    try {
+      const parsed = JSON.parse(purchase.guest_names || "[]");
+      names = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      names = [];
+    }
+    for (const name of names) {
+      const trimmed = String(name || "").trim();
+      if (!trimmed || !regId) continue;
+      await env.ISIR_DB.prepare(
+        `INSERT INTO accompanying_persons (id, registration_id, name, created_at)
+         VALUES (?, ?, ?, ?)`,
+      )
+        .bind(crypto.randomUUID(), regId, trimmed, Date.now())
+        .run();
+    }
+  } catch (e) {
+    console.error("Failed to insert accompanying person names:", e);
+  }
+
+  await sendAccompanyingAddonConfirmationEmail(env, purchase.id);
+
+  return {
+    applied: true,
+    purchaseId: purchase.id,
+    registrationId: regId,
+    quantity: qty,
+  };
+}
+
+async function sendAccompanyingAddonConfirmationEmail(env, purchaseId) {
+  if (
+    !env?.ISIR_DB ||
+    !env?.RESEND_API_KEY ||
+    !env?.CONFIRMATION_FROM_EMAIL ||
+    !purchaseId
+  ) {
+    return { success: false };
+  }
+
+  try {
+    const purchase = await env.ISIR_DB.prepare(
+      `SELECT p.*, r.email, r.first_name, r.middle_name, r.last_name, r.accompanying_count
+       FROM accompanying_purchases p
+       JOIN registrations r ON r.id = p.registration_id
+       WHERE p.id = ?
+       LIMIT 1`,
+    )
+      .bind(purchaseId)
+      .first();
+
+    if (!purchase?.email) return { success: false };
+
+    const name =
+      [purchase.first_name, purchase.middle_name, purchase.last_name]
+        .filter(Boolean)
+        .join(" ") || "Attendee";
+    const qty = Number(purchase.quantity || 0);
+    const unit = Number(purchase.unit_price || 0);
+    const total = Number(purchase.total_price || 0);
+    const rateLabel =
+      Number(purchase.is_early_bird) === 1 ? "Early Bird" : "Standard";
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Accompanying Person Confirmed – ISIR 2026</title></head>
+<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
+  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
+    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Accompanying person add-on confirmed</p>
+  </div>
+  <p>Dear ${escapeHtml(name)},</p>
+  <p>Thank you. Your accompanying person payment has been received and added to your registration.</p>
+  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
+    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a3a6c;">Purchase summary</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+      <tr><td style="padding: 4px 0;">Registration ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(purchase.registration_id)}</strong></td></tr>
+      <tr><td style="padding: 4px 0;">Accompanying persons added</td><td style="padding: 4px 0; text-align: right;">${qty}</td></tr>
+      <tr><td style="padding: 4px 0;">Rate</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(rateLabel)} ($${unit} each)</td></tr>
+      <tr><td style="padding: 4px 0;">Total accompanying on registration</td><td style="padding: 4px 0; text-align: right;">${Number(purchase.accompanying_count || 0)}</td></tr>
+      <tr><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd;">Amount paid</td><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd; text-align: right;"><strong>USD ${total.toFixed(2)}</strong></td></tr>
+    </table>
+  </div>
+  <p>Accompanying person fee includes Welcome Reception and the Gala evening (live performances at Busan Cinema Center).</p>
+  <p>If you have any questions, please contact <a href="mailto:support@isir2026.org" style="color: #1a3a6c;">support@isir2026.org</a>.</p>
+  <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
+</body>
+</html>`;
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: env.CONFIRMATION_FROM_EMAIL,
+        to: [purchase.email],
+        subject: "ISIR 2026 – Accompanying person confirmed",
+        html,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("Accompanying confirmation email failed:", res.status, err);
+      return { success: false };
+    }
+    return { success: true };
+  } catch (e) {
+    console.error("Accompanying confirmation email error:", e);
+    return { success: false };
+  }
+}
+
 // Handle Stripe payment intent creation
 async function handleCreatePaymentIntent(request, env, corsHeaders) {
   try {
@@ -7021,8 +7630,27 @@ async function handleStripeWebhook(request, env) {
 
     // Handle the event
     switch (event.type) {
-      case "payment_intent.succeeded":
+      case "payment_intent.succeeded": {
         const paymentIntent = event.data.object;
+        const paymentType = paymentIntent.metadata?.paymentType;
+
+        // Accompanying person add-on (post-registration)
+        if (paymentType === "accompanying_addon") {
+          try {
+            const result = await applyAccompanyingPurchasePayment(
+              env,
+              paymentIntent,
+            );
+            console.log(
+              "Accompanying add-on payment applied:",
+              JSON.stringify(result),
+            );
+          } catch (dbError) {
+            console.error("Accompanying add-on webhook error:", dbError);
+          }
+          break;
+        }
+
         const registrationId = paymentIntent.metadata?.registrationId;
 
         if (registrationId && env.ISIR_DB) {
@@ -7072,9 +7700,23 @@ async function handleStripeWebhook(request, env) {
           }
         }
         break;
+      }
 
-      case "payment_intent.payment_failed":
+      case "payment_intent.payment_failed": {
         const failedPayment = event.data.object;
+        const failedPaymentType = failedPayment.metadata?.paymentType;
+
+        if (failedPaymentType === "accompanying_addon") {
+          try {
+            await applyAccompanyingPurchasePayment(env, failedPayment, {
+              markFailed: true,
+            });
+          } catch (dbError) {
+            console.error("Accompanying add-on failed webhook error:", dbError);
+          }
+          break;
+        }
+
         const failedRegistrationId = failedPayment.metadata?.registrationId;
 
         if (failedRegistrationId && env.ISIR_DB) {
@@ -7095,6 +7737,7 @@ async function handleStripeWebhook(request, env) {
           }
         }
         break;
+      }
 
       default:
         console.log(`Unhandled event type: ${event.type}`);

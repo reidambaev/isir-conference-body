@@ -931,8 +931,8 @@ const ProgramTab = () => {
           <Talk
             time="10:30 – 10:55 AM"
             title="Inflammation and Autoantibodies; Long Term Consequences of Preeclampsia"
-            speaker="Babette LaMarca"
-            affiliation="University of Mississippi School of Medicine, USA"
+            speaker="Babbette LaMarca"
+            affiliation="University of Mississippi Medical Center, Jackson, MS, USA"
           />
           <Talk
             time="10:55 – 11:20 AM"
@@ -1077,7 +1077,7 @@ const ProgramTab = () => {
           code="S16"
           title="T Cell Immunity and Pregnancy"
           room="Room A"
-          moderators="Birdie LaMarca, University of Mississippi Medical Center, USA; Aera Han, CHA University, Korea"
+          moderators="Birdie LaMarca, University of Mississippi Medical Center, Jackson, MS, USA; Aera Han, CHA University, Korea"
         >
           <Talk
             time="2:15 – 2:40 PM"

@@ -173,8 +173,9 @@ function isir_check_member_registration($request) {
     $is_actual_member = $membership_data['has_active_membership'] && 
                         !isir_is_non_member_level($membership_data['level_name']);
     
-    // Only consider them a member if they have active membership AND it's not a "Non-Member" level
-    $is_member = $is_actual_member && $name_matches;
+    // Only consider them a member if they have active membership AND it's not a "Non-Member" level.
+    // Email-only: do not require name match to unlock member tickets.
+    $is_member = $is_actual_member;
     
     // Get user info for pre-filling registration form
     $user_info = array(
@@ -493,11 +494,7 @@ function isir_get_status_message($membership_data, $name_matches, $provided_name
         }
         return 'No active membership found';
     }
-    
-    if (!empty($provided_name) && !$name_matches) {
-        return 'Email is registered but name does not match';
-    }
-    
+
     return 'Valid member with active ' . $membership_data['level_name'] . ' membership';
 }
 

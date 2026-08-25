@@ -142,7 +142,8 @@ function isir_check_member_registration($request) {
     
     return new WP_REST_Response(array(
         'success'   => true,
-        'is_member' => $membership_data['has_active_membership'] && $name_matches,
+        // Email-only: do not require name match to unlock member tickets.
+        'is_member' => $membership_data['has_active_membership'],
         'message'   => isir_get_status_message($membership_data, $name_matches, $name),
         'data'      => array(
             'email_registered'  => true,
@@ -244,11 +245,7 @@ function isir_get_status_message($membership_data, $name_matches, $provided_name
         }
         return 'No active membership found';
     }
-    
-    if (!empty($provided_name) && !$name_matches) {
-        return 'Email is registered but name does not match';
-    }
-    
+
     return 'Valid member with active ' . $membership_data['level_name'] . ' membership';
 }
 
