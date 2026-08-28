@@ -322,7 +322,6 @@ function buildBodyParagraphs(abstract) {
 function buildAbstractParagraphs({ abstract, label }, { pageBreakBefore = false }) {
   const { authorBlocks, unique } = buildAuthorAffiliationBlocks(abstract);
   const title = sanitizeDocxText(abstract.title || "").trim() || "Untitled";
-  const keywords = sanitizeDocxText(abstract.keywords || "").trim();
   const paragraphs = [];
 
   if (pageBreakBefore) {
@@ -345,18 +344,6 @@ function buildAbstractParagraphs({ abstract, label }, { pageBreakBefore = false 
       leftPara(
         textRuns(`${aff.n} ${aff.line}`, { italics: true, size: AFFIL_SIZE }),
         { after: 40 },
-      ),
-    );
-  }
-
-  if (keywords) {
-    paragraphs.push(
-      leftPara(
-        [
-          ...textRuns("Keywords: ", { bold: true, size: AFFIL_SIZE }),
-          ...textRuns(keywords, { size: AFFIL_SIZE }),
-        ],
-        { before: 200, after: 160 },
       ),
     );
   }
