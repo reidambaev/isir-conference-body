@@ -13,6 +13,7 @@ import {
   getPosterSession,
   buildPosterSessionLetter,
 } from "./config/oralSessions.js";
+import { parseProgramSession } from "./config/programSessions.js";
 
 const SPEAKER_PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MiB cap for R2 headshots (JPEG/PNG)
 const SPEAKER_CV_MAX_BYTES = 10 * 1024 * 1024; // 10 MiB cap for brief CV (PDF/Word)
@@ -561,6 +562,27 @@ async function handleApiRequest(request, env, url) {
     request.method === "POST"
   ) {
     return handleBulkUpdateAbstractPosterSession(request, env, corsHeaders);
+  }
+
+  // PATCH /api/admin/abstracts/:id/program-session - Set invited speaker program session
+  const abstractProgramSessionMatch = url.pathname.match(
+    /^\/api\/admin\/abstracts\/([^/]+)\/program-session$/,
+  );
+  if (abstractProgramSessionMatch && request.method === "PATCH") {
+    return handleUpdateAbstractProgramSession(
+      request,
+      env,
+      corsHeaders,
+      abstractProgramSessionMatch[1],
+    );
+  }
+
+  // POST /api/admin/abstracts/program-session - Bulk set invited speaker program session
+  if (
+    url.pathname === "/api/admin/abstracts/program-session" &&
+    request.method === "POST"
+  ) {
+    return handleBulkUpdateAbstractProgramSession(request, env, corsHeaders);
   }
 
   // PATCH /api/admin/abstracts/:id/invited-speaker - Toggle invited speaker flag
@@ -9357,6 +9379,234 @@ async function handleBulkUpdateAbstractPosterSession(request, env, corsHeaders) 
   }
 }
 
+async function setAbstractProgramSession(env, abstractId, programSession) {
+  const assignedAt = programSession ? Date.now() : null;
+  const updatedAt = Date.now();
+  try {
+    const result = await env.ISIR_DB.prepare(
+      `UPDATE abstractions
+       SET program_session = ?, program_session_assigned_at = ?, updated_at = ?
+       WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(programSession, assignedAt, updatedAt, abstractId)
+      .run();
+    return { ok: true, changes: result?.meta?.changes ?? 0 };
+  } catch (error) {
+    const message = String(error?.message || error || "");
+    if (/no such column/i.test(message)) {
+      return {
+        ok: false,
+        migrationPending: true,
+        error:
+          "program_session column missing — run db/migration_add_program_session.sql",
+      };
+    }
+    throw error;
+  }
+}
+
+function programSessionAssignError(existing) {
+  if (!existing) return "Abstract not found";
+  if (Number(existing.is_invited_speaker || 0) !== 1) {
+    return "Only invited speaker abstracts can be assigned a program session";
+  }
+  return null;
+}
+
+function readProgramSessionPayload(data) {
+  return parseProgramSession(
+    data?.program_session ?? data?.programSession ?? data?.session,
+  );
+}
+
+async function handleUpdateAbstractProgramSession(
+  request,
+  env,
+  corsHeaders,
+  abstractId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    if (!abstractId) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing abstract id" }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const data = await request.json();
+    const parsed = readProgramSessionPayload(data);
+    if (!parsed.ok) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            "session must be a program session (PS1, PF1, S1, POP1, …), or null/clear to unassign",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const existing = await env.ISIR_DB.prepare(
+      `SELECT id, is_invited_speaker FROM abstractions
+       WHERE id = ? AND deleted_at IS NULL`,
+    )
+      .bind(abstractId)
+      .first();
+
+    if (!existing) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Abstract not found" }),
+        { status: 404, headers: corsHeaders },
+      );
+    }
+
+    const assignError = programSessionAssignError(existing);
+    if (assignError && parsed.value) {
+      return new Response(
+        JSON.stringify({ success: false, error: assignError }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const updated = await setAbstractProgramSession(
+      env,
+      abstractId,
+      parsed.value,
+    );
+    if (!updated.ok) {
+      return new Response(
+        JSON.stringify({ success: false, error: updated.error }),
+        { status: 500, headers: corsHeaders },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        id: abstractId,
+        session: parsed.value,
+        program_session: parsed.value,
+        program_session_assigned_at: parsed.value ? Date.now() : null,
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Update abstract program session error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || "Failed to update program session",
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+async function handleBulkUpdateAbstractProgramSession(
+  request,
+  env,
+  corsHeaders,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+
+    const data = await request.json();
+    const ids = Array.isArray(data?.ids)
+      ? data.ids.map((id) => String(id || "").trim()).filter(Boolean)
+      : [];
+    const parsed = readProgramSessionPayload(data);
+
+    if (ids.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "ids must be a non-empty array of abstract ids",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (!parsed.ok) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error:
+            "session must be a program session (PS1, PF1, S1, POP1, …), or null/clear to unassign",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    if (ids.length > 500) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Cannot update more than 500 abstracts at once",
+        }),
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    let updated = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const id of ids) {
+      const existing = await env.ISIR_DB.prepare(
+        `SELECT id, is_invited_speaker FROM abstractions
+         WHERE id = ? AND deleted_at IS NULL`,
+      )
+        .bind(id)
+        .first();
+
+      if (!existing) {
+        skipped += 1;
+        errors.push({ id, error: "not found" });
+        continue;
+      }
+      const assignError = programSessionAssignError(existing);
+      if (assignError && parsed.value) {
+        skipped += 1;
+        errors.push({ id, error: assignError });
+        continue;
+      }
+
+      const result = await setAbstractProgramSession(env, id, parsed.value);
+      if (!result.ok) {
+        return new Response(
+          JSON.stringify({ success: false, error: result.error }),
+          { status: 500, headers: corsHeaders },
+        );
+      }
+      if ((result.changes || 0) > 0) updated += 1;
+      else skipped += 1;
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        session: parsed.value,
+        program_session: parsed.value,
+        updated,
+        skipped,
+        errors: errors.slice(0, 20),
+      }),
+      { status: 200, headers: corsHeaders },
+    );
+  } catch (error) {
+    console.error("Bulk update abstract program session error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || "Failed to bulk update program session",
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
 // Admin endpoint: Set whether an abstract is an invited speaker submission
 function parseAdminBooleanFlag(raw) {
   if (raw === undefined || raw === null) return null;
@@ -9414,6 +9664,21 @@ async function handleUpdateAbstractInvitedSpeaker(
     )
       .bind(isInvitedSpeaker, abstractId)
       .run();
+
+    if (isInvitedSpeaker === 0) {
+      try {
+        await env.ISIR_DB.prepare(
+          `UPDATE abstractions
+           SET program_session = NULL, program_session_assigned_at = NULL
+           WHERE id = ?`,
+        )
+          .bind(abstractId)
+          .run();
+      } catch (error) {
+        const message = String(error?.message || error || "");
+        if (!/no such column.*program_session/i.test(message)) throw error;
+      }
+    }
 
     // Invited speaker abstracts are not peer-reviewed — drop any reviewer assignments
     if (isInvitedSpeaker === 1) {

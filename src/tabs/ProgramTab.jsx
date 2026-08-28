@@ -85,7 +85,11 @@ function inferEventType(title) {
   if (t.includes("gala")) return "gala";
   if (t.includes("poster")) return "poster";
   if (t.includes("registration")) return "registration";
-  if (t.includes("reception") || t.includes("social") || t.includes("enjoy busan"))
+  if (
+    t.includes("reception") ||
+    t.includes("social") ||
+    t.includes("enjoy busan")
+  )
     return "social";
   if (t.includes("meeting")) return "meeting";
   if (
@@ -172,7 +176,9 @@ function Session({
     <section
       className={`min-w-0 rounded-xl border overflow-hidden flex flex-col ${styles.panel} ${className}`}
     >
-      <div className={`shrink-0 ${isForum ? "h-1" : "h-1.5"} ${styles.accent}`} />
+      <div
+        className={`shrink-0 ${isForum ? "h-1" : "h-1.5"} ${styles.accent}`}
+      />
       <div className={`flex-1 flex flex-col ${isCompact ? "p-3" : "p-4"}`}>
         {/* Fixed header area so talk lists start on the same row across columns */}
         <div
@@ -360,11 +366,8 @@ const ORAL_SLOT_TIMES = [
 ];
 
 function OralSlotList() {
-  return ORAL_SLOT_TIMES.map((time) => (
-    <Talk key={time} compact time={time} />
-  ));
+  return ORAL_SLOT_TIMES.map((time) => <Talk key={time} compact time={time} />);
 }
-
 
 const ProgramTab = () => {
   const days = [
@@ -449,7 +452,11 @@ const ProgramTab = () => {
         label="Opening Day"
         date="Thursday, November 5, 2026"
       >
-        <TimeRow time="1:00 – 5:00 PM" title="Registration" room="Foyer, 3rd Floor" />
+        <TimeRow
+          time="1:00 – 5:00 PM"
+          title="Registration"
+          room="Foyer, 3rd Floor"
+        />
         <TimeRow
           time="2:30 – 4:00 PM"
           title="ISIR Council Meeting"
@@ -465,8 +472,16 @@ const ProgramTab = () => {
         date="Friday, November 6, 2026"
         theme="Reproductive Immunology at the Forefront of Population Health"
       >
-        <TimeRow time="7:30 – 8:30 AM" title="Breakfast" room="Foyer, 3rd Floor" />
-        <TimeRow time="7:30 AM – 6:00 PM" title="Registration" room="Foyer, 3rd Floor" />
+        <TimeRow
+          time="7:30 – 8:30 AM"
+          title="Breakfast"
+          room="Foyer, 3rd Floor"
+        />
+        <TimeRow
+          time="7:30 AM – 6:00 PM"
+          title="Registration"
+          room="Foyer, 3rd Floor"
+        />
 
         <BlockLabel>President Symposium I · Rooms A–C</BlockLabel>
         <Session
@@ -520,101 +535,101 @@ const ProgramTab = () => {
             </Session>
           }
         >
-        <Session
-          code="S1"
-          title="Immune Regulation in the Endometrium"
-          room="Room A"
-          moderators="Renate van der Molen, Radboudumc, Netherlands; Tao Zhang, The Chinese University of Hong Kong, China"
-        >
-          <Talk
-            time="10:05 – 10:30 AM"
-            title="Immune Regulation of Endometrium Healing and Scarring Following Natural and Cesarean Delivery"
-            speaker="Emilia Solano"
-            affiliation="Clinic St. Hedwig, University Medical Center Regensburg, Germany"
-          />
-          <Talk
-            time="10:30 – 10:55 AM"
-            title="Single-cell-level Digital Twins for Preterm Birth Prevention Strategies"
-            speaker="Brice Gaudilliere"
-            affiliation="Stanford University, USA"
-          />
-          <Talk
-            time="10:55 – 11:20 AM"
-            title="How Endometrial Inflammation and Immune Remodeling Shape Implantation and Early Pregnancy"
-            speaker="Lianghui Diao"
-            affiliation="Shenzhen Zhongshan Obstetrics & Gynecology Hospital, Shenzhen, China"
-          />
-          <Talk
-            time="11:20 – 11:45 AM"
-            title="MSC-derived Therapeutics to Restore Compromised Uterine Environments"
-            speaker="Haengseok Song"
-            affiliation="CHA University, Korea"
-          />
-        </Session>
+          <Session
+            code="S1"
+            title="Immune Regulation in the Endometrium"
+            room="Room A"
+            moderators="Renate van der Molen, Radboudumc, Netherlands; Tao Zhang, The Chinese University of Hong Kong, China"
+          >
+            <Talk
+              time="10:05 – 10:30 AM"
+              title="Immune Regulation of Endometrium Healing and Scarring Following Natural and Cesarean Delivery"
+              speaker="Emilia Solano"
+              affiliation="Clinic St. Hedwig, University Medical Center Regensburg, Germany"
+            />
+            <Talk
+              time="10:30 – 10:55 AM"
+              title="Single-cell-level Digital Twins for Preterm Birth Prevention Strategies"
+              speaker="Brice Gaudilliere"
+              affiliation="Stanford University, USA"
+            />
+            <Talk
+              time="10:55 – 11:20 AM"
+              title="How Endometrial Inflammation and Immune Remodeling Shape Implantation and Early Pregnancy"
+              speaker="Lianghui Diao"
+              affiliation="Shenzhen Zhongshan Obstetrics & Gynecology Hospital, Shenzhen, China"
+            />
+            <Talk
+              time="11:20 – 11:45 AM"
+              title="MSC-derived Therapeutics to Restore Compromised Uterine Environments"
+              speaker="Haengseok Song"
+              affiliation="CHA University, Korea"
+            />
+          </Session>
 
-        <Session
-          code="S2"
-          title="Gynecologic Malignancies and Immune Abnormalities"
-          room="Room B"
-          moderators="Young Tae Kim, Yonsei University, College of Medicine, Korea; Sandra Blois, UKE, Germany"
-        >
-          <Talk
-            time="10:05 – 10:30 AM"
-            title="Ovarian Tumor-Induced Suppression of Anti-tumor Immunity and Its Prevention"
-            speaker="Animesh Barua"
-            affiliation="Simmaron Research, USA"
-          />
-          <Talk
-            time="10:30 – 10:55 AM"
-            title="The Role of Cancer-Associated Cells in Ovarian Cancer Microenvironment"
-            speaker="Eun Ju Lee"
-            affiliation="Chung-Ang University School of Medicine, Korea"
-          />
-          <Talk
-            time="10:55 – 11:20 AM"
-            title="From Bench to Bedside: Transforming Gynecologic Care with Organoids and Patient Biospecimens"
-            speaker="Eun Ji Nam"
-            affiliation="Yonsei University, Korea"
-          />
-          <Talk
-            time="11:20 – 11:45 AM"
-            title="Mechanism of Immune Escape in Gynecologic Malignancies and Its Therapeutic Modulation"
-            speaker="Hiroshi Nishio"
-            affiliation="Keio University, Japan"
-          />
-        </Session>
+          <Session
+            code="S2"
+            title="Gynecologic Malignancies and Immune Abnormalities"
+            room="Room B"
+            moderators="Young Tae Kim, Yonsei University, College of Medicine, Korea; Sandra Blois, UKE, Germany"
+          >
+            <Talk
+              time="10:05 – 10:30 AM"
+              title="Ovarian Tumor-Induced Suppression of Anti-tumor Immunity and Its Prevention"
+              speaker="Animesh Barua"
+              affiliation="Simmaron Research, USA"
+            />
+            <Talk
+              time="10:30 – 10:55 AM"
+              title="The Role of Cancer-Associated Cells in Ovarian Cancer Microenvironment"
+              speaker="Eun Ju Lee"
+              affiliation="Chung-Ang University School of Medicine, Korea"
+            />
+            <Talk
+              time="10:55 – 11:20 AM"
+              title="From Bench to Bedside: Transforming Gynecologic Care with Organoids and Patient Biospecimens"
+              speaker="Eun Ji Nam"
+              affiliation="Yonsei University, Korea"
+            />
+            <Talk
+              time="11:20 – 11:45 AM"
+              title="Mechanism of Immune Escape in Gynecologic Malignancies and Its Therapeutic Modulation"
+              speaker="Hiroshi Nishio"
+              affiliation="Keio University, Japan"
+            />
+          </Session>
 
-        <Session
-          code="S3"
-          title="Environmental Exposures and Developmental Origins of Disease"
-          room="Room C"
-          moderators="Jelmer Prins, University of Groningen, Netherlands; Nardhy Gomez-Lopez, Washington University School of Medicine, USA"
-        >
-          <Talk
-            time="10:05 – 10:30 AM"
-            title="Maternal Infections during Pregnancy"
-            speaker="Petra Arck"
-            affiliation="Universitätsklinikum Hamburg-Eppendorf, Hamburg, Germany"
-          />
-          <Talk
-            time="10:30 – 10:55 AM"
-            title="Impact of Microplastics at Maternal-Fetal Interface"
-            speaker="Yong Sun Maeng"
-            affiliation="Yonsei University, Korea"
-          />
-          <Talk
-            time="10:55 – 11:20 AM"
-            title="TBD"
-            speaker="Anke Diemert"
-            affiliation="Universitätsklinikum Hamburg-Eppendorf, Hamburg, Germany"
-          />
-          <Talk
-            time="11:20 – 11:45 AM"
-            title="GOLDEN: Gene Expression and Allele-informed Decomposition for Genetic Heterogeneity in Spatial Transcriptomic Data"
-            speaker="Hyojung Paik"
-            affiliation="Korea Institute of Science and Technology Information, Korea"
-          />
-        </Session>
+          <Session
+            code="S3"
+            title="Environmental Exposures and Developmental Origins of Disease"
+            room="Room C"
+            moderators="Jelmer Prins, University of Groningen, Netherlands; Nardhy Gomez-Lopez, Washington University School of Medicine, USA"
+          >
+            <Talk
+              time="10:05 – 10:30 AM"
+              title="Maternal Infections during Pregnancy"
+              speaker="Petra Arck"
+              affiliation="Universitätsklinikum Hamburg-Eppendorf, Hamburg, Germany"
+            />
+            <Talk
+              time="10:30 – 10:55 AM"
+              title="Impact of Microplastics at Maternal-Fetal Interface"
+              speaker="Yong Sun Maeng"
+              affiliation="Yonsei University, Korea"
+            />
+            <Talk
+              time="10:55 – 11:20 AM"
+              title="TBD"
+              speaker="Anke Diemert"
+              affiliation="Universitätsklinikum Hamburg-Eppendorf, Hamburg, Germany"
+            />
+            <Talk
+              time="11:20 – 11:45 AM"
+              title="GOLDEN: Gene Expression and Allele-informed Decomposition for Genetic Heterogeneity in Spatial Transcriptomic Data"
+              speaker="Hyojung Paik"
+              affiliation="Korea Institute of Science and Technology Information, Korea"
+            />
+          </Session>
         </ConcurrentBlock>
 
         <TimeRow
@@ -647,83 +662,83 @@ const ProgramTab = () => {
         <BlockLabel>Scientific Sessions · 2:30 – 3:45 PM</BlockLabel>
 
         <ParallelSessions>
-        <Session
-          code="S4"
-          title="KI Symposium"
-          room="Room A"
-          moderators="Haengseok Song, CHA University, Korea; Hwang Kyung Joo"
-        >
-          <Talk
-            time="2:30 – 2:55 PM"
-            title="Precision Immunotherapy with Intravenous Immunoglobulin (IVIG) in Women with Reproductive Failure: From Biomarker Profiling to Clinical Practice"
-            speaker="Sungki Lee"
-            affiliation="Konyang University, Korea"
-          />
-          <Talk
-            time="2:55 – 3:20 PM"
-            title="The Endometrium at the Maternal-Fetal Interface: From Regenerative Organoids to Functional Receptivity-On-A-Chip"
-            speaker="Yunjung Kang"
-            affiliation="CHA University, Korea"
-          />
-          <Talk
-            time="3:20 – 3:45 PM"
-            title="Redefining Protein S Deficiency Cutoff Values for Women with Reproductive Failure"
-            speaker="Jaewon Han"
-            affiliation="Konyang University, Korea"
-          />
-        </Session>
+          <Session
+            code="S4"
+            title="KI Symposium"
+            room="Room A"
+            moderators="Haengseok Song, CHA University, Korea; Hwang Kyung Joo"
+          >
+            <Talk
+              time="2:30 – 2:55 PM"
+              title="Precision Immunotherapy with Intravenous Immunoglobulin (IVIG) in Women with Reproductive Failure: From Biomarker Profiling to Clinical Practice"
+              speaker="Sungki Lee"
+              affiliation="Konyang University, Korea"
+            />
+            <Talk
+              time="2:55 – 3:20 PM"
+              title="The Endometrium at the Maternal-Fetal Interface: From Regenerative Organoids to Functional Receptivity-On-A-Chip"
+              speaker="Yunjung Kang"
+              affiliation="CHA University, Korea"
+            />
+            <Talk
+              time="3:20 – 3:45 PM"
+              title="Redefining Protein S Deficiency Cutoff Values for Women with Reproductive Failure"
+              speaker="Jaewon Han"
+              affiliation="Konyang University, Korea"
+            />
+          </Session>
 
-        <Session
-          code="S5"
-          title="Microbiome and Pregnancy Outcomes"
-          room="Room B"
-          moderators="Alison Kohlmeier, Emory University, School of Medicine, USA; Ismael Mancilla-Herrera, National Institute of Perinatologia Isidro Espinosa de los Reyes, México"
-        >
-          <Talk
-            time="2:30 – 2:55 PM"
-            title="Mom Matters: Maternal Influences on Infant Gut Microbiome and Health in 714 Mother-Infant Pairs in the Lifelines NEXT Cohort"
-            speaker="Trisha Sinha"
-            affiliation="University Medical Center Groningen (UMCG), Netherlands"
-          />
-          <Talk
-            time="2:55 – 3:20 PM"
-            title="Microbiome-Host Interactions and Pregnancy Outcomes"
-            speaker="David MacIntyre"
-            affiliation="Robinson Research Institute, Adelaide University, Australia"
-          />
-          <Talk
-            time="3:20 – 3:45 PM"
-            title="Sperm Immunology — Past, Present, and Future"
-            speaker="Hiroaki Shibahara"
-            affiliation="Hanabusa Women's Clinic, Kobe Chuo Ward, Japan"
-          />
-        </Session>
+          <Session
+            code="S5"
+            title="Microbiome and Pregnancy Outcomes"
+            room="Room B"
+            moderators="Alison Kohlmeier, Emory University, School of Medicine, USA; Ismael Mancilla-Herrera, National Institute of Perinatologia Isidro Espinosa de los Reyes, México"
+          >
+            <Talk
+              time="2:30 – 2:55 PM"
+              title="Mom Matters: Maternal Influences on Infant Gut Microbiome and Health in 714 Mother-Infant Pairs in the Lifelines NEXT Cohort"
+              speaker="Trisha Sinha"
+              affiliation="University Medical Center Groningen (UMCG), Netherlands"
+            />
+            <Talk
+              time="2:55 – 3:20 PM"
+              title="Microbiome-Host Interactions and Pregnancy Outcomes"
+              speaker="David MacIntyre"
+              affiliation="Robinson Research Institute, Adelaide University, Australia"
+            />
+            <Talk
+              time="3:20 – 3:45 PM"
+              title="Sperm Immunology — Past, Present, and Future"
+              speaker="Hiroaki Shibahara"
+              affiliation="Hanabusa Women's Clinic, Kobe Chuo Ward, Japan"
+            />
+          </Session>
 
-        <Session
-          code="S6"
-          title="Male Infertility"
-          room="Room C"
-          moderators="Surabhi Gupta, All India Institute of Medical Sciences, India; Lachlan Moldenhauer, Adelaide University, Australia"
-        >
-          <Talk
-            time="2:30 – 2:55 PM"
-            title="Identification of Glycoprotein A in Seminal Plasma as a Potent Inhibitor of the Coagulation Cascade: Implications for Sperm Immune Tolerance"
-            speaker="Jaeho Lee"
-            affiliation="CHA University, Korea"
-          />
-          <Talk
-            time="2:55 – 3:20 PM"
-            title="Local Innate Immunity Cytokine Network Contributes to Male Reproductive Failure"
-            speaker="Maciej Kurpisz"
-            affiliation="Institute of Human Genetics, Polish Academy of Science, Poland"
-          />
-          <Talk
-            time="3:20 – 3:45 PM"
-            title="Human Sperm as Modulators of Female Reproductive Tract Immunity"
-            speaker="David Sharkey"
-            affiliation="Adelaide University, Australia"
-          />
-        </Session>
+          <Session
+            code="S6"
+            title="Male Infertility"
+            room="Room C"
+            moderators="Surabhi Gupta, All India Institute of Medical Sciences, India; Lachlan Moldenhauer, Adelaide University, Australia"
+          >
+            <Talk
+              time="2:30 – 2:55 PM"
+              title="Identification of Glycoprotein A in Seminal Plasma as a Potent Inhibitor of the Coagulation Cascade: Implications for Sperm Immune Tolerance"
+              speaker="Jaeho Lee"
+              affiliation="CHA University, Korea"
+            />
+            <Talk
+              time="2:55 – 3:20 PM"
+              title="Local Innate Immunity Cytokine Network Contributes to Male Reproductive Failure"
+              speaker="Maciej Kurpisz"
+              affiliation="Institute of Human Genetics, Polish Academy of Science, Poland"
+            />
+            <Talk
+              time="3:20 – 3:45 PM"
+              title="Human Sperm as Modulators of Female Reproductive Tract Immunity"
+              speaker="David Sharkey"
+              affiliation="Adelaide University, Australia"
+            />
+          </Session>
         </ParallelSessions>
 
         <BreakBlock time="3:45 – 4:00 PM" title="Coffee Break" />
@@ -731,33 +746,33 @@ const ProgramTab = () => {
         <BlockLabel>Oral Presentations · 4:00 – 5:06 PM</BlockLabel>
 
         <ParallelSessions equalHeight={false}>
-        <Session
-          type="oral"
-          title="Young Investigator Award Competition"
-          room="Room A"
-          moderators="Svetlana Dambaeva, Chicago Medical School, RFUMS, USA; Atsushi Fukui"
-          note="Oral presentations (will be selected from abstracts)"
-        >
-          <OralSlotList />
-        </Session>
+          <Session
+            type="oral"
+            title="Young Investigator Award Competition"
+            room="Room A"
+            moderators="Svetlana Dambaeva, Chicago Medical School, RFUMS, USA; Atsushi Fukui"
+            note="Oral presentations (will be selected from abstracts)"
+          >
+            <OralSlotList />
+          </Session>
 
-        <Session
-          code="N1"
-          title="New Research Findings I · Pre-Conception, Fertility & Reproductive Disorders"
-          room="Room B"
-          note="Oral presentations (will be selected from abstracts)"
-        >
-          <OralSlotList />
-        </Session>
+          <Session
+            code="N1"
+            title="New Research Findings I · Pre-Conception, Fertility & Reproductive Disorders"
+            room="Room B"
+            note="Oral presentations (will be selected from abstracts)"
+          >
+            <OralSlotList />
+          </Session>
 
-        <Session
-          code="N2"
-          title="New Research Findings II · Early Pregnancy and Implantation"
-          room="Room C"
-          note="Oral presentations (will be selected from abstracts)"
-        >
-          <OralSlotList />
-        </Session>
+          <Session
+            code="N2"
+            title="New Research Findings II · Early Pregnancy and Implantation"
+            room="Room C"
+            note="Oral presentations (will be selected from abstracts)"
+          >
+            <OralSlotList />
+          </Session>
         </ParallelSessions>
 
         <TimeRow time="5:30 – 8:00 PM" title="Trainee Social" room="TBD" />
@@ -770,88 +785,98 @@ const ProgramTab = () => {
         date="Saturday, November 7, 2026"
         theme="Translating Reproductive Immunology into Clinical Practice"
       >
-        <TimeRow time="7:30 – 8:30 AM" title="Breakfast" room="Foyer, 3rd Floor" />
-        <TimeRow time="7:30 AM – 6:00 PM" title="Registration" room="Foyer, 3rd Floor" />
+        <TimeRow
+          time="7:30 – 8:30 AM"
+          title="Breakfast"
+          room="Foyer, 3rd Floor"
+        />
+        <TimeRow
+          time="7:30 AM – 6:00 PM"
+          title="Registration"
+          room="Foyer, 3rd Floor"
+        />
 
-        <BlockLabel>Scientific Sessions · 8:35 – 9:50 AM · 3rd Floor</BlockLabel>
+        <BlockLabel>
+          Scientific Sessions · 8:35 – 9:50 AM · 3rd Floor
+        </BlockLabel>
 
         <ParallelSessions>
-        <Session
-          code="S7"
-          title="Immune Mechanisms of Female Reproductive Aging"
-          room="Room A"
-          moderators="Jung Ryeol Lee, Seoul National University, College of Medicine, Korea; Alek Stanik-Kostic, University of Wisconsin, Madison, USA"
-        >
-          <Talk
-            time="8:35 – 9:00 AM"
-            title="Immune Disturbances in Female Reproductive Aging"
-            speaker="Xue Jiao"
-            affiliation="Center for Reproductive Medicine, Shandong University, China"
-          />
-          <Talk
-            time="9:00 – 9:25 AM"
-            title="Immune and Inflammatory Mechanisms Underlying Ovarian Dysfunction"
-            speaker="Akira Iwase"
-            affiliation="Gunma University Graduate School of Medicine, Maebashi, Japan"
-          />
-          <Talk
-            time="9:25 – 9:50 AM"
-            title="Endometrial Functions in Recurrent Pregnancy Loss"
-            speaker="Nicoletta Di Simone"
-            affiliation="Humanitas University, Italy"
-          />
-        </Session>
+          <Session
+            code="S7"
+            title="Immune Mechanisms of Female Reproductive Aging"
+            room="Room A"
+            moderators="Jung Ryeol Lee, Seoul National University, College of Medicine, Korea; Alek Stanik-Kostic, University of Wisconsin, Madison, USA"
+          >
+            <Talk
+              time="8:35 – 9:00 AM"
+              title="Immune Disturbances in Female Reproductive Aging"
+              speaker="Xue Jiao"
+              affiliation="Center for Reproductive Medicine, Shandong University, China"
+            />
+            <Talk
+              time="9:00 – 9:25 AM"
+              title="Immune and Inflammatory Mechanisms Underlying Ovarian Dysfunction"
+              speaker="Akira Iwase"
+              affiliation="Gunma University Graduate School of Medicine, Maebashi, Japan"
+            />
+            <Talk
+              time="9:25 – 9:50 AM"
+              title="Endometrial Functions in Recurrent Pregnancy Loss"
+              speaker="Nicoletta Di Simone"
+              affiliation="Humanitas University, Italy"
+            />
+          </Session>
 
-        <Session
-          code="S8"
-          title="Preeclampsia and Its Systemic Consequences"
-          room="Room B"
-          moderators="Seppo Heinone, University of Helsinki, Helsinki University Hospital, Finland; Nathan E. Campbell, The University of Mississippi Medical Center, USA"
-        >
-          <Talk
-            time="8:35 – 9:00 AM"
-            title="Autophagy on Guard: Self-Defense against Syncytiotrophoblast"
-            speaker="Akitoshi Nakashima"
-            affiliation="University of Toyama, Japan"
-          />
-          <Talk
-            time="9:00 – 9:25 AM"
-            title="Reprogramming Macrophages: A New Paradigm for Preventing Preterm Labor"
-            speaker="Hee Young Cho"
-            affiliation="Seoul National University, Korea"
-          />
-          <Talk
-            time="9:25 – 9:50 AM"
-            title="The Sugar Code Under Pressure: Glycosylation in Preeclampsia"
-            speaker="Sandra Blois"
-            affiliation="Universitätsklinikum Hamburg-Eppendorf, Germany"
-          />
-        </Session>
+          <Session
+            code="S8"
+            title="Preeclampsia and Its Systemic Consequences"
+            room="Room B"
+            moderators="Seppo Heinone, University of Helsinki, Helsinki University Hospital, Finland; Nathan E. Campbell, The University of Mississippi Medical Center, USA"
+          >
+            <Talk
+              time="8:35 – 9:00 AM"
+              title="Autophagy on Guard: Self-Defense against Syncytiotrophoblast"
+              speaker="Akitoshi Nakashima"
+              affiliation="University of Toyama, Japan"
+            />
+            <Talk
+              time="9:00 – 9:25 AM"
+              title="Reprogramming Macrophages: A New Paradigm for Preventing Preterm Labor"
+              speaker="Hee Young Cho"
+              affiliation="Seoul National University, Korea"
+            />
+            <Talk
+              time="9:25 – 9:50 AM"
+              title="The Sugar Code Under Pressure: Glycosylation in Preeclampsia"
+              speaker="Sandra Blois"
+              affiliation="Universitätsklinikum Hamburg-Eppendorf, Germany"
+            />
+          </Session>
 
-        <Session
-          code="S9"
-          title="Rheumatic Conditions and Reproductive Outcomes"
-          room="Room C"
-          moderators="Joon Woo Kim, Chicago Medical School, RFUHS, USA; Angela Alvarez, Universidad de Antioquia, Colombia"
-        >
-          <Talk
-            time="8:35 – 9:00 AM"
-            title="Bridging Autoimmunity and Pregnancy Complications; Immunological Therapeutic Approaches for Improving Pregnancy Outcomes"
-            speaker="Sayaka Tsuda"
-            affiliation="University of Toyama, Japan"
-          />
-          <Talk
-            time="9:00 – 9:25 AM"
-            title="Correlation between Positive Autoimmune Antibodies and Pregnancy Outcomes"
-            speaker="Li Wu"
-            affiliation="University of Science and Technology of China, China"
-          />
-          <Talk
-            time="9:25 – 9:50 AM"
-            title="The Value of Screening and Intervention of Thyroid Autoantibodies in the Patients with Recurrent Pregnancy Loss"
-            speaker="Hong Zhang"
-          />
-        </Session>
+          <Session
+            code="S9"
+            title="Rheumatic Conditions and Reproductive Outcomes"
+            room="Room C"
+            moderators="Joon Woo Kim, Chicago Medical School, RFUHS, USA; Angela Alvarez, Universidad de Antioquia, Colombia"
+          >
+            <Talk
+              time="8:35 – 9:00 AM"
+              title="Bridging Autoimmunity and Pregnancy Complications; Immunological Therapeutic Approaches for Improving Pregnancy Outcomes"
+              speaker="Sayaka Tsuda"
+              affiliation="University of Toyama, Japan"
+            />
+            <Talk
+              time="9:00 – 9:25 AM"
+              title="Correlation between Positive Autoimmune Antibodies and Pregnancy Outcomes"
+              speaker="Li Wu"
+              affiliation="University of Science and Technology of China, China"
+            />
+            <Talk
+              time="9:25 – 9:50 AM"
+              title="The Value of Screening and Intervention of Thyroid Autoantibodies in the Patients with Recurrent Pregnancy Loss"
+              speaker="Hong Zhang"
+            />
+          </Session>
         </ParallelSessions>
 
         <BreakBlock time="9:50 – 10:05 AM" title="Coffee Break" />
@@ -884,101 +909,101 @@ const ProgramTab = () => {
             </Session>
           }
         >
-        <Session
-          code="S10"
-          title="Ovarian Inflammatory Disease and Aging"
-          room="Room A"
-          moderators="Kyung Ah Lee, CHA University Global IVF Group, Korea; Jie Zhao; Maria Dinorah Salazar Garcia, Rush University Medical Center, USA"
-        >
-          <Talk
-            time="10:05 – 10:30 AM"
-            title="Translational Research in Ovarian Function Restoration: From Unmet Needs to Scientific Advances"
-            speaker="Jung Ryeol Lee"
-            affiliation="Seoul National University, Korea"
-          />
-          <Talk
-            time="10:30 – 10:55 AM"
-            title="Immune Dysfunction in PMOS (Formerly PCOS): An Underrecognized Driver of Disease and a Promising Therapeutic Target"
-            speaker="Malimi Laloraya"
-            affiliation="University of Kerala, India"
-          />
-          <Talk
-            time="10:55 – 11:20 AM"
-            title="Inflammaging and Its Impact on Human Reproduction"
-            speaker="Huang Zhongwei"
-            affiliation="National University of Singapore, Singapore"
-          />
-          <Talk
-            time="11:20 – 11:45 AM"
-            title="Autoimmune Modulation of Immune-Endocrine-Metabolic Regulation of Ovarian Reserve"
-            speaker="Aera Han"
-            affiliation="CHA University, Korea"
-          />
-        </Session>
+          <Session
+            code="S10"
+            title="Ovarian Inflammatory Disease and Aging"
+            room="Room A"
+            moderators="Kyung Ah Lee, CHA University Global IVF Group, Korea; Jie Zhao; Maria Dinorah Salazar Garcia, Rush University Medical Center, USA"
+          >
+            <Talk
+              time="10:05 – 10:30 AM"
+              title="Translational Research in Ovarian Function Restoration: From Unmet Needs to Scientific Advances"
+              speaker="Jung Ryeol Lee"
+              affiliation="Seoul National University, Korea"
+            />
+            <Talk
+              time="10:30 – 10:55 AM"
+              title="Immune Dysfunction in PMOS (Formerly PCOS): An Underrecognized Driver of Disease and a Promising Therapeutic Target"
+              speaker="Malini Laloraya"
+              affiliation="University of Kerala, India"
+            />
+            <Talk
+              time="10:55 – 11:20 AM"
+              title="Inflammaging and Its Impact on Human Reproduction"
+              speaker="Huang Zhongwei"
+              affiliation="National University of Singapore, Singapore"
+            />
+            <Talk
+              time="11:20 – 11:45 AM"
+              title="Autoimmune Modulation of Immune-Endocrine-Metabolic Regulation of Ovarian Reserve"
+              speaker="Aera Han"
+              affiliation="CHA University, Korea"
+            />
+          </Session>
 
-        <Session
-          code="S11"
-          title="Preeclampsia and Its Systemic Consequences"
-          room="Room B"
-          moderators="Valerie Tiempo Guinto, University of the Philippines–Philippine General Hospital, Philippines; Owen Herrock, the University of Gothenburg, Sweden"
-        >
-          <Talk
-            time="10:05 – 10:30 AM"
-            title="Preeclampsia and the Brain"
-            speaker="Lina Bergman"
-            affiliation="University of Gothenburg, Sweden"
-          />
-          <Talk
-            time="10:30 – 10:55 AM"
-            title="Inflammation and Autoantibodies; Long Term Consequences of Preeclampsia"
-            speaker="Babbette LaMarca"
-            affiliation="University of Mississippi Medical Center, Jackson, MS, USA"
-          />
-          <Talk
-            time="10:55 – 11:20 AM"
-            title="Vascular Targets of Inflammation Mediating Maternal Microvascular Dysfunction after Preeclampsia"
-            speaker="Ana Stanhewicz"
-            affiliation="University of Iowa, USA"
-          />
-          <Talk
-            time="11:20 – 11:45 AM"
-            title="A Galectin-9-Driven CD11high Decidual Macrophage Subset Suppresses Uterine Vascular Remodeling in Preeclampsia"
-            speaker="Meirong Du"
-            affiliation="Fudan University, Shanghai, China"
-          />
-        </Session>
+          <Session
+            code="S11"
+            title="Preeclampsia and Its Systemic Consequences"
+            room="Room B"
+            moderators="Valerie Tiempo Guinto, University of the Philippines–Philippine General Hospital, Philippines; Owen Herrock, the University of Gothenburg, Sweden"
+          >
+            <Talk
+              time="10:05 – 10:30 AM"
+              title="Preeclampsia and the Brain"
+              speaker="Lina Bergman"
+              affiliation="University of Gothenburg, Sweden"
+            />
+            <Talk
+              time="10:30 – 10:55 AM"
+              title="Inflammation and Autoantibodies; Long Term Consequences of Preeclampsia"
+              speaker="Babbette LaMarca"
+              affiliation="University of Mississippi Medical Center, Jackson, MS, USA"
+            />
+            <Talk
+              time="10:55 – 11:20 AM"
+              title="Vascular Targets of Inflammation Mediating Maternal Microvascular Dysfunction after Preeclampsia"
+              speaker="Ana Stanhewicz"
+              affiliation="University of Iowa, USA"
+            />
+            <Talk
+              time="11:20 – 11:45 AM"
+              title="A Galectin-9-Driven CD11high Decidual Macrophage Subset Suppresses Uterine Vascular Remodeling in Preeclampsia"
+              speaker="Meirong Du"
+              affiliation="Fudan University, Shanghai, China"
+            />
+          </Session>
 
-        <Session
-          code="S12"
-          title="Current Immunotherapeutic Options for Reproductive Health"
-          room="Room C"
-          moderators="Giovanni Jubiz, Center for Reproductive Immunology & Infertility, USA; Maria Socorro Agcaoili, University of the Philippines–Philippine General Hospital, Philippines"
-        >
-          <Talk
-            time="10:05 – 10:30 AM"
-            title="Neoself Autoantibody (anti-β2GPI/HLA-DR) Involved in Recurrent Pregnancy Loss and Infertility"
-            speaker="Hideto Yamada"
-            affiliation="Teine Keijinkai Hospital, Japan"
-          />
-          <Talk
-            time="10:30 – 10:55 AM"
-            title="TBD"
-            speaker="Conor Harrity"
-            affiliation="RCSI University of Medicine and Health Sciences, Ireland"
-          />
-          <Talk
-            time="10:55 – 11:20 AM"
-            title="Developing IL-10 Encapsulated Exosomes as Novel Therapeutics for Spontaneous Preterm Birth"
-            speaker="Ananth Kumar Kammala"
-            affiliation="University of Texas Medical Branch, Galveston, USA"
-          />
-          <Talk
-            time="11:20 – 11:45 AM"
-            title="ImmuLIT®: A Novel Immunomodulatory Approach in Recurrent Reproductive Failure"
-            speaker="Mohan Raut"
-            affiliation="Dr. Raut's Center for Reproductive Immunology, India"
-          />
-        </Session>
+          <Session
+            code="S12"
+            title="Current Immunotherapeutic Options for Reproductive Health"
+            room="Room C"
+            moderators="Giovanni Jubiz, Center for Reproductive Immunology & Infertility, USA; Maria Socorro Agcaoili, University of the Philippines–Philippine General Hospital, Philippines"
+          >
+            <Talk
+              time="10:05 – 10:30 AM"
+              title="Neoself Autoantibody (anti-β2GPI/HLA-DR) Involved in Recurrent Pregnancy Loss and Infertility"
+              speaker="Hideto Yamada"
+              affiliation="Teine Keijinkai Hospital, Japan"
+            />
+            <Talk
+              time="10:30 – 10:55 AM"
+              title="TBD"
+              speaker="Conor Harrity"
+              affiliation="RCSI University of Medicine and Health Sciences, Ireland"
+            />
+            <Talk
+              time="10:55 – 11:20 AM"
+              title="Developing IL-10 Encapsulated Exosomes as Novel Therapeutics for Spontaneous Preterm Birth"
+              speaker="Ananth Kumar Kammala"
+              affiliation="University of Texas Medical Branch, Galveston, USA"
+            />
+            <Talk
+              time="11:20 – 11:45 AM"
+              title="ImmuLIT®: A Novel Immunomodulatory Approach in Recurrent Reproductive Failure"
+              speaker="Mohan Raut"
+              affiliation="Dr. Raut's Center for Reproductive Immunology, India"
+            />
+          </Session>
         </ConcurrentBlock>
 
         <TimeRow
@@ -991,213 +1016,213 @@ const ProgramTab = () => {
         <BlockLabel>Scientific Sessions · 1:00 – 2:15 PM</BlockLabel>
 
         <ParallelSessions>
-        <Session
-          code="S13"
-          title="Exosome, Mitochondrial Function, and Cell-Based Therapies"
-          room="Room A"
-          moderators="Ann-Charlotte Iversen, Norwegian University of Science and Technology, Norway; Mariana Garcia, University Medical Center Hamburg-Eppendorf, Germany"
-        >
-          <Talk
-            time="1:00 – 1:25 PM"
-            title="The Role of Trophoblast Extracellular Vesicles in Regulating Maternal Physiology During Pregnancy"
-            speaker="Larry Chamley"
-            affiliation="University of Auckland, New Zealand"
-          />
-          <Talk
-            time="1:25 – 1:50 PM"
-            title="Immune Deterrence by the Chorion Trophoblast: Protecting the Feto-Maternal Interface"
-            speaker="Ramkumar Menon"
-            affiliation="The University of Texas Medical Branch at Galveston, USA"
-          />
-          <Talk
-            time="1:50 – 2:15 PM"
-            title="Placenta-derived Extracellular Vesicles: Dialogue with Maternal Immune Cells"
-            speaker="Udo Markert"
-            affiliation="University Hospital Jena, Germany"
-          />
-        </Session>
+          <Session
+            code="S13"
+            title="Exosome, Mitochondrial Function, and Cell-Based Therapies"
+            room="Room A"
+            moderators="Ann-Charlotte Iversen, Norwegian University of Science and Technology, Norway; Mariana Garcia, University Medical Center Hamburg-Eppendorf, Germany"
+          >
+            <Talk
+              time="1:00 – 1:25 PM"
+              title="The Role of Trophoblast Extracellular Vesicles in Regulating Maternal Physiology During Pregnancy"
+              speaker="Larry Chamley"
+              affiliation="University of Auckland, New Zealand"
+            />
+            <Talk
+              time="1:25 – 1:50 PM"
+              title="Immune Deterrence by the Chorion Trophoblast: Protecting the Feto-Maternal Interface"
+              speaker="Ramkumar Menon"
+              affiliation="The University of Texas Medical Branch at Galveston, USA"
+            />
+            <Talk
+              time="1:50 – 2:15 PM"
+              title="Placenta-derived Extracellular Vesicles: Dialogue with Maternal Immune Cells"
+              speaker="Udo Markert"
+              affiliation="University Hospital Jena, Germany"
+            />
+          </Session>
 
-        <Session
-          code="S14"
-          title="Infection, Inflammation, and Pregnancy"
-          room="Room B"
-          moderators="Jacob Kohlmeier, Emory University School of Medicine, USA; Maria Emilia Solano, University of Regensburg, Germany"
-        >
-          <Talk
-            time="1:00 – 1:25 PM"
-            title="Inflammation in Pregnancy: From Physiological Roles to Therapeutic Targets"
-            speaker="Yasuyuki Negishi"
-            affiliation="Nippon Medical School, Japan"
-          />
-          <Talk
-            time="1:25 – 1:50 PM"
-            title="Maternal Influences, the Microbiome, and Early-Life Immune Development"
-            speaker="Jelmer Prins"
-            affiliation="University of Groningen, Netherlands"
-          />
-          <Talk
-            time="1:50 – 2:15 PM"
-            title="Maternal Infection and Placental Barrier"
-            speaker="Shihoko Komine-Aizawa"
-            affiliation="Nihon University School of Medicine, Japan"
-          />
-        </Session>
+          <Session
+            code="S14"
+            title="Infection, Inflammation, and Pregnancy"
+            room="Room B"
+            moderators="Jacob Kohlmeier, Emory University School of Medicine, USA; Maria Emilia Solano, University of Regensburg, Germany"
+          >
+            <Talk
+              time="1:00 – 1:25 PM"
+              title="Inflammation in Pregnancy: From Physiological Roles to Therapeutic Targets"
+              speaker="Yasuyuki Negishi"
+              affiliation="Nippon Medical School, Japan"
+            />
+            <Talk
+              time="1:25 – 1:50 PM"
+              title="Maternal Influences, the Microbiome, and Early-Life Immune Development"
+              speaker="Jelmer Prins"
+              affiliation="University of Groningen, Netherlands"
+            />
+            <Talk
+              time="1:50 – 2:15 PM"
+              title="Maternal Infection and Placental Barrier"
+              speaker="Shihoko Komine-Aizawa"
+              affiliation="Nihon University School of Medicine, Japan"
+            />
+          </Session>
 
-        <Session
-          code="S15"
-          title="Update on Reproductive Disorders and Management"
-          room="Room C"
-          moderators="Iryna Sudoma, Reproductive Clinic Nadiya, Ukraine; Thanh Luu, Chicago Medical School, RFUMS, USA"
-        >
-          <Talk
-            time="1:00 – 1:25 PM"
-            title="Tacrolimus Treatment in Reproductive Failures"
-            speaker="Koji Nakagawa"
-            affiliation="Sugiyama Obstetrics and Gynecology Hospital, Japan"
-          />
-          <Talk
-            time="1:25 – 1:50 PM"
-            title="Towards Successful Pregnancy: Advances in the Understanding and Management of Recurrent Pregnancy Loss and Chronic Histiocytic Intervillositis"
-            speaker="Marie-Louise van der Hoorn"
-            affiliation="Leiden University Medical Centre, Netherlands"
-          />
-          <Talk
-            time="1:50 – 2:15 PM"
-            title="Clinical Application of Endometrial and Peripheral NK cell Subpopulations: Diagnostic and Therapeutic Approaches for RIF and RPL"
-            speaker="Atsushi Fukui"
-            affiliation="Fukushima Medical University, Japan"
-          />
-        </Session>
+          <Session
+            code="S15"
+            title="Update on Reproductive Disorders and Management"
+            room="Room C"
+            moderators="Iryna Sudoma, Reproductive Clinic Nadiya, Ukraine; Thanh Luu, Chicago Medical School, RFUMS, USA"
+          >
+            <Talk
+              time="1:00 – 1:25 PM"
+              title="Tacrolimus Treatment in Reproductive Failures"
+              speaker="Koji Nakagawa"
+              affiliation="Sugiyama Obstetrics and Gynecology Hospital, Japan"
+            />
+            <Talk
+              time="1:25 – 1:50 PM"
+              title="Towards Successful Pregnancy: Advances in the Understanding and Management of Recurrent Pregnancy Loss and Chronic Histiocytic Intervillositis"
+              speaker="Marie-Louise van der Hoorn"
+              affiliation="Leiden University Medical Centre, Netherlands"
+            />
+            <Talk
+              time="1:50 – 2:15 PM"
+              title="Clinical Application of Endometrial and Peripheral NK cell Subpopulations: Diagnostic and Therapeutic Approaches for RIF and RPL"
+              speaker="Atsushi Fukui"
+              affiliation="Fukushima Medical University, Japan"
+            />
+          </Session>
         </ParallelSessions>
 
         <BlockLabel>Scientific Sessions · 2:15 – 3:55 PM</BlockLabel>
 
         <ParallelSessions>
-        <Session
-          code="S16"
-          title="T Cell Immunity and Pregnancy"
-          room="Room A"
-          moderators="Birdie LaMarca, University of Mississippi Medical Center, Jackson, MS, USA; Aera Han, CHA University, Korea"
-        >
-          <Talk
-            time="2:15 – 2:40 PM"
-            title="T Cells Shape Pregnancy Outcomes in Chronic Placental Inflammation"
-            speaker="Nardhy Gomez-Lopez"
-            affiliation="Washington University School of Medicine in St. Louis, USA"
-          />
-          <Talk
-            time="2:40 – 3:05 PM"
-            title="Maternal T Cell Responses Against the Fetal Placenta During Chronic Villitis"
-            speaker="Elizabeth Enniga"
-            affiliation="Mayo Clinic, USA"
-          />
-          <Talk
-            time="3:05 – 3:30 PM"
+          <Session
+            code="S16"
             title="T Cell Immunity and Pregnancy"
-            speaker="Wenjuan Wang"
-            affiliation="Shanghai Jiao Tong University, China"
-          />
-          <Talk
-            time="3:30 – 3:55 PM"
-            title="Balancing Tolerance and Defense at the Villous Trophoblast Surface"
-            speaker="Kenichiro Motomura"
-            affiliation="National Center for Child Health and Development, Japan"
-          />
-        </Session>
+            room="Room A"
+            moderators="Birdie LaMarca, University of Mississippi Medical Center, Jackson, MS, USA; Aera Han, CHA University, Korea"
+          >
+            <Talk
+              time="2:15 – 2:40 PM"
+              title="T Cells Shape Pregnancy Outcomes in Chronic Placental Inflammation"
+              speaker="Nardhy Gomez-Lopez"
+              affiliation="Washington University School of Medicine in St. Louis, USA"
+            />
+            <Talk
+              time="2:40 – 3:05 PM"
+              title="Maternal T Cell Responses Against the Fetal Placenta During Chronic Villitis"
+              speaker="Elizabeth Enniga"
+              affiliation="Mayo Clinic, USA"
+            />
+            <Talk
+              time="3:05 – 3:30 PM"
+              title="T Cell Immunity and Pregnancy"
+              speaker="Wenjuan Wang"
+              affiliation="Shanghai Jiao Tong University, China"
+            />
+            <Talk
+              time="3:30 – 3:55 PM"
+              title="Balancing Tolerance and Defense at the Villous Trophoblast Surface"
+              speaker="Kenichiro Motomura"
+              affiliation="National Center for Child Health and Development, Japan"
+            />
+          </Session>
 
-        <Session
-          code="S17"
-          title="Fetal Outcome with Inflammatory Insult"
-          room="Room B"
-          moderators="Youssef Derbala, Derbala Institute for Reproductive Immunology, USA; Raj Raghupathy, Kuwait University, Kuwait"
-        >
-          <Talk
-            time="2:15 – 2:40 PM"
-            title="Inflammation, Vascular Lesions, and Fetal Health"
-            speaker="Gendi Lash"
-            affiliation="Guangzhou Women and Children's Medical Center, China"
-          />
-          <Talk
-            time="2:40 – 3:05 PM"
-            title="Placental Contributions to Sex-Specific Offspring Neurodevelopment"
-            speaker="Eunha Kim"
-            affiliation="Korea University, Korea"
-          />
-          <Talk
-            time="3:05 – 3:30 PM"
-            title="Fetal Outcomes of Pregnancies with an Inflammatory Insult"
-            speaker="Cherie Ocampo-Cervantes"
-            affiliation="University of the Philippines, Philippines"
-          />
-          <Talk
-            time="3:30 – 3:55 PM"
-            title="Placental-, Immune- and Vascular Changes in Obstetrical Syndromes"
-            speaker="Gabor Nandor Than"
-            affiliation="Semmelweis University, Hungary"
-          />
-        </Session>
+          <Session
+            code="S17"
+            title="Fetal Outcome with Inflammatory Insult"
+            room="Room B"
+            moderators="Youssef Derbala, Derbala Institute for Reproductive Immunology, USA; Raj Raghupathy, Kuwait University, Kuwait"
+          >
+            <Talk
+              time="2:15 – 2:40 PM"
+              title="Inflammation, Vascular Lesions, and Fetal Health"
+              speaker="Gendi Lash"
+              affiliation="Guangzhou Women and Children's Medical Center, China"
+            />
+            <Talk
+              time="2:40 – 3:05 PM"
+              title="Placental Contributions to Sex-Specific Offspring Neurodevelopment"
+              speaker="Eunha Kim"
+              affiliation="Korea University, Korea"
+            />
+            <Talk
+              time="3:05 – 3:30 PM"
+              title="Fetal Outcomes of Pregnancies with an Inflammatory Insult"
+              speaker="Cherie Ocampo-Cervantes"
+              affiliation="University of the Philippines, Philippines"
+            />
+            <Talk
+              time="3:30 – 3:55 PM"
+              title="Placental-, Immune- and Vascular Changes in Obstetrical Syndromes"
+              speaker="Gabor Nandor Than"
+              affiliation="Semmelweis University, Hungary"
+            />
+          </Session>
 
-        <Session
-          code="S18"
-          title="Early Pregnancy and Placental Development"
-          room="Room C"
-          moderators="Gil Mor, Wayne State University School of Medicine, USA; Diana M Morales-Prieto, Jena University Hospital, Germany"
-        >
-          <Talk
-            time="2:15 – 2:40 PM"
-            title="Defining Antigenic Drivers of the Early Pregnancy Treg Cell Response"
-            speaker="Sarah Robertson"
-            affiliation="University of Adelaide, Australia"
-          />
-          <Talk
-            time="2:40 – 3:05 PM"
-            title="Pregnancy-Expanded Regulatory T Cells Constrain Maternal Inflammation to Protect Fetal Neurodevelopment"
-            speaker="Ho-Keun Kwon"
-            affiliation="Yonsei University, Korea"
-          />
-          <Talk
-            time="3:05 – 3:30 PM"
-            title="Maternal and Trophoblast Immune Responses to Cytomegalovirus Infection"
-            speaker="Takeshi Nagamatsu"
-            affiliation="International University of Health and Welfare, Japan"
-          />
-          <Talk
-            time="3:30 – 3:55 PM"
-            title="Novel Diagnostic Method to Diagnose Chronic Endometritis"
-            speaker="Tao Judy Zhang"
-            affiliation="The Chinese University of Hong Kong, China"
-          />
-        </Session>
+          <Session
+            code="S18"
+            title="Early Pregnancy and Placental Development"
+            room="Room C"
+            moderators="Gil Mor, Wayne State University School of Medicine, USA; Diana M Morales-Prieto, Jena University Hospital, Germany"
+          >
+            <Talk
+              time="2:15 – 2:40 PM"
+              title="Defining Antigenic Drivers of the Early Pregnancy Treg Cell Response"
+              speaker="Sarah Robertson"
+              affiliation="University of Adelaide, Australia"
+            />
+            <Talk
+              time="2:40 – 3:05 PM"
+              title="Pregnancy-Expanded Regulatory T Cells Constrain Maternal Inflammation to Protect Fetal Neurodevelopment"
+              speaker="Ho-Keun Kwon"
+              affiliation="Yonsei University, Korea"
+            />
+            <Talk
+              time="3:05 – 3:30 PM"
+              title="Maternal and Trophoblast Immune Responses to Cytomegalovirus Infection"
+              speaker="Takeshi Nagamatsu"
+              affiliation="International University of Health and Welfare, Japan"
+            />
+            <Talk
+              time="3:30 – 3:55 PM"
+              title="Novel Diagnostic Method to Diagnose Chronic Endometritis"
+              speaker="Tao Judy Zhang"
+              affiliation="The Chinese University of Hong Kong, China"
+            />
+          </Session>
         </ParallelSessions>
 
         <BreakBlock time="3:55 – 4:05 PM" title="Coffee Break" />
 
         <BlockLabel>New Research Findings · 4:00 – 5:06 PM</BlockLabel>
         <ParallelSessions equalHeight={false}>
-        <Session
-          code="N3"
-          title="New Research Findings III · Immune Regulation in Reproduction"
-          room="Room A"
-          note="Oral presentations (will be selected from abstracts)"
-        >
-          <OralSlotList />
-        </Session>
-        <Session
-          code="N4"
-          title="New Research Findings IV · Immunity, Environment, and Reproductive Fate"
-          room="Room B"
-          note="Oral presentations (will be selected from abstracts)"
-        >
-          <OralSlotList />
-        </Session>
-        <Session
-          code="N5"
-          title="New Research Findings V · Maternal-Fetal Immunology & Gestational Complications"
-          room="Room C"
-          note="Oral presentations (will be selected from abstracts)"
-        >
-          <OralSlotList />
-        </Session>
+          <Session
+            code="N3"
+            title="New Research Findings III · Immune Regulation in Reproduction"
+            room="Room A"
+            note="Oral presentations (will be selected from abstracts)"
+          >
+            <OralSlotList />
+          </Session>
+          <Session
+            code="N4"
+            title="New Research Findings IV · Immunity, Environment, and Reproductive Fate"
+            room="Room B"
+            note="Oral presentations (will be selected from abstracts)"
+          >
+            <OralSlotList />
+          </Session>
+          <Session
+            code="N5"
+            title="New Research Findings V · Maternal-Fetal Immunology & Gestational Complications"
+            room="Room C"
+            note="Oral presentations (will be selected from abstracts)"
+          >
+            <OralSlotList />
+          </Session>
         </ParallelSessions>
       </DaySection>
 
@@ -1208,7 +1233,11 @@ const ProgramTab = () => {
         date="Sunday, November 8, 2026"
         theme="Advancing Women's Health and Population Sustainability Through Global Collaboration"
       >
-        <TimeRow time="7:30 – 8:30 AM" title="Breakfast" room="Foyer, 3rd Floor" />
+        <TimeRow
+          time="7:30 – 8:30 AM"
+          title="Breakfast"
+          room="Foyer, 3rd Floor"
+        />
         <TimeRow
           time="7:30 AM – 12:00 PM"
           title="Registration"
@@ -1267,101 +1296,101 @@ const ProgramTab = () => {
             </Session>
           }
         >
-        <Session
-          code="S19"
-          title="Immune Regulation and Therapeutic Application of Human Reproduction"
-          room="Room A"
-          moderators="Mayumi Sugiura-Ogasawara, Nagoya City University, Japan; Jayesh Amin, NOVA WINGS IVF Group / Association of Reproductive Genetics and Immunology, India"
-        >
-          <Talk
-            time="10:05 – 10:30 AM"
-            title="Biofabrication of Female Reproductive Organs: Vascularized Ovary Chip"
-            speaker="Young Shik Choi"
-            affiliation="Yonsei University, Korea"
-          />
-          <Talk
-            time="10:30 – 10:55 AM"
-            title="Regulation of Decidual Immune Composition"
-            speaker="Alek Stanik-Kostic"
-            affiliation="University of Wisconsin, Madison, USA"
-          />
-          <Talk
-            time="10:55 – 11:20 AM"
-            title="Evaluation of Endometrial Gene Expression in Women with Reproductive Failures"
-            speaker="Svetlana Dambaeva"
-            affiliation="Rosalind Franklin University of Medicine and Science, USA"
-          />
-          <Talk
-            time="11:20 – 11:45 AM"
-            title="The Double-Edged Sword: Cytokines Shaping Autoimmune and Inflammatory Diseases Progression or Remission in Pregnancy"
-            speaker="Marie-Pierre Piccinni"
-            affiliation="University of Florence, Italy"
-          />
-        </Session>
+          <Session
+            code="S19"
+            title="Immune Regulation and Therapeutic Application of Human Reproduction"
+            room="Room A"
+            moderators="Mayumi Sugiura-Ogasawara, Nagoya City University, Japan; Jayesh Amin, NOVA WINGS IVF Group / Association of Reproductive Genetics and Immunology, India"
+          >
+            <Talk
+              time="10:05 – 10:30 AM"
+              title="Biofabrication of Female Reproductive Organs: Vascularized Ovary Chip"
+              speaker="Young Shik Choi"
+              affiliation="Yonsei University, Korea"
+            />
+            <Talk
+              time="10:30 – 10:55 AM"
+              title="Regulation of Decidual Immune Composition"
+              speaker="Alek Stanik-Kostic"
+              affiliation="University of Wisconsin, Madison, USA"
+            />
+            <Talk
+              time="10:55 – 11:20 AM"
+              title="Evaluation of Endometrial Gene Expression in Women with Reproductive Failures"
+              speaker="Svetlana Dambaeva"
+              affiliation="Rosalind Franklin University of Medicine and Science, USA"
+            />
+            <Talk
+              time="11:20 – 11:45 AM"
+              title="The Double-Edged Sword: Cytokines Shaping Autoimmune and Inflammatory Diseases Progression or Remission in Pregnancy"
+              speaker="Marie-Pierre Piccinni"
+              affiliation="University of Florence, Italy"
+            />
+          </Session>
 
-        <Session
-          code="S20"
-          title="High Risk OB, 2nd/3rd Trimester Complications"
-          room="Room B"
-          moderators="Yoshimitsu Kuwabara, Nippon Medical School, Japan; Archana Sampath, Indian Council of Medical Research Headquarters, India"
-        >
-          <Talk
-            time="10:05 – 10:30 AM"
-            title="Maternal Vitamin D Deficiency and Adverse Pregnancy Outcomes: Clinical Evidence for a Critical Window and Emerging Immunological Mechanisms"
-            speaker="Ji Yeon Lee"
-            affiliation="CHA University, Korea"
-          />
-          <Talk
-            time="10:30 – 10:55 AM"
-            title="Multimodal Single-Cell Analyses Reveal Subclinical Dysfunction and Limited Metformin Efficacy in Placentas of Women with PMOS"
-            speaker="Qiaolin Deng"
-            affiliation="The Wenner-Gren Institute, Stockholm University, Sweden"
-          />
-          <Talk
-            time="10:55 – 11:20 AM"
-            title="Precision Medicine in Cervical Insufficiency: Optimizing Cervical Cerclage for Preterm Birth Prevention"
-            speaker="Keun-Young Lee"
-            affiliation="Hallym University, Korea"
-          />
-          <Talk
-            time="11:20 – 11:45 AM"
-            title="Senescence of Decidual Macrophages in Advanced Maternal Age and Adverse Pregnancy Outcomes"
-            speaker="Aihua Liao"
-            affiliation="Huazhong University of Science and Technology, China"
-          />
-        </Session>
+          <Session
+            code="S20"
+            title="High Risk OB, 2nd/3rd Trimester Complications"
+            room="Room B"
+            moderators="Yoshimitsu Kuwabara, Nippon Medical School, Japan; Archana Sampath, Indian Council of Medical Research Headquarters, India"
+          >
+            <Talk
+              time="10:05 – 10:30 AM"
+              title="Maternal Vitamin D Deficiency and Adverse Pregnancy Outcomes: Clinical Evidence for a Critical Window and Emerging Immunological Mechanisms"
+              speaker="Ji Yeon Lee"
+              affiliation="CHA University, Korea"
+            />
+            <Talk
+              time="10:30 – 10:55 AM"
+              title="Multimodal Single-Cell Analyses Reveal Subclinical Dysfunction and Limited Metformin Efficacy in Placentas of Women with PMOS"
+              speaker="Qiaolin Deng"
+              affiliation="The Wenner-Gren Institute, Stockholm University, Sweden"
+            />
+            <Talk
+              time="10:55 – 11:20 AM"
+              title="Precision Medicine in Cervical Insufficiency: Optimizing Cervical Cerclage for Preterm Birth Prevention"
+              speaker="Keun-Young Lee"
+              affiliation="Hallym University, Korea"
+            />
+            <Talk
+              time="11:20 – 11:45 AM"
+              title="Senescence of Decidual Macrophages in Advanced Maternal Age and Adverse Pregnancy Outcomes"
+              speaker="Aihua Liao"
+              affiliation="Huazhong University of Science and Technology, China"
+            />
+          </Session>
 
-        <Session
-          code="S21"
-          title="Immunotherapeutic Options for Reproductive Failures"
-          room="Room C"
-          moderators="Mugdha Raut, Dr. Raut's Center For Reproductive Immunology, India; Jie Zhao, Peking University Third Hospital, China"
-        >
-          <Talk
-            time="10:05 – 10:30 AM"
-            title="Evidence-based Immunotherapeutic Options for Reproductive Failure"
-            speaker="Ole Christiansen"
-            affiliation="Center for Recurrent Pregnancy Loss of Western Denmark, Aalborg, Denmark"
-          />
-          <Talk
-            time="10:30 – 10:55 AM"
-            title="From Micronutrients to Reproductive Immune Readiness: Reframing Preconception Care through Reproductive Immunology"
-            speaker="Kuniaki Ota"
-            affiliation="Fukushima Medical University, Japan"
-          />
-          <Talk
-            time="10:55 – 11:20 AM"
-            title="Personalized Immunotherapy for RPL and RIF in Korean Patients: From Evidence to Practice"
-            speaker="Joon Cheol Park"
-            affiliation="Kyungpook National University, Korea"
-          />
-          <Talk
-            time="11:20 – 11:45 AM"
-            title="Current Immunotherapeutic Options for Reproductive Failure"
-            speaker="Marcelo Cavalcante"
-            affiliation="University of Fortaleza (UNIFOR), Brazil"
-          />
-        </Session>
+          <Session
+            code="S21"
+            title="Immunotherapeutic Options for Reproductive Failures"
+            room="Room C"
+            moderators="Mugdha Raut, Dr. Raut's Center For Reproductive Immunology, India; Jie Zhao, Peking University Third Hospital, China"
+          >
+            <Talk
+              time="10:05 – 10:30 AM"
+              title="Evidence-based Immunotherapeutic Options for Reproductive Failure"
+              speaker="Ole Christiansen"
+              affiliation="Center for Recurrent Pregnancy Loss of Western Denmark, Aalborg, Denmark"
+            />
+            <Talk
+              time="10:30 – 10:55 AM"
+              title="From Micronutrients to Reproductive Immune Readiness: Reframing Preconception Care through Reproductive Immunology"
+              speaker="Kuniaki Ota"
+              affiliation="Fukushima Medical University, Japan"
+            />
+            <Talk
+              time="10:55 – 11:20 AM"
+              title="Personalized Immunotherapy for RPL and RIF in Korean Patients: From Evidence to Practice"
+              speaker="Joon Cheol Park"
+              affiliation="Kyungpook National University, Korea"
+            />
+            <Talk
+              time="11:20 – 11:45 AM"
+              title="Current Immunotherapeutic Options for Reproductive Failure"
+              speaker="Marcelo Cavalcante"
+              affiliation="University of Fortaleza (UNIFOR), Brazil"
+            />
+          </Session>
         </ConcurrentBlock>
 
         <TimeRow

@@ -1,6 +1,10 @@
 import { useMemo, useState } from "react";
 import { pdf } from "@react-pdf/renderer";
 import AbstractExtractPDF from "../components/AbstractExtractPDF";
+import {
+  downloadJournalWord,
+  getProgramSessionLabel,
+} from "../utils/journalAbstractWordExport";
 
 function avgTotalOf(row) {
   const v = row?.review_summary?.avg_total;
@@ -114,6 +118,7 @@ export default function AbstractExtractSection({
   const [topNInput, setTopNInput] = useState("50");
   const [message, setMessage] = useState(null);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [wordBusy, setWordBusy] = useState(false);
   const [splitByCategory, setSplitByCategory] = useState(false);
 
   const typeLabelOf = (abstract) => {
@@ -142,9 +147,7 @@ export default function AbstractExtractSection({
   const pool = useMemo(() => {
     return (abstracts || [])
       .filter(
-        (a) =>
-          Number(a.is_invited_speaker || 0) !== 1 &&
-          String(a.status || "").toLowerCase() === "accepted",
+        (a) => String(a.status || "").toLowerCase() === "accepted",
       )
       .map((abstract) => {
         const scoreRow = scoreById.get(abstract.id);
@@ -320,6 +323,30 @@ export default function AbstractExtractSection({
     }
   };
 
+  const exportSelectedWord = async () => {
+    if (selectedRows.length === 0) {
+      setMessage({ type: "error", text: "Select at least one abstract." });
+      return;
+    }
+    setWordBusy(true);
+    setMessage(null);
+    try {
+      await downloadJournalWord(selectedRows);
+      setMessage({
+        type: "ok",
+        text: `Exported ${selectedRows.length} abstract${selectedRows.length === 1 ? "" : "s"} to Word for journal submission.`,
+      });
+    } catch (err) {
+      console.error("Journal Word export failed:", err);
+      setMessage({
+        type: "error",
+        text: err.message || "Could not generate Word document.",
+      });
+    } finally {
+      setWordBusy(false);
+    }
+  };
+
   const exportSelectedCsv = () => {
     const rowsToExport =
       selectedRows.length > 0 ? selectedRows : filteredRows;
@@ -413,9 +440,9 @@ export default function AbstractExtractSection({
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Extract abstracts</h2>
           <p className="text-gray-500 text-sm mt-1 max-w-2xl">
-            Accepted abstracts only. Filter oral / poster / clinical / basic,
-            pick a sort, select the top N, and export PDF or CSV (category,
-            names, scores).
+            Accepted abstracts (including invited speakers). Filter oral /
+            poster / clinical / basic, pick a sort, select the top N, and
+            export PDF, Word (journal), or CSV.
           </p>
         </div>
         {onGoToSubmissions ? (
@@ -642,6 +669,14 @@ export default function AbstractExtractSection({
             </button>
             <button
               type="button"
+              onClick={exportSelectedWord}
+              disabled={selectedList.length === 0 || wordBusy}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100 disabled:opacity-50"
+            >
+              {wordBusy ? "Building Word…" : "Export Word (journal)"}
+            </button>
+            <button
+              type="button"
               onClick={exportSelectedPdf}
               disabled={selectedList.length === 0 || pdfBusy}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-50"
@@ -691,7 +726,7 @@ export default function AbstractExtractSection({
                     Type
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Format
+                    Format / Session
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     YI
@@ -710,6 +745,10 @@ export default function AbstractExtractSection({
                   const reviews = Number(row.review_summary?.review_count || 0);
                   const checked = selectedIds.has(row.id);
                   const fmt = formatLabel(row);
+                  const isInvited = Number(row.is_invited_speaker || 0) === 1;
+                  const sessionLabel = isInvited
+                    ? getProgramSessionLabel(row.program_session)
+                    : null;
                   return (
                     <tr
                       key={row.id}
@@ -734,6 +773,11 @@ export default function AbstractExtractSection({
                         <p className="text-[11px] text-gray-400 font-mono mt-0.5">
                           {row.id}
                         </p>
+                        {isInvited ? (
+                          <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-800 ring-1 ring-orange-200">
+                            Invited speaker
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-3 py-3 text-gray-700 whitespace-nowrap">
                         {row.presenter_name || "—"}
@@ -752,9 +796,15 @@ export default function AbstractExtractSection({
                         })()}
                       </td>
                       <td className="px-3 py-3">
-                        <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-700 capitalize">
-                          {fmt}
-                        </span>
+                        {isInvited ? (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium bg-orange-50 text-orange-900 ring-1 ring-orange-200 max-w-[12rem] line-clamp-2">
+                            {sessionLabel || "Unassigned session"}
+                          </span>
+                        ) : (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-700 capitalize">
+                            {fmt}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         {Number(row.young_investigator) === 1 ? (

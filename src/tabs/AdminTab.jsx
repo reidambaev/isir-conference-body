@@ -15,6 +15,11 @@ import {
 import FormatAssignmentSection from "./FormatAssignmentSection";
 import OralSessionAssignmentSection from "./OralSessionAssignmentSection";
 import AbstractExtractSection from "./AbstractExtractSection";
+import {
+  PROGRAM_SESSIONS,
+  getProgramSession,
+  parseProgramSession,
+} from "../config/programSessions.js";
 
 const REGISTRATION_TICKET_LABELS = {
   "isir-member": "ISIR Member",
@@ -106,6 +111,34 @@ function getAbstractTypeLabel(abstract) {
   ).trim();
   if (!raw) return "Not specified";
   return normalizeAbstractSubmissionType(raw) || raw;
+}
+
+function InvitedProgramSessionSelect({
+  value,
+  onChange,
+  disabled = false,
+  id,
+  className = "w-full min-w-[7.5rem] px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50",
+}) {
+  const session = getProgramSession(value) || "";
+  return (
+    <select
+      id={id}
+      value={session}
+      disabled={disabled}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => onChange(e.target.value || null)}
+      className={className}
+      aria-label="Session"
+    >
+      <option value="">Unassigned</option>
+      {PROGRAM_SESSIONS.map((code) => (
+        <option key={code} value={code}>
+          {code}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 const ADMIN_SECTION_COOKIE = "isir_admin_section";
@@ -1275,6 +1308,9 @@ export default function AdminTab() {
     useState("all");
   const [invitedAbstractStatusFilter, setInvitedAbstractStatusFilter] =
     useState("all");
+  /** all | unassigned | program session code */
+  const [invitedAbstractSessionFilter, setInvitedAbstractSessionFilter] =
+    useState("all");
   /** all | missing-confirmation | missing-decision | likely-duplicates */
   const [invitedAbstractIssueFilter, setInvitedAbstractIssueFilter] =
     useState("all");
@@ -1325,6 +1361,8 @@ export default function AdminTab() {
   const [updatingSpeakersId, setUpdatingSpeakersId] = useState(null);
   const [acceptingAllInvitedSpeakers, setAcceptingAllInvitedSpeakers] =
     useState(false);
+  const [updatingProgramSessionId, setUpdatingProgramSessionId] =
+    useState(null);
   const [abstractToDelete, setAbstractToDelete] = useState(null);
   const [deleteConfirmTitle, setDeleteConfirmTitle] = useState("");
   const [deletingAbstractId, setDeletingAbstractId] = useState(null);
@@ -3478,6 +3516,15 @@ export default function AdminTab() {
       result = result.filter((a) => a.status === invitedAbstractStatusFilter);
     }
 
+    if (invitedAbstractSessionFilter === "unassigned") {
+      result = result.filter((a) => !getProgramSession(a.program_session));
+    } else if (invitedAbstractSessionFilter !== "all") {
+      result = result.filter(
+        (a) =>
+          getProgramSession(a.program_session) === invitedAbstractSessionFilter,
+      );
+    }
+
     if (invitedAbstractIssueFilter === "missing-confirmation") {
       result = result.filter((a) => !a.confirmation_sent_at);
     } else if (invitedAbstractIssueFilter === "missing-decision") {
@@ -3502,6 +3549,13 @@ export default function AdminTab() {
           return (a.category || "").localeCompare(b.category || "");
         case "status":
           return (a.status || "").localeCompare(b.status || "");
+        case "session": {
+          const sessionA = getProgramSession(a.program_session) || "zzz";
+          const sessionB = getProgramSession(b.program_session) || "zzz";
+          return sessionA.localeCompare(sessionB, undefined, {
+            numeric: true,
+          });
+        }
         default:
           return 0;
       }
@@ -3513,6 +3567,7 @@ export default function AdminTab() {
     invitedAbstractSearch,
     invitedAbstractCategoryFilter,
     invitedAbstractStatusFilter,
+    invitedAbstractSessionFilter,
     invitedAbstractIssueFilter,
     abstractDuplicateMap,
     invitedAbstractSortBy,
@@ -3685,7 +3740,16 @@ export default function AdminTab() {
       setAbstracts((prev) =>
         prev.map((a) =>
           a.id === abstractId
-            ? { ...a, is_invited_speaker: nextValue }
+            ? {
+                ...a,
+                is_invited_speaker: nextValue,
+                ...(nextValue === 0
+                  ? {
+                      program_session: null,
+                      program_session_assigned_at: null,
+                    }
+                  : {}),
+              }
             : a,
         ),
       );
@@ -3694,6 +3758,56 @@ export default function AdminTab() {
       alert(err.message || "Failed to update invited speaker status");
     } finally {
       setUpdatingInvitedSpeakerId(null);
+    }
+  };
+
+  const updateAbstractProgramSession = async (abstractId, sessionCode) => {
+    if (!isLocalDemo && !adminToken) {
+      alert("Admin access token is missing.");
+      return;
+    }
+    const parsed = parseProgramSession(sessionCode);
+    if (!parsed.ok) {
+      alert("Choose a valid program session, or Unassigned to clear.");
+      return;
+    }
+
+    setUpdatingProgramSessionId(abstractId);
+    try {
+      if (!isLocalDemo) {
+        const response = await fetch(
+          `/api/admin/abstracts/${abstractId}/program-session`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Admin-Token": adminToken,
+            },
+            body: JSON.stringify({ session: parsed.value }),
+          },
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error || "Failed to update session");
+        }
+      }
+
+      setAbstracts((prev) =>
+        prev.map((a) =>
+          a.id === abstractId
+            ? {
+                ...a,
+                program_session: parsed.value,
+                program_session_assigned_at: parsed.value ? Date.now() : null,
+              }
+            : a,
+        ),
+      );
+    } catch (err) {
+      console.error("Error updating invited speaker session:", err);
+      alert(err.message || "Failed to update session");
+    } finally {
+      setUpdatingProgramSessionId(null);
     }
   };
 
@@ -7315,6 +7429,28 @@ export default function AdminTab() {
                 </select>
               </div>
 
+              <div className="min-w-[120px]">
+                <label className="sr-only" htmlFor="invited-abstract-session">
+                  Session
+                </label>
+                <select
+                  id="invited-abstract-session"
+                  value={invitedAbstractSessionFilter}
+                  onChange={(e) =>
+                    setInvitedAbstractSessionFilter(e.target.value)
+                  }
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-colors appearance-none cursor-pointer"
+                >
+                  <option value="all">All sessions</option>
+                  <option value="unassigned">Unassigned</option>
+                  {PROGRAM_SESSIONS.map((code) => (
+                    <option key={code} value={code}>
+                      {code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <button
                 type="button"
                 onClick={() =>
@@ -7403,6 +7539,7 @@ export default function AdminTab() {
                     <option value="title-desc">Title Z–A</option>
                     <option value="category">By category</option>
                     <option value="status">By status</option>
+                    <option value="session">By session</option>
                   </select>
                 </div>
                 {invitedAbstractMoreFiltersActive && (
@@ -7411,6 +7548,7 @@ export default function AdminTab() {
                       type="button"
                       onClick={() => {
                         setInvitedAbstractIssueFilter("all");
+                        setInvitedAbstractSessionFilter("all");
                         setInvitedAbstractSortBy("date-desc");
                       }}
                       className="text-xs font-medium text-gray-500 hover:text-gray-800"
@@ -7529,6 +7667,9 @@ export default function AdminTab() {
                       Status
                     </th>
                     <th className="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Session
+                    </th>
+                    <th className="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                       Words
                     </th>
                     <th className="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
@@ -7601,6 +7742,18 @@ export default function AdminTab() {
                           {abstract.status}
                         </span>
                       </td>
+                      <td
+                        className="px-5 py-4"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <InvitedProgramSessionSelect
+                          value={abstract.program_session}
+                          disabled={updatingProgramSessionId === abstract.id}
+                          onChange={(code) =>
+                            updateAbstractProgramSession(abstract.id, code)
+                          }
+                        />
+                      </td>
                       <td className="px-5 py-4 text-sm font-medium text-gray-600">
                         {abstract.word_count}
                       </td>
@@ -7666,6 +7819,21 @@ export default function AdminTab() {
                               {formatDate(abstract.submission_date)}
                             </span>
                           </div>
+                        </div>
+                        <div
+                          className="ml-4 shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                            Session
+                          </label>
+                          <InvitedProgramSessionSelect
+                            value={abstract.program_session}
+                            disabled={updatingProgramSessionId === abstract.id}
+                            onChange={(code) =>
+                              updateAbstractProgramSession(abstract.id, code)
+                            }
+                          />
                         </div>
                         <button
                           type="button"

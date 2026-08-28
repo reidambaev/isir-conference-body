@@ -191,6 +191,8 @@ CREATE TABLE
         poster_session TEXT,
         poster_session_assigned_at INTEGER,
         poster_session_email_sent_at INTEGER,
+        program_session TEXT,
+        program_session_assigned_at INTEGER,
         deleted_at INTEGER,
         created_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000),
         updated_at INTEGER DEFAULT (strftime ('%s', 'now') * 1000)
@@ -252,6 +254,8 @@ CREATE INDEX IF NOT EXISTS idx_abstractions_deleted_at ON abstractions (deleted_
 CREATE INDEX IF NOT EXISTS idx_abstractions_oral_session ON abstractions (oral_session);
 
 CREATE INDEX IF NOT EXISTS idx_abstractions_poster_session ON abstractions (poster_session);
+
+CREATE INDEX IF NOT EXISTS idx_abstractions_program_session ON abstractions (program_session);
 
 -- Shared admin dismissals for likely-duplicate abstract pairs
 CREATE TABLE
