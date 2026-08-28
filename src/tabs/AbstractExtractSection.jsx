@@ -5,6 +5,7 @@ import {
   downloadJournalWord,
   getProgramSessionLabel,
 } from "../utils/journalAbstractWordExport";
+import { getProgramSession } from "../config/programSessions";
 
 function avgTotalOf(row) {
   const v = row?.review_summary?.avg_total;
@@ -324,17 +325,19 @@ export default function AbstractExtractSection({
   };
 
   const exportSelectedWord = async () => {
-    if (selectedRows.length === 0) {
-      setMessage({ type: "error", text: "Select at least one abstract." });
+    const rowsToExport =
+      selectedRows.length > 0 ? selectedRows : filteredRows;
+    if (rowsToExport.length === 0) {
+      setMessage({ type: "error", text: "Nothing to export." });
       return;
     }
     setWordBusy(true);
     setMessage(null);
     try {
-      await downloadJournalWord(selectedRows);
+      await downloadJournalWord(rowsToExport);
       setMessage({
         type: "ok",
-        text: `Exported ${selectedRows.length} abstract${selectedRows.length === 1 ? "" : "s"} to Word for journal submission.`,
+        text: `Exported ${rowsToExport.length} abstract${rowsToExport.length === 1 ? "" : "s"} to Word for journal submission${selectedRows.length > 0 ? "" : " (all matching filters)"}.`,
       });
     } catch (err) {
       console.error("Journal Word export failed:", err);
@@ -670,10 +673,14 @@ export default function AbstractExtractSection({
             <button
               type="button"
               onClick={exportSelectedWord}
-              disabled={selectedList.length === 0 || wordBusy}
+              disabled={filteredRows.length === 0 || wordBusy}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100 disabled:opacity-50"
             >
-              {wordBusy ? "Building Word…" : "Export Word (journal)"}
+              {wordBusy
+                ? "Building Word…"
+                : selectedList.length > 0
+                  ? `Export Word (${selectedList.length})`
+                  : "Export Word (journal)"}
             </button>
             <button
               type="button"
@@ -798,7 +805,9 @@ export default function AbstractExtractSection({
                       <td className="px-3 py-3">
                         {isInvited ? (
                           <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium bg-orange-50 text-orange-900 ring-1 ring-orange-200 max-w-[12rem] line-clamp-2">
-                            {sessionLabel || "Unassigned session"}
+                            {getProgramSession(row.program_session) ||
+                              sessionLabel ||
+                              "Unassigned session"}
                           </span>
                         ) : (
                           <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-700 capitalize">
