@@ -43,6 +43,27 @@ const PROGRAM_SESSION_LABELS = {
 const LEFT = { alignment: AlignmentType.LEFT };
 const BODY_SIZE = 24; // half-points (12pt)
 const AFFIL_SIZE = 20; // 10pt
+const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+/** Strip characters that break WordprocessingML XML. */
+function sanitizeDocxText(value) {
+  if (value == null) return "";
+  return String(value)
+    .replace(/\u00A0/g, " ")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, "")
+    .replace(/[\uD800-\uDFFF]/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/ {2,}/g, " ");
+}
+
+function textRun(text, options = {}) {
+  return new TextRun({
+    text: sanitizeDocxText(text),
+    size: BODY_SIZE,
+    ...options,
+  });
+}
 
 export function getProgramSessionLabel(code) {
   const session = getProgramSession(code);
@@ -195,55 +216,45 @@ function buildAuthorsParagraph(authorBlocks) {
   if (authorBlocks.length === 0) return null;
   const runs = [];
   authorBlocks.forEach((block, i) => {
-    runs.push(new TextRun({ text: block.name, size: BODY_SIZE }));
+    runs.push(textRun(block.name));
     if (block.nums.length > 0) {
       runs.push(
-        new TextRun({
-          text: block.nums.join(","),
+        textRun(block.nums.join(","), {
           superScript: true,
-          size: BODY_SIZE,
         }),
       );
     }
     if (i < authorBlocks.length - 1) {
-      runs.push(new TextRun({ text: ", ", size: BODY_SIZE }));
+      runs.push(textRun(", "));
     }
   });
   return leftPara(runs, { after: 120 });
 }
 
 function buildBodyParagraphs(abstract) {
-  const bodyText = String(
+  const bodyText = sanitizeDocxText(
     abstract?.abstract || abstract?.abstract_text || "",
   ).trim();
   if (!bodyText) {
-    return [leftPara([new TextRun({ text: "No abstract text.", size: BODY_SIZE })])];
+    return [leftPara([textRun("No abstract text.")])];
   }
   return splitAbstractSections(bodyText).map((section) => {
     const runs = [];
     if (section.heading) {
-      runs.push(
-        new TextRun({ text: `${section.heading}: `, bold: true, size: BODY_SIZE }),
-      );
+      runs.push(textRun(`${section.heading}: `, { bold: true }));
     }
-    runs.push(new TextRun({ text: section.body, size: BODY_SIZE }));
+    runs.push(textRun(section.body));
     return leftPara(runs, { after: 120 });
   });
 }
 
 function buildAbstractParagraphs({ abstract, label }) {
   const { authorBlocks, unique } = buildAuthorAffiliationBlocks(abstract);
-  const title = String(abstract.title || "").trim() || "Untitled";
-  const keywords = String(abstract.keywords || "").trim();
+  const title = sanitizeDocxText(abstract.title || "").trim() || "Untitled";
+  const keywords = sanitizeDocxText(abstract.keywords || "").trim();
   const paragraphs = [
-    leftPara(
-      [new TextRun({ text: label, bold: true, size: BODY_SIZE })],
-      { after: 160 },
-    ),
-    leftPara(
-      [new TextRun({ text: title, bold: true, size: BODY_SIZE })],
-      { after: 160 },
-    ),
+    leftPara([textRun(label, { bold: true })], { after: 160 }),
+    leftPara([textRun(title, { bold: true })], { after: 160 }),
   ];
 
   const authorsPara = buildAuthorsParagraph(authorBlocks);
@@ -253,8 +264,7 @@ function buildAbstractParagraphs({ abstract, label }) {
     paragraphs.push(
       leftPara(
         [
-          new TextRun({
-            text: `${aff.n} ${aff.line}`,
+          textRun(`${aff.n} ${aff.line}`, {
             italics: true,
             size: AFFIL_SIZE,
           }),
@@ -268,8 +278,8 @@ function buildAbstractParagraphs({ abstract, label }) {
     paragraphs.push(
       leftPara(
         [
-          new TextRun({ text: "Keywords: ", bold: true, size: AFFIL_SIZE }),
-          new TextRun({ text: keywords, size: AFFIL_SIZE }),
+          textRun("Keywords: ", { bold: true, size: AFFIL_SIZE }),
+          textRun(keywords, { size: AFFIL_SIZE }),
         ],
         { before: 200, after: 160 },
       ),
@@ -277,7 +287,7 @@ function buildAbstractParagraphs({ abstract, label }) {
   }
 
   paragraphs.push(...buildBodyParagraphs(abstract));
-  paragraphs.push(leftPara([], { after: 360 }));
+  paragraphs.push(leftPara([textRun(" ")], { after: 360 }));
   return paragraphs;
 }
 
@@ -291,21 +301,15 @@ export function buildJournalWordDocument(abstracts) {
 
   const children = [
     leftPara(
-      [
-        new TextRun({
-          text: "ISIR 2026 World Congress — Abstracts",
-          bold: true,
-          size: 36,
-        }),
-      ],
+      [textRun("ISIR 2026 World Congress — Abstracts", { bold: true, size: 36 })],
       { after: 120 },
     ),
     leftPara(
       [
-        new TextRun({
-          text: `${items.length} abstract${items.length === 1 ? "" : "s"} · ${generatedDate}`,
-          size: 22,
-        }),
+        textRun(
+          `${items.length} abstract${items.length === 1 ? "" : "s"} · ${generatedDate}`,
+          { size: 22 },
+        ),
       ],
       { after: 480 },
     ),
@@ -322,13 +326,16 @@ export function buildJournalWordDocument(abstracts) {
 
 export async function downloadJournalWord(abstracts, filename) {
   const doc = buildJournalWordDocument(abstracts);
-  const blob = await Packer.toBlob(doc);
+  const buffer = await Packer.toArrayBuffer(doc);
+  const blob = new Blob([buffer], { type: DOCX_MIME });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download =
     filename ||
     `abstracts-journal-${new Date().toISOString().split("T")[0]}.docx`;
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
