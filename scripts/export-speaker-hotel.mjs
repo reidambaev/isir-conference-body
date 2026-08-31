@@ -45,6 +45,6 @@ const date = new Date().toISOString().slice(0, 10);
 const outDir = path.join(root, "exports");
 fs.mkdirSync(outDir, { recursive: true });
 const outPath = path.join(outDir, `speaker-hotel-registrations-${date}.csv`);
-fs.writeFileSync(outPath, `${lines.join("\n")}\n`, "utf8");
+fs.writeFileSync(outPath, `\uFEFF${lines.join("\n")}\n`, "utf8");
 
 console.log(`Exported ${rows.length} registration(s) to ${outPath}`);

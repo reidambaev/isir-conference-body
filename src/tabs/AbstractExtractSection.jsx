@@ -6,6 +6,7 @@ import {
   getProgramSessionLabel,
 } from "../utils/journalAbstractWordExport";
 import { getProgramSession } from "../config/programSessions";
+import { csvExportFilename, downloadCsv } from "../utils/csvExport";
 
 function avgTotalOf(row) {
   const v = row?.review_summary?.avg_total;
@@ -357,10 +358,6 @@ export default function AbstractExtractSection({
       setMessage({ type: "error", text: "Nothing to export." });
       return;
     }
-    const esc = (v) => {
-      const s = v == null ? "" : String(v);
-      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
     const num = (v) =>
       v != null && !Number.isNaN(Number(v)) ? Number(v).toFixed(2) : "";
     const headers = [
@@ -392,16 +389,16 @@ export default function AbstractExtractSection({
       return [
         index + 1,
         a.id,
-        esc(a.title),
-        esc(a.category),
-        esc(typeLabelOf(a)),
-        esc(a.presenter_name),
-        esc(a.presenter_email),
-        esc(a.corresponding_name),
-        esc(a.corresponding_email),
-        esc(formatLabel(a)),
-        esc(a.presentation_preference),
-        esc(a.assigned_format || ""),
+        a.title,
+        a.category,
+        typeLabelOf(a),
+        a.presenter_name,
+        a.presenter_email,
+        a.corresponding_name,
+        a.corresponding_email,
+        formatLabel(a),
+        a.presentation_preference,
+        a.assigned_format || "",
         Number(a.young_investigator) === 1 ? "Yes" : "No",
         Number(a.possible_young_investigator) === 1 ? "Yes" : "No",
         num(summary.avg_total),
@@ -411,19 +408,14 @@ export default function AbstractExtractSection({
         num(summary.avg_study_design),
         num(summary.avg_data_analysis),
         num(summary.avg_significance),
-        esc(a.status),
+        a.status,
       ];
     });
-    const csv = [headers.join(","), ...csvRows.map((r) => r.join(","))].join(
-      "\n",
+    downloadCsv(
+      csvExportFilename("abstracts-extract"),
+      headers,
+      csvRows,
     );
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `abstracts-extract-${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
     setMessage({
       type: "ok",
       text: `Exported ${rowsToExport.length} abstract${rowsToExport.length === 1 ? "" : "s"} to CSV${selectedRows.length > 0 ? " (selection)" : " (all matching filters)"}.`,

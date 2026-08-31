@@ -20,6 +20,12 @@ import {
   getProgramSession,
   parseProgramSession,
 } from "../config/programSessions.js";
+import { csvExportFilename, downloadCsv } from "../utils/csvExport";
+import {
+  formatCongressAttendanceForCsv,
+  getRegistrationCongressAttendance,
+  parseRegistrationDayList,
+} from "../utils/registrationAttendance";
 
 const REGISTRATION_TICKET_LABELS = {
   "isir-member": "ISIR Member",
@@ -29,16 +35,6 @@ const REGISTRATION_TICKET_LABELS = {
   "invited-speaker": "Invited Speaker",
   "korea-day-pass": "Daypass (Korean locals only)",
 };
-
-function parseRegistrationDayList(raw) {
-  if (raw == null || raw === "") return [];
-  try {
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
 
 /** Map legacy calendar keys (Thu–Sun congress) to Fri–Sun labels for rollups. */
 const LEGACY_MEAL_DAY_TO_WEEKEND = {
@@ -4957,10 +4953,6 @@ export default function AdminTab() {
   };
 
   const exportToCSV = () => {
-    const esc = (v) => {
-      const s = v == null ? "" : String(v);
-      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
     const scoreById = new Map(
       (reviewerAbstractScores || [])
         .filter((row) => row?.id)
@@ -4996,18 +4988,18 @@ export default function AdminTab() {
         v != null && !Number.isNaN(Number(v)) ? Number(v).toFixed(2) : "";
       return [
         a.id,
-        esc(a.title),
-        esc(a.category),
-        esc(getAbstractTypeLabel(a)),
-        esc(a.status),
+        a.title,
+        a.category,
+        getAbstractTypeLabel(a),
+        a.status,
         Number(a.young_investigator) === 1 ? "Yes" : "No",
         Number(a.possible_young_investigator) === 1 ? "Yes" : "No",
-        esc(a.presenter_name),
-        esc(a.presenter_email),
-        esc(a.corresponding_name),
-        esc(a.corresponding_email),
-        esc(a.presentation_preference),
-        esc(a.assigned_format || ""),
+        a.presenter_name,
+        a.presenter_email,
+        a.corresponding_name,
+        a.corresponding_email,
+        a.presentation_preference,
+        a.assigned_format || "",
         num(summary.avg_total),
         Number(summary.review_count || 0),
         num(summary.avg_originality),
@@ -5016,25 +5008,14 @@ export default function AdminTab() {
         num(summary.avg_data_analysis),
         num(summary.avg_significance),
         a.word_count ?? "",
-        esc(formatDate(a.submission_date)),
+        formatDate(a.submission_date),
       ];
     });
 
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `abstracts-export-${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
+    downloadCsv(csvExportFilename("abstracts-export"), headers, rows);
   };
 
   const exportSpeakerHotelToCSV = () => {
-    const esc = (v) => {
-      const s = v == null ? "" : String(v);
-      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-
     const headers = [
       "invited_speaker_email",
       "passport_name",
@@ -5060,32 +5041,176 @@ export default function AdminTab() {
             return speakerHotelNameSort === "asc" ? cmp : -cmp;
           })
         : speakerHotelRegistrations
-    ).map((row) =>
-      [
-        row.invited_speaker_email,
-        row.passport_name,
-        row.nationality,
-        row.guest_count,
-        row.address_physical,
-        row.contact_email,
-        row.phone,
-        row.arrival_date,
-        row.departure_date,
-        formatDate(row.created_at),
-        formatDate(row.updated_at),
-      ].map(esc),
-    );
+    ).map((row) => [
+      row.invited_speaker_email,
+      row.passport_name,
+      row.nationality,
+      row.guest_count,
+      row.address_physical,
+      row.contact_email,
+      row.phone,
+      row.arrival_date,
+      row.departure_date,
+      formatDate(row.created_at),
+      formatDate(row.updated_at),
+    ]);
 
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join(
-      "\n",
+    downloadCsv(
+      csvExportFilename("speaker-hotel-registrations"),
+      headers,
+      rows,
     );
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `speaker-hotel-registrations-${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+  };
+
+  const exportRegistrationsToCSV = () => {
+    const headers = [
+      "id",
+      "email",
+      "first_name",
+      "last_name",
+      "institution",
+      "country",
+      "phone",
+      "cell_phone",
+      "ticket_type",
+      "ticket_label",
+      "payment_status",
+      "total_price",
+      "currency",
+      "accompanying_count",
+      "registered_at",
+      "attendance_mode",
+      "congress_days",
+      "thursday",
+      "friday",
+      "saturday",
+      "sunday",
+      "opening_reception_attending",
+      "gala_dinner_attending",
+      "lunch_days",
+      "breakfast_days",
+      "dietary_vegan",
+      "dietary_vegetarian",
+      "dietary_gluten_free",
+      "dietary_kosher",
+      "dietary_other",
+    ];
+    const yesNo = (v) => (Number(v) === 1 ? "Yes" : "No");
+    const rows = filteredRegistrations.map((reg) => {
+      const att = formatCongressAttendanceForCsv(reg);
+      const lunchDays = normalizeWeekendMealDayList(reg.lunch_days);
+      const breakfastDays = registrationBreakfastDaysForDisplay(reg);
+      return [
+        reg.id,
+        reg.email,
+        reg.first_name,
+        reg.last_name,
+        reg.institution || "",
+        reg.country || "",
+        reg.phone || "",
+        reg.cell_phone || "",
+        reg.ticket_type || "",
+        REGISTRATION_TICKET_LABELS[reg.ticket_type] || reg.ticket_type || "",
+        reg.payment_status || "",
+        reg.total_price ?? "",
+        reg.currency || "USD",
+        Number(reg.accompanying_count || 0),
+        formatDate(reg.created_at || reg.registration_date),
+        att.attendance_mode,
+        att.congress_days,
+        att.thursday,
+        att.friday,
+        att.saturday,
+        att.sunday,
+        yesNo(reg.opening_reception_attending),
+        yesNo(reg.gala_dinner_attending),
+        lunchDays.length ? formatCongressMealDayList(lunchDays) : "",
+        breakfastDays.length ? formatCongressMealDayList(breakfastDays) : "",
+        yesNo(reg.dietary_vegan),
+        yesNo(reg.dietary_vegetarian),
+        yesNo(reg.dietary_gluten_free),
+        yesNo(reg.dietary_kosher),
+        yesNo(reg.dietary_other),
+      ];
+    });
+
+    downloadCsv(csvExportFilename("registrations-export"), headers, rows);
+  };
+
+  const exportTraineesToCSV = () => {
+    const traineeRows = registrations.filter((r) =>
+      r.ticket_type?.includes("trainee"),
+    );
+    const headers = [
+      "id",
+      "email",
+      "first_name",
+      "last_name",
+      "institution",
+      "ticket_type",
+      "ticket_label",
+      "trainee_letter_status",
+      "trainee_letter_url",
+      "payment_status",
+      "registered_at",
+      "attendance_mode",
+      "congress_days",
+      "thursday",
+      "friday",
+      "saturday",
+      "sunday",
+    ];
+    const rows = traineeRows.map((reg) => {
+      const att = formatCongressAttendanceForCsv(reg);
+      return [
+        reg.id,
+        reg.email,
+        reg.first_name,
+        reg.last_name,
+        reg.institution || "",
+        reg.ticket_type || "",
+        REGISTRATION_TICKET_LABELS[reg.ticket_type] || reg.ticket_type || "",
+        reg.trainee_letter_status || "pending",
+        reg.trainee_letter_url || "",
+        reg.payment_status || "",
+        formatDate(reg.created_at || reg.registration_date),
+        att.attendance_mode,
+        att.congress_days,
+        att.thursday,
+        att.friday,
+        att.saturday,
+        att.sunday,
+      ];
+    });
+
+    downloadCsv(csvExportFilename("trainees-export"), headers, rows);
+  };
+
+  const exportVisaToCSV = () => {
+    const headers = [
+      "id",
+      "name",
+      "email",
+      "affiliation",
+      "country",
+      "status",
+      "notes",
+      "registration_proof_filename",
+      "submitted_at",
+    ];
+    const rows = visaRequests.map((request) => [
+      request.id,
+      request.name,
+      request.email,
+      request.affiliation || "",
+      request.country || "",
+      request.status || "",
+      request.notes || "",
+      request.registration_proof_filename || "",
+      formatDate(request.created_at),
+    ]);
+
+    downloadCsv(csvExportFilename("visa-requests-export"), headers, rows);
   };
 
   if (loading) {
@@ -8578,9 +8703,20 @@ export default function AdminTab() {
       {/* Visa Requests Section */}
       {activeSection === "visa" && (
         <div className="space-y-4">
-          <h2 className="text-2xl font-semibold text-gray-800">
-            Visa Requests
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-2xl font-semibold text-gray-800">
+              Visa Requests
+            </h2>
+            {visaRequests.length > 0 && (
+              <button
+                type="button"
+                onClick={exportVisaToCSV}
+                className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 text-sm font-medium"
+              >
+                Export CSV
+              </button>
+            )}
+          </div>
           {visaRequests.length === 0 ? (
             <p className="text-gray-500">No visa requests yet.</p>
           ) : (
@@ -8829,13 +8965,24 @@ export default function AdminTab() {
             <h2 className="text-2xl font-semibold text-gray-800">
               Registrations
             </h2>
-            <button
-              onClick={openTestPaymentModal}
-              disabled={testPaymentLoading}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors text-sm font-medium"
-            >
-              {testPaymentLoading ? "Preparing..." : "Make $1 Test Payment"}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {filteredRegistrations.length > 0 && (
+                <button
+                  type="button"
+                  onClick={exportRegistrationsToCSV}
+                  className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 text-sm font-medium"
+                >
+                  Export CSV
+                </button>
+              )}
+              <button
+                onClick={openTestPaymentModal}
+                disabled={testPaymentLoading}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors text-sm font-medium"
+              >
+                {testPaymentLoading ? "Preparing..." : "Make $1 Test Payment"}
+              </button>
+            </div>
           </div>
           {registrations.length === 0 ? (
             <p className="text-gray-500">No registrations yet.</p>
@@ -8887,6 +9034,9 @@ export default function AdminTab() {
                           Ticket
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Congress days
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           +Guests
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -8936,6 +9086,8 @@ export default function AdminTab() {
                         ]
                           .filter(Boolean)
                           .join(" ");
+                        const congressAttendance =
+                          getRegistrationCongressAttendance(reg);
                         const cur = reg.currency || "USD";
                         const fmtMoney = (n) =>
                           `${cur} ${Number(n || 0).toFixed(2)}`;
@@ -9008,6 +9160,11 @@ export default function AdminTab() {
                                     </span>
                                   )}
                               </td>
+                              <td className="px-4 py-3 text-sm text-gray-600 max-w-[14rem]">
+                                <span className="line-clamp-2">
+                                  {congressAttendance.label}
+                                </span>
+                              </td>
                               <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 tabular-nums">
                                 {Number(reg.accompanying_count || 0)}
                               </td>
@@ -9030,7 +9187,7 @@ export default function AdminTab() {
                             {isOpen && (
                               <tr className="bg-gray-50">
                                 <td
-                                  colSpan={9}
+                                  colSpan={10}
                                   className="px-4 py-4 text-sm text-gray-700 border-t border-gray-100"
                                 >
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
@@ -9135,7 +9292,7 @@ export default function AdminTab() {
                                         <dd>{ticketLabel}</dd>
                                         {reg.ticket_type === "korea-day-pass" &&
                                           (() => {
-                                            const d = normalizeWeekendMealDayList(
+                                            const d = parseRegistrationDayList(
                                               reg.day_pass_days,
                                             );
                                             return d.length ? (
@@ -9569,9 +9726,21 @@ export default function AdminTab() {
       {/* Trainee Applications Section */}
       {activeSection === "trainees" && (
         <div className="space-y-4">
-          <h2 className="text-2xl font-semibold text-gray-800">
-            Trainee Applications
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-2xl font-semibold text-gray-800">
+              Trainee Applications
+            </h2>
+            {registrations.filter((r) => r.ticket_type?.includes("trainee"))
+              .length > 0 && (
+              <button
+                type="button"
+                onClick={exportTraineesToCSV}
+                className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 text-sm font-medium"
+              >
+                Export CSV
+              </button>
+            )}
+          </div>
           <p className="text-gray-600 text-sm">
             Review trainee/student registrations and accept or reject their
             verification letters.

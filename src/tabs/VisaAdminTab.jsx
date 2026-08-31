@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { csvExportFilename, downloadCsv } from "../utils/csvExport";
 
 const STATUS_OPTIONS = ["pending", "approved", "rejected"];
 
@@ -73,6 +74,32 @@ export default function VisaAdminTab() {
     }
     return counts;
   }, [visaRequests]);
+
+  const exportVisaToCSV = () => {
+    const headers = [
+      "id",
+      "name",
+      "email",
+      "affiliation",
+      "country",
+      "status",
+      "notes",
+      "registration_proof_filename",
+      "submitted_at",
+    ];
+    const rows = filteredRequests.map((request) => [
+      request.id,
+      request.name,
+      request.email,
+      request.affiliation || "",
+      request.country || "",
+      request.status || "",
+      request.notes || "",
+      request.registration_proof_filename || "",
+      formatDate(request.created_at),
+    ]);
+    downloadCsv(csvExportFilename("visa-requests-export"), headers, rows);
+  };
 
   const updateStatus = async (id, status) => {
     if (!id) return;
@@ -251,6 +278,15 @@ export default function VisaAdminTab() {
         >
           Refresh
         </button>
+        {filteredRequests.length > 0 && (
+          <button
+            type="button"
+            onClick={exportVisaToCSV}
+            className="px-4 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800 text-sm font-medium"
+          >
+            Export CSV
+          </button>
+        )}
       </div>
 
       {filteredRequests.length === 0 ? (
