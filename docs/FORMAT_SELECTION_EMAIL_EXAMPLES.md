@@ -139,12 +139,12 @@ Implementation: `buildOralSessionLetter` in `src/config/oralSessions.js`, sent b
 
 ---
 
-# Poster session letters (#1 / #2)
+# Poster session letters (I / II)
 
-Admins assign posters from **Admin → Sessions → Posters**. **Split unassigned equally at random** shuffles and divides them as evenly as possible between #1 and #2.
+Admins assign posters from **Admin → Sessions → Posters**. **Split unassigned equally at random** shuffles and divides them as evenly as possible between Poster Session I and II.
 
-Official letter copy is not in yet. Placeholders mention Poster Session #1 vs #2 and leave session date TBA. Recipients: presenting and corresponding authors.
+Poster numbers (`P-101`, `P-102`, …) are assigned alphabetically by title across all accepted posters (same as abstract extract). Each letter includes session date/time, poster number, portrait dimensions (95 × 120 cm), and emails both presenting and corresponding authors.
 
-**Subject:** `ISIR 2026 – Poster Session #1` (or `#2`)
+**Subject:** `ISIR 2026 – Poster Session I` (or `Poster Session II`)
 
 Requires `db/migration_add_poster_session.sql`. Implementation: `buildPosterSessionLetter` in `src/config/oralSessions.js`.

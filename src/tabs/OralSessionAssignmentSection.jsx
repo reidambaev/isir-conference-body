@@ -11,6 +11,7 @@ import {
   buildOralSessionLetter,
   buildPosterSessionLetter,
   splitEquallyAtRandom,
+  assignPosterNumbers,
 } from "../config/oralSessions.js";
 
 const SESSION_BADGE = {
@@ -145,6 +146,16 @@ export default function OralSessionAssignmentSection({
     );
   }, [abstracts, isPoster]);
 
+  const posterNumberById = useMemo(() => {
+    const posters = (abstracts || []).filter(
+      (a) =>
+        String(a.status || "").toLowerCase() === "accepted" &&
+        Number(a.is_invited_speaker || 0) !== 1 &&
+        normalizeFormat(a.assigned_format) === "poster",
+    );
+    return assignPosterNumbers(posters);
+  }, [abstracts]);
+
   const stats = useMemo(() => {
     const bySession = Object.fromEntries(sessions.map((s) => [s.code, 0]));
     let unassigned = 0;
@@ -226,10 +237,19 @@ export default function OralSessionAssignmentSection({
     if (!viewingAbstract) return null;
     const session = getSession(viewingAbstract[sessionField]);
     if (!session) return null;
-    return isPoster
-      ? buildPosterSessionLetter(viewingAbstract, session)
-      : buildOralSessionLetter(viewingAbstract, session);
-  }, [viewingAbstract, getSession, sessionField, isPoster]);
+    if (isPoster) {
+      return buildPosterSessionLetter(viewingAbstract, session, {
+        posterNumber: posterNumberById.get(viewingAbstract.id) || null,
+      });
+    }
+    return buildOralSessionLetter(viewingAbstract, session);
+  }, [
+    viewingAbstract,
+    getSession,
+    sessionField,
+    isPoster,
+    posterNumberById,
+  ]);
 
   const visibleIds = filteredRows.map((r) => r.id);
   const allVisibleSelected =
@@ -502,12 +522,8 @@ export default function OralSessionAssignmentSection({
 
     const recipient = recipientLabel(abstract);
     const alreadySent = Boolean(abstract?.[emailField]);
-    const draftNote =
-      isPoster && session.emailReady === false
-        ? " This uses a placeholder letter (session date and poster instructions are TBA)."
-        : "";
     const confirmed = window.confirm(
-      `${alreadySent ? "Resend" : "Send"} ${session.title || session.code} letter to ${recipient}?${draftNote}`,
+      `${alreadySent ? "Resend" : "Send"} ${session.title || session.code} letter to ${recipient}?`,
     );
     if (!confirmed) return;
 
@@ -580,13 +596,10 @@ export default function OralSessionAssignmentSection({
     }
 
     const verb = onlyMissing ? "send" : "resend";
-    const draftNote = isPoster
-      ? " Poster letters are placeholders until the official #1 / #2 copy is provided."
-      : "";
     const confirmed = window.confirm(
       `About to ${verb} ${isPoster ? "poster" : "oral"} session letters for ${
         targets.length
-      } abstract${targets.length === 1 ? "" : "s"} (presenting and corresponding authors).${draftNote} Continue?`,
+      } abstract${targets.length === 1 ? "" : "s"} (presenting and corresponding authors). Continue?`,
     );
     if (!confirmed) return;
 
@@ -669,7 +682,7 @@ export default function OralSessionAssignmentSection({
           </h2>
           <p className="text-gray-500 text-sm mt-1 max-w-2xl">
             {isPoster
-              ? "Place each poster abstract into Poster Session #1 or #2. Use random equal split to divide unassigned (or selected) posters evenly. Letters email both presenting and corresponding authors. Official #1 / #2 letter copy is still TBA — previews use a placeholder."
+              ? "Place each poster abstract into Poster Session I or II. Poster numbers (P-101, P-102, …) follow alphabetical title order across all posters, matching the abstract extract. Use random equal split for unassigned posters. Letters include session date/time, poster number, and dimensions."
               : "Place each oral abstract into the Young Investigator Award (YI) or a New Research Findings session (N1–N5), then send the speaker letter. YI uses a different opening. Letters email both the presenting and corresponding authors."}
           </p>
         </div>
@@ -933,6 +946,9 @@ export default function OralSessionAssignmentSection({
                     />
                   </th>
                   <th className="px-4 py-3">Abstract</th>
+                  {isPoster ? (
+                    <th className="px-4 py-3">Poster #</th>
+                  ) : null}
                   <th className="px-4 py-3">Authors</th>
                   <th className="px-4 py-3">Session</th>
                   <th className="px-4 py-3">Email</th>
@@ -971,6 +987,11 @@ export default function OralSessionAssignmentSection({
                           </span>
                         ) : null}
                       </td>
+                      {isPoster ? (
+                        <td className="px-4 py-3 font-mono text-xs text-gray-800">
+                          {posterNumberById.get(row.id) || "—"}
+                        </td>
+                      ) : null}
                       <td className="px-4 py-3 text-xs text-gray-700 min-w-[180px]">
                         <p>
                           <span className="text-gray-500">Presenting:</span>{" "}
@@ -1159,9 +1180,6 @@ export default function OralSessionAssignmentSection({
                 <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-4">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-violet-800 mb-1">
                     Letter preview
-                    {isPoster && letterPreview.session?.emailReady === false
-                      ? " (placeholder)"
-                      : ""}
                   </p>
                   <p className="text-xs text-violet-900 mb-3">
                     Subject: {letterPreview.subject}

@@ -12,6 +12,7 @@ import {
   parsePosterSession,
   getPosterSession,
   buildPosterSessionLetter,
+  assignPosterNumbers,
 } from "./config/oralSessions.js";
 import { parseProgramSession } from "./config/programSessions.js";
 
@@ -4498,7 +4499,31 @@ async function sendOralSessionLetterEmail(env, abstract) {
   }
 }
 
-async function sendPosterSessionLetterEmail(env, abstract) {
+async function getPosterNumberMap(env) {
+  if (!env?.ISIR_DB) return new Map();
+  try {
+    const res = await env.ISIR_DB.prepare(
+      `SELECT id, title FROM abstractions
+       WHERE deleted_at IS NULL
+         AND lower(status) = 'accepted'
+         AND lower(assigned_format) = 'poster'
+         AND COALESCE(is_invited_speaker, 0) != 1`,
+    ).all();
+    return assignPosterNumbers(res.results || []);
+  } catch (e) {
+    console.warn(
+      "Could not load poster numbering pool (migration pending?):",
+      e?.message || e,
+    );
+    return new Map();
+  }
+}
+
+async function sendPosterSessionLetterEmail(
+  env,
+  abstract,
+  posterNumberMap = null,
+) {
   if (!env.RESEND_API_KEY || !env.CONFIRMATION_FROM_EMAIL) {
     return {
       success: false,
@@ -4540,7 +4565,9 @@ async function sendPosterSessionLetterEmail(env, abstract) {
     };
   }
 
-  const letter = buildPosterSessionLetter(abstract, session);
+  const numberMap = posterNumberMap || (await getPosterNumberMap(env));
+  const posterNumber = numberMap.get(abstract.id) || null;
+  const letter = buildPosterSessionLetter(abstract, session, { posterNumber });
   const recipients =
     letter?.recipients || collectOralSessionRecipients(abstract);
   if (!recipients.length) {
@@ -11314,6 +11341,7 @@ async function handleBulkSendPosterSessionNotifications(
     let skipped = 0;
     let failed = 0;
     const results = [];
+    const posterNumberMap = await getPosterNumberMap(env);
 
     for (const row of rows) {
       const status = String(row.status || "")
@@ -11365,7 +11393,7 @@ async function handleBulkSendPosterSessionNotifications(
         continue;
       }
 
-      const r = await sendPosterSessionLetterEmail(env, row);
+      const r = await sendPosterSessionLetterEmail(env, row, posterNumberMap);
       if (r.success) {
         sent++;
         results.push({

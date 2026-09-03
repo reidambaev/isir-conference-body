@@ -217,15 +217,44 @@ export function parsePosterSession(raw) {
 }
 
 export function posterSessionSubject(session) {
-  return `ISIR 2026 – Poster Session #${session?.number || ""}`.trim();
+  const label = session?.title || `Poster Session #${session?.number || ""}`;
+  return `ISIR 2026 – ${label}`.trim();
 }
 
+const POSTER_DIMENSIONS_TEXT = `Dimensions:
+Posters must be in portrait orientation (vertical, not landscape). The dimensions are as follows:
+Width: 95 cm (37.4 inches)
+Height: 120 cm (47.2 inches)`;
+
+const POSTER_DIMENSIONS_HTML = `<p><strong>Dimensions:</strong><br/>
+Posters must be in portrait orientation (vertical, not landscape). The dimensions are as follows:<br/>
+Width: 95 cm (37.4 inches)<br/>
+Height: 120 cm (47.2 inches)</p>`;
+
 /**
- * Placeholder poster letter. Session date and display instructions are TBA
- * until the official #1 / #2 letters are provided.
+ * Alphabetical poster labels P-101, P-102, … (same scheme as abstract extract export).
+ * Pass accepted poster abstracts (id + title); order within the list is ignored.
  */
-export function buildPosterSessionLetter(abstract, session) {
+export function assignPosterNumbers(abstracts, { start = 101 } = {}) {
+  const posters = [...(abstracts || [])].sort((a, b) =>
+    String(a?.title || "").localeCompare(String(b?.title || ""), undefined, {
+      sensitivity: "base",
+    }),
+  );
+  const byId = new Map();
+  let num = start;
+  for (const row of posters) {
+    if (row?.id) {
+      byId.set(row.id, `P-${num}`);
+      num += 1;
+    }
+  }
+  return byId;
+}
+
+export function buildPosterSessionLetter(abstract, session, options = {}) {
   if (!session) return null;
+  const posterNumber = options.posterNumber || null;
   const recipients = collectOralSessionRecipients(abstract);
   const greeting = oralSessionGreeting(recipients);
   const id = String(abstract?.id || "").trim() || "—";
@@ -234,6 +263,10 @@ export function buildPosterSessionLetter(abstract, session) {
   const opening = `Congratulations! Your abstract, ${id}: ${title}, has been assigned to ${session.title} at the ISIR 2026 Congress, taking place November 5 - 8, 2026, in Busan, Korea.`;
   const highlighted = `<strong>${escapeHtml(id)}: ${escapeHtml(title)}</strong>`;
   const openingHtml = `Congratulations! Your abstract, ${highlighted}, has been assigned to ${escapeHtml(session.title)} at the ISIR 2026 Congress, taking place November 5 - 8, 2026, in Busan, Korea.`;
+
+  const posterNumberLine = posterNumber
+    ? `Poster Number: ${posterNumber}`
+    : "Poster Number: (assigned when poster list is finalized)";
 
   const text = `Dear ${greeting},
 
@@ -245,8 +278,9 @@ Your poster is scheduled as follows:
 Title: ${title}
 ${session.sessionLine}
 Session Date: ${session.dateLine}
+${posterNumberLine}
 
-Poster display instructions, board numbers, and presentation times will be sent in a follow-up letter.
+${POSTER_DIMENSIONS_TEXT}
 
 Withdrawal of Presentations/Failure to Present:
 If it becomes necessary to withdraw your abstract, please have the presenting author email ISIR directly with this request at info@isir2026.org We encourage you to identify a named co-author on your abstract to present in your place before considering withdrawal.
@@ -254,9 +288,10 @@ If it becomes necessary to withdraw your abstract, please have the presenting au
 Meeting Registration and Housing Reservations:
 You must register yourself for the meeting. Online registration, hotel reservations, and the Preliminary Program are available at https://isir2026.org.
 
-Once again, congratulations on this achievement. We look forward to seeing you in Busan!
+We look forward to welcoming you to Busan!
 
-The ISIR 2026 Organizing Committee`;
+Warm regards,
+The Organizing Committee`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -268,18 +303,19 @@ The ISIR 2026 Organizing Committee`;
   <p>Your poster is scheduled as follows:</p>
   <p style="margin: 0 0 4px 0;"><strong>Title:</strong> ${escapeHtml(title)}</p>
   <p style="margin: 0 0 4px 0;"><strong>${escapeHtml(session.sessionLine)}</strong></p>
-  <p style="margin: 0 0 16px 0;"><strong>Session Date:</strong> ${escapeHtml(session.dateLine)}</p>
-  <p>Poster display instructions, board numbers, and presentation times will be sent in a follow-up letter.</p>
+  <p style="margin: 0 0 4px 0;"><strong>Session Date:</strong> ${escapeHtml(session.dateLine)}</p>
+  <p style="margin: 0 0 16px 0;"><strong>Poster Number:</strong> ${escapeHtml(posterNumber || "(assigned when poster list is finalized)")}</p>
+  ${POSTER_DIMENSIONS_HTML}
   <p><strong>Withdrawal of Presentations/Failure to Present:</strong><br/>
   If it becomes necessary to withdraw your abstract, please have the presenting author email ISIR directly with this request at <a href="mailto:info@isir2026.org" style="color: #1a3a6c;">info@isir2026.org</a> We encourage you to identify a named co-author on your abstract to present in your place before considering withdrawal.</p>
   <p><strong>Meeting Registration and Housing Reservations:</strong><br/>
   You must register yourself for the meeting. Online registration, hotel reservations, and the Preliminary Program are available at <a href="https://isir2026.org" style="color: #1a3a6c;">https://isir2026.org</a>.</p>
-  <p>Once again, congratulations on this achievement. We look forward to seeing you in Busan!</p>
-  <p style="margin-top: 28px;">The ISIR 2026 Organizing Committee</p>
+  <p>We look forward to welcoming you to Busan!</p>
+  <p style="margin-top: 28px;">Warm regards,<br/>The Organizing Committee</p>
 </body>
 </html>`;
 
-  return { subject, html, text, recipients, greeting, session };
+  return { subject, html, text, recipients, greeting, session, posterNumber };
 }
 
 function openingParagraph(abstract, session) {
