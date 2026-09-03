@@ -25,7 +25,7 @@ const deadlines = [
   {
     date: "Sept 1",
     title: "Early Bird Registration Deadline",
-    desc: "Register by this date to secure the discounted rate. Presenting authors must be registered.",
+    desc: "Early bird rates have ended. Standard registration rates now apply. Presenting authors must be registered.",
     isUrgent: true,
     actions: [{ label: "Register Now", tab: "registration" }],
   },

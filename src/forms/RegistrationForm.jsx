@@ -26,7 +26,7 @@ import {
   selectedDayPassCongressDayKeys,
   PREVIEW_KEY,
   PREVIEW_REGISTRATION_TEST_USD,
-  EARLY_BIRD_DEADLINE,
+  isEarlyBirdPeriod as isEarlyBirdPeriodNow,
 } from "../config/constants";
 import {
   getCurrency,
@@ -240,9 +240,7 @@ const RegistrationForm = ({ onClose }) => {
   );
 
   // Auto-detect early bird period (before September 1, 2026)
-  const earlyBirdDeadline = EARLY_BIRD_DEADLINE;
-  const currentDate = new Date();
-  const isEarlyBirdPeriod = currentDate < earlyBirdDeadline;
+  const isEarlyBirdPeriod = isEarlyBirdPeriodNow();
 
   // State for country, state, and city selectors
   const [countryid, setCountryid] = useState(233); // Default to United States

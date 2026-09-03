@@ -178,7 +178,7 @@ const AboutTab = () => (
               <div>
                 <strong>Early Bird Deadline:</strong>
                 <br />
-                September 1, 2026
+                September 1, 2026 (ended)
               </div>
             </li>
             <li className="flex items-start">

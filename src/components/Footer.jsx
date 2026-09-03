@@ -190,7 +190,7 @@ const Footer = ({ onNavigateTab }) => (
                 />
               </svg>
               <div>
-                <p className="font-medium text-white">Early Bird Deadline</p>
+                <p className="font-medium text-white">Early Bird Ended</p>
                 <p>September 1, 2026</p>
               </div>
             </li>

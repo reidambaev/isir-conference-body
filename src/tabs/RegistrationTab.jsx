@@ -1,6 +1,13 @@
 import React, { useEffect, useState } from "react";
 import RegistrationForm from "../forms/RegistrationForm";
-import { REGISTRATION_OPEN, isPreviewMode } from "../config/constants";
+import {
+  REGISTRATION_OPEN,
+  TICKET_PRICES,
+  getAccompanyingPrice,
+  getTicketPrice,
+  isEarlyBirdPeriod,
+  isPreviewMode,
+} from "../config/constants";
 import galaImage from "../assets/gala.jpg";
 
 const RegistrationTab = () => {
@@ -13,6 +20,16 @@ const RegistrationTab = () => {
   const hasInviteLink = Boolean(params?.get("invite"));
   const registrationOpen = REGISTRATION_OPEN || isPreviewMode();
   const inPreviewMode = isPreviewMode();
+  const earlyBirdActive = isEarlyBirdPeriod();
+  const feeLabel = (suffix = "") =>
+    earlyBirdActive ? `Early Bird / Standard${suffix}` : `Standard rate${suffix}`;
+  const feeAmount = (ticketType) => {
+    const current = getTicketPrice(ticketType, earlyBirdActive);
+    const standard = TICKET_PRICES[ticketType]?.standard;
+    return { current, standard };
+  };
+  const accompanyingAmount = getAccompanyingPrice(earlyBirdActive);
+  const accompanyingStandard = getAccompanyingPrice(false);
 
   useEffect(() => {
     if (hasInviteLink && registrationOpen) setShowRegistrationForm(true);
@@ -172,8 +189,14 @@ const RegistrationTab = () => {
         </div>
       </div>
 
-      {/* Early Bird Banner */}
-      <div className="mb-8 p-6 rounded-2xl bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-yellow-300 shadow-lg">
+      {/* Early Bird / Standard rate banner */}
+      <div
+        className={`mb-8 p-6 rounded-2xl border-2 shadow-lg ${
+          earlyBirdActive
+            ? "bg-gradient-to-r from-amber-50 to-yellow-50 border-yellow-300"
+            : "bg-gradient-to-r from-slate-50 to-gray-50 border-slate-300"
+        }`}
+      >
         <div className="flex flex-col md:flex-row items-center justify-between">
           <div className="flex items-center mb-4 md:mb-0">
             <div
@@ -200,11 +223,22 @@ const RegistrationTab = () => {
                 className="text-xl font-bold"
                 style={{ color: "var(--color-primary)" }}
               >
-                Early Bird Discount!
+                {earlyBirdActive
+                  ? "Early Bird Discount!"
+                  : "Early Bird Pricing Has Ended"}
               </h4>
               <p className="text-gray-700">
-                Register by <strong>September 1, 2026</strong> and save up to{" "}
-                <strong>$100</strong>
+                {earlyBirdActive ? (
+                  <>
+                    Register by <strong>September 1, 2026</strong> and save up
+                    to <strong>$100</strong>
+                  </>
+                ) : (
+                  <>
+                    Standard registration rates now apply. Early bird ended{" "}
+                    <strong>September 1, 2026</strong>.
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -267,11 +301,15 @@ const RegistrationTab = () => {
                   className="text-3xl font-bold"
                   style={{ color: "var(--color-primary)" }}
                 >
-                  $350
+                  ${feeAmount("isir-member").current}
                 </span>
-                <span className="text-sm text-gray-500 line-through">$450</span>
+                {earlyBirdActive && (
+                  <span className="text-sm text-gray-500 line-through">
+                    ${feeAmount("isir-member").standard}
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-gray-500">Early Bird / Standard</p>
+              <p className="text-xs text-gray-500">{feeLabel()}</p>
             </div>
 
             {/* Non-Member */}
@@ -284,11 +322,15 @@ const RegistrationTab = () => {
                   className="text-3xl font-bold"
                   style={{ color: "var(--color-primary)" }}
                 >
-                  $650
+                  ${feeAmount("non-member").current}
                 </span>
-                <span className="text-sm text-gray-500 line-through">$750</span>
+                {earlyBirdActive && (
+                  <span className="text-sm text-gray-500 line-through">
+                    ${feeAmount("non-member").standard}
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-gray-500">Early Bird / Standard</p>
+              <p className="text-xs text-gray-500">{feeLabel()}</p>
             </div>
 
             {/* Daypass */}
@@ -306,12 +348,16 @@ const RegistrationTab = () => {
                   className="text-3xl font-bold"
                   style={{ color: "var(--color-primary)" }}
                 >
-                  $200
+                  ${feeAmount("korea-day-pass").current}
                 </span>
-                <span className="text-sm text-gray-500 line-through">$250</span>
+                {earlyBirdActive && (
+                  <span className="text-sm text-gray-500 line-through">
+                    ${feeAmount("korea-day-pass").standard}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-gray-500">
-                Early Bird / Standard (per selected day)
+                {feeLabel(" (per selected day)")}
               </p>
             </div>
 
@@ -327,11 +373,15 @@ const RegistrationTab = () => {
                   className="text-3xl font-bold"
                   style={{ color: "var(--color-primary)" }}
                 >
-                  $150
+                  ${feeAmount("trainee-member").current}
                 </span>
-                <span className="text-sm text-gray-500 line-through">$200</span>
+                {earlyBirdActive && (
+                  <span className="text-sm text-gray-500 line-through">
+                    ${feeAmount("trainee-member").standard}
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-gray-500">Early Bird / Standard*</p>
+              <p className="text-xs text-gray-500">{feeLabel("*")}</p>
             </div>
 
             {/* Trainee/Student Non-Member */}
@@ -346,11 +396,15 @@ const RegistrationTab = () => {
                   className="text-3xl font-bold"
                   style={{ color: "var(--color-primary)" }}
                 >
-                  $250
+                  ${feeAmount("trainee-non-member").current}
                 </span>
-                <span className="text-sm text-gray-500 line-through">$300</span>
+                {earlyBirdActive && (
+                  <span className="text-sm text-gray-500 line-through">
+                    ${feeAmount("trainee-non-member").standard}
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-gray-500">Early Bird / Standard*</p>
+              <p className="text-xs text-gray-500">{feeLabel("*")}</p>
             </div>
 
             {/* Accompanying Person */}
@@ -363,11 +417,15 @@ const RegistrationTab = () => {
                   className="text-3xl font-bold"
                   style={{ color: "var(--color-primary)" }}
                 >
-                  $250
+                  ${accompanyingAmount}
                 </span>
-                <span className="text-sm text-gray-500 line-through">$350</span>
+                {earlyBirdActive && (
+                  <span className="text-sm text-gray-500 line-through">
+                    ${accompanyingStandard}
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-gray-500">Early Bird / Standard**</p>
+              <p className="text-xs text-gray-500">{feeLabel("**")}</p>
             </div>
           </div>
 
@@ -540,8 +598,10 @@ const RegistrationTab = () => {
                   </h5>
                   <p className="text-gray-600 text-sm mb-3">
                     Complete your congress registration and select your
-                    category. Early bird rates available until September 1,
-                    2026.
+                    category.
+                    {earlyBirdActive
+                      ? " Early bird rates available until September 1, 2026."
+                      : " Standard rates now apply (early bird ended September 1, 2026)."}
                   </p>
                   <button
                     onClick={() =>

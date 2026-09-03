@@ -35,16 +35,157 @@ import SpeakerHotelTab from "./tabs/SpeakerHotelTab";
 import AccompanyingTab from "./tabs/AccompanyingTab";
 import { isAdminLocalhost } from "./tabs/adminLocalDemoData";
 
-function hasAdminAccessToken() {
+const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+
+// "fully authenticated" — both tokens present, skip password screen entirely
+// e.g. /admin?admin=TOKEN1&admin2=TOKEN2
+function hasFullUrlBypass() {
   try {
     const params = new URLSearchParams(window.location.search);
-    if (String(params.get("admin") || "").trim()) return true;
-    return Boolean(
-      String(localStorage.getItem("isir_admin_token") || "").trim(),
-    );
+    return Boolean(String(params.get("admin") || "").trim()) &&
+           Boolean(String(params.get("admin2") || "").trim());
   } catch {
     return false;
   }
+}
+
+// "first gate passed" — ?admin=TOKEN1 is in the URL (show password screen)
+function hasFirstToken() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return Boolean(String(params.get("admin") || "").trim());
+  } catch {
+    return false;
+  }
+}
+
+// "second gate passed" — password was entered and validated, saved in localStorage
+function hasSecondToken() {
+  try {
+    const token = String(localStorage.getItem("isir_admin_token_2") || "").trim();
+    if (!token) return false;
+    const expiry = Number(localStorage.getItem("isir_admin_token_2_expiry") || 0);
+    if (expiry && Date.now() > expiry) {
+      localStorage.removeItem("isir_admin_token_2");
+      localStorage.removeItem("isir_admin_token_2_expiry");
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function hasAdminAccessToken() {
+  if (hasFullUrlBypass()) return true;
+  if (hasFirstToken() && hasSecondToken()) return true;
+  return false;
+}
+
+function adminLogout() {
+  try {
+    localStorage.removeItem("isir_admin_token");
+    localStorage.removeItem("isir_admin_token_expiry");
+    localStorage.removeItem("isir_admin_token_2");
+    localStorage.removeItem("isir_admin_token_2_expiry");
+  } catch {}
+  window.location.reload();
+}
+
+function AdminPasswordGate({ onUnlock }) {
+  const [password, setPassword] = React.useState("");
+  const [error, setError] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const trimmed = password.trim();
+    if (!trimmed) return;
+
+    setLoading(true);
+    setError(false);
+
+    try {
+      const res = await fetch("/api/admin/verify", {
+        headers: { "X-Admin-Token": trimmed },
+      });
+
+      if (res.ok) {
+        // Password is correct — save it and unlock
+        try {
+          localStorage.setItem("isir_admin_token_2", trimmed);
+          localStorage.setItem("isir_admin_token_2_expiry", String(Date.now() + ADMIN_SESSION_TTL_MS));
+        } catch {}
+        onUnlock();
+      } else {
+        // Wrong password
+        setError(true);
+        setPassword("");
+      }
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12 w-full max-w-sm text-center">
+        <div className="flex justify-center mb-5">
+          <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-50">
+            <svg
+              className="w-7 h-7 text-blue-600"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
+          </span>
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">Admin Access</h1>
+        <p className="text-gray-500 text-sm mb-6">
+          Enter the admin password to continue.
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="password"
+            name="password"
+            autoComplete="current-password"
+            autoFocus
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError(false);
+            }}
+            placeholder="Password"
+            disabled={loading}
+            className={`w-full border rounded-lg px-4 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
+              error ? "border-red-400 bg-red-50" : "border-gray-300"
+            }`}
+          />
+          {error && (
+            <p className="text-red-500 text-xs font-medium">
+              Incorrect password. Please try again.
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={loading || !password.trim()}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg text-sm transition"
+          >
+            {loading ? "Verifying…" : "Unlock"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
 }
 export default function App() {
   const [activeTab, setActiveTab] = useState("about");
@@ -364,29 +505,47 @@ export default function App() {
   // Online: only with an admin token — otherwise show a token-required error.
   if (isAdminPage) {
     if (!isAdminLocalhost() && !hasAdminAccessToken()) {
+      // No ?admin= token at all → blank wall, reveal nothing
+      if (!hasFirstToken()) {
+        return (
+          <div ref={appRef} className="min-h-screen bg-gray-50">
+            <main className="max-w-xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+              <div className="bg-white rounded-xl shadow-lg p-6 md:p-10 text-center">
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Page not found
+                </h1>
+                <p className="mt-3 text-gray-600">
+                  The page you're looking for doesn't exist.
+                </p>
+              </div>
+            </main>
+          </div>
+        );
+      }
+      // Has ?admin=TOKEN1 but no second token → show password screen
       return (
-        <div ref={appRef} className="min-h-screen bg-gray-50">
-          <main className="max-w-xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-            <div className="bg-white rounded-xl shadow-lg p-6 md:p-10 text-center">
-              <h1 className="text-2xl font-bold text-gray-900">
-                Admin access required
-              </h1>
-              <p className="mt-3 text-gray-600">
-                An admin token is needed to view this page. Open it with{" "}
-                <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm text-gray-800">
-                  ?admin=YOUR_TOKEN
-                </code>{" "}
-                in the URL.
-              </p>
-            </div>
-          </main>
-        </div>
+        <AdminPasswordGate
+          onUnlock={() => {
+            window.location.reload();
+          }}
+        />
       );
     }
     console.log("Rendering admin page");
     return (
       <div ref={appRef} className="min-h-screen bg-gray-50">
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex justify-end px-4 sm:px-6 lg:px-8 pt-4">
+          <button
+            onClick={adminLogout}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-600 transition"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
+            </svg>
+            Log out
+          </button>
+        </div>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
             <AdminTab />
           </div>

@@ -206,6 +206,13 @@ async function handleApiRequest(request, env, url) {
   if (url.pathname === "/api/discount-code/verify" && request.method === "GET") {
     return handleVerifyDiscountCode(env, url, corsHeaders);
   }
+  // GET /api/admin/verify — lightweight token check (returns 200 if token is valid)
+  if (url.pathname === "/api/admin/verify" && request.method === "GET") {
+    const authError = ensureAdmin(request, env, corsHeaders);
+    if (authError) return authError;
+    return jsonResponse({ success: true }, 200, corsHeaders);
+  }
+
   if (url.pathname === "/api/admin/discount-code" && request.method === "GET") {
     return handleAdminGetDiscountCode(request, env, corsHeaders);
   }
@@ -1389,7 +1396,10 @@ function requireAdmin(request, env) {
   const expected = env.ADMIN_TOKEN;
   if (!expected) return false;
   const headerToken = request.headers.get("X-Admin-Token");
-  return Boolean(headerToken && headerToken === expected);
+  if (!headerToken) return false;
+  if (headerToken === expected) return true;
+  const expected2 = env.ADMIN_TOKEN_2;
+  return Boolean(expected2 && headerToken === expected2);
 }
 
 function ensureAdmin(request, env, corsHeaders) {
@@ -1413,7 +1423,9 @@ function ensureAdmin(request, env, corsHeaders) {
       corsHeaders,
     );
   }
-  if (headerToken !== expected) {
+  const expected2 = env.ADMIN_TOKEN_2;
+  const valid = headerToken === expected || (expected2 && headerToken === expected2);
+  if (!valid) {
     return jsonResponse(
       { success: false, error: "Unauthorized" },
       401,
