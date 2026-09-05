@@ -65,8 +65,7 @@ export default function RegistrationBalanceInvoiceSection({
           },
           body: JSON.stringify({
             amountUsd,
-            reason:
-              "Remaining registration balance. A discount code was applied as a flat price instead of a reduction.",
+            reason: "Remaining registration balance.",
           }),
         },
       );
