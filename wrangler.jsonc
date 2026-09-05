@@ -32,10 +32,21 @@
       "invocation_logs": true
     }
   },
+  // Git/wrangler deploys replace dashboard plaintext vars with this file.
+  // keep_vars preserves dashboard-only vars that are not listed here.
+  // Secrets (encrypted) are never deleted by a deploy.
+  "keep_vars": true,
+  "vars": {
+    "REGISTRATION_FLAT_DISCOUNT_AMOUNT_USD": "250"
+  },
   // Separate Worker name + URL; inherits D1/R2/bindings from root unless overridden here.
+  // vars are not inherited by named environments and must be repeated.
   "env": {
     "preview": {
-      "name": "isir-conference-2026-preview"
+      "name": "isir-conference-2026-preview",
+      "vars": {
+        "REGISTRATION_FLAT_DISCOUNT_AMOUNT_USD": "250"
+      }
     }
   }
 }
