@@ -330,9 +330,6 @@ export default function PayBalanceTab() {
             <>
               <div className="bg-gradient-to-br from-amber-50 to-white rounded-xl p-5 border-2 border-amber-200">
                 <p className="font-semibold text-gray-800">Remaining balance</p>
-                {invoice.reason && (
-                  <p className="text-sm text-gray-600 mt-1">{invoice.reason}</p>
-                )}
                 <p className="mt-4 text-right text-lg font-bold text-gray-900">
                   Amount due: {formatCurrency(Number(invoice.amountUsd || 0))}
                 </p>

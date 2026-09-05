@@ -65,7 +65,7 @@ export default function RegistrationBalanceInvoiceSection({
           },
           body: JSON.stringify({
             amountUsd,
-            reason: "Remaining registration balance.",
+            reason: "",
           }),
         },
       );
