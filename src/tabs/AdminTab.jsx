@@ -9227,6 +9227,13 @@ export default function AdminTab() {
                                               ? "Sending…"
                                               : "Resend confirmation"}
                                           </button>
+                                          <RegistrationBalanceInvoiceSection
+                                            adminToken={adminToken}
+                                            registrationId={reg.id}
+                                            email={reg.email}
+                                            ticketPrice={reg.ticket_price}
+                                            totalPrice={reg.total_price}
+                                          />
                                         </dd>
                                         <dt className="text-gray-500">
                                           Full name
@@ -9465,13 +9472,6 @@ export default function AdminTab() {
                                       </div>
                                     </dl>
                                   </div>
-                                  <RegistrationBalanceInvoiceSection
-                                    adminToken={adminToken}
-                                    registrationId={reg.id}
-                                    email={reg.email}
-                                    ticketPrice={reg.ticket_price}
-                                    totalPrice={reg.total_price}
-                                  />
                                 </td>
                               </tr>
                             )}
