@@ -33,6 +33,7 @@ import {
 import SpeakerProfileTab from "./tabs/SpeakerProfileTab";
 import SpeakerHotelTab from "./tabs/SpeakerHotelTab";
 import AccompanyingTab from "./tabs/AccompanyingTab";
+import PayBalanceTab from "./tabs/PayBalanceTab";
 import { isAdminLocalhost } from "./tabs/adminLocalDemoData";
 
 const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
@@ -254,6 +255,14 @@ export default function App() {
       pathname.startsWith("/accompanying")
     );
   });
+  const [isPayBalancePage, setIsPayBalancePage] = useState(() => {
+    const pathname = window.location.pathname || document.location.pathname;
+    return (
+      pathname === "/pay-balance" ||
+      pathname === "/pay-balance/" ||
+      pathname.startsWith("/pay-balance")
+    );
+  });
   const [isVisaPage, setIsVisaPage] = useState(() => {
     const pathname = window.location.pathname || document.location.pathname;
     return (
@@ -306,6 +315,11 @@ export default function App() {
           pathname === "/accompanying/" ||
           pathname.startsWith("/accompanying");
         setIsAccompanyingPage(isAccompanying);
+        const isPayBalance =
+          pathname === "/pay-balance" ||
+          pathname === "/pay-balance/" ||
+          pathname.startsWith("/pay-balance");
+        setIsPayBalancePage(isPayBalance);
         const isVisa =
           pathname === "/visa" ||
           pathname === "/visa/" ||
@@ -617,6 +631,18 @@ export default function App() {
         <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
             <AccompanyingTab />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (isPayBalancePage) {
+    return (
+      <div ref={appRef} className="min-h-screen bg-gray-50">
+        <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-xl shadow-lg p-6 md:p-10">
+            <PayBalanceTab />
           </div>
         </main>
       </div>

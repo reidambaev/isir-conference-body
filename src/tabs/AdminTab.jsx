@@ -15,6 +15,7 @@ import {
 import FormatAssignmentSection from "./FormatAssignmentSection";
 import OralSessionAssignmentSection from "./OralSessionAssignmentSection";
 import AbstractExtractSection from "./AbstractExtractSection";
+import RegistrationBalanceInvoiceSection from "./RegistrationBalanceInvoiceSection";
 import {
   PROGRAM_SESSIONS,
   getProgramSession,
@@ -9464,6 +9465,13 @@ export default function AdminTab() {
                                       </div>
                                     </dl>
                                   </div>
+                                  <RegistrationBalanceInvoiceSection
+                                    adminToken={adminToken}
+                                    registrationId={reg.id}
+                                    email={reg.email}
+                                    ticketPrice={reg.ticket_price}
+                                    totalPrice={reg.total_price}
+                                  />
                                 </td>
                               </tr>
                             )}

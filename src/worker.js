@@ -290,6 +290,19 @@ async function handleApiRequest(request, env, url) {
     return handleAccompanyingCreatePaymentIntent(request, env, corsHeaders);
   }
 
+  // POST /api/pay-balance/lookup — find a remaining-balance invoice
+  if (url.pathname === "/api/pay-balance/lookup" && request.method === "POST") {
+    return handlePayBalanceLookup(request, env, corsHeaders);
+  }
+
+  // POST /api/pay-balance/create-payment-intent — pay a remaining-balance invoice
+  if (
+    url.pathname === "/api/pay-balance/create-payment-intent" &&
+    request.method === "POST"
+  ) {
+    return handlePayBalanceCreatePaymentIntent(request, env, corsHeaders);
+  }
+
   // POST /api/upload-trainee-letter
   if (url.pathname === "/api/upload-trainee-letter") {
     if (request.method === "POST") {
@@ -467,6 +480,43 @@ async function handleApiRequest(request, env, url) {
       env,
       corsHeaders,
       sendRegistrationConfirmationMatch[1],
+    );
+  }
+
+  // GET /api/admin/registrations/:id/balance-invoices
+  const listBalanceInvoicesMatch = url.pathname.match(
+    /^\/api\/admin\/registrations\/([^/]+)\/balance-invoices$/,
+  );
+  if (listBalanceInvoicesMatch && request.method === "GET") {
+    return handleAdminListBalanceInvoices(
+      request,
+      env,
+      corsHeaders,
+      listBalanceInvoicesMatch[1],
+    );
+  }
+
+  // POST /api/admin/registrations/:id/balance-invoices
+  if (listBalanceInvoicesMatch && request.method === "POST") {
+    return handleAdminCreateBalanceInvoice(
+      request,
+      env,
+      corsHeaders,
+      listBalanceInvoicesMatch[1],
+    );
+  }
+
+  // POST /api/admin/registrations/:id/balance-invoices/:invoiceId/cancel
+  const cancelBalanceInvoiceMatch = url.pathname.match(
+    /^\/api\/admin\/registrations\/([^/]+)\/balance-invoices\/([^/]+)\/cancel$/,
+  );
+  if (cancelBalanceInvoiceMatch && request.method === "POST") {
+    return handleAdminCancelBalanceInvoice(
+      request,
+      env,
+      corsHeaders,
+      cancelBalanceInvoiceMatch[1],
+      cancelBalanceInvoiceMatch[2],
     );
   }
 
@@ -7234,6 +7284,762 @@ async function sendAccompanyingAddonConfirmationEmail(env, purchaseId) {
   }
 }
 
+async function ensureBalanceInvoicesTable(env) {
+  if (!env?.ISIR_DB) return;
+  await env.ISIR_DB.prepare(
+    `CREATE TABLE IF NOT EXISTS registration_balance_invoices (
+      id TEXT PRIMARY KEY,
+      registration_id TEXT NOT NULL,
+      amount_usd REAL NOT NULL,
+      reason TEXT,
+      payment_status TEXT DEFAULT 'pending',
+      payment_intent_id TEXT,
+      payment_date INTEGER,
+      created_by TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      cancelled_at INTEGER
+    )`,
+  ).run();
+  await env.ISIR_DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_balance_invoices_registration
+     ON registration_balance_invoices (registration_id)`,
+  ).run();
+  await env.ISIR_DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_balance_invoices_payment_intent
+     ON registration_balance_invoices (payment_intent_id)`,
+  ).run();
+  await env.ISIR_DB.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_balance_invoices_status
+     ON registration_balance_invoices (payment_status)`,
+  ).run();
+}
+
+function serializeBalanceInvoice(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    registrationId: row.registration_id,
+    amountUsd: Number(row.amount_usd || 0),
+    reason: row.reason || "",
+    paymentStatus: row.payment_status || "pending",
+    paymentIntentId: row.payment_intent_id || null,
+    paymentDate: row.payment_date || null,
+    createdAt: row.created_at || null,
+    cancelledAt: row.cancelled_at || null,
+  };
+}
+
+function getPublicSiteBase(env, request) {
+  if (typeof env?.PUBLIC_SITE_URL === "string" && env.PUBLIC_SITE_URL.trim()) {
+    return env.PUBLIC_SITE_URL.trim().replace(/\/$/, "");
+  }
+  try {
+    return new URL(request.url).origin;
+  } catch {
+    return "https://www.isir2026.org";
+  }
+}
+
+function buildBalancePaymentUrl(base, invoice, email) {
+  const url = new URL("/pay-balance", `${String(base || "").replace(/\/$/, "")}/`);
+  if (invoice?.registration_id || invoice?.registrationId) {
+    url.searchParams.set(
+      "id",
+      invoice.registration_id || invoice.registrationId,
+    );
+  }
+  if (invoice?.id) url.searchParams.set("invoice", invoice.id);
+  if (email) url.searchParams.set("email", email);
+  return url.toString();
+}
+
+async function listBalanceInvoicesForRegistration(env, registrationId) {
+  await ensureBalanceInvoicesTable(env);
+  const result = await env.ISIR_DB.prepare(
+    `SELECT * FROM registration_balance_invoices
+     WHERE registration_id = ?
+     ORDER BY created_at DESC`,
+  )
+    .bind(registrationId)
+    .all();
+  return (result?.results || []).map(serializeBalanceInvoice);
+}
+
+async function handleAdminListBalanceInvoices(
+  request,
+  env,
+  corsHeaders,
+  registrationId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+    const invoices = await listBalanceInvoicesForRegistration(
+      env,
+      registrationId,
+    );
+    return jsonResponse({ success: true, invoices }, 200, corsHeaders);
+  } catch (error) {
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to load invoices" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleAdminCreateBalanceInvoice(
+  request,
+  env,
+  corsHeaders,
+  registrationId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    const data = await request.json().catch(() => ({}));
+    const amountUsd = Number(data?.amountUsd);
+    const reason =
+      typeof data?.reason === "string" ? data.reason.trim() : "";
+
+    if (!Number.isFinite(amountUsd) || amountUsd <= 0 || amountUsd > 20000) {
+      return jsonResponse(
+        { success: false, error: "Amount must be between 0.01 and 20000 USD" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const registration = await env.ISIR_DB.prepare(
+      `SELECT id, email, first_name, last_name, payment_status
+       FROM registrations WHERE id = ? LIMIT 1`,
+    )
+      .bind(registrationId)
+      .first();
+    if (!registration?.id) {
+      return jsonResponse(
+        { success: false, error: "Registration not found" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    await ensureBalanceInvoicesTable(env);
+
+    const existingPending = await env.ISIR_DB.prepare(
+      `SELECT * FROM registration_balance_invoices
+       WHERE registration_id = ? AND payment_status = 'pending'
+       ORDER BY created_at DESC LIMIT 1`,
+    )
+      .bind(registrationId)
+      .first();
+
+    const now = Date.now();
+    let invoice = existingPending;
+    if (existingPending?.id) {
+      await env.ISIR_DB.prepare(
+        `UPDATE registration_balance_invoices
+         SET amount_usd = ?, reason = ?, payment_intent_id = NULL, updated_at = ?
+         WHERE id = ?`,
+      )
+        .bind(amountUsd, reason || null, now, existingPending.id)
+        .run();
+      invoice = await env.ISIR_DB.prepare(
+        `SELECT * FROM registration_balance_invoices WHERE id = ? LIMIT 1`,
+      )
+        .bind(existingPending.id)
+        .first();
+    } else {
+      const invoiceId = `BAL-${now}-${Math.random().toString(36).slice(2, 9)}`;
+      await env.ISIR_DB.prepare(
+        `INSERT INTO registration_balance_invoices (
+          id, registration_id, amount_usd, reason, payment_status,
+          created_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
+      )
+        .bind(
+          invoiceId,
+          registrationId,
+          amountUsd,
+          reason || null,
+          "admin",
+          now,
+          now,
+        )
+        .run();
+      invoice = await env.ISIR_DB.prepare(
+        `SELECT * FROM registration_balance_invoices WHERE id = ? LIMIT 1`,
+      )
+        .bind(invoiceId)
+        .first();
+    }
+
+    const paymentUrl = buildBalancePaymentUrl(
+      getPublicSiteBase(env, request),
+      invoice,
+      registration.email,
+    );
+
+    const invoices = await listBalanceInvoicesForRegistration(
+      env,
+      registrationId,
+    );
+    return jsonResponse(
+      {
+        success: true,
+        invoice: serializeBalanceInvoice(invoice),
+        invoices,
+        paymentUrl,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Create balance invoice error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to create invoice" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function handleAdminCancelBalanceInvoice(
+  request,
+  env,
+  corsHeaders,
+  registrationId,
+  invoiceId,
+) {
+  try {
+    const auth = ensureAdmin(request, env, corsHeaders);
+    if (auth) return auth;
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    await ensureBalanceInvoicesTable(env);
+    const invoice = await env.ISIR_DB.prepare(
+      `SELECT * FROM registration_balance_invoices
+       WHERE id = ? AND registration_id = ? LIMIT 1`,
+    )
+      .bind(invoiceId, registrationId)
+      .first();
+    if (!invoice?.id) {
+      return jsonResponse(
+        { success: false, error: "Invoice not found" },
+        404,
+        corsHeaders,
+      );
+    }
+    if (String(invoice.payment_status || "").toLowerCase() === "completed") {
+      return jsonResponse(
+        { success: false, error: "Paid invoices cannot be cancelled" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    await env.ISIR_DB.prepare(
+      `UPDATE registration_balance_invoices
+       SET payment_status = 'cancelled', cancelled_at = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+      .bind(Date.now(), Date.now(), invoiceId)
+      .run();
+
+    const invoices = await listBalanceInvoicesForRegistration(
+      env,
+      registrationId,
+    );
+    return jsonResponse({ success: true, invoices }, 200, corsHeaders);
+  } catch (error) {
+    return jsonResponse(
+      { success: false, error: error.message || "Failed to cancel invoice" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function sendBalanceInvoicePaidEmail(env, invoiceId) {
+  if (
+    !env?.ISIR_DB ||
+    !env?.RESEND_API_KEY ||
+    !env?.CONFIRMATION_FROM_EMAIL ||
+    !invoiceId
+  ) {
+    return { success: false };
+  }
+
+  try {
+    const row = await env.ISIR_DB.prepare(
+      `SELECT i.*, r.email, r.first_name, r.middle_name, r.last_name, r.total_price
+       FROM registration_balance_invoices i
+       JOIN registrations r ON r.id = i.registration_id
+       WHERE i.id = ?
+       LIMIT 1`,
+    )
+      .bind(invoiceId)
+      .first();
+    if (!row?.email) return { success: false };
+
+    const name =
+      [row.first_name, row.middle_name, row.last_name]
+        .filter(Boolean)
+        .join(" ") || "Attendee";
+    const amount = Number(row.amount_usd || 0);
+    const newTotal = Number(row.total_price || 0);
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Balance paid – ISIR 2026</title></head>
+<body style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1a1a1a; line-height: 1.5;">
+  <div style="border-bottom: 3px solid #1a3a6c; padding-bottom: 16px; margin-bottom: 24px;">
+    <h1 style="color: #1a3a6c; font-size: 1.5rem; margin: 0;">ISIR 2026 World Congress</h1>
+    <p style="color: #555; font-size: 0.9rem; margin: 4px 0 0 0;">Remaining balance paid</p>
+  </div>
+  <p>Dear ${escapeHtml(name)},</p>
+  <p>Thank you. Your remaining registration balance has been received and applied to your registration.</p>
+  <div style="background: #f5f7fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+      <tr><td style="padding: 4px 0;">Registration ID</td><td style="padding: 4px 0; text-align: right;"><strong>${escapeHtml(row.registration_id)}</strong></td></tr>
+      <tr><td style="padding: 4px 0;">Invoice</td><td style="padding: 4px 0; text-align: right;">${escapeHtml(row.id)}</td></tr>
+      <tr><td style="padding: 4px 0;">Amount paid</td><td style="padding: 4px 0; text-align: right;"><strong>USD ${amount.toFixed(2)}</strong></td></tr>
+      <tr><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd;">Updated registration total</td><td style="padding: 8px 0 4px 0; border-top: 1px solid #ddd; text-align: right;"><strong>USD ${newTotal.toFixed(2)}</strong></td></tr>
+    </table>
+  </div>
+  <p>Keep this email with your original registration receipt. If you have any questions, please contact <a href="mailto:support@isir2026.org" style="color: #1a3a6c;">support@isir2026.org</a>.</p>
+  <p style="margin-top: 28px;">Best regards,<br/><strong>ISIR 2026 Team</strong></p>
+</body>
+</html>`;
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: env.CONFIRMATION_FROM_EMAIL,
+        to: [row.email],
+        subject: "ISIR 2026 – Remaining balance paid",
+        html,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("Balance paid email failed:", res.status, err);
+      return { success: false };
+    }
+    return { success: true };
+  } catch (e) {
+    console.error("Balance paid email error:", e);
+    return { success: false };
+  }
+}
+
+/**
+ * POST /api/pay-balance/lookup
+ * Body: { email, registrationId?: string, invoiceId?: string }
+ */
+async function handlePayBalanceLookup(request, env, corsHeaders) {
+  try {
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    const data = await request.json().catch(() => ({}));
+    const email = normalizeEmail(data?.email);
+    const registrationId = String(data?.registrationId || "").trim();
+    const invoiceId = String(data?.invoiceId || "").trim();
+
+    if (!email) {
+      return jsonResponse(
+        { success: false, error: "Email is required" },
+        400,
+        corsHeaders,
+      );
+    }
+    if (!registrationId && !invoiceId) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Registration ID or invoice ID is required",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
+    await ensureBalanceInvoicesTable(env);
+
+    let invoice = null;
+    if (invoiceId) {
+      invoice = await env.ISIR_DB.prepare(
+        `SELECT * FROM registration_balance_invoices WHERE id = ? LIMIT 1`,
+      )
+        .bind(invoiceId)
+        .first();
+    }
+
+    const lookupRegId = registrationId || invoice?.registration_id;
+    if (!lookupRegId) {
+      return jsonResponse(
+        { success: false, error: "No remaining balance found for these details" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    const row = await env.ISIR_DB.prepare(
+      `SELECT id, email, first_name, last_name, payment_status
+       FROM registrations WHERE id = ? LIMIT 1`,
+    )
+      .bind(lookupRegId)
+      .first();
+
+    if (!row?.id || normalizeEmail(row.email) !== email) {
+      return jsonResponse(
+        { success: false, error: "No remaining balance found for these details" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    if (!invoice) {
+      invoice = await env.ISIR_DB.prepare(
+        `SELECT * FROM registration_balance_invoices
+         WHERE registration_id = ? AND payment_status = 'pending'
+         ORDER BY created_at DESC LIMIT 1`,
+      )
+        .bind(row.id)
+        .first();
+    }
+    if (!invoice) {
+      invoice = await env.ISIR_DB.prepare(
+        `SELECT * FROM registration_balance_invoices
+         WHERE registration_id = ?
+         ORDER BY created_at DESC LIMIT 1`,
+      )
+        .bind(row.id)
+        .first();
+    }
+
+    if (!invoice?.id) {
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "There is no remaining balance on this registration. If you were asked to pay a difference, contact support@isir2026.org.",
+        },
+        404,
+        corsHeaders,
+      );
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        registration: {
+          id: row.id,
+          emailMasked: maskRegistrationEmail(row.email),
+          firstName: row.first_name || "",
+          lastName: row.last_name || "",
+        },
+        invoice: serializeBalanceInvoice(invoice),
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Pay-balance lookup error:", error);
+    return jsonResponse(
+      { success: false, error: error.message || "Lookup failed" },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+/**
+ * POST /api/pay-balance/create-payment-intent
+ * Body: { registrationId, invoiceId, email }
+ */
+async function handlePayBalanceCreatePaymentIntent(
+  request,
+  env,
+  corsHeaders,
+) {
+  try {
+    if (!env.STRIPE_SECRET_KEY) {
+      throw new Error("Stripe secret key not configured");
+    }
+    if (!env.ISIR_DB) {
+      return jsonResponse(
+        { success: false, error: "Database not configured" },
+        500,
+        corsHeaders,
+      );
+    }
+
+    const data = await request.json().catch(() => ({}));
+    const registrationId = String(data?.registrationId || "").trim();
+    const invoiceId = String(data?.invoiceId || "").trim();
+    const email = normalizeEmail(data?.email);
+
+    if (!registrationId || !invoiceId || !email) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "registrationId, invoiceId, and email are required",
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
+    await ensureBalanceInvoicesTable(env);
+
+    const row = await env.ISIR_DB.prepare(
+      `SELECT id, email FROM registrations WHERE id = ? LIMIT 1`,
+    )
+      .bind(registrationId)
+      .first();
+    if (!row?.id || normalizeEmail(row.email) !== email) {
+      return jsonResponse(
+        { success: false, error: "Registration not found" },
+        404,
+        corsHeaders,
+      );
+    }
+
+    const invoice = await env.ISIR_DB.prepare(
+      `SELECT * FROM registration_balance_invoices
+       WHERE id = ? AND registration_id = ? LIMIT 1`,
+    )
+      .bind(invoiceId, registrationId)
+      .first();
+    if (!invoice?.id) {
+      return jsonResponse(
+        { success: false, error: "Invoice not found" },
+        404,
+        corsHeaders,
+      );
+    }
+    if (String(invoice.payment_status || "").toLowerCase() !== "pending") {
+      return jsonResponse(
+        { success: false, error: "This balance is not awaiting payment" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const amountUsd = Number(invoice.amount_usd || 0);
+    if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
+      return jsonResponse(
+        { success: false, error: "Invalid invoice amount" },
+        400,
+        corsHeaders,
+      );
+    }
+
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+      apiVersion: "2024-11-20.acacia",
+    });
+
+    if (invoice.payment_intent_id) {
+      try {
+        const existingIntent = await stripe.paymentIntents.retrieve(
+          invoice.payment_intent_id,
+        );
+        if (
+          existingIntent?.client_secret &&
+          existingIntent.status !== "canceled" &&
+          existingIntent.status !== "succeeded" &&
+          Number(existingIntent.amount) === Math.round(amountUsd * 100)
+        ) {
+          return jsonResponse(
+            {
+              success: true,
+              clientSecret: existingIntent.client_secret,
+              paymentIntentId: existingIntent.id,
+              amountUsd,
+              currency: "USD",
+              invoiceId: invoice.id,
+            },
+            200,
+            corsHeaders,
+          );
+        }
+      } catch (retrieveError) {
+        console.error(
+          "Failed to retrieve existing balance payment intent:",
+          retrieveError,
+        );
+      }
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create(
+      {
+        amount: Math.round(amountUsd * 100),
+        currency: "usd",
+        metadata: {
+          paymentType: "registration_balance",
+          invoiceId: invoice.id,
+          registrationId,
+          email,
+        },
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      },
+      {
+        idempotencyKey: `balance-${invoice.id}-${Math.round(amountUsd * 100)}`,
+      },
+    );
+
+    await env.ISIR_DB.prepare(
+      `UPDATE registration_balance_invoices
+       SET payment_intent_id = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+      .bind(paymentIntent.id, Date.now(), invoice.id)
+      .run();
+
+    return jsonResponse(
+      {
+        success: true,
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amountUsd,
+        currency: "USD",
+        invoiceId: invoice.id,
+      },
+      200,
+      corsHeaders,
+    );
+  } catch (error) {
+    console.error("Pay-balance payment intent error:", error);
+    return jsonResponse(
+      {
+        success: false,
+        error: error.message || "Failed to create payment intent",
+      },
+      500,
+      corsHeaders,
+    );
+  }
+}
+
+async function applyBalanceInvoicePayment(
+  env,
+  paymentIntent,
+  { markFailed = false } = {},
+) {
+  if (!env?.ISIR_DB) return { applied: false };
+
+  await ensureBalanceInvoicesTable(env);
+
+  const invoiceId = paymentIntent.metadata?.invoiceId;
+  const registrationId = paymentIntent.metadata?.registrationId;
+  const paymentIntentId = paymentIntent.id;
+
+  let invoice = null;
+  if (invoiceId) {
+    invoice = await env.ISIR_DB.prepare(
+      `SELECT * FROM registration_balance_invoices WHERE id = ? LIMIT 1`,
+    )
+      .bind(invoiceId)
+      .first();
+  }
+  if (!invoice && paymentIntentId) {
+    invoice = await env.ISIR_DB.prepare(
+      `SELECT * FROM registration_balance_invoices WHERE payment_intent_id = ? LIMIT 1`,
+    )
+      .bind(paymentIntentId)
+      .first();
+  }
+  if (!invoice?.id) {
+    return { applied: false };
+  }
+
+  if (markFailed) {
+    await env.ISIR_DB.prepare(
+      `UPDATE registration_balance_invoices
+       SET payment_status = 'failed', updated_at = ?
+       WHERE id = ? AND payment_status != 'completed'`,
+    )
+      .bind(Date.now(), invoice.id)
+      .run();
+    return { applied: true, invoiceId: invoice.id, failed: true };
+  }
+
+  if (String(invoice.payment_status || "").toLowerCase() === "completed") {
+    return { applied: true, invoiceId: invoice.id, alreadyCompleted: true };
+  }
+
+  const addTotal = Number(invoice.amount_usd || 0);
+  const regId = invoice.registration_id || registrationId;
+
+  await env.ISIR_DB.prepare(
+    `UPDATE registration_balance_invoices
+     SET payment_status = 'completed',
+         payment_intent_id = ?,
+         payment_date = ?,
+         updated_at = ?
+     WHERE id = ?`,
+  )
+    .bind(paymentIntentId, Date.now(), Date.now(), invoice.id)
+    .run();
+
+  if (regId && addTotal > 0) {
+    await env.ISIR_DB.prepare(
+      `UPDATE registrations
+       SET total_price = COALESCE(total_price, 0) + ?,
+           updated_at = ?
+       WHERE id = ?`,
+    )
+      .bind(addTotal, Date.now(), regId)
+      .run();
+  }
+
+  await sendBalanceInvoicePaidEmail(env, invoice.id);
+
+  return {
+    applied: true,
+    invoiceId: invoice.id,
+    registrationId: regId,
+    amountUsd: addTotal,
+  };
+}
+
 // Handle Stripe payment intent creation
 async function handleCreatePaymentIntent(request, env, corsHeaders) {
   try {
@@ -7712,6 +8518,23 @@ async function handleStripeWebhook(request, env) {
           break;
         }
 
+        // Remaining registration balance (admin-created invoice)
+        if (paymentType === "registration_balance") {
+          try {
+            const result = await applyBalanceInvoicePayment(
+              env,
+              paymentIntent,
+            );
+            console.log(
+              "Registration balance payment applied:",
+              JSON.stringify(result),
+            );
+          } catch (dbError) {
+            console.error("Registration balance webhook error:", dbError);
+          }
+          break;
+        }
+
         const registrationId = paymentIntent.metadata?.registrationId;
 
         if (registrationId && env.ISIR_DB) {
@@ -7774,6 +8597,17 @@ async function handleStripeWebhook(request, env) {
             });
           } catch (dbError) {
             console.error("Accompanying add-on failed webhook error:", dbError);
+          }
+          break;
+        }
+
+        if (failedPaymentType === "registration_balance") {
+          try {
+            await applyBalanceInvoicePayment(env, failedPayment, {
+              markFailed: true,
+            });
+          } catch (dbError) {
+            console.error("Registration balance failed webhook error:", dbError);
           }
           break;
         }
